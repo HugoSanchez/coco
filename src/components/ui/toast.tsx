@@ -51,9 +51,6 @@ const Toast = React.forwardRef<
       className={cn(toastVariants({ variant }), className)}
       {...props}
     >
-      <div className={`h-10 w-10 rounded-full text-white`}>
-
-      </div>
       <div className="flex-grow">
         {props.children}
       </div>

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from '@/lib/supabase'
 import { useToast } from "@/components/ui/use-toast"
+import { Loader } from "lucide-react"
 
 const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
@@ -64,11 +65,11 @@ interface DayAvailability {
 export function WeeklyAvailability() {
   // State variables for the availability
   const [availability, setAvailability] = useState<DayAvailability[]>(
-        daysOfWeek.map((day, index) => ({
-            isAvailable: index >= 1 && index <= 5, // Monday to Friday are true
-            timeSlots: [{ start: '09:00', end: '17:00' }]
-        }))
-    )
+      daysOfWeek.map((day, index) => ({
+          isAvailable: index >= 1 && index <= 5, // Monday to Friday are true
+          timeSlots: [{ start: '09:00', end: '17:00' }]
+      }))
+  )
   
   // Create a toast
   const toast = useToast()
@@ -131,14 +132,6 @@ export function WeeklyAvailability() {
     ))
   }
 
-  const testToast = () => {
-    toast.toast({
-      title: "Test",
-      description: "This is a test toast.",
-      color: 'bg-green-100'
-    })
-  }
-
   const handleSave = async () => {
     // Save the availability to the database
     setSaveStatus('loading');
@@ -150,18 +143,12 @@ export function WeeklyAvailability() {
     // Handle user feedback if the user is not logged in
     if (!user) {
       toast.toast({
-        variant: "destructive",
         title: "Error",
         description: "You must be logged in to save your availability.",
+        color: 'error',
       })
       return
     }
-    
-    // Handle user feedback if the availability is being saved
-    toast.toast({
-      title: "Saving...",
-      description: "Your availability is being saved.",
-    })
     
     // Create the availability data object
     const availabilityData = {
@@ -181,12 +168,19 @@ export function WeeklyAvailability() {
   
     if (error) {
       console.error('Error saving availability:', error)
-      alert('Failed to save availability. Please try again.')
+      toast.toast({
+        title: "Error",
+        description: "You must be logged in to save your availability.",
+        color: 'error',
+      })
     } else {
       console.log('Availability saved:', data)
-      alert('Availability settings saved successfully!')
+      toast.toast({
+        title: "Bravo!",
+        description: "Your availability has been saved.",
+        color: 'success',
+      })
     }
-
      // Reset status
     setSaveStatus('idle');
     setStatusMessage('');
@@ -349,7 +343,7 @@ export function WeeklyAvailability() {
       </div>
 
       <Button 
-        onClick={testToast} 
+        onClick={handleSave} 
         className="w-full"
         disabled={saveStatus === 'loading'}
       >

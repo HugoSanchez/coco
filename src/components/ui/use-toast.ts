@@ -1,7 +1,7 @@
 "use client"
 
-// Inspired by react-hot-toast library
 import * as React from "react"
+import { LucideIcon } from "lucide-react"
 
 import type {
   ToastActionElement,
@@ -13,8 +13,10 @@ const TOAST_REMOVE_DELAY = 1000000
 
 type ToasterToast = ToastProps & {
   id: string
-  title?: React.ReactNode
-  description?: React.ReactNode
+  title?: React.ReactNode | any
+  description?: React.ReactNode | any
+  color?: string
+  icon?: React.ReactNode | any
   action?: ToastActionElement
 }
 
