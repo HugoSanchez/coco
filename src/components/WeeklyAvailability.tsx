@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from '@/lib/supabase'
 import { useToast } from "@/components/ui/use-toast"
-import { Loader } from "lucide-react"
+import { Spinner } from "@/components/ui/spinner"
 
 const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
@@ -80,7 +80,8 @@ export function WeeklyAvailability() {
   const [meetingPrice, setMeetingPrice] = useState('0')
   const [meetingDuration, setMeetingDuration] = useState('30')
 
-  // State variables for the save status
+  // State variables for the component status
+  const [isLoading, setIsLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState<string>('');
 
@@ -92,6 +93,49 @@ export function WeeklyAvailability() {
       setTimeZone(matchingTimeZone.value);
     }
   }, []);
+
+  useEffect(() => {
+    // Fetch the user's schedule from the database
+    // and set the state variables to the schedule data
+    setIsLoading(true)
+    const loadUserSchedule = async () => {
+      const schedule = await fetchUserSchedule()
+      if (schedule) {
+        setAvailability(schedule.weekly_availability)
+        setTimeZone(schedule.time_zone)
+        setMeetingDuration(schedule.meeting_duration.toString())
+        setMeetingPrice(schedule.meeting_price.toString())
+        setCurrency(schedule.currency)
+      }
+      setIsLoading(false)
+    }
+
+    loadUserSchedule()
+  }, [])
+
+  // Get the user, then fetch their schedule 
+  // from the database if it exists 
+  const fetchUserSchedule = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      console.error('No user logged in')
+      return null
+    }
+  
+    const { data, error } = await supabase
+      .from('schedules')
+      .select('*')
+      .eq('user_id', user.id)
+      .single()
+  
+    if (error) {
+      console.error('Error fetching schedule:', error)
+      return null
+    }
+  
+    return data
+  }
 
   const handleDayToggle = (index: number) => {
     // Toggle the availability of a day
@@ -186,6 +230,14 @@ export function WeeklyAvailability() {
     setStatusMessage('');
   }
 
+  if (isLoading) {
+    return (
+      <div className='fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2'>
+        <Spinner />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">Available hours</h2>
@@ -253,7 +305,7 @@ export function WeeklyAvailability() {
             </div>
             
             {day.isAvailable && day.timeSlots.length > 1 && (
-              <div className="ml-28 space-y-2 border border-black">
+              <div className="ml-28 space-y-2">
                 
                 {day.timeSlots.slice(1).map((slot, slotIndex) => (
                   <div key={slotIndex + 1} className="flex items-center space-x-2 pl-30">

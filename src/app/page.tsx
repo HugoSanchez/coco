@@ -21,7 +21,7 @@ export default function Home() {
   }, [router])
 
   return (
-    <div className="w-full h-screen flex items-center justify-center pb-24">
+    <div className="w-full h-screen flex items-center justify-center">
       <div className="w-full max-w-md px-10 py-16 border border-gray-300 rounded-md shadow-sm">
           <h1 className="text-4xl font-black mb-2 text-center">Sign up</h1>
           <p className="text-center mb-8 text-primary text-lg">Type your email to get started</p>
