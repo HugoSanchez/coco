@@ -30,7 +30,6 @@ export default function Auth() {
         description: 'Check your email for the login link!',
       })
     }
-    setLoading(false)
   }
 
   return (

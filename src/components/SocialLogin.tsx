@@ -3,7 +3,6 @@ import { supabase } from '@/lib/supabase'
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { FcGoogle } from 'react-icons/fc'
-import { FaApple } from 'react-icons/fa'
 
 export function SocialLogin() {
   const [isLoading, setIsLoading] = useState(false)

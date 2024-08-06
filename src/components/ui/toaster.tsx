@@ -19,7 +19,7 @@ export function Toaster() {
     <ToastProvider>
       {toasts.map(function ({ id, title, description, color, action, ...props }) {
         return (
-          <Toast key={id} {...props}>
+          <Toast key={id} {...props} className="border border-gray-200">
             <div className="flex items-center gap-4">
               <div className={cn(
               "h-10 w-10 rounded-full flex items-center justify-center",
