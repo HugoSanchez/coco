@@ -30,7 +30,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="w-full max-w-2xl px-4 mt-32">
+    <div className="w-full max-w-2xl px-4 mt-32 pb-24">
         <WeeklyAvailability />
     </div>
   )

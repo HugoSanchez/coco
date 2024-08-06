@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from '@/lib/supabase'
+import { useToast } from "@/components/ui/use-toast"
 
 const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
@@ -61,6 +62,7 @@ interface DayAvailability {
 }
 
 export function WeeklyAvailability() {
+  // State variables for the availability
   const [availability, setAvailability] = useState<DayAvailability[]>(
         daysOfWeek.map((day, index) => ({
             isAvailable: index >= 1 && index <= 5, // Monday to Friday are true
@@ -68,12 +70,21 @@ export function WeeklyAvailability() {
         }))
     )
   
+  // Create a toast
+  const toast = useToast()
+  
+  // State variables for the form
   const [currency, setCurrency] = useState('EUR')
   const [timeZone, setTimeZone] = useState('UTC/GMT+0')
   const [meetingPrice, setMeetingPrice] = useState('0')
   const [meetingDuration, setMeetingDuration] = useState('30')
 
+  // State variables for the save status
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [statusMessage, setStatusMessage] = useState<string>('');
+
   useEffect(() => {
+    // Set the time zone to the user's time zone
     const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const matchingTimeZone = timezones.find(tz => tz.value === userTimeZone);
     if (matchingTimeZone) {
@@ -82,12 +93,14 @@ export function WeeklyAvailability() {
   }, []);
 
   const handleDayToggle = (index: number) => {
+    // Toggle the availability of a day
     setAvailability(prev => prev.map((day, i) => 
       i === index ? { ...day, isAvailable: !day.isAvailable } : day
     ))
   }
 
   const handleTimeChange = (dayIndex: number, slotIndex: number, field: 'start' | 'end', value: string) => {
+    // Handle the time change for a time slot
     setAvailability(prev => prev.map((day, i) => 
       i === dayIndex ? {
         ...day,
@@ -99,6 +112,7 @@ export function WeeklyAvailability() {
   }
 
   const addTimeSlot = (dayIndex: number) => {
+    // Add a time slot to a day
     setAvailability(prev => prev.map((day, i) => 
       i === dayIndex ? {
         ...day,
@@ -108,6 +122,7 @@ export function WeeklyAvailability() {
   }
 
   const removeTimeSlot = (dayIndex: number, slotIndex: number) => {
+    // Remove a time slot from a day
     setAvailability(prev => prev.map((day, i) => 
       i === dayIndex ? {
         ...day,
@@ -116,15 +131,39 @@ export function WeeklyAvailability() {
     ))
   }
 
+  const testToast = () => {
+    toast.toast({
+      title: "Test",
+      description: "This is a test toast.",
+      color: 'bg-green-100'
+    })
+  }
+
   const handleSave = async () => {
+    // Save the availability to the database
+    setSaveStatus('loading');
+    setStatusMessage('Saving your availability...');
+
+    // Get the current user
     const { data: { user } } = await supabase.auth.getUser()
-    console.log('Current user:', user)
     
+    // Handle user feedback if the user is not logged in
     if (!user) {
-      alert('You must be logged in to save your availability.')
+      toast.toast({
+        variant: "destructive",
+        title: "Error",
+        description: "You must be logged in to save your availability.",
+      })
       return
     }
-  
+    
+    // Handle user feedback if the availability is being saved
+    toast.toast({
+      title: "Saving...",
+      description: "Your availability is being saved.",
+    })
+    
+    // Create the availability data object
     const availabilityData = {
       user_id: user.id,
       weekly_availability: availability,
@@ -133,7 +172,8 @@ export function WeeklyAvailability() {
       meeting_price: parseFloat(meetingPrice),
       currency: currency
     }
-  
+    
+    // Save the availability to the database
     const { data, error } = await supabase
       .from('schedules')
       .upsert(availabilityData, { onConflict: 'user_id' })
@@ -146,6 +186,10 @@ export function WeeklyAvailability() {
       console.log('Availability saved:', data)
       alert('Availability settings saved successfully!')
     }
+
+     // Reset status
+    setSaveStatus('idle');
+    setStatusMessage('');
   }
 
   return (
@@ -304,8 +348,12 @@ export function WeeklyAvailability() {
         </div>
       </div>
 
-      <Button onClick={handleSave} className="w-full">
-        Save Availability
+      <Button 
+        onClick={testToast} 
+        className="w-full"
+        disabled={saveStatus === 'loading'}
+      >
+        {saveStatus === 'loading' ? 'Saving...' : 'Save Availability'}
       </Button>
     </div>
   )
