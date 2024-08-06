@@ -1,13 +1,54 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { supabase } from '@/lib/supabase'
 
 const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+
+const timezones = [
+  { value: 'Etc/GMT', label: 'GMT/UTC+0' },
+  { value: 'Europe/London', label: 'GMT+0 London' },
+  { value: 'Europe/Dublin', label: 'GMT+0 Dublin' },
+  { value: 'Europe/Lisbon', label: 'GMT+0 Lisbon' },
+  { value: 'Africa/Casablanca', label: 'GMT+0 Casablanca' },
+  { value: 'Europe/Paris', label: 'GMT+1 Paris' },
+  { value: 'Europe/Berlin', label: 'GMT+1 Berlin' },
+  { value: 'Europe/Rome', label: 'GMT+1 Rome' },
+  { value: 'Europe/Madrid', label: 'GMT+1 Madrid' },
+  { value: 'Europe/Athens', label: 'GMT+2 Athens' },
+  { value: 'Europe/Kiev', label: 'GMT+2 Kiev' },
+  { value: 'Africa/Cairo', label: 'GMT+2 Cairo' },
+  { value: 'Europe/Moscow', label: 'GMT+3 Moscow' },
+  { value: 'Asia/Istanbul', label: 'GMT+3 Istanbul' },
+  { value: 'Asia/Dubai', label: 'GMT+4 Dubai' },
+  { value: 'Asia/Karachi', label: 'GMT+5 Karachi' },
+  { value: 'Asia/Dhaka', label: 'GMT+6 Dhaka' },
+  { value: 'Asia/Bangkok', label: 'GMT+7 Bangkok' },
+  { value: 'Asia/Singapore', label: 'GMT+8 Singapore' },
+  { value: 'Asia/Tokyo', label: 'GMT+9 Tokyo' },
+  { value: 'Australia/Sydney', label: 'GMT+10 Sydney' },
+  { value: 'Pacific/Noumea', label: 'GMT+11 Noumea' },
+  { value: 'Pacific/Auckland', label: 'GMT+12 Auckland' },
+  { value: 'Pacific/Apia', label: 'GMT+13 Apia' },
+  { value: 'Pacific/Kiritimati', label: 'GMT+14 Kiritimati' },
+  { value: 'Atlantic/Azores', label: 'GMT-1 Azores' },
+  { value: 'Atlantic/Cape_Verde', label: 'GMT-1 Cape Verde' },
+  { value: 'Atlantic/South_Georgia', label: 'GMT-2 South Georgia' },
+  { value: 'America/Sao_Paulo', label: 'GMT-3 São Paulo' },
+  { value: 'America/New_York', label: 'GMT-5 New York' },
+  { value: 'America/Chicago', label: 'GMT-6 Chicago' },
+  { value: 'America/Denver', label: 'GMT-7 Denver' },
+  { value: 'America/Los_Angeles', label: 'GMT-8 Los Angeles' },
+  { value: 'America/Anchorage', label: 'GMT-9 Anchorage' },
+  { value: 'Pacific/Honolulu', label: 'GMT-10 Honolulu' },
+  { value: 'Pacific/Midway', label: 'GMT-11 Midway' },
+  { value: 'Pacific/Niue', label: 'GMT-11 Niue' },
+];
 
 interface TimeSlot {
   start: string
@@ -26,9 +67,19 @@ export function WeeklyAvailability() {
             timeSlots: [{ start: '09:00', end: '17:00' }]
         }))
     )
- 
-  const [timeZone, setTimeZone] = useState('UTC')
+  
+  const [currency, setCurrency] = useState('EUR')
+  const [timeZone, setTimeZone] = useState('UTC/GMT+0')
+  const [meetingPrice, setMeetingPrice] = useState('0')
   const [meetingDuration, setMeetingDuration] = useState('30')
+
+  useEffect(() => {
+    const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const matchingTimeZone = timezones.find(tz => tz.value === userTimeZone);
+    if (matchingTimeZone) {
+      setTimeZone(matchingTimeZone.value);
+    }
+  }, []);
 
   const handleDayToggle = (index: number) => {
     setAvailability(prev => prev.map((day, i) => 
@@ -65,9 +116,36 @@ export function WeeklyAvailability() {
     ))
   }
 
-  const handleSave = () => {
-    // TODO: Implement saving to database
-    console.log('Saving availability:', { availability, timeZone, meetingDuration })
+  const handleSave = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    console.log('Current user:', user)
+    
+    if (!user) {
+      alert('You must be logged in to save your availability.')
+      return
+    }
+  
+    const availabilityData = {
+      user_id: user.id,
+      weekly_availability: availability,
+      time_zone: timeZone,
+      meeting_duration: parseInt(meetingDuration),
+      meeting_price: parseFloat(meetingPrice),
+      currency: currency
+    }
+  
+    const { data, error } = await supabase
+      .from('schedules')
+      .upsert(availabilityData, { onConflict: 'user_id' })
+      .select()
+  
+    if (error) {
+      console.error('Error saving availability:', error)
+      alert('Failed to save availability. Please try again.')
+    } else {
+      console.log('Availability saved:', data)
+      alert('Availability settings saved successfully!')
+    }
   }
 
   return (
@@ -177,11 +255,11 @@ export function WeeklyAvailability() {
               <SelectValue placeholder="Select time zone" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="UTC">UTC</SelectItem>
-              <SelectItem value="America/New_York">Eastern Time</SelectItem>
-              <SelectItem value="America/Chicago">Central Time</SelectItem>
-              <SelectItem value="America/Denver">Mountain Time</SelectItem>
-              <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
+              {timezones.map((tz) => (
+                <SelectItem key={tz.value} value={tz.value}>
+                  {tz.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -198,6 +276,31 @@ export function WeeklyAvailability() {
               <SelectItem value="60">1 hour</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="price">Meeting Price</Label>
+        <div className="flex items-center space-x-2">
+          <Select value={currency} onValueChange={setCurrency}>
+            <SelectTrigger id="currency" className="w-[80px]">
+              <SelectValue placeholder="Currency" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="EUR">EUR</SelectItem>
+              <SelectItem value="USD">USD</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            type="number"
+            id="price"
+            placeholder="Enter price"
+            value={meetingPrice}
+            onChange={(e) => setMeetingPrice(e.target.value)}
+            min="0"
+            step="0.01"
+            className="flex-grow"
+          />
         </div>
       </div>
 
