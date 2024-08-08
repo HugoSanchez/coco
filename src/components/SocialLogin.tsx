@@ -14,7 +14,7 @@ export function SocialLogin() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`
+        redirectTo: `${window.location.origin}/dashboard`
       }
     })
 
