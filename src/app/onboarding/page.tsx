@@ -5,6 +5,7 @@ import { ProfileSetup } from '@/components/ProfileSetup'
 import { WeeklyAvailability } from '@/components/WeeklyAvailability'
 import { OnboardingBreadcrumb } from '@/components/Breadcrumb'
 import { Button } from '@/components/ui/button'
+import { InfoIcon } from 'lucide-react'
 
 const steps = [
   { name: 'Create a Profile', description: 'Help your costumers know who you are.', component: ProfileSetup },
@@ -43,15 +44,17 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="container mx-auto lg:px-96 py-24">
+    <div className="container mx-auto lg:px-96 py-24 bg-gray-50">
         <OnboardingBreadcrumb 
         steps={steps} 
         currentStep={currentStep} 
         onStepClick={handleStepClick}
         />
-        <div className="mt-12">
-        <h1 className="text-2xl font-bold">{steps[currentStep].name}</h1>
-        <p className="text-md text-gray-600 mb-8">{steps[currentStep].description}</p>
+        <div className="mt-12 ">
+            <div className='flex flex-row items-center gap-2 mb-12'>
+                <h1 className="text-2xl font-bold">{steps[currentStep].name}</h1>
+                <InfoIcon className='h-4 w-4 text-gray-500' />
+            </div>
         <CurrentStepComponent onComplete={handleStepComplete} />
         </div>
         <div className="mt-8 flex justify-between">

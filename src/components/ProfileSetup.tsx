@@ -87,18 +87,7 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-            <label htmlFor="profilePicture" className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center text-xs text-center font-medium text-gray-700">Profile Picture</label>
-                <Input
-                    id="profilePicture"
-                    type="file"
-                    onChange={handleProfilePictureChange}
-                    className="hidden"
-                    accept="image/*"
-                />  
-        </div>         
-    
+    <form onSubmit={handleSubmit} className="space-y-6">    
       <div>
         <label htmlFor="name" className="block text-md font-medium text-gray-700">Name</label>
         <p className='text-sm text-gray-500 mb-2'>This is the name that will be displayed on your calendar.</p>
@@ -121,6 +110,16 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
         />
+      </div>
+      <div>
+        <label htmlFor="profilePicture" className="block text-sm font-medium text-gray-700">Profile Picture</label>
+        <p className='text-sm text-gray-500 mb-2'>We recommend using the same as your instagram profile.</p>
+            <Input
+            id="profilePicture"
+            type="file"
+            onChange={handleProfilePictureChange}
+            accept="image/*"
+            />
       </div>
       <Button type="submit" disabled={isLoading}>
         {isLoading ? 'Saving...' : 'Save Profile'}

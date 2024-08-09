@@ -239,13 +239,8 @@ export function WeeklyAvailability() {
   }
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Available hours</h2>
-      <p className="text-gray-600">
-        Set the times that people will be able to schedule meetings with you.
-      </p>
-      
-      <div className="space-y-4 bg-gray-50 p-4 rounded-md">
+    <div className="space-y-6">      
+      <div className="space-y-4 bg-gray-100 border border-gray-200 p-4 rounded-md">
         <p className='text-xl font-bold'>Weekly hours</p>
         {availability.map((day, dayIndex) => (
           <div key={dayIndex} className="flex flex-col space-y-2">

@@ -39,7 +39,7 @@ export default function Header() {
   }
 
   return (
-    <header className={`fixed top-0 left-0 right-0 bg-background z-10 transition-shadow duration-300 h-16 ${
+    <header className={`fixed top-0 left-0 right-0 bg-gray-50 z-10 transition-shadow duration-300 h-16 ${
       isScrolled ? 'shadow-md' : ''
     }`}>
       <div className="container mx-auto px-4 h-full flex justify-between items-center">
@@ -48,8 +48,8 @@ export default function Header() {
         </Link>
         <nav>
           <ul className="flex space-x-4 items-center">
-            <li><Link href="/" className="text-primary">Home</Link></li>
-            <li><Link href="/about" className="text-primary">About</Link></li>
+            <li><Link href="/" className="text-primary font-light text-sm">Home</Link></li>
+            <li><Link href="/about" className="text-primary font-light text-sm">About</Link></li>
             {user && (
               <li>
                 <Button onClick={handleSignOut} variant="outline" size="sm">
