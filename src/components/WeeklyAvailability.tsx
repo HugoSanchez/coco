@@ -391,7 +391,7 @@ export function WeeklyAvailability() {
 
       <Button 
         onClick={handleSave} 
-        className="w-full"
+        className="w-full bg-emerald-400 hover:bg-emerald-300"
         disabled={saveStatus === 'loading'}
       >
         {saveStatus === 'loading' ? 'Saving...' : 'Save Availability'}
