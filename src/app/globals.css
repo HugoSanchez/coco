@@ -59,6 +59,22 @@
   }
 }
 
+input:invalid {
+  box-shadow: none; /* Remove default red glow in Firefox */
+}
+
+input:required {
+  box-shadow: none; /* Remove default red glow in Firefox */
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px white inset !important;
+    -webkit-text-fill-color: black !important;
+}
+
 @layer base {
   * {
     @apply border-border;
