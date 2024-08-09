@@ -8,7 +8,6 @@ const oauth2Client = new google.auth.OAuth2(
 )
 
 // GET /api/auth/google-calendar
-// This is the route that the user is redirected to when they click the "Sign in with Google" button
 // It generates the URL for the Google Calendar API authorization flow  
 export async function GET() {
   const authUrl = oauth2Client.generateAuthUrl({
