@@ -58,8 +58,9 @@ export default function Onboarding() {
     const handleStepClick = (index: number) => {
         // Only allow navigating to previous or current steps
         if (index <= currentStep) {
+            router.push(`/onboarding?step=${index + 1}`)
             setCurrentStep(index)
-        }
+          }
     }
 
     return (

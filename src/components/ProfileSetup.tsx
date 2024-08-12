@@ -125,7 +125,7 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
                     required
                     onChange={(e) => setName(e.target.value)}
                     onInvalid={(e) => e.preventDefault()}
-                    className='autofill:bg-white transition-none'
+                    className='autofill:bg-white transition-none text-gray-700'
                 />
                 {showValidation && !name && (
                     <p className="text-red-500 text-sm mt-1">Please fill in this field.</p>
@@ -138,6 +138,7 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                className='autofill:bg-white transition-none text-gray-700'
                 rows={3}
                 />
             </div>
