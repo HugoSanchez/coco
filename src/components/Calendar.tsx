@@ -52,17 +52,17 @@ export default function Calendar({ onSelectDate }: CalendarProps) {
             <button 
                 disabled={isSameMonth(currentMonth, new Date())}
                 onClick={prevMonth} 
-                className={`p-2 ${isSameMonth(currentMonth, new Date()) ? '' : 'rounded-full bg-emerald-50'}`}>
+                className={`p-2 ${isSameMonth(currentMonth, new Date()) ? '' : 'rounded-full bg-emerald-100'}`}>
             <ChevronLeft className="h-5 w-5 text-gray-400" />
             </button>
             <h2 className="text-lg font-semibold text-gray-800">{format(currentMonth, 'MMMM yyyy')}</h2>
-            <button onClick={nextMonth} className="p-2 rounded-full bg-emerald-50">
+            <button onClick={nextMonth} className="p-2 rounded-full bg-emerald-100">
             <ChevronRight className="h-5 w-5 text-gray-400" />
             </button>
         </div>
         <div className="grid grid-cols-7 gap-1">
             {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map(day => (
-            <div key={day} className="text-center font-medium text-xs text-gray-400 mb-1 py-4">
+            <div key={day} className="text-center md:p-2 md:h-10 md:w-10 md:text-left font-medium text-xs text-gray-400 mb-1 py-4">
                 {day}
             </div>
             ))}
@@ -72,18 +72,18 @@ export default function Calendar({ onSelectDate }: CalendarProps) {
                 return (
                     <div 
                         key={day.toString()}
-                        className='h-14 w-14 rounded-full text-center'
+                        className='h-12 w-12 md:h-14 md:w-14 rounded-full text-center flex items-center justify-center'
                     >
                     <button
                         key={day.toString()}
                         onClick={() => isSelectable && onSelectDate(day)}
                         disabled={!isSelectable}
-                        className={`p-2 h-12 w-12 text-center text-sm rounded-full 
-                        ${isSelectable ? 'hover:bg-emerald-50' : 'cursor-default'}
+                        className={`p-2 h-10 w-10 md:h-12 md:w-12 text-center text-sm rounded-full 
+                        ${isSelectable ? 'hover:bg-emerald-100' : 'cursor-default'}
                         ${!isCurrentMonth ? 'text-gray-300' : 
-                            isToday(day) ? 'text-emerald-400 font-semibold' :
+                            isToday(day) ? 'text-emerald-500 font-semibold' :
                             'text-gray-900'}
-                        ${isSameDay(day, new Date()) ? 'bg-emerald-100' : ''}
+                        ${isSameDay(day, new Date()) ? 'bg-emerald-200' : ''}
                         ${isSunday(day) ? '' : ''}`
                         }
                     >
