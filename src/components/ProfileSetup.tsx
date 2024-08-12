@@ -14,6 +14,7 @@ interface ProfileSetupProps {
 
 export function ProfileSetup({ onComplete }: ProfileSetupProps) {
     const [name, setName] = useState('');
+    const [userName, setUserName] = useState('');
     const [description, setDescription] = useState('');
     const [profilePicture, setProfilePicture] = useState<File | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -114,10 +115,11 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
 
     return (
         <div>
-            <form onSubmit={handleSubmit} className="space-y-8">   
+            <form onSubmit={handleSubmit} className="space-y-8"> 
+              
             <div>
                 <label htmlFor="name" className="block text-md font-medium text-gray-700">Name</label>
-                <p className='text-sm text-gray-500 mb-2'>Your public name, to be displayed on your calendar.</p>
+                <p className='text-sm text-gray-500 mb-2'>Your public name, to be displayed on your calendar</p>
                 <Input
                     id="name"
                     type="text"
@@ -130,6 +132,7 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
                 {showValidation && !name && (
                     <p className="text-red-500 text-sm mt-1">Please fill in this field.</p>
                 )}
+                <p className='text-xs text-gray-500 my-2'>http://coco-cal.com/book/{name.toLowerCase().replace(' ', '-')}</p>
             </div>
             <div>
                 <label htmlFor="description" className="block text-md font-medium text-gray-700">Calendar Description</label>
