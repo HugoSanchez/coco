@@ -1,17 +1,22 @@
-import { NextResponse } from 'next/server';
-import { getAvailableSlots } from '@/lib/calendar';
+import { NextResponse } from 'next/server'
+import { getAvailableSlots } from '@/lib/calendar'
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get('userId');
-  const startDate = new Date(searchParams.get('startDate') as string);
-  const endDate = new Date(searchParams.get('endDate') as string);
+    const { searchParams } = new URL(request.url)
+    const username = searchParams.get('username')
+    const monthStr = searchParams.get('month')
 
-  if (!userId || !startDate || !endDate) {
-    return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
-  }
+    if (!username || !monthStr) {
+      return NextResponse.json({ error: 'Missing username or month' }, { status: 400 })
+    }
 
-  const availableSlots = await getAvailableSlots(userId, startDate, endDate);
+    const month = new Date(monthStr)
 
-  return NextResponse.json({ availableSlots });
+    try {
+      const availableSlots = await getAvailableSlots(username, month)
+      return NextResponse.json(availableSlots)
+    } catch (error) {
+      console.error('Error fetching available slots:', error)
+      return NextResponse.json({ error: 'Failed to fetch available slots' }, { status: 500 })
+    }
 }

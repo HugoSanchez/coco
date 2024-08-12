@@ -9,28 +9,43 @@ import { Clock, ChevronLeft } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer"
 import { Button } from "@/components/ui/button"
 
+import { TimeSlot } from '@/lib/calendar'
+
+
 export default function BookingPage() {
-  const { username }:{username: string} = useParams()
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  const [availableSlots, setAvailableSlots] = useState<string[]>([])
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+    const { username }:{username: string} = useParams()
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+    const [availableSlots, setAvailableSlots] = useState<any[]>([])
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
-  const handleDateSelect = async (date: Date) => {
-    setSelectedDate(date)
-    // const slots = await getAvailableSlots(username as string, date)
-    // setAvailableSlots(slots)
-    setIsDrawerOpen(true)
-  }
-
-  useEffect(() => {
-    if (selectedDate) {
-      // getAvailableSlots(username as string, selectedDate).then(setAvailableSlots)
+    const handleDateSelect = async (date: Date) => {
+        setSelectedDate(date)
+        // const slots = await getAvailableSlots(username as string, date)
+        // setAvailableSlots(slots)
+        setIsDrawerOpen(true)
     }
-  }, [username, selectedDate])
+
+    const fetchAvailableSlots = async (month: Date) => {
+        try {
+            const response = await fetch(`/api/available-slots?username=${username}&month=${month.toISOString()}`)
+            if (!response.ok) throw new Error('Failed to fetch available slots')
+            const data = await response.json()
+            console.log(data)
+            setAvailableSlots(data)
+        } catch (error) {
+            console.error('Error fetching available slots:', error)
+            // Handle error (e.g., show error message to user)
+        }
+    }
+
+    useEffect(() => {
+        fetchAvailableSlots(new Date())
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [username])
 
     return (
         <div className="container flex justify-center px-6 py-24 md:py-20 min-h-screen">
-            <div className="mb:h-[80vh] max-w-[30vw] overflow-hidden">
+            <div className="mb:h-[80vh] md:max-w-[30vw] overflow-hidden">
                 <div className="flex flex-col md:flex-row h-full">
 
                 {/* Calendar and Time Slots Section */}

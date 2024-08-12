@@ -79,8 +79,9 @@ export default function Calendar({ onSelectDate, selectedDay }: CalendarProps) {
                         key={day.toString()}
                         onClick={() => isSelectable && onSelectDate(day)}
                         disabled={!isSelectable}
-                        className={`p-2 h-10 w-10 md:h-12 md:w-12 text-center text-sm rounded-full 
+                        className={`p-2 h-10 w-10 md:h-12 md:w-12 text-center text-sm font-medium rounded-full 
                         ${isSelectable ? 'hover:bg-emerald-100' : 'cursor-default'}
+                        ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}
                         ${isSameDay(day, selectedDay as Date) ? 'bg-emerald-200 text-emerald-500 font-semibold' : ''}
                         ${isSameDay(day, new Date()) && selectedDay === null ? 'bg-emerald-200' : ''}
                         ${isSameDay(day, new Date()) && selectedDay !== null ? 'bg-gray-200' : ''}
