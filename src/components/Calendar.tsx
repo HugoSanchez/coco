@@ -17,7 +17,8 @@ import {
 } from 'date-fns'
 
 interface CalendarProps {
-  onSelectDate: (date: Date) => void
+    username: string
+    onSelectDate: (date: Date) => void
 }
 
 export default function Calendar({ onSelectDate }: CalendarProps) {
@@ -54,7 +55,7 @@ export default function Calendar({ onSelectDate }: CalendarProps) {
                 className={`p-2 ${isSameMonth(currentMonth, new Date()) ? '' : 'rounded-full bg-emerald-50'}`}>
             <ChevronLeft className="h-5 w-5 text-gray-400" />
             </button>
-            <h2 className="text-lg font-light text-gray-800">{format(currentMonth, 'MMMM yyyy')}</h2>
+            <h2 className="text-lg font-semibold text-gray-800">{format(currentMonth, 'MMMM yyyy')}</h2>
             <button onClick={nextMonth} className="p-2 rounded-full bg-emerald-50">
             <ChevronRight className="h-5 w-5 text-gray-400" />
             </button>

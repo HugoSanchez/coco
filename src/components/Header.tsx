@@ -4,12 +4,15 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 
 export default function Header() {
+  const pathname = usePathname()
   const [isScrolled, setIsScrolled] = useState(false)
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
+
+  const isBookingPage = /^\/[^\/]+$/.test(pathname)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -38,16 +41,19 @@ export default function Header() {
     router.push('/')
   }
 
-  return (
-    <header className={`fixed top-0 left-0 right-0 bg-gray-50 z-10 transition-shadow duration-300 h-16 ${
+ 
+    return (
+      <header className={`fixed top-0 left-0 right-0 bg-gray-50 z-10 transition-shadow duration-300 h-16 ${
       isScrolled ? 'shadow-md' : ''
     }`}>
-      <div className="container mx-auto px-4 h-full flex justify-between items-center">
+      <div className="container mx-auto px-6 h-full flex justify-between items-center">
         <Link href="/" className="text-2xl font-bold text-primary ">
           coco
         </Link>
         <nav>
-          <ul className="flex space-x-4 items-center">
+          {
+            !isBookingPage && 
+            <ul className="flex space-x-4 items-center">
             <li><Link href="/" className="text-primary font-light text-sm">Home</Link></li>
             <li><Link href="/about" className="text-primary font-light text-sm">About</Link></li>
             {user && (
@@ -58,6 +64,7 @@ export default function Header() {
               </li>
             )}
           </ul>
+          }
         </nav>
       </div>
     </header>
