@@ -18,10 +18,11 @@ import {
 
 interface CalendarProps {
     username: string
+    selectedDay: Date | null
     onSelectDate: (date: Date) => void
 }
 
-export default function Calendar({ onSelectDate }: CalendarProps) {
+export default function Calendar({ onSelectDate, selectedDay }: CalendarProps) {
     const [currentMonth, setCurrentMonth] = useState(new Date())
 
     useEffect(() => {
@@ -80,10 +81,9 @@ export default function Calendar({ onSelectDate }: CalendarProps) {
                         disabled={!isSelectable}
                         className={`p-2 h-10 w-10 md:h-12 md:w-12 text-center text-sm rounded-full 
                         ${isSelectable ? 'hover:bg-emerald-100' : 'cursor-default'}
-                        ${!isCurrentMonth ? 'text-gray-300' : 
-                            isToday(day) ? 'text-emerald-500 font-semibold' :
-                            'text-gray-900'}
-                        ${isSameDay(day, new Date()) ? 'bg-emerald-200' : ''}
+                        ${isSameDay(day, selectedDay as Date) ? 'bg-emerald-200 text-emerald-500 font-semibold' : ''}
+                        ${isSameDay(day, new Date()) && selectedDay === null ? 'bg-emerald-200' : ''}
+                        ${isSameDay(day, new Date()) && selectedDay !== null ? 'bg-gray-200' : ''}
                         ${isSunday(day) ? '' : ''}`
                         }
                     >

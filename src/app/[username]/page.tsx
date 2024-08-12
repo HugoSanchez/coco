@@ -43,6 +43,7 @@ export default function BookingPage() {
                         <div className="w-full flex flex-col mt-4 md:flex-row">
                             <Calendar 
                                 username={username}
+                                selectedDay={selectedDate}
                                 onSelectDate={handleDateSelect} />
                         </div>
                         <div className='bg-gray-50'>
