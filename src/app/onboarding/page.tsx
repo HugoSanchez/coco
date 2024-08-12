@@ -1,16 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ProfileSetup } from '@/components/ProfileSetup'
 import { WeeklyAvailability } from '@/components/WeeklyAvailability'
+import { PaymentSetup } from '@/components/PaymentSetup'
 import { OnboardingBreadcrumb } from '@/components/Breadcrumb'
 import { Button } from '@/components/ui/button'
-import { InfoIcon } from 'lucide-react'
+import { InfoIcon } from 'lucide-react'     
+import { useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+
 
 const steps = [
   { name: 'Create a Profile', description: 'Help your costumers know who you are.', component: ProfileSetup },
   { name: 'Set Availability', description: 'Set your availability', component: WeeklyAvailability },
-  { name: 'Payment Setup', description: 'Set up your payment method', component: () => <div>Payment setup placeholder</div> },
+  { name: 'Payment Setup', description: 'Set up your payment method', component: PaymentSetup },
 ]
 
 export default function Onboarding() {
@@ -18,15 +22,20 @@ export default function Onboarding() {
     const [onNext, setOnNext] = useState(false)
     const [onPrevious, setOnPrevious] = useState(false)
     const [currentStep, setCurrentStep] = useState(0)
+    const router = useRouter()
+    const searchParams = useSearchParams()
 
     const CurrentStepComponent = steps[currentStep].component
 
-    const handleNext = () => {
-        setOnNext(true)
-        if (currentStep < steps.length - 1) {
-            setCurrentStep(currentStep + 1)
+    useEffect(() => {
+        const step = searchParams.get('step')
+        if (step) {
+          const stepIndex = parseInt(step) - 1
+          if (stepIndex >= 0 && stepIndex < steps.length) {
+            setCurrentStep(stepIndex)
+          }
         }
-    }
+      }, [searchParams])
 
     const handlePrevious = () => {
         setOnPrevious(true)
@@ -39,6 +48,10 @@ export default function Onboarding() {
     const handleStepComplete = () => {
         if (currentStep < steps.length - 1) {
             setCurrentStep(currentStep + 1)
+            const nextStep = currentStep + 1
+            router.push(`/onboarding?step=${nextStep + 1}`)
+        } else if (currentStep === steps.length - 1) {
+            router.push('/dashboard')
         }
     }
 

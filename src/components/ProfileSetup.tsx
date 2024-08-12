@@ -6,25 +6,48 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/lib/supabase";
+import { ConnectCalendar } from "@/components/ConnectCalendar";
 
 interface ProfileSetupProps {
     onComplete: () => void;
 }
 
 export function ProfileSetup({ onComplete }: ProfileSetupProps) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [profilePicture, setProfilePicture] = useState<File | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showValidation, setShowValidation] = useState(false);
-  
-  const toast = useToast();
+    const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
+    const [profilePicture, setProfilePicture] = useState<File | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [showValidation, setShowValidation] = useState(false);
+    
+    const toast = useToast();
 
-  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setProfilePicture(e.target.files[0]);
-    }
-  };
+    useEffect(() => {
+        fetchUserProfile();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const fetchUserProfile = async () => {
+        try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('No user found');
+
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+
+        if (error) throw error;
+
+        if (data) {
+            setName(data.name || '');
+            setDescription(data.description || '');
+            // Note: We can't pre-fill the file input, but we can show the existing profile picture URL if needed
+        }
+        } catch (error) {
+            console.error('Error fetching user profile:', error);
+        }
+    };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     setIsLoading(true);
@@ -91,10 +114,10 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
 
     return (
         <div>
-            <form onSubmit={handleSubmit} className="space-y-8">    
+            <form onSubmit={handleSubmit} className="space-y-8">   
             <div>
                 <label htmlFor="name" className="block text-md font-medium text-gray-700">Name</label>
-                <p className='text-sm text-gray-500 mb-2'>This is the name that will be displayed on your calendar.</p>
+                <p className='text-sm text-gray-500 mb-2'>Your public name, to be displayed on your calendar.</p>
                 <Input
                     id="name"
                     type="text"
@@ -110,8 +133,7 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
             </div>
             <div>
                 <label htmlFor="description" className="block text-md font-medium text-gray-700">Calendar Description</label>
-                <p className='text-sm text-gray-500 mb-2'>This description will appear when sharing your calendar with your clients. 
-                    Help them understand what you are offering.</p>
+                <p className='text-sm text-gray-500 mb-2'>Help your clients understand what they are booking.</p>
                 <Textarea
                 id="description"
                 value={description}
@@ -120,22 +142,19 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
                 />
             </div>
             <div>
-                <label htmlFor="profilePicture" className="block text-sm font-medium text-gray-700">Profile Picture</label>
-                <p className='text-sm text-gray-500 mb-2'>We recommend using the same as your instagram profile.</p>
-                    <Input
-                    id="profilePicture"
-                    type="file"
-                    onChange={handleProfilePictureChange}
-                    accept="image/*"
-                    />
+                <p className="block text-md font-medium text-gray-700">Calendar Integration</p>
+                <p className='text-sm text-gray-500 mb-2'>This will help you have better control over your time and availability.</p>
+                <ConnectCalendar />
             </div>
+            <div className='pt-8'>
             <Button 
                 type="submit" 
                 disabled={isLoading || !name} 
-                className='mt-32 h-12 w-full shadow-sm bg-teal-400 hover:bg-teal-400 hover:opacity-90'
+                className='h-12 w-full shadow-sm bg-teal-400 hover:bg-teal-400 hover:opacity-90'
             >
                 {isLoading ? 'Saving...' : 'Save Profile'}
             </Button>
+            </div>
             </form>
         
         </div>

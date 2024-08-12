@@ -1,66 +1,79 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { useToast } from '@/components/ui/use-toast'
+import { useToast } from "@/components/ui/use-toast"
+import { useRouter } from 'next/navigation'
 
-import { WeeklyAvailability } from '@/components/WeeklyAvailability'
-import { ConnectCalendar } from '@/components/ConnectCalendar'
+interface UserProfile {
+  id: string
+  name: string
+  // Add other profile fields as needed
+}
 
 export default function Dashboard() {
-  const [user, setUser] = useState<any>(null)
-  const searchParams = useSearchParams()
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<any | null>(null)
+  const { toast } = useToast()
   const router = useRouter()
-  const toast = useToast()
-  const calendarConnected = searchParams.get('calendar_connected')
-
 
   useEffect(() => {
-    const getUser = async () => {
+    const loadUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-      if (!user) {
+      if (!user || user === null) {
         router.push('/')
-      }
+        throw new Error('No user')
+      } else setUser(user)
     }
-    getUser()
+    loadUser()
   }, [router])
 
-  
   useEffect(() => {
-    if (calendarConnected === 'true') {
-      toast.toast({
-        color: 'success',
-        title: 'Success',
-        description: 'Calendar connected successfully!',
-      })
-    } else if (calendarConnected === 'false') {
-      toast.toast({
-        color: 'error',
-        title: 'Error',
-        description: 'Failed to connect calendar. Please try again.',
-      })
+    const loadProfile = async () => {
+      try {   
+        setLoading(true)
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+
+        if (error) throw error
+
+        setProfile(data)
+      } catch (error) {
+        console.error('Error loading profile:', error)
+        toast({
+          title: "Error",
+          description: "Failed to load user profile.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calendarConnected])
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/')
-  }
+    if (user) {
+      loadProfile()
+    }
+  }, [user, toast])
 
-  if (!user) {
+  if (loading) {
     return <div>Loading...</div>
   }
 
   return (
-    <div className="w-full max-w-2xl px-4 mt-32 pb-24">
-        <WeeklyAvailability />
-        {
-          
-        }
-        <ConnectCalendar />
+    <div className="p-32">
+      <h1 className="text-3xl font-light mb-4 border-black">
+        {profile ? `Welcome, ${profile.name}, this is your dashboard!` : 'Welcome to your Dashboard'}
+      </h1>
+      {/* Rest of your dashboard content */}
     </div>
   )
 }
+
+
+/**
+ * 
+ */

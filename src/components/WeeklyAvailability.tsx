@@ -62,7 +62,7 @@ interface DayAvailability {
   timeSlots: TimeSlot[]
 }
 
-export function WeeklyAvailability() {
+export function WeeklyAvailability({onComplete}: {onComplete: () => void}) {
   // State variables for the availability
   const [availability, setAvailability] = useState<DayAvailability[]>(
       daysOfWeek.map((day, index) => ({
@@ -225,7 +225,10 @@ export function WeeklyAvailability() {
         color: 'success',
       })
     }
-     // Reset status
+
+    // Move to the next step
+    onComplete()
+    // Reset status
     setSaveStatus('idle');
     setStatusMessage('');
   }
