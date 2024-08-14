@@ -20,6 +20,46 @@ export interface TimeSlot {
   end: Date;
 }
 
+async function refreshToken(userId: string, refreshToken: string) {
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+  );
+
+  oauth2Client.setCredentials({
+    refresh_token: refreshToken
+  });
+
+  try {
+    const { credentials } = await oauth2Client.refreshAccessToken();
+    
+    if (!credentials.access_token) {
+      throw new Error('No access token returned after refresh');
+    }
+
+    // Update the token in your database
+    const { error: updateError } = await supabase
+      .from('calendar_tokens')
+      .update({
+        access_token: credentials.access_token,
+        expiry_date: credentials.expiry_date
+      })
+      .eq('user_id', userId);
+
+    if (updateError) {
+      console.error('Error updating token in database:', updateError);
+      throw new Error('Failed to update token in database');
+    }
+
+    return credentials.access_token;
+  } catch (error: any) {
+    console.error('Detailed refresh token error:', JSON.stringify(error, null, 2));
+    throw new Error(`Failed to refresh token: ${error.message}`);
+  }
+}
+
+
 function calculateAvailableSlots(
   availabilitySettings: AvailabilitySettings,
   calendarEvents: CalendarEvent[],
@@ -109,9 +149,6 @@ export async function getAvailableSlots(username: string, month: Date) {
     console.log(availabilitySettings)
   }
 
-  return availabilitySettings
-
-
   // Fetch user's calendar tokens
   const { data: calendarTokens, error: tokensError } = await supabase
       .from('calendar_tokens')
@@ -123,6 +160,18 @@ export async function getAvailableSlots(username: string, month: Date) {
       throw new Error('Calendar tokens not found');
   }
 
+  // Check if token is expired and refresh if necessary
+  const now = Date.now();
+  if (now >= calendarTokens.expiry_date) {
+    try {
+      const newAccessToken = await refreshToken(userId, calendarTokens.refresh_token);
+      calendarTokens.access_token = newAccessToken;
+    } catch (refreshError) {
+      console.error('Error refreshing token:', refreshError);
+      throw new Error('Failed to refresh access token');
+    }
+  }
+
   // Set up Google Calendar API client
   const oauth2Client = new google.auth.OAuth2();
   oauth2Client.setCredentials({
@@ -131,9 +180,9 @@ export async function getAvailableSlots(username: string, month: Date) {
   });
 
   const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
-
   const monthStart = startOfMonth(month);
   const monthEnd = endOfMonth(month);
+
 
   // Fetch calendar events for the entire month
   const { data: events } = await calendar.events.list({
@@ -143,6 +192,9 @@ export async function getAvailableSlots(username: string, month: Date) {
       singleEvents: true,
       orderBy: 'startTime',
   });
+
+  console.log(events)
+  return calendarTokens
 
   // Calculate available slots for the entire month
   // const availableSlots = calculateAvailableSlots(availabilitySettings, events.items as CalendarEvent[], month);
