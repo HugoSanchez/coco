@@ -20,7 +20,7 @@ import {
   addDays
 } from 'date-fns';
 
-interface TimeSlot {
+export interface TimeSlot {
   start: string;
   end: string;
 }

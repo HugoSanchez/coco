@@ -14,8 +14,9 @@ import { TimeSlot } from '@/lib/calendar'
 export default function BookingPage() {
     const { username }:{username: string} = useParams()
     const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-    const [availableSlots, setAvailableSlots] = useState<any[]>([])
+    const [availableSlots, setAvailableSlots] = useState<{ [day: string]: TimeSlot[]; }>({})
     const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+    const [userTimeZone, setUserTimeZone] = useState('UTC') 
 
     const handleDateSelect = async (date: Date) => {
         setSelectedDate(date)
@@ -39,6 +40,7 @@ export default function BookingPage() {
 
     useEffect(() => {
         fetchAvailableSlots(new Date())
+        setUserTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [username])
 
@@ -89,16 +91,17 @@ export default function BookingPage() {
                             Back
                         </Button>
                         <DrawerTitle>
-                            Available Times for {selectedDate?.toDateString()}
+                            
                         </DrawerTitle>
                         <TimeSlots 
                             date={selectedDate} 
                             availableSlots={availableSlots} 
+                            userTimeZone={userTimeZone}
                             onSelectSlot={(slot) => {
                                 // Handle slot selection
                                 console.log('Selected slot:', slot)
                                 setIsDrawerOpen(false)
-                        }} 
+                            }} 
                         />
                     </div>
                 </DrawerContent>
