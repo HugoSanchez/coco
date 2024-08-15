@@ -1,24 +1,43 @@
 import { google } from 'googleapis';
 import { supabase } from './supabase';
 import { createClient } from '@supabase/supabase-js';
-import { addMinutes, parse, isBefore, isAfter, areIntervalsOverlapping, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { fromZonedTime, toZonedTime } from 'date-fns-tz';
+import { 
+  parseISO, 
+  isWithinInterval, 
+  setHours, 
+  setMinutes, 
+  addMinutes, 
+  parse, 
+  isBefore, 
+  isAfter, 
+  areIntervalsOverlapping, 
+  startOfMonth, 
+  endOfMonth, 
+  eachDayOfInterval,
+  format,
+  addHours,
+  addDays
+} from 'date-fns';
+
+interface TimeSlot {
+  start: string;
+  end: string;
+}
+
+interface DayAvailability {
+  timeSlots: TimeSlot[];
+  isAvailable: boolean;
+}
 
 interface AvailabilitySettings {
-  weeklyAvailability: {
-    [key: string]: { start: string; end: string }[];
-  };
-  meetingDuration: number; // in minutes
+  weekly_availability: DayAvailability[];
+  time_zone: string;
+  meeting_duration: number;
+  meeting_price: number;
+  currency: string;
 }
 
-interface CalendarEvent {
-  start: { dateTime: string };
-  end: { dateTime: string };
-}
-
-export interface TimeSlot {
-  start: Date;
-  end: Date;
-}
 
 async function refreshToken(userId: string, refreshToken: string) {
   const oauth2Client = new google.auth.OAuth2(
@@ -60,46 +79,72 @@ async function refreshToken(userId: string, refreshToken: string) {
 }
 
 
+
 function calculateAvailableSlots(
   availabilitySettings: AvailabilitySettings,
-  calendarEvents: CalendarEvent[],
-  date: Date
+  calendarEvents: any[],
+  date: Date,
+  calendarTimeZone: string
 ): { [day: string]: TimeSlot[] } {
   const availableSlots: { [day: string]: TimeSlot[] } = {};
-  const { weeklyAvailability, meetingDuration } = availabilitySettings;
+  const { weekly_availability, meeting_duration, time_zone } = availabilitySettings;
 
   const monthStart = startOfMonth(date);
   const monthEnd = endOfMonth(date);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-  daysInMonth.forEach(day => {
-    const dayOfWeek = day.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
-    const dayAvailability = weeklyAvailability[dayOfWeek];
+  daysInMonth.forEach((day, index) => {
+    const dayOfWeek = index % 7;
+    const dayAvailability = weekly_availability[dayOfWeek];
 
-    if (dayAvailability) {
-      availableSlots[day.toISOString().split('T')[0]] = [];
+    if (dayAvailability.isAvailable) {
+      const dayKey = format(day, 'yyyy-MM-dd');
+      availableSlots[dayKey] = [];
 
-      for (const window of dayAvailability) {
-        const windowStart = parse(window.start, 'HH:mm', day);
-        const windowEnd = parse(window.end, 'HH:mm', day);
+      for (const slot of dayAvailability.timeSlots) {
+        const [startHour, startMinute] = slot.start.split(':').map(Number);
+        const [endHour, endMinute] = slot.end.split(':').map(Number);
 
-        for (let slotStart = windowStart; isBefore(slotStart, windowEnd); slotStart = addMinutes(slotStart, meetingDuration)) {
-          const slotEnd = addMinutes(slotStart, meetingDuration);
+        let slotStart = fromZonedTime(setMinutes(setHours(day, startHour), startMinute), time_zone);
+        const slotEnd = fromZonedTime(setMinutes(setHours(day, endHour), endMinute), time_zone);
+
+        while (isBefore(slotStart, slotEnd)) {
+          const potentialEndTime = addMinutes(slotStart, meeting_duration);
           
-          if (isAfter(slotEnd, windowEnd)) {
+          if (isAfter(potentialEndTime, slotEnd)) {
             break;
           }
 
-          const isOverlapping = calendarEvents.some(event => 
-            areIntervalsOverlapping(
-              { start: slotStart, end: slotEnd },
-              { start: new Date(event.start.dateTime), end: new Date(event.end.dateTime) }
-            )
-          );
+          const isOverlapping = calendarEvents.some(event => {
+            let eventStartUTC: Date, eventEndUTC: Date;
+
+            if (event.start.dateTime) {
+              eventStartUTC = parseISO(event.start.dateTime);
+              eventEndUTC = event.end.dateTime 
+                ? parseISO(event.end.dateTime)
+                : addHours(eventStartUTC, 1);
+            } else if (event.start.date) {
+              eventStartUTC = parseISO(event.start.date);
+              eventEndUTC = event.end.date 
+                ? parseISO(event.end.date)
+                : addDays(eventStartUTC, 1);
+            } else {
+              return false;
+            }
+
+            return isWithinInterval(slotStart, { start: eventStartUTC, end: eventEndUTC }) ||
+                   isWithinInterval(potentialEndTime, { start: eventStartUTC, end: eventEndUTC }) ||
+                   (isBefore(slotStart, eventStartUTC) && isAfter(potentialEndTime, eventEndUTC));
+          });
 
           if (!isOverlapping) {
-            availableSlots[day.toISOString().split('T')[0]].push({ start: slotStart, end: slotEnd });
+            availableSlots[dayKey].push({ 
+              start: slotStart.toISOString(),
+              end: potentialEndTime.toISOString()
+            });
           }
+
+          slotStart = potentialEndTime;
         }
       }
     }
@@ -193,11 +238,16 @@ export async function getAvailableSlots(username: string, month: Date) {
       orderBy: 'startTime',
   });
 
-  console.log(events)
-  return calendarTokens
-
   // Calculate available slots for the entire month
-  // const availableSlots = calculateAvailableSlots(availabilitySettings, events.items as CalendarEvent[], month);
+  const availableSlots = calculateAvailableSlots(
+    availabilitySettings,
+    events.items || [],
+    month,
+    events.timeZone || 'UTC'
+  );
+
+  console.log('SET: ', availabilitySettings)
+  return availableSlots;
 
   return {events, availabilitySettings};
 }

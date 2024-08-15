@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Calendar from '@/components/Calendar'
 import TimeSlots from '@/components/TimeSlots'
-import { getAvailableSlots } from '@/lib/calendar'
 import { Clock, ChevronLeft } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer"
 import { Button } from "@/components/ui/button"
