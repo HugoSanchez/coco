@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Calendar from '@/components/Calendar'
 import TimeSlots from '@/components/TimeSlots'
+import { ConfirmationForm } from '@/components/ConfirmationForm'
 import { Clock, ChevronLeft } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer"
 import { Button } from "@/components/ui/button"
@@ -15,14 +16,34 @@ export default function BookingPage() {
     const { username }:{username: string} = useParams()
     const [selectedDate, setSelectedDate] = useState<Date | null>(null)
     const [availableSlots, setAvailableSlots] = useState<{ [day: string]: TimeSlot[]; }>({})
+    const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false)
     const [userTimeZone, setUserTimeZone] = useState('UTC') 
+    const [currentMonth, setCurrentMonth] = useState(new Date())
 
+    const handleMonthChange = (newMonth: Date) => {
+        setCurrentMonth(newMonth)
+    }
+    
     const handleDateSelect = async (date: Date) => {
         setSelectedDate(date)
-        // const slots = await getAvailableSlots(username as string, date)
-        // setAvailableSlots(slots)
         setIsDrawerOpen(true)
+    }
+
+    const handleConfirmBooking = async (confirmationDetails: any) => {
+        console.log('Confirming booking for:', confirmationDetails)
+        // Handle booking confirmation
+    }
+
+    const handleClickBack = () => {
+        // If there's a selected slot, we don't want to close the drawer
+        // but render the available slots again.
+        if (selectedSlot) setSelectedSlot(null)
+        // If there's no selected slot, we close the drawer.
+        else {
+            setSelectedDate(null)
+            setIsDrawerOpen(false)
+        }
     }
 
     const fetchAvailableSlots = async (month: Date) => {
@@ -39,10 +60,10 @@ export default function BookingPage() {
     }
 
     useEffect(() => {
-        fetchAvailableSlots(new Date())
+        fetchAvailableSlots(currentMonth)
         setUserTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone)
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [username])
+    }, [username, currentMonth])
 
     return (
         <div className="container flex justify-center px-6 py-24 md:py-20 min-h-screen">
@@ -60,16 +81,14 @@ export default function BookingPage() {
                             <Calendar 
                                 username={username}
                                 selectedDay={selectedDate}
-                                onSelectDate={handleDateSelect} 
                                 availableSlots={availableSlots}
+                                onSelectDate={handleDateSelect} 
+                                onMonthChange={handleMonthChange}
                                 />
                         </div>
                         <div className='bg-gray-50'>
                             <h2 className="text-lg font-semibold">About {username.charAt(0).toUpperCase() + username.slice(1)}</h2>
                             <p className='text-md text-gray-700 font-light mb-6'>Book my personalized nutrition consultation today! Achieve balance, vitality, and well-being with expert guidance.</p>
-
-                            
-                            
                             <div className='flex flex-row items-center'>
                                 <Clock className='w-4 h-4 mr-2' /> 
                                 <p className='font-light text-gray-700'>{"60 minutes"}</p>
@@ -86,7 +105,7 @@ export default function BookingPage() {
                     <div className="p-4">
                         <Button
                             variant="ghost"
-                            onClick={() => setIsDrawerOpen(false)}
+                            onClick={handleClickBack}
                             className="mb-4"
                         >
                         <ChevronLeft className="mr-2 h-4 w-4" />
@@ -95,16 +114,26 @@ export default function BookingPage() {
                         <DrawerTitle>
                             
                         </DrawerTitle>
-                        <TimeSlots 
-                            date={selectedDate} 
-                            availableSlots={availableSlots} 
-                            userTimeZone={userTimeZone}
-                            onSelectSlot={(slot) => {
-                                // Handle slot selection
-                                console.log('Selected slot:', slot)
-                                setIsDrawerOpen(false)
-                            }} 
-                        />
+                        {selectedSlot ? (
+                            <ConfirmationForm
+                                selectedSlot={selectedSlot}
+                                userTimeZone={userTimeZone}
+                                onConfirm={handleConfirmBooking}
+                                onCancel={() => setSelectedSlot(null)}
+                            />
+                        ) : (
+                            <TimeSlots 
+                                    date={selectedDate} 
+                                    availableSlots={availableSlots} 
+                                    userTimeZone={userTimeZone}
+                                    onSelectSlot={(slot) => {
+                                        // Handle slot selection
+                                        console.log('Selected slot:', slot)
+                                        setSelectedSlot(slot)
+                                    }} 
+                                />
+                        )}
+                        
                     </div>
                 </DrawerContent>
             </Drawer>

@@ -23,9 +23,10 @@ interface CalendarProps {
     selectedDay: Date | null
     onSelectDate: (date: Date) => void
     availableSlots: { [day: string]: TimeSlot[] };
+    onMonthChange: (newMonth: Date) => void;
 }
 
-export default function Calendar({ onSelectDate, selectedDay, availableSlots }: CalendarProps) {
+export default function Calendar({ onSelectDate, onMonthChange, selectedDay, availableSlots }: CalendarProps) {
     const [currentMonth, setCurrentMonth] = useState(new Date())
 
     useEffect(() => {
@@ -40,10 +41,15 @@ export default function Calendar({ onSelectDate, selectedDay, availableSlots }: 
     const prevMonth = () => {
         const newMonth = subMonths(currentMonth, 1)
         if (!isBefore(startOfMonth(newMonth), startOfMonth(new Date()))) {
-        setCurrentMonth(newMonth)
+            onMonthChange(subMonths(currentMonth, 1))
+            setCurrentMonth(newMonth)
         }
     }
-    const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1))
+    const nextMonth = () =>{
+        const newMonth = addMonths(currentMonth, 1)
+        onMonthChange(newMonth)
+        setCurrentMonth(newMonth) 
+    }
     const monthStart = startOfMonth(currentMonth)
     const monthEnd = endOfMonth(currentMonth)
     const startDate = startOfWeek(monthStart, { weekStartsOn: 1 })
@@ -89,9 +95,7 @@ export default function Calendar({ onSelectDate, selectedDay, availableSlots }: 
                         ${isSelectable ? 'hover:bg-emerald-200 hover:opacity-80' : 'cursor-default'}
                         ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}
                         ${isSameDay(day, selectedDay as Date) ? 'bg-emerald-200 text-emerald-500 font-semibold' : ''}
-                        ${isSameDay(day, new Date()) && selectedDay === null ? 'bg-emerald-200' : ''}
-                        ${isSameDay(day, new Date()) && selectedDay !== null ? 'bg-gray-200' : ''}
-                        ${isSunday(day) ? '' : ''}`
+                        ${isSameDay(day, new Date()) ? 'bg-gray-200' : ''}`
                         }
                     >
                         {format(day, 'd')}
