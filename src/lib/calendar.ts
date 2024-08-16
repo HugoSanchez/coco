@@ -93,8 +93,8 @@ function calculateAvailableSlots(
   const monthEnd = endOfMonth(date);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-  daysInMonth.forEach((day, index) => {
-    const dayOfWeek = index % 7;
+  daysInMonth.forEach((day) => {
+    const dayOfWeek = day.getDay();
     const dayAvailability = weekly_availability[dayOfWeek];
 
     if (dayAvailability.isAvailable) {
@@ -173,8 +173,6 @@ export async function getAvailableSlots(username: string, month: Date) {
       .single();
 
   if (userError || !userData) {
-      console.log(userError)
-      console.log(userData)
       throw new Error('User not found');
   }
 
@@ -189,9 +187,6 @@ export async function getAvailableSlots(username: string, month: Date) {
 
   if (settingsError) {
       throw new Error('Availability settings not found');
-  }
-  else {
-    console.log(availabilitySettings)
   }
 
   // Fetch user's calendar tokens
@@ -246,9 +241,7 @@ export async function getAvailableSlots(username: string, month: Date) {
     events.timeZone || 'UTC'
   );
 
-  console.log('SET: ', availabilitySettings)
   return availableSlots;
 
-  return {events, availabilitySettings};
 }
 
