@@ -1,19 +1,24 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import Calendar from '@/components/Calendar'
 import TimeSlots from '@/components/TimeSlots'
 import { ConfirmationForm } from '@/components/ConfirmationForm'
 import { Clock, ChevronLeft } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer"
 import { Button } from "@/components/ui/button"
-
+import { parse, format, startOfMonth } from 'date-fns'
 import { TimeSlot } from '@/lib/calendar'
 
 
 export default function BookingPage() {
+    // Params & Navigation
+    const router = useRouter()
     const { username }:{username: string} = useParams()
+    const searchParams = useSearchParams()
+
+    // State variables
     const [selectedDate, setSelectedDate] = useState<Date | null>(null)
     const [availableSlots, setAvailableSlots] = useState<{ [day: string]: TimeSlot[]; }>({})
     const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
@@ -21,11 +26,64 @@ export default function BookingPage() {
     const [userTimeZone, setUserTimeZone] = useState('UTC') 
     const [currentMonth, setCurrentMonth] = useState(new Date())
 
+    // Effects
+    useEffect(() => {
+        const monthParam = searchParams.get('month')
+        const dateParam = searchParams.get('date')
+
+        let monthToFetch: Date
+
+        if (monthParam) {
+            monthToFetch = parse(monthParam, 'yyyy-MM', new Date())
+            setCurrentMonth(monthToFetch)
+        } else {
+            monthToFetch = startOfMonth(new Date())
+            setCurrentMonth(monthToFetch)
+        }
+
+        if (dateParam) {
+            setSelectedDate(parse(dateParam, 'yyyy-MM-dd', new Date()))
+        }
+
+        setUserTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone)
+
+        fetchAvailableSlots(monthToFetch)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams, username])
+
+    const fetchAvailableSlots = async (month: Date) => {
+        try {
+            const response = await fetch(`/api/available-slots?username=${username}&month=${month.toISOString()}`)
+            if (!response.ok) throw new Error('Failed to fetch available slots')
+            const data = await response.json()
+            console.log(data)
+            setAvailableSlots(data)
+        } catch (error) {
+            console.error('Error fetching available slots:', error)
+            // Handle error (e.g., show error message to user)
+        }
+    }
+
+    const updateURL = (month: Date, date: Date | null) => {
+        const newParams = new URLSearchParams(searchParams)
+        newParams.set('month', format(month, 'yyyy-MM'))
+        if (date) {
+            newParams.set('date', format(date, 'yyyy-MM-dd'))
+        } else {
+            newParams.delete('date')
+        }
+        router.push(`/${username}?${newParams.toString()}`)
+    }
+
+
+    // Event handlers
     const handleMonthChange = (newMonth: Date) => {
+        updateURL(newMonth, selectedDate)
         setCurrentMonth(newMonth)
     }
     
-    const handleDateSelect = async (date: Date) => {
+    const handleDateSelect = async (currentMonth: any, date: Date) => {
+        updateURL(currentMonth, date)
         setSelectedDate(date)
         setIsDrawerOpen(true)
     }
@@ -46,25 +104,7 @@ export default function BookingPage() {
         }
     }
 
-    const fetchAvailableSlots = async (month: Date) => {
-        try {
-            const response = await fetch(`/api/available-slots?username=${username}&month=${month.toISOString()}`)
-            if (!response.ok) throw new Error('Failed to fetch available slots')
-            const data = await response.json()
-            console.log(data)
-            setAvailableSlots(data)
-        } catch (error) {
-            console.error('Error fetching available slots:', error)
-            // Handle error (e.g., show error message to user)
-        }
-    }
-
-    useEffect(() => {
-        fetchAvailableSlots(currentMonth)
-        setUserTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [username, currentMonth])
-
+   
     return (
         <div className="container flex justify-center px-6 py-24 md:py-20 min-h-screen">
             <div className="mb:h-[80vh] md:max-w-[30vw] overflow-hidden">
@@ -82,7 +122,7 @@ export default function BookingPage() {
                                 username={username}
                                 selectedDay={selectedDate}
                                 availableSlots={availableSlots}
-                                onSelectDate={handleDateSelect} 
+                                onSelectDate={(date: Date) => handleDateSelect(currentMonth, date)} 
                                 onMonthChange={handleMonthChange}
                                 />
                         </div>
