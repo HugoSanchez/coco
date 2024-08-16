@@ -16,13 +16,16 @@ import {
     isSunday
 } from 'date-fns'
 
+import { TimeSlot } from '@/lib/calendar'
+
 interface CalendarProps {
     username: string
     selectedDay: Date | null
     onSelectDate: (date: Date) => void
+    availableSlots: { [day: string]: TimeSlot[] };
 }
 
-export default function Calendar({ onSelectDate, selectedDay }: CalendarProps) {
+export default function Calendar({ onSelectDate, selectedDay, availableSlots }: CalendarProps) {
     const [currentMonth, setCurrentMonth] = useState(new Date())
 
     useEffect(() => {
@@ -70,6 +73,8 @@ export default function Calendar({ onSelectDate, selectedDay }: CalendarProps) {
             {days.map(day => {
                 const isCurrentMonth = isSameMonth(day, currentMonth)
                 const isSelectable = isCurrentMonth && !isBefore(day, new Date())
+                const dateKey = format(day, 'yyyy-MM-dd');
+                const hasAvailableSlots = availableSlots[dateKey] && availableSlots[dateKey].length > 0 && day >= new Date();
                 return (
                     <div 
                         key={day.toString()}
@@ -80,7 +85,8 @@ export default function Calendar({ onSelectDate, selectedDay }: CalendarProps) {
                         onClick={() => isSelectable && onSelectDate(day)}
                         disabled={!isSelectable}
                         className={`p-2 h-10 w-10 md:h-12 md:w-12 text-center text-sm font-medium rounded-full 
-                        ${isSelectable ? 'hover:bg-emerald-100' : 'cursor-default'}
+                        ${hasAvailableSlots ? 'bg-emerald-100' : ''}
+                        ${isSelectable ? 'hover:bg-emerald-200 hover:opacity-80' : 'cursor-default'}
                         ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}
                         ${isSameDay(day, selectedDay as Date) ? 'bg-emerald-200 text-emerald-500 font-semibold' : ''}
                         ${isSameDay(day, new Date()) && selectedDay === null ? 'bg-emerald-200' : ''}

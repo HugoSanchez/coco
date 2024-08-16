@@ -23,8 +23,8 @@ export default function TimeSlots({ date, availableSlots, onSelectSlot, userTime
 
   return (
     <div>
-      <h3 className="text-lg font-medium text-gray-900 mb-4">{format(date, 'EEEE, MMMM d')}</h3>
-      <div className="grid grid-cols-1 gap-2 border border-blue-600">
+      <h3 className="text-lg font-light text-gray-900 mb-4">Available times for {format(date, 'EEEE, MMMM d')}</h3>
+      <div className="grid grid-cols-1 gap-2">
         {
             slotsForDate.length === 0 && (
                 <div className="text-gray-500">No available times for this day</div>
@@ -37,14 +37,14 @@ export default function TimeSlots({ date, availableSlots, onSelectSlot, userTime
             <button
               key={index}
               onClick={() => onSelectSlot(slot)}
-              className="bg-white border border-gray-300 rounded-md py-2 px-4 hover:bg-blue-50 hover:border-blue-500 text-sm font-medium text-gray-700"
+              className="bg-white border border-gray-200 rounded-md py-4 px-4 hover:bg-emerald-50 hover:border-emerald-300 text-sm font-medium text-gray-700"
             >
-              {format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')}
+              {format(startTime, 'h:mm a')}
             </button>
           )
         })}
       </div>
-      <p className="mt-4 text-sm text-gray-500">Times are shown in your local timezone: {userTimeZone}</p>
+      <p className="mt-8 text-sm text-gray-500 font-light">Times are shown in your local timezone: {userTimeZone}</p>
     </div>
   )
 }

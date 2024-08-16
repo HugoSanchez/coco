@@ -60,7 +60,9 @@ export default function BookingPage() {
                             <Calendar 
                                 username={username}
                                 selectedDay={selectedDate}
-                                onSelectDate={handleDateSelect} />
+                                onSelectDate={handleDateSelect} 
+                                availableSlots={availableSlots}
+                                />
                         </div>
                         <div className='bg-gray-50'>
                             <h2 className="text-lg font-semibold">About {username.charAt(0).toUpperCase() + username.slice(1)}</h2>
@@ -80,7 +82,7 @@ export default function BookingPage() {
             </div>
             {/* Drawer for Time Slots */}
             <Drawer direction='right' open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-                <DrawerContent className="w-full sm:max-w-md">
+                <DrawerContent className="w-full sm:max-w-md bg-gray-50">
                     <div className="p-4">
                         <Button
                             variant="ghost"
