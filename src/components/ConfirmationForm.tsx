@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { format } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
 import { TimeSlot } from '@/lib/calendar'
-import { Apple, AppleIcon } from 'lucide-react'
-import { FaApple } from 'react-icons/fa';
+import { FaApple, FaCheckCircle } from 'react-icons/fa';
 import { Spinner } from './ui/spinner';
 
 
@@ -25,21 +24,56 @@ export function ConfirmationForm({ selectedSlot, userTimeZone, onConfirm, onCanc
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
+    const [isConfirmed, setIsConfirmed] = useState(false);
+    const [fadeIn, setFadeIn] = useState(false);
 
     const startTime = toZonedTime(new Date(selectedSlot.start), userTimeZone);
     const endTime = toZonedTime(new Date(selectedSlot.end), userTimeZone);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    useEffect(() => {
+        if (isConfirmed) {
+            // Trigger the fade-in effect after a short delay
+            const timer = setTimeout(() => setFadeIn(true), 50);
+            return () => clearTimeout(timer);
+        }
+    }, [isConfirmed]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        // onConfirm({ name, email });
+        
+        // Simulate payment process
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        setLoading(false);
+        setIsConfirmed(true);
+        onConfirm({ name, email });
     };
+
+    if (isConfirmed) {
+        return (
+            <div className={`space-y-8 p-4 flex flex-col items-center justify-center h-full transition-opacity duration-500 ease-in-out ${fadeIn ? 'opacity-100' : 'opacity-0'}`}>
+                <FaCheckCircle className="text-emerald-400 text-7xl mb-4" />
+                <h2 className="text-2xl font-bold mb-2">Booking Confirmed!</h2>
+                <p className="text-center mb-4">
+                    Your appointment with Henry has been booked for:
+                    <br />
+                    <strong>{format(startTime, 'MMMM d, yyyy')}</strong>
+                    <br />
+                    <strong>{format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')}</strong>
+                </p>
+                <p className="text-sm text-gray-600 text-center">
+                    A confirmation email has been sent to {email}
+                </p>
+            </div>
+        );
+    }
 
     return (
         <div className="p-4">
         <h2 className="text-xl font-bold mb-4">100,00€</h2>
         <p className="mb-4">
-            You&apos;re booking an appointment with Clara
+            You&apos;re booking an appointment with Henry
             <br />
             <strong>{format(startTime, 'MMMM d, yyyy')}</strong>
             <br />
