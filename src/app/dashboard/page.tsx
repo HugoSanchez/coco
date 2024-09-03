@@ -111,7 +111,7 @@ export default function Dashboard() {
     <div className="flex min-h-screen w-full flex-col py-24">
       <header className="flex items-center justify-between px-4 md:px-16 pb-6">
         <h1 className="text-3xl font-bold">Dashboard</h1>
-        <Button>
+        <Button className='bg-emerald-500 hover:bg-emerald-600'>
             Calendar link
             <CopyIcon className="h-4 w-4 ml-2"/>
         </Button>
