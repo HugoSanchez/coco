@@ -70,10 +70,10 @@ export function WeeklyAvailability({onComplete}: {onComplete: () => void}) {
           timeSlots: [{ start: '09:00', end: '17:00' }]
       }))
   )
-  
+
   // Create a toast
   const toast = useToast()
-  
+
   // State variables for the form
   const [currency, setCurrency] = useState('EUR')
   const [timeZone, setTimeZone] = useState('UTC/GMT+0')
@@ -113,43 +113,43 @@ export function WeeklyAvailability({onComplete}: {onComplete: () => void}) {
     loadUserSchedule()
   }, [])
 
-  // Get the user, then fetch their schedule 
-  // from the database if it exists 
+  // Get the user, then fetch their schedule
+  // from the database if it exists
   const fetchUserSchedule = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    
+
     if (!user) {
       console.error('No user logged in')
       return null
     }
-  
+
     const { data, error } = await supabase
       .from('schedules')
       .select('*')
       .eq('user_id', user.id)
       .single()
-  
+
     if (error) {
       console.error('Error fetching schedule:', error)
       return null
     }
-  
+
     return data
   }
 
   const handleDayToggle = (index: number) => {
     // Toggle the availability of a day
-    setAvailability(prev => prev.map((day, i) => 
+    setAvailability(prev => prev.map((day, i) =>
       i === index ? { ...day, isAvailable: !day.isAvailable } : day
     ))
   }
 
   const handleTimeChange = (dayIndex: number, slotIndex: number, field: 'start' | 'end', value: string) => {
     // Handle the time change for a time slot
-    setAvailability(prev => prev.map((day, i) => 
+    setAvailability(prev => prev.map((day, i) =>
       i === dayIndex ? {
         ...day,
-        timeSlots: day.timeSlots.map((slot, j) => 
+        timeSlots: day.timeSlots.map((slot, j) =>
           j === slotIndex ? { ...slot, [field]: value } : slot
         )
       } : day
@@ -158,7 +158,7 @@ export function WeeklyAvailability({onComplete}: {onComplete: () => void}) {
 
   const addTimeSlot = (dayIndex: number) => {
     // Add a time slot to a day
-    setAvailability(prev => prev.map((day, i) => 
+    setAvailability(prev => prev.map((day, i) =>
       i === dayIndex ? {
         ...day,
         timeSlots: [...day.timeSlots, { start: '09:00', end: '17:00' }]
@@ -168,7 +168,7 @@ export function WeeklyAvailability({onComplete}: {onComplete: () => void}) {
 
   const removeTimeSlot = (dayIndex: number, slotIndex: number) => {
     // Remove a time slot from a day
-    setAvailability(prev => prev.map((day, i) => 
+    setAvailability(prev => prev.map((day, i) =>
       i === dayIndex ? {
         ...day,
         timeSlots: day.timeSlots.filter((_, j) => j !== slotIndex)
@@ -183,7 +183,7 @@ export function WeeklyAvailability({onComplete}: {onComplete: () => void}) {
 
     // Get the current user
     const { data: { user } } = await supabase.auth.getUser()
-    
+
     // Handle user feedback if the user is not logged in
     if (!user) {
       toast.toast({
@@ -193,7 +193,7 @@ export function WeeklyAvailability({onComplete}: {onComplete: () => void}) {
       })
       return
     }
-    
+
     // Create the availability data object
     const availabilityData = {
       user_id: user.id,
@@ -203,13 +203,13 @@ export function WeeklyAvailability({onComplete}: {onComplete: () => void}) {
       meeting_price: parseFloat(meetingPrice),
       currency: currency
     }
-    
+
     // Save the availability to the database
     const { data, error } = await supabase
       .from('schedules')
       .upsert(availabilityData, { onConflict: 'user_id' })
       .select()
-  
+
     if (error) {
       console.error('Error saving availability:', error)
       toast.toast({
@@ -242,7 +242,7 @@ export function WeeklyAvailability({onComplete}: {onComplete: () => void}) {
   }
 
   return (
-    <div className="space-y-6">      
+    <div className="space-y-6">
       <div className="space-y-4 bg-gray-100 border border-gray-200 p-4 rounded-md">
         <p className='text-xl font-bold'>Weekly hours</p>
         {availability.map((day, dayIndex) => (
@@ -258,7 +258,7 @@ export function WeeklyAvailability({onComplete}: {onComplete: () => void}) {
               <Label htmlFor={`day-${dayIndex}`} className="font-bold w-14">
                 {daysOfWeek[dayIndex]}
               </Label>
-              
+
               {day.isAvailable && day.timeSlots.length > 0 ? (
                 <div className="flex items-center space-x-2 flex-grow">
                   <Input
@@ -289,7 +289,7 @@ export function WeeklyAvailability({onComplete}: {onComplete: () => void}) {
                   {day.isAvailable ? 'No time slots' : 'Unavailable'}
                 </p>
               )}
-              
+
               {day.isAvailable && (
                 <Button
                   variant="ghost"
@@ -301,10 +301,10 @@ export function WeeklyAvailability({onComplete}: {onComplete: () => void}) {
                 </Button>
               )}
             </div>
-            
+
             {day.isAvailable && day.timeSlots.length > 1 && (
               <div className="ml-28 space-y-2">
-                
+
                 {day.timeSlots.slice(1).map((slot, slotIndex) => (
                   <div key={slotIndex + 1} className="flex items-center space-x-2 pl-30">
                     <Input
@@ -392,9 +392,9 @@ export function WeeklyAvailability({onComplete}: {onComplete: () => void}) {
         </div>
       </div>
 
-      <Button 
-        onClick={handleSave} 
-        className="w-full bg-emerald-400 hover:bg-emerald-300"
+      <Button
+        onClick={handleSave}
+        className="w-full bg-teal-400 hover:bg-teal-300"
         disabled={saveStatus === 'loading'}
       >
         {saveStatus === 'loading' ? 'Saving...' : 'Save Availability'}
