@@ -19,7 +19,7 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
     const [profilePicture, setProfilePicture] = useState<File | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [showValidation, setShowValidation] = useState(false);
-    
+
     const toast = useToast();
 
     useEffect(() => {
@@ -52,7 +52,7 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     setIsLoading(true);
-    e.preventDefault(); 
+    e.preventDefault();
     try {
         // Get the current user from supabase
         const { data: { user } } = await supabase.auth.getUser();
@@ -62,7 +62,7 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
         let profilePictureUrl = '';
 
         // Upload profile picture if one was selected
-        // This is a supabase storage bucket that allows 
+        // This is a supabase storage bucket that allows
         // you to upload images and get a public url for them
         if (profilePicture) {
             const fileExt = profilePicture.name.split('.').pop();
@@ -115,8 +115,8 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
 
     return (
         <div>
-            <form onSubmit={handleSubmit} className="space-y-8"> 
-              
+            <form onSubmit={handleSubmit} className="space-y-8">
+
             <div>
                 <label htmlFor="name" className="block text-md font-medium text-gray-700">Name</label>
                 <p className='text-sm text-gray-500 mb-2'>Your public name, to be displayed on your calendar</p>
@@ -145,26 +145,21 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
                 rows={3}
                 />
             </div>
-            <div>
-                <p className="block text-md font-medium text-gray-700">Calendar Integration</p>
-                <p className='text-sm text-gray-500 mb-2'>This will help you have better control over your time and availability.</p>
-                <ConnectCalendar />
-            </div>
             <div className='pt-8'>
-            <Button 
-                type="submit" 
-                disabled={isLoading || !name} 
+            <Button
+                type="submit"
+                disabled={isLoading || !name}
                 className='h-12 w-full shadow-sm bg-teal-400 hover:bg-teal-400 hover:opacity-90'
             >
-                {isLoading ? 'Saving...' : 'Save Profile'}
+                {isLoading ? 'Saving...' : 'Continue'}
             </Button>
             </div>
             </form>
-        
+
         </div>
     );
 }
 
 /**
- *  
+ *
  */

@@ -3,18 +3,19 @@
 import { useState, useEffect } from 'react'
 import { ProfileSetup } from '@/components/ProfileSetup'
 import { WeeklyAvailability } from '@/components/WeeklyAvailability'
-import { PaymentSetup } from '@/components/PaymentSetup'
+import { CalendarStep } from '@/components/CalendarStep'
 import { OnboardingBreadcrumb } from '@/components/Breadcrumb'
 import { Button } from '@/components/ui/button'
-import { InfoIcon } from 'lucide-react'     
+import { InfoIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
 
 
+
 const steps = [
   { name: 'Create a Profile', description: 'Help your costumers know who you are.', component: ProfileSetup },
+  { name: 'Connect your calendar', description: 'This way coco will always be in sync with your google calendar.', component: CalendarStep },
   { name: 'Set Availability', description: 'Set your availability', component: WeeklyAvailability },
-  { name: 'Payment Setup', description: 'Set up your payment method', component: PaymentSetup },
 ]
 
 export default function Onboarding() {
@@ -65,9 +66,9 @@ export default function Onboarding() {
 
     return (
         <div className="container mx-auto lg:px-96 py-24 bg-gray-50">
-            <OnboardingBreadcrumb 
-            steps={steps} 
-            currentStep={currentStep} 
+            <OnboardingBreadcrumb
+            steps={steps}
+            currentStep={currentStep}
             onStepClick={handleStepClick}
             />
             <div className="mt-12">
@@ -78,12 +79,12 @@ export default function Onboarding() {
             <CurrentStepComponent onComplete={handleStepComplete} />
             </div>
             <div className="mt-8 flex justify-between">
-            
+
             {
                 currentStep > 0 && (
-                    <Button 
+                    <Button
                         variant="ghost"
-                        onClick={handlePrevious} 
+                        onClick={handlePrevious}
                         disabled={currentStep === 0}
                     >
                         Previous
