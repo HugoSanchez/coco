@@ -6,94 +6,36 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/lib/supabase";
-import { ConnectCalendar } from "@/components/ConnectCalendar";
 import Image from 'next/image';
+import { useUser } from '@/contexts/UserContext';
 
 interface ProfileSetupProps {
     onComplete: () => void;
 }
 
 export function ProfileSetup({ onComplete }: ProfileSetupProps) {
-    const [name, setName] = useState('');
-    const [userName, setUserName] = useState('');
-    const [description, setDescription] = useState('');
-    const [profilePicture, setProfilePicture] = useState<File | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [showValidation, setShowValidation] = useState(false);
-    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
-    const toast = useToast();
+    const { user, profile, refreshProfile } = useUser()
+    const [name, setName] = useState('')
+    const [description, setDescription] = useState('')
+    const [profilePicture, setProfilePicture] = useState<File | null>(null)
+    const [isLoading, setIsLoading] = useState(false)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const toast = useToast()
 
     useEffect(() => {
-        fetchUserProfile();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    useEffect(() => {
-        return () => {
-            if (previewUrl && previewUrl.startsWith('blob:')) {
-                URL.revokeObjectURL(previewUrl);
-            }
-        };
-    }, [previewUrl]);
-
-    const fetchUserProfile = async () => {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error('No user found');
-
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single();
-
-            if (error) throw error;
-
-            if (data) {
-                setName(data.name || '');
-                setDescription(data.description || '');
-                console.log('Profile data:', data);
-                if (data.profile_picture_url) {
-                    console.log('Setting profile picture URL:', data.profile_picture_url);
-                    setPreviewUrl(data.profile_picture_url);
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching user profile:', error);
+        if (profile) {
+            setName(profile.name || '')
+            setDescription(profile.description || '')
+            setPreviewUrl(profile.profile_picture_url || null)
         }
-    };
-
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            if (previewUrl && previewUrl.startsWith('blob:')) {
-                URL.revokeObjectURL(previewUrl);
-            }
-
-            setProfilePicture(file);
-            setPreviewUrl(URL.createObjectURL(file));
-        }
-    };
-
-    const handleRemoveImage = () => {
-        if (previewUrl && previewUrl.startsWith('blob:')) {
-            URL.revokeObjectURL(previewUrl);
-        }
-        setProfilePicture(null);
-        setPreviewUrl(null);
-    };
+    }, [profile])
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        setIsLoading(true);
+        e.preventDefault()
+        setIsLoading(true)
 
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error('No user found');
-
-            // Only handle file upload if a new file was selected
-            let profile_picture_url = previewUrl;
+            let profile_picture_url = previewUrl
             if (profilePicture) {
                 const fileExt = profilePicture.name.split('.').pop();
                 const fileName = `${user.id}-${Date.now()}.${fileExt}`;
@@ -117,7 +59,6 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
                 profile_picture_url = publicUrl;
             }
 
-            // Save profile information
             const { error: profileError } = await supabase
                 .from('profiles')
                 .upsert({
@@ -126,28 +67,45 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
                     description,
                     email: user.email,
                     profile_picture_url,
-                });
+                })
 
-            if (profileError) throw profileError;
+            if (profileError) throw profileError
 
+            await refreshProfile() // Refresh the global profile state
             toast.toast({
                 title: "Success",
                 description: "Profile updated successfully!",
-                color: "success",
-            });
-
-            onComplete();
-
+            })
+            onComplete()
         } catch (error) {
-            console.error('Error updating profile:', error);
+            console.error('Error:', error)
             toast.toast({
                 title: "Error",
-                description: "Failed to update profile. Please try again.",
-                color: "error",
-            });
+                description: "Failed to update profile",
+            })
         } finally {
-            setIsLoading(false);
+            setIsLoading(false)
         }
+    }
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (previewUrl && previewUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(previewUrl);
+            }
+
+            setProfilePicture(file);
+            setPreviewUrl(URL.createObjectURL(file));
+        }
+    };
+
+    const handleRemoveImage = () => {
+        if (previewUrl && previewUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(previewUrl);
+        }
+        setProfilePicture(null);
+        setPreviewUrl(null);
     };
 
     return (
@@ -222,9 +180,6 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
                         onInvalid={(e) => e.preventDefault()}
                         className='autofill:bg-white transition-none text-gray-700'
                     />
-                    {showValidation && !name && (
-                        <p className="text-red-500 text-sm mt-1">Please fill in this field.</p>
-                    )}
                     <p className='text-xs text-gray-500 my-2'>http://coco-cal.com/book/{name.toLowerCase().replace(' ', '-')}</p>
                 </div>
                 <div>
