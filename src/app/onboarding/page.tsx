@@ -65,18 +65,14 @@ export default function Onboarding() {
     }
 
     return (
-        <div className="container mx-auto lg:px-96 py-24 bg-gray-50">
+        <div className="container mx-auto lg:px-96 mt-16 py-2 bg-gray-50">
             <OnboardingBreadcrumb
             steps={steps}
             currentStep={currentStep}
             onStepClick={handleStepClick}
             />
             <div className="mt-12">
-                <div className='flex flex-row items-center gap-2 mb-12'>
-                    <h1 className="text-2xl font-bold">{steps[currentStep].name}</h1>
-                    <InfoIcon className='h-4 w-4 text-gray-500' />
-                </div>
-            <CurrentStepComponent onComplete={handleStepComplete} />
+            	<CurrentStepComponent onComplete={handleStepComplete} />
             </div>
             <div className="mt-8 flex justify-between">
 

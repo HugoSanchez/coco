@@ -7,5 +7,5 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string
 export const supabase = createClient(
     supabaseUrl,
     supabaseAnonKey,
-  )
+)
 
