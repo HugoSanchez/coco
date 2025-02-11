@@ -11,8 +11,7 @@ import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer"
 import { Button } from "@/components/ui/button"
 import { parse, format, startOfMonth } from 'date-fns'
 import { TimeSlot } from '@/lib/calendar'
-import { supabase } from '@/lib/supabase'
-import { getUserProfileByUsername, UserProfileWithSchedule } from '@/lib/db/profiles'
+import { getUserProfileAndScheduleByUsername, UserProfileWithSchedule } from '@/lib/db/profiles'
 
 interface UserProfile {
     id: string;
@@ -25,7 +24,7 @@ interface UserProfile {
 interface PageState {
     isLoading: boolean;
     error: string | null;
-    userProfile: UserProfile | null;
+    userProfile: UserProfileWithSchedule | null;  // Update this type
     availableSlots: { [day: string]: TimeSlot[] };
     selectedDate: Date | null;
     selectedSlot: TimeSlot | null;
@@ -57,16 +56,8 @@ export default function BookingPage() {
     useEffect(() => {
         async function initializePageData() {
             try {
-				console.log('username:', username)
 				// Get user profile
-                const profileData = await getUserProfileByUsername(username as string)
-				console.log('profileData:', profileData)
-                // Extract meeting duration from the joined data
-                const userProfile: UserProfile = {
-                    ...profileData,
-                    meeting_duration: profileData.schedules?.meeting_duration || 60
-                }
-
+                const profileData = await getUserProfileAndScheduleByUsername(username as string)
                 // Handle URL parameters
                 const monthParam = searchParams.get('month')
                 const dateParam = searchParams.get('date')
@@ -90,7 +81,7 @@ export default function BookingPage() {
                 setState(prev => ({
                     ...prev,
                     isLoading: false,
-                    userProfile,
+                    userProfile: profileData,
                     availableSlots,
                     currentMonth: monthToFetch,
                     selectedDate,
@@ -229,7 +220,7 @@ export default function BookingPage() {
                         <div className='flex flex-row items-center'>
                             <Clock className='w-4 h-4 mr-2' />
                             <p className='font-light text-gray-700'>
-                                {state.userProfile.meeting_duration} minutes
+                                {state.userProfile.schedules?.meeting_duration || 60} minutes
                             </p>
                         </div>
                     </div>

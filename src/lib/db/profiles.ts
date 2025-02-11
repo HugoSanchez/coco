@@ -16,7 +16,7 @@ export interface UserProfileWithSchedule {
     };
 }
 
-export async function getUserProfileByUsername(username: string) {
+export async function getUserProfileAndScheduleByUsername(username: string) {
     // First, get the basic profile data
     const { data: profile, error: profileError } = await supabase
     .from('profiles')
