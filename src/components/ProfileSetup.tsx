@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/lib/supabase";
 import Image from 'next/image';
 import { useUser } from '@/contexts/UserContext';
@@ -16,22 +15,60 @@ interface ProfileSetupProps {
 export function ProfileSetup({ onComplete }: ProfileSetupProps) {
     const { user, profile, refreshProfile } = useUser()
     const [name, setName] = useState('')
+    const [username, setUsername] = useState('')
     const [description, setDescription] = useState('')
     const [profilePicture, setProfilePicture] = useState<File | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-    const toast = useToast()
+    const [usernameError, setUsernameError] = useState('')
 
     useEffect(() => {
         if (profile) {
             setName(profile.name || '')
+            setUsername(profile.username || '')
             setDescription(profile.description || '')
             setPreviewUrl(profile.profile_picture_url || null)
         }
     }, [profile])
 
+    const validateUsername = async (username: string) => {
+        if (username === profile?.username) return true
+
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('username', username)
+            .single()
+
+        if (error?.code === 'PGRST116') {
+            // No matching username found - username is available
+            return true
+        }
+
+        return false
+    }
+
+    const handleUsernameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newUsername = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-')
+        setUsername(newUsername)
+
+        if (newUsername.length < 3) {
+            setUsernameError('Username must be at least 3 characters')
+            return
+        }
+
+        const isAvailable = await validateUsername(newUsername)
+        if (!isAvailable) {
+            setUsernameError('This username is already taken')
+        } else {
+            setUsernameError('')
+        }
+    }
+
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
+        if (usernameError) return
+
         setIsLoading(true)
 
         try {
@@ -64,6 +101,7 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
                 .upsert({
                     id: user.id,
                     name,
+                    username: username.toLowerCase().replace(/\s+/g, '-'),
                     description,
                     email: user.email,
                     profile_picture_url,
@@ -72,17 +110,9 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
             if (profileError) throw profileError
 
             await refreshProfile() // Refresh the global profile state
-            toast.toast({
-                title: "Success",
-                description: "Profile updated successfully!",
-            })
             onComplete()
         } catch (error) {
             console.error('Error:', error)
-            toast.toast({
-                title: "Error",
-                description: "Failed to update profile",
-            })
         } finally {
             setIsLoading(false)
         }
@@ -180,8 +210,27 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
                         onInvalid={(e) => e.preventDefault()}
                         className='autofill:bg-white transition-none text-gray-700'
                     />
-                    <p className='text-xs text-gray-500 my-2'>http://coco-cal.com/book/{name.toLowerCase().replace(' ', '-')}</p>
                 </div>
+
+                <div>
+                    <label htmlFor="username" className="block text-md font-medium text-gray-700">Username</label>
+                    <p className='text-sm text-gray-500 mb-2'>Your unique calendar link</p>
+                    <Input
+                        id="username"
+                        type="text"
+                        value={username}
+                        required
+                        onChange={handleUsernameChange}
+                        className={`autofill:bg-white transition-none text-gray-700 ${
+                            usernameError ? 'border-red-500' : ''
+                        }`}
+                    />
+                    {usernameError && (
+                        <p className="text-red-500 text-sm mt-1">{usernameError}</p>
+                    )}
+                    <p className='text-xs text-gray-500 my-2'>coco-cal.com/book/{username}</p>
+                </div>
+
                 <div>
                     <label htmlFor="description" className="block text-md font-medium text-gray-700">Calendar Description</label>
                     <p className='text-sm text-gray-500 mb-2'>Help your clients understand what they are booking.</p>

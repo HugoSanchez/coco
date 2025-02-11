@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 interface UserProfile {
     id: string
     name: string
+    username: string
     email: string
     description?: string
     profile_picture_url?: string

@@ -2,18 +2,18 @@ import { google } from 'googleapis';
 import { supabase } from './supabase';
 import { createClient } from '@supabase/supabase-js';
 import { fromZonedTime, toZonedTime } from 'date-fns-tz';
-import { 
-  parseISO, 
-  isWithinInterval, 
-  setHours, 
-  setMinutes, 
-  addMinutes, 
-  parse, 
-  isBefore, 
-  isAfter, 
-  areIntervalsOverlapping, 
-  startOfMonth, 
-  endOfMonth, 
+import {
+  parseISO,
+  isWithinInterval,
+  setHours,
+  setMinutes,
+  addMinutes,
+  parse,
+  isBefore,
+  isAfter,
+  areIntervalsOverlapping,
+  startOfMonth,
+  endOfMonth,
   eachDayOfInterval,
   format,
   addHours,
@@ -52,7 +52,7 @@ async function refreshToken(userId: string, refreshToken: string) {
 
   try {
     const { credentials } = await oauth2Client.refreshAccessToken();
-    
+
     if (!credentials.access_token) {
       throw new Error('No access token returned after refresh');
     }
@@ -110,7 +110,7 @@ function calculateAvailableSlots(
 
         while (isBefore(slotStart, slotEnd)) {
           const potentialEndTime = addMinutes(slotStart, meeting_duration);
-          
+
           if (isAfter(potentialEndTime, slotEnd)) {
             break;
           }
@@ -120,12 +120,12 @@ function calculateAvailableSlots(
 
             if (event.start.dateTime) {
               eventStartUTC = parseISO(event.start.dateTime);
-              eventEndUTC = event.end.dateTime 
+              eventEndUTC = event.end.dateTime
                 ? parseISO(event.end.dateTime)
                 : addHours(eventStartUTC, 1);
             } else if (event.start.date) {
               eventStartUTC = parseISO(event.start.date);
-              eventEndUTC = event.end.date 
+              eventEndUTC = event.end.date
                 ? parseISO(event.end.date)
                 : addDays(eventStartUTC, 1);
             } else {
@@ -138,7 +138,7 @@ function calculateAvailableSlots(
           });
 
           if (!isOverlapping) {
-            availableSlots[dayKey].push({ 
+            availableSlots[dayKey].push({
               start: slotStart.toISOString(),
               end: potentialEndTime.toISOString()
             });
@@ -169,7 +169,7 @@ export async function getAvailableSlots(username: string, month: Date) {
   const { data: userData, error: userError } = await supabase
       .from('profiles')
       .select('*')
-      .eq('name', 'Henry') // We need to fix this: usernames need to be unique and always lowecase.
+      .eq('username', username.toLowerCase())
       .single();
 
   if (userError || !userData) {

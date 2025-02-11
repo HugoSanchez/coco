@@ -75,7 +75,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const loadProfile = async () => {
-      try {   
+      try {
         setLoading(true)
         const { data, error } = await supabase
           .from('profiles')
@@ -110,7 +110,10 @@ export default function Dashboard() {
   return (
     <div className="flex min-h-screen w-full flex-col py-24">
       <header className="flex items-center justify-between px-4 md:px-16 pb-6">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+		<div className='flex flex-col'>
+			<h1 className="text-3xl font-bold">Hola {profile?.name},</h1>
+			<h3 className="text-2xl">este es tu dashboard</h3>
+		</div>
         <Button className='bg-emerald-500 hover:bg-emerald-600'>
             Calendar link
             <CopyIcon className="h-4 w-4 ml-2"/>

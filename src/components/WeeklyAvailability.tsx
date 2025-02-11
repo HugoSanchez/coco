@@ -63,342 +63,342 @@ interface DayAvailability {
 }
 
 export function WeeklyAvailability({onComplete}: {onComplete: () => void}) {
-  // State variables for the availability
-  const [availability, setAvailability] = useState<DayAvailability[]>(
-      daysOfWeek.map((day, index) => ({
-          isAvailable: index >= 1 && index <= 5, // Monday to Friday are true
-          timeSlots: [{ start: '09:00', end: '17:00' }]
-      }))
-  )
+	// State variables for the availability
+	const [availability, setAvailability] = useState<DayAvailability[]>(
+		daysOfWeek.map((day, index) => ({
+			isAvailable: index >= 1 && index <= 5, // Monday to Friday are true
+			timeSlots: [{ start: '09:00', end: '17:00' }]
+		}))
+	)
 
-  // Create a toast
-  const toast = useToast()
+	// Create a toast
+	const toast = useToast()
 
-  // State variables for the form
-  const [currency, setCurrency] = useState('EUR')
-  const [timeZone, setTimeZone] = useState('UTC/GMT+0')
-  const [meetingPrice, setMeetingPrice] = useState('0')
-  const [meetingDuration, setMeetingDuration] = useState('30')
+	// State variables for the form
+	const [currency, setCurrency] = useState('EUR')
+	const [timeZone, setTimeZone] = useState('UTC/GMT+0')
+	const [meetingPrice, setMeetingPrice] = useState('0')
+	const [meetingDuration, setMeetingDuration] = useState('30')
 
-  // State variables for the component status
-  const [isLoading, setIsLoading] = useState(true)
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [statusMessage, setStatusMessage] = useState<string>('');
+	// State variables for the component status
+	const [isLoading, setIsLoading] = useState(true)
+	const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+	const [statusMessage, setStatusMessage] = useState<string>('');
 
-  useEffect(() => {
-    // Set the time zone to the user's time zone
-    const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const matchingTimeZone = timezones.find(tz => tz.value === userTimeZone);
-    if (matchingTimeZone) {
-      setTimeZone(matchingTimeZone.value);
-    }
-  }, []);
+	useEffect(() => {
+		// Set the time zone to the user's time zone
+		const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+		const matchingTimeZone = timezones.find(tz => tz.value === userTimeZone);
+		if (matchingTimeZone) {
+		setTimeZone(matchingTimeZone.value);
+		}
+	}, []);
 
-  useEffect(() => {
-    // Fetch the user's schedule from the database
-    // and set the state variables to the schedule data
-    setIsLoading(true)
-    const loadUserSchedule = async () => {
-      const schedule = await fetchUserSchedule()
-      if (schedule) {
-        setAvailability(schedule.weekly_availability)
-        setTimeZone(schedule.time_zone)
-        setMeetingDuration(schedule.meeting_duration.toString())
-        setMeetingPrice(schedule.meeting_price.toString())
-        setCurrency(schedule.currency)
-      }
-      setIsLoading(false)
-    }
+	useEffect(() => {
+		// Fetch the user's schedule from the database
+		// and set the state variables to the schedule data
+		setIsLoading(true)
+		const loadUserSchedule = async () => {
+		const schedule = await fetchUserSchedule()
+		if (schedule) {
+			setAvailability(schedule.weekly_availability)
+			setTimeZone(schedule.time_zone)
+			setMeetingDuration(schedule.meeting_duration.toString())
+			setMeetingPrice(schedule.meeting_price.toString())
+			setCurrency(schedule.currency)
+		}
+		setIsLoading(false)
+		}
 
-    loadUserSchedule()
-  }, [])
+		loadUserSchedule()
+	}, [])
 
-  // Get the user, then fetch their schedule
-  // from the database if it exists
-  const fetchUserSchedule = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+	// Get the user, then fetch their schedule
+	// from the database if it exists
+	const fetchUserSchedule = async () => {
+		const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) {
-      console.error('No user logged in')
-      return null
-    }
+		if (!user) {
+		console.error('No user logged in')
+		return null
+		}
 
-    const { data, error } = await supabase
-      .from('schedules')
-      .select('*')
-      .eq('user_id', user.id)
-      .single()
+		const { data, error } = await supabase
+		.from('schedules')
+		.select('*')
+		.eq('user_id', user.id)
+		.single()
 
-    if (error) {
-      console.error('Error fetching schedule:', error)
-      return null
-    }
+		if (error) {
+		console.error('Error fetching schedule:', error)
+		return null
+		}
 
-    return data
-  }
+		return data
+	}
 
-  const handleDayToggle = (index: number) => {
-    // Toggle the availability of a day
-    setAvailability(prev => prev.map((day, i) =>
-      i === index ? { ...day, isAvailable: !day.isAvailable } : day
-    ))
-  }
+	const handleDayToggle = (index: number) => {
+		// Toggle the availability of a day
+		setAvailability(prev => prev.map((day, i) =>
+		i === index ? { ...day, isAvailable: !day.isAvailable } : day
+		))
+	}
 
-  const handleTimeChange = (dayIndex: number, slotIndex: number, field: 'start' | 'end', value: string) => {
-    // Handle the time change for a time slot
-    setAvailability(prev => prev.map((day, i) =>
-      i === dayIndex ? {
-        ...day,
-        timeSlots: day.timeSlots.map((slot, j) =>
-          j === slotIndex ? { ...slot, [field]: value } : slot
-        )
-      } : day
-    ))
-  }
+	const handleTimeChange = (dayIndex: number, slotIndex: number, field: 'start' | 'end', value: string) => {
+		// Handle the time change for a time slot
+		setAvailability(prev => prev.map((day, i) =>
+		i === dayIndex ? {
+			...day,
+			timeSlots: day.timeSlots.map((slot, j) =>
+			j === slotIndex ? { ...slot, [field]: value } : slot
+			)
+		} : day
+		))
+	}
 
-  const addTimeSlot = (dayIndex: number) => {
-    // Add a time slot to a day
-    setAvailability(prev => prev.map((day, i) =>
-      i === dayIndex ? {
-        ...day,
-        timeSlots: [...day.timeSlots, { start: '09:00', end: '17:00' }]
-      } : day
-    ))
-  }
+	const addTimeSlot = (dayIndex: number) => {
+		// Add a time slot to a day
+		setAvailability(prev => prev.map((day, i) =>
+		i === dayIndex ? {
+			...day,
+			timeSlots: [...day.timeSlots, { start: '09:00', end: '17:00' }]
+		} : day
+		))
+	}
 
-  const removeTimeSlot = (dayIndex: number, slotIndex: number) => {
-    // Remove a time slot from a day
-    setAvailability(prev => prev.map((day, i) =>
-      i === dayIndex ? {
-        ...day,
-        timeSlots: day.timeSlots.filter((_, j) => j !== slotIndex)
-      } : day
-    ))
-  }
+	const removeTimeSlot = (dayIndex: number, slotIndex: number) => {
+		// Remove a time slot from a day
+		setAvailability(prev => prev.map((day, i) =>
+		i === dayIndex ? {
+			...day,
+			timeSlots: day.timeSlots.filter((_, j) => j !== slotIndex)
+		} : day
+		))
+	}
 
-  const handleSave = async () => {
-    // Save the availability to the database
-    setSaveStatus('loading');
-    setStatusMessage('Saving your availability...');
+	const handleSave = async () => {
+		// Save the availability to the database
+		setSaveStatus('loading');
+		setStatusMessage('Saving your availability...');
 
-    // Get the current user
-    const { data: { user } } = await supabase.auth.getUser()
+		// Get the current user
+		const { data: { user } } = await supabase.auth.getUser()
 
-    // Handle user feedback if the user is not logged in
-    if (!user) {
-      toast.toast({
-        title: "Error",
-        description: "You must be logged in to save your availability.",
-        color: 'error',
-      })
-      return
-    }
+		// Handle user feedback if the user is not logged in
+		if (!user) {
+		toast.toast({
+			title: "Error",
+			description: "You must be logged in to save your availability.",
+			color: 'error',
+		})
+		return
+		}
 
-    // Create the availability data object
-    const availabilityData = {
-      user_id: user.id,
-      weekly_availability: availability,
-      time_zone: timeZone,
-      meeting_duration: parseInt(meetingDuration),
-      meeting_price: parseFloat(meetingPrice),
-      currency: currency
-    }
+		// Create the availability data object
+		const availabilityData = {
+		user_id: user.id,
+		weekly_availability: availability,
+		time_zone: timeZone,
+		meeting_duration: parseInt(meetingDuration),
+		meeting_price: parseFloat(meetingPrice),
+		currency: currency
+		}
 
-    // Save the availability to the database
-    const { data, error } = await supabase
-      .from('schedules')
-      .upsert(availabilityData, { onConflict: 'user_id' })
-      .select()
+		// Save the availability to the database
+		const { data, error } = await supabase
+		.from('schedules')
+		.upsert(availabilityData, { onConflict: 'user_id' })
+		.select()
 
-    if (error) {
-      console.error('Error saving availability:', error)
-      toast.toast({
-        title: "Error",
-        description: "You must be logged in to save your availability.",
-        color: 'error',
-      })
-    } else {
-      console.log('Availability saved:', data)
-      toast.toast({
-        title: "Bravo!",
-        description: "Your availability has been saved.",
-        color: 'success',
-      })
-    }
+		if (error) {
+		console.error('Error saving availability:', error)
+		toast.toast({
+			title: "Error",
+			description: "You must be logged in to save your availability.",
+			color: 'error',
+		})
+		} else {
+		console.log('Availability saved:', data)
+		toast.toast({
+			title: "Bravo!",
+			description: "Your availability has been saved.",
+			color: 'success',
+		})
+		}
 
-    // Move to the next step
-    onComplete()
-    // Reset status
-    setSaveStatus('idle');
-    setStatusMessage('');
-  }
+		// Move to the next step
+		onComplete()
+		// Reset status
+		setSaveStatus('idle');
+		setStatusMessage('');
+	}
 
-  if (isLoading) {
-    return (
-      <div className='fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2'>
-        <Spinner />
-      </div>
-    )
-  }
+	if (isLoading) {
+		return (
+		<div className='fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2'>
+			<Spinner />
+		</div>
+		)
+	}
 
-  return (
-    <div className="space-y-6">
-      <div className="space-y-4 bg-gray-100 border border-gray-200 p-4 rounded-md">
-        <p className='text-xl font-bold'>Weekly hours</p>
-        {availability.map((day, dayIndex) => (
-          <div key={dayIndex} className="flex flex-col space-y-2">
-            <div className="flex items-center space-x-4">
-              <div className='flex w-6 items-center justify-center'>
-                <Checkbox
-                  id={`day-${dayIndex}`}
-                  checked={day.isAvailable}
-                  onCheckedChange={() => handleDayToggle(dayIndex)}
-                />
-              </div>
-              <Label htmlFor={`day-${dayIndex}`} className="font-bold w-14">
-                {daysOfWeek[dayIndex]}
-              </Label>
+	return (
+		<div className="space-y-6">
+		<div className="space-y-4 bg-gray-100 border border-gray-200 p-4 rounded-md">
+			<p className='text-xl font-bold'>Weekly hours</p>
+			{availability.map((day, dayIndex) => (
+			<div key={dayIndex} className="flex flex-col space-y-2">
+				<div className="flex items-center space-x-4">
+				<div className='flex w-6 items-center justify-center'>
+					<Checkbox
+					id={`day-${dayIndex}`}
+					checked={day.isAvailable}
+					onCheckedChange={() => handleDayToggle(dayIndex)}
+					/>
+				</div>
+				<Label htmlFor={`day-${dayIndex}`} className="font-bold w-14">
+					{daysOfWeek[dayIndex]}
+				</Label>
 
-              {day.isAvailable && day.timeSlots.length > 0 ? (
-                <div className="flex items-center space-x-2 flex-grow">
-                  <Input
-                    type="time"
-                    value={day.timeSlots[0].start}
-                    onChange={(e) => handleTimeChange(dayIndex, 0, 'start', e.target.value)}
-                    className="w-24"
-                  />
-                  <span>-</span>
-                  <Input
-                    type="time"
-                    value={day.timeSlots[0].end}
-                    onChange={(e) => handleTimeChange(dayIndex, 0, 'end', e.target.value)}
-                    className="w-24"
-                  />
-                  {day.timeSlots.length === 1 && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeTimeSlot(dayIndex, 0)}
-                    >
-                      ×
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <p className="font-light text-gray-500 flex-grow">
-                  {day.isAvailable ? 'No time slots' : 'Unavailable'}
-                </p>
-              )}
+				{day.isAvailable && day.timeSlots.length > 0 ? (
+					<div className="flex items-center space-x-2 flex-grow">
+					<Input
+						type="time"
+						value={day.timeSlots[0].start}
+						onChange={(e) => handleTimeChange(dayIndex, 0, 'start', e.target.value)}
+						className="w-24"
+					/>
+					<span>-</span>
+					<Input
+						type="time"
+						value={day.timeSlots[0].end}
+						onChange={(e) => handleTimeChange(dayIndex, 0, 'end', e.target.value)}
+						className="w-24"
+					/>
+					{day.timeSlots.length === 1 && (
+						<Button
+						variant="ghost"
+						size="icon"
+						onClick={() => removeTimeSlot(dayIndex, 0)}
+						>
+						×
+						</Button>
+					)}
+					</div>
+				) : (
+					<p className="font-light text-gray-500 flex-grow">
+					{day.isAvailable ? 'No time slots' : 'Unavailable'}
+					</p>
+				)}
 
-              {day.isAvailable && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => addTimeSlot(dayIndex)}
-                  className='text-xl font-extralight'
-                >
-                  +
-                </Button>
-              )}
-            </div>
+				{day.isAvailable && (
+					<Button
+					variant="ghost"
+					size="sm"
+					onClick={() => addTimeSlot(dayIndex)}
+					className='text-xl font-extralight'
+					>
+					+
+					</Button>
+				)}
+				</div>
 
-            {day.isAvailable && day.timeSlots.length > 1 && (
-              <div className="ml-28 space-y-2">
+				{day.isAvailable && day.timeSlots.length > 1 && (
+				<div className="ml-28 space-y-2">
 
-                {day.timeSlots.slice(1).map((slot, slotIndex) => (
-                  <div key={slotIndex + 1} className="flex items-center space-x-2 pl-30">
-                    <Input
-                      type="time"
-                      value={slot.start}
-                      onChange={(e) => handleTimeChange(dayIndex, slotIndex + 1, 'start', e.target.value)}
-                      className="w-24"
-                    />
-                    <span>-</span>
-                    <Input
-                      type="time"
-                      value={slot.end}
-                      onChange={(e) => handleTimeChange(dayIndex, slotIndex + 1, 'end', e.target.value)}
-                      className="w-24"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeTimeSlot(dayIndex, slotIndex + 1)}
-                    >
-                      ×
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+					{day.timeSlots.slice(1).map((slot, slotIndex) => (
+					<div key={slotIndex + 1} className="flex items-center space-x-2 pl-30">
+						<Input
+						type="time"
+						value={slot.start}
+						onChange={(e) => handleTimeChange(dayIndex, slotIndex + 1, 'start', e.target.value)}
+						className="w-24"
+						/>
+						<span>-</span>
+						<Input
+						type="time"
+						value={slot.end}
+						onChange={(e) => handleTimeChange(dayIndex, slotIndex + 1, 'end', e.target.value)}
+						className="w-24"
+						/>
+						<Button
+						variant="ghost"
+						size="icon"
+						onClick={() => removeTimeSlot(dayIndex, slotIndex + 1)}
+						>
+						×
+						</Button>
+					</div>
+					))}
+				</div>
+				)}
+			</div>
+			))}
+		</div>
 
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="timezone">Time Zone</Label>
-          <Select value={timeZone} onValueChange={setTimeZone}>
-            <SelectTrigger id="timezone">
-              <SelectValue placeholder="Select time zone" />
-            </SelectTrigger>
-            <SelectContent>
-              {timezones.map((tz) => (
-                <SelectItem key={tz.value} value={tz.value}>
-                  {tz.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+		<div className="space-y-4">
+			<div>
+			<Label htmlFor="timezone">Time Zone</Label>
+			<Select value={timeZone} onValueChange={setTimeZone}>
+				<SelectTrigger id="timezone">
+				<SelectValue placeholder="Select time zone" />
+				</SelectTrigger>
+				<SelectContent>
+				{timezones.map((tz) => (
+					<SelectItem key={tz.value} value={tz.value}>
+					{tz.label}
+					</SelectItem>
+				))}
+				</SelectContent>
+			</Select>
+			</div>
 
-        <div>
-          <Label htmlFor="duration">Meeting Duration</Label>
-          <Select value={meetingDuration} onValueChange={setMeetingDuration}>
-            <SelectTrigger id="duration">
-              <SelectValue placeholder="Select meeting duration" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="15">15 minutes</SelectItem>
-              <SelectItem value="30">30 minutes</SelectItem>
-              <SelectItem value="60">1 hour</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+			<div>
+			<Label htmlFor="duration">Meeting Duration</Label>
+			<Select value={meetingDuration} onValueChange={setMeetingDuration}>
+				<SelectTrigger id="duration">
+				<SelectValue placeholder="Select meeting duration" />
+				</SelectTrigger>
+				<SelectContent>
+				<SelectItem value="15">15 minutes</SelectItem>
+				<SelectItem value="30">30 minutes</SelectItem>
+				<SelectItem value="60">1 hour</SelectItem>
+				</SelectContent>
+			</Select>
+			</div>
+		</div>
 
-      <div>
-        <Label htmlFor="price">Meeting Price</Label>
-        <div className="flex items-center space-x-2">
-          <Select value={currency} onValueChange={setCurrency}>
-            <SelectTrigger id="currency" className="w-[80px]">
-              <SelectValue placeholder="Currency" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="EUR">EUR</SelectItem>
-              <SelectItem value="USD">USD</SelectItem>
-            </SelectContent>
-          </Select>
-          <Input
-            type="number"
-            id="price"
-            placeholder="Enter price"
-            value={meetingPrice}
-            onChange={(e) => setMeetingPrice(e.target.value)}
-            min="0"
-            step="0.01"
-            className="flex-grow"
-          />
-        </div>
-      </div>
+		<div>
+			<Label htmlFor="price">Meeting Price</Label>
+			<div className="flex items-center space-x-2">
+			<Select value={currency} onValueChange={setCurrency}>
+				<SelectTrigger id="currency" className="w-[80px]">
+				<SelectValue placeholder="Currency" />
+				</SelectTrigger>
+				<SelectContent>
+				<SelectItem value="EUR">EUR</SelectItem>
+				<SelectItem value="USD">USD</SelectItem>
+				</SelectContent>
+			</Select>
+			<Input
+				type="number"
+				id="price"
+				placeholder="Enter price"
+				value={meetingPrice}
+				onChange={(e) => setMeetingPrice(e.target.value)}
+				min="0"
+				step="0.01"
+				className="flex-grow"
+			/>
+			</div>
+		</div>
 
-      <Button
-        onClick={handleSave}
-        className="w-full bg-teal-400 hover:bg-teal-300"
-        disabled={saveStatus === 'loading'}
-      >
-        {saveStatus === 'loading' ? 'Saving...' : 'Save Availability'}
-      </Button>
-    </div>
-  )
+		<Button
+			onClick={handleSave}
+			className='h-12 w-full shadow-sm bg-teal-400 hover:bg-teal-400 hover:opacity-90'
+			disabled={saveStatus === 'loading'}
+		>
+			{saveStatus === 'loading' ? 'Saving...' : 'Continue'}
+		</Button>
+		</div>
+	)
 }
