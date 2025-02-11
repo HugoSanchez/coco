@@ -19,24 +19,37 @@ const steps = [
 ]
 
 export default function Onboarding() {
+    const searchParams = useSearchParams()
+    const step = searchParams.get('step')
+
+    // Initialize currentStep based on URL parameter
+    const initialStep = step ? Math.max(0, Math.min(parseInt(step) - 1, steps.length - 1)) : 0
 
     const [onNext, setOnNext] = useState(false)
     const [onPrevious, setOnPrevious] = useState(false)
-    const [currentStep, setCurrentStep] = useState(0)
+    const [currentStep, setCurrentStep] = useState(initialStep)
     const router = useRouter()
-    const searchParams = useSearchParams()
+    const calendarConnected = searchParams.get('calendar_connected')
 
     const CurrentStepComponent = steps[currentStep].component
+
+    // Keep the rest of your useEffects for subsequent updates
+    useEffect(() => {
+        if (calendarConnected === 'true') {
+            // Handle successful calendar connection
+            // Maybe show a success toast or update UI
+        }
+    }, [calendarConnected])
 
     useEffect(() => {
         const step = searchParams.get('step')
         if (step) {
           const stepIndex = parseInt(step) - 1
-          if (stepIndex >= 0 && stepIndex < steps.length) {
+          if (stepIndex >= 0 && stepIndex < steps.length && stepIndex !== currentStep) {
             setCurrentStep(stepIndex)
           }
         }
-      }, [searchParams])
+    }, [searchParams, currentStep])
 
     const handlePrevious = () => {
         setOnPrevious(true)

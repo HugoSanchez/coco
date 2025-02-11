@@ -69,10 +69,10 @@ export async function GET(request: NextRequest) {
 
         if (tokenError) throw tokenError
 
-        return NextResponse.redirect(new URL('/onboarding?step=1?calendar_connected=true', request.url))
+        return NextResponse.redirect(new URL('/onboarding?step=2&calendar_connected=true', request.url))
       } catch (error) {
         console.error('Error in Google Calendar callback:', error)
-        return NextResponse.redirect(new URL('/onboarding?step=1?calendar_connected=false', request.url))
+        return NextResponse.redirect(new URL('/onboarding?step=1&calendar_connected=false', request.url))
       }
     } else {
       return new NextResponse('No code provided', { status: 400 })
