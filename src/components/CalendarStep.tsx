@@ -24,7 +24,7 @@ export function CalendarStep({ onComplete }: CalendarStepProps) {
     return (
         <div>
             <div className='mb-8'>
-                <p className="block text-md font-medium text-gray-700">Calendar Integration</p>
+                <p className="block text-md font-medium text-gray-700">Connect your Calendar</p>
                 <p className='text-sm text-gray-500 mb-2'>Coco will always be in sync with your google calendar.</p>
 				<div className='pt-2'>
 					<ConnectCalendar />

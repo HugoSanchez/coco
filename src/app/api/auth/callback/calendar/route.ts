@@ -12,17 +12,17 @@ const oauth2Client = new google.auth.OAuth2(
 // GET /api/auth/callback/calendar
 // This is the callback route for the Google Calendar API
 // It is called by Google when the user is redirected back to the app
-// after they have authorized the app to access their calendar. 
+// after they have authorized the app to access their calendar.
 export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const code = searchParams.get('code')
-  
+
     if (code) {
       try {
         // Get the access token from Google
         const { tokens } = await oauth2Client.getToken(code)
         oauth2Client.setCredentials(tokens)
-  
+
         // Get user info from Google
         const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client })
         const { data: googleUserInfo } = await oauth2.userinfo.get()
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
         if (!googleUserInfo.email) {
           throw new Error('Failed to get user email from Google')
         }
-        
+
         // Initialize Supabase client
         const supabase = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -66,9 +66,9 @@ export async function GET(request: NextRequest) {
           }, {
             onConflict: 'user_id',
           })
-  
+
         if (tokenError) throw tokenError
-  
+
         return NextResponse.redirect(new URL('/onboarding?step=1?calendar_connected=true', request.url))
       } catch (error) {
         console.error('Error in Google Calendar callback:', error)

@@ -189,7 +189,7 @@ export default function BookingPage() {
                                     alt={state.userProfile.name}
                                     width={60}
                                     height={60}
-                                    className="rounded-full"
+                                    className="lg:h-16 lg:w-16 h-8 w-8 rounded-full"
                                 />
                             )}
                             <h2 className='text-3xl font-light'>
