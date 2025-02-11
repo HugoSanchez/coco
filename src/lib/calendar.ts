@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import { supabaseAdmin as supabase } from './supabaseAdmin';
 import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { updateUserCalendarTokens } from './db/calendar-tokens';
+import { oauth2Client } from './googleOAth';
 import {
 	parseISO,
 	isWithinInterval,
@@ -38,23 +39,12 @@ interface AvailabilitySettings {
   currency: string;
 }
 
-// First, let's create a function to get a properly configured OAuth2 client
-function getOAuth2Client() {
-  return new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
-  );
-}
-
 // Function to refresh the access token
 // This function is used to refresh the access token when it expires
 // It takes the user's ID and the refresh token as arguments
 // It returns the new access token from Google.
 async function refreshToken(userId: string, refreshToken: string) {
-	console.log('Attempting to refresh token...');
-	// Use the properly configured OAuth2 client
-	const oauth2Client = getOAuth2Client();
+	console.log('Attempting to refresh token...');;
 	// Set the credentials to the refresh token
 	oauth2Client.setCredentials({refresh_token: refreshToken});
 
@@ -194,12 +184,10 @@ export async function getAvailableSlots(username: string, month: Date) {
 		throw new Error('Calendar tokens not found');
 	}
 
-	// Create OAuth2 client with proper configuration
-	const oauth2Client = getOAuth2Client();
 	// Get the current time
 	const now = Date.now();
 	// Check if the access token is expired
-	if (calendarTokens.expiry_date && calendarTokens.expiry_date < now) {
+	if (calendarTokens.expiry_date && calendarTokens.expiry_date < now || true) {
 		console.log('Access token expired, refreshing...');
 		// Call the refreshToken function to get a new access token
 		const newAccessToken = await refreshToken(userId, calendarTokens.refresh_token);

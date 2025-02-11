@@ -3,9 +3,9 @@ import { google } from 'googleapis'
 import { createClient } from '@supabase/supabase-js'
 
 const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID_CALENDAR,
-  process.env.GOOGLE_CLIENT_SECRET_CALENDAR,
-  'http://localhost:3000/api/auth/callback/calendar'
+	process.env.GOOGLE_CLIENT_ID_CALENDAR,
+	process.env.GOOGLE_CLIENT_SECRET_CALENDAR,
+	'http://localhost:3000/api/auth/callback/calendar'
 )
 
 
