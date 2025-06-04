@@ -101,6 +101,54 @@ export type Database = {
         }
         Relationships: []
       }
+      clients: {
+        Row: {
+          billing_advance_days: number | null
+          billing_amount: number | null
+          billing_frequency: string | null
+          billing_trigger: string | null
+          billing_type: string | null
+          created_at: string | null
+          description: string | null
+          email: string
+          id: string
+          name: string
+          should_bill: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          billing_advance_days?: number | null
+          billing_amount?: number | null
+          billing_frequency?: string | null
+          billing_trigger?: string | null
+          billing_type?: string | null
+          created_at?: string | null
+          description?: string | null
+          email: string
+          id?: string
+          name: string
+          should_bill?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          billing_advance_days?: number | null
+          billing_amount?: number | null
+          billing_frequency?: string | null
+          billing_trigger?: string | null
+          billing_type?: string | null
+          created_at?: string | null
+          description?: string | null
+          email?: string
+          id?: string
+          name?: string
+          should_bill?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
