@@ -23,30 +23,30 @@ export async function DELETE(request: Request) {
 	try {
 		// Initialize Supabase client with service role key
 		const supabase = createClient(
-		process.env.NEXT_PUBLIC_SUPABASE_URL!,
-		process.env.SUPABASE_SERVICE_ROLE_KEY!,
-		{
-			auth: {
-			autoRefreshToken: false,
-			persistSession: false
+			process.env.NEXT_PUBLIC_SUPABASE_URL!,
+			process.env.SUPABASE_SERVICE_ROLE_KEY!,
+			{
+				auth: {
+				autoRefreshToken: false,
+				persistSession: false
+				}
 			}
-		}
 		)
 
 		// Get user from request
 		const { data: { user }, error: userError } = await supabase.auth.getUser()
 		if (userError || !user) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 		}
 
 		// Delete calendar tokens for the user
 		const { error: deleteError } = await supabase
-		.from('calendar_tokens')
-		.delete()
-		.eq('user_id', user.id)
+			.from('calendar_tokens')
+			.delete()
+			.eq('user_id', user.id)
 
 		if (deleteError) {
-		return NextResponse.json({ error: 'Failed to disconnect calendar' }, { status: 500 })
+			return NextResponse.json({ error: 'Failed to disconnect calendar' }, { status: 500 })
 		}
 
 		return NextResponse.json({ success: true })
