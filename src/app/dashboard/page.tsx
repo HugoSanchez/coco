@@ -47,6 +47,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { getClientsForUser, Client } from '@/lib/db/clients'
 
 interface UserProfile {
   id: string
@@ -60,6 +61,8 @@ export default function Dashboard() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any | null>(null)
+  const [clients, setClients] = useState<Client[]>([])
+  const [loadingClients, setLoadingClients] = useState(true)
   const { toast } = useToast()
   const router = useRouter()
 
@@ -104,8 +107,37 @@ export default function Dashboard() {
     }
   }, [user, toast])
 
-  if (loading) {
+  useEffect(() => {
+    const fetchClients = async () => {
+      if (!user) return
+      setLoadingClients(true)
+      try {
+        const data = await getClientsForUser(user.id)
+        setClients(data)
+      } catch (e) {
+        // handle error
+      } finally {
+        setLoadingClients(false)
+      }
+    }
+    fetchClients()
+  }, [user])
+
+  if (loading || loadingClients) {
     return <div>Loading...</div>
+  }
+
+  // If no clients, show placeholder
+  if (clients.length === 0 || false) {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center">
+		<h2 className="text-2xl font-light max-w-lg text-center mb-4">Ya casi estamos listos, empieza añadiendo tu primer paciente</h2>
+		<Button className='my-2 px-8 py-4 text-lg bg-teal-500 hover:bg-teal-600'>
+			Añade tu primer paciente
+		</Button>
+		<p className="text-muted-foreground font-light text-sm max-w-sm text-center mt-4">¿Tienes dudas? Haz click aquí para añadirte a ti mismo y testear la funcionalidad. </p>
+      </div>
+    )
   }
 
   return (
@@ -316,7 +348,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
           <div x-chunk="dashboard-01-chunk-5">
-            <ClientList />
+            <ClientList clients={clients} loading={loadingClients} />
           </div>
         </div>
       </main>
