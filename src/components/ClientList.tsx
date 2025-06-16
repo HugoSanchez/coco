@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { ClientForm } from './ClientForm'
 import { Tables } from '@/types/database.types'
 import { useUser } from '@/contexts/UserContext'
+import { getClientsForUser } from '@/lib/db/clients'
 
 type Client = Tables<'clients'>
 
@@ -19,23 +20,12 @@ export function ClientList() {
 	const { user } = useUser()
 
 	const fetchClients = async () => {
-
 		try {
 			setLoading(true)
-
 			if (!user) {
 				throw new Error('Not authenticated')
 			}
-
-			const response = await fetch('/api/clients', {
-				credentials: 'include',
-			})
-
-			if (!response.ok) {
-				throw new Error('Failed to fetch clients')
-			}
-
-			const data = await response.json()
+			const data = await getClientsForUser(user.id)
 			setClients(data)
 		} catch (error) {
 			console.error('Error fetching clients:', error)

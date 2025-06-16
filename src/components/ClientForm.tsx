@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useUser } from '@/contexts/UserContext'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/db/clients'
 
 interface ClientFormProps {
   isOpen: boolean
@@ -42,41 +42,20 @@ export function ClientForm({ isOpen, onClose, onClientCreated }: ClientFormProps
         throw new Error('Not authenticated')
       }
 
-      console.log('User from context:', user) // Debug log
-
       const payload = {
+        user_id: user.id,
         name: formData.name,
         email: formData.email,
         description: formData.description || null,
-        shouldBill: formData.shouldBill,
-        billingAmount: formData.billingAmount ? parseFloat(formData.billingAmount) : null,
-        billingType: formData.billingType || null,
-        billingFrequency: formData.billingFrequency || null,
-        billingTrigger: formData.billingTrigger || null,
-        billingAdvanceDays: formData.billingAdvanceDays ? parseInt(formData.billingAdvanceDays) : 0
+        should_bill: formData.shouldBill,
+        billing_amount: formData.billingAmount ? parseFloat(formData.billingAmount) : null,
+        billing_type: formData.billingType || null,
+        billing_frequency: formData.billingFrequency || null,
+        billing_trigger: formData.billingTrigger || null,
+        billing_advance_days: formData.billingAdvanceDays ? parseInt(formData.billingAdvanceDays) : 0
       }
 
-      console.log('Payload:', payload) // Debug log
-
-      const response = await fetch('/api/clients', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Ensure cookies are sent
-        body: JSON.stringify(payload)
-      })
-
-      console.log('Response status:', response.status) // Debug log
-
-      if (!response.ok) {
-        const error = await response.json()
-        console.log('Error response:', error) // Debug log
-        throw new Error(error.error || 'Failed to create client')
-      }
-
-      const result = await response.json()
-      console.log('Success:', result) // Debug log
+      await createClient(payload)
 
       // Reset form
       setFormData({
