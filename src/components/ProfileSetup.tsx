@@ -100,8 +100,12 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
     return (
         <div>
             <form onSubmit={handleSubmit} className="space-y-8">
+				<div>
+					<h2 className="text-2xl font-bold">Crea tu perfil</h2>
+					<p className='text-sm text-gray-500 mb-2'>Facilita que tus pacientes sepan quién eres.</p>
+				</div>
                 <div>
-                    <label htmlFor="name" className="block text-md font-medium text-gray-700">Profile Picture</label>
+                    <label htmlFor="name" className="block text-md font-medium text-gray-700">Foto de perfil</label>
                     <div className="mt-2 flex flex-col space-y-3">
                         <div className="relative w-20 h-20">
                             <label htmlFor="profile-picture" className="cursor-pointer block">
@@ -125,7 +129,7 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
                                                 e.preventDefault();
                                                 handleRemoveImage();
                                             }}
-                                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600"
+                                            className="absolute -top-1 -right-1 bg-black text-white rounded-full p-0.5 hover:bg-gray-800"
                                         >
                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                                                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -150,7 +154,7 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
                         </div>
                         <div>
                             <span className="text-sm text-teal-600 hover:text-teal-500 cursor-pointer" onClick={() => document.getElementById('profile-picture')?.click()}>
-                                {previewUrl ? 'Change photo' : 'Upload photo'}
+                                {previewUrl ? 'Cambiar imagen' : 'Subir imagen'}
                             </span>
                             <p className="text-xs text-gray-500 mt-1">JPG, PNG or GIF (max. 2MB)</p>
                         </div>
@@ -158,8 +162,8 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
                 </div>
 
                 <div>
-                    <label htmlFor="name" className="block text-md font-medium text-gray-700">Name</label>
-                    <p className='text-sm text-gray-500 mb-2'>Your public name, to be displayed on your calendar</p>
+                    <label htmlFor="name" className="block text-md font-medium text-gray-700">Nombre</label>
+                    <p className='text-sm text-gray-500 mb-2'>Tu nombre real, para que tus pacientes te reconozcan</p>
                     <Input
                         id="name"
                         type="text"
@@ -172,8 +176,8 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
                 </div>
 
                 <div>
-                    <label htmlFor="username" className="block text-md font-medium text-gray-700">Username</label>
-                    <p className='text-sm text-gray-500 mb-2'>Your unique calendar link</p>
+                    <label htmlFor="username" className="block text-md font-medium text-gray-700">Nombre de usuario</label>
+                    <p className='text-sm text-gray-500 mb-2'>Debe de ser único, ten en cuenta que puede ser público.</p>
                     <Input
                         id="username"
                         type="text"
@@ -190,7 +194,7 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
                     <p className='text-xs text-gray-500 my-2'>coco-cal.com/book/{username}</p>
                 </div>
 
-                <div>
+                <div hidden>
                     <label htmlFor="description" className="block text-md font-medium text-gray-700">Calendar Description</label>
                     <p className='text-sm text-gray-500 mb-2'>Help your clients understand what they are booking.</p>
                     <Textarea
@@ -205,9 +209,9 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
 					<Button
 						type="submit"
 						disabled={isLoading || !name}
-						className='h-12 w-full shadow-sm bg-teal-400 hover:bg-teal-400 hover:opacity-90'
+						className='h-12 w-full shadow-sm bg-teal-400 hover:bg-teal-400 hover:opacity-90 text-md'
 					>
-						{isLoading ? 'Saving...' : 'Continue'}
+						{isLoading ? 'Guardando...' : 'Continuar'}
 					</Button>
                 </div>
             </form>

@@ -243,7 +243,7 @@ export function WeeklyAvailability({onComplete}: {onComplete: () => void}) {
 
 	return (
 		<div className="space-y-6">
-		<div className="space-y-4 bg-gray-100 border border-gray-200 p-4 rounded-md">
+		<div className="space-y-4 bg-gray-100 p-8 rounded-md">
 			<p className='text-xl font-bold'>Weekly hours</p>
 			{availability.map((day, dayIndex) => (
 			<div key={dayIndex} className="flex flex-col space-y-2">
@@ -394,10 +394,10 @@ export function WeeklyAvailability({onComplete}: {onComplete: () => void}) {
 
 		<Button
 			onClick={handleSave}
-			className='h-12 w-full shadow-sm bg-teal-400 hover:bg-teal-400 hover:opacity-90'
+			className='h-12 w-full shadow-sm bg-teal-400 hover:bg-teal-400 hover:opacity-90 text-md'
 			disabled={saveStatus === 'loading'}
 		>
-			{saveStatus === 'loading' ? 'Saving...' : 'Continue'}
+			{saveStatus === 'loading' ? 'Guardando...' : 'Continuar'}
 		</Button>
 		</div>
 	)

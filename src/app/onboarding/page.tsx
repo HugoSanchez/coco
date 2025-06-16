@@ -13,9 +13,9 @@ import { useSearchParams } from 'next/navigation'
 
 
 const steps = [
-  { name: 'Create a Profile', description: 'Help your costumers know who you are.', component: ProfileSetup },
-  { name: 'Connect your calendar', description: 'This way coco will always be in sync with your google calendar.', component: CalendarStep },
-  { name: 'Set Availability', description: 'Set your availability', component: WeeklyAvailability },
+  { name: '1. Crea tu perfil', description: 'Help your costumers know who you are.', component: ProfileSetup },
+  { name: '2. Connecta tu calendario', description: 'This way coco will always be in sync with your google calendar.', component: CalendarStep },
+  { name: '3. Añade tu disponibilidad', description: 'Set your availability', component: WeeklyAvailability },
 ]
 
 export default function Onboarding() {

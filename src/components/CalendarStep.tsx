@@ -23,9 +23,11 @@ export function CalendarStep({ onComplete }: CalendarStepProps) {
 
     return (
         <div>
+			<div>
+				<h2 className="text-2xl font-bold">2. Connecta tu calendario</h2>
+				<p className='text-md text-gray-500 my-2'>Coco estará siempre sincronizado con tu calendario de Google de manera que te resulte fácil y automático agendar nuevas consultas.</p>
+			</div>
             <div className='mb-8'>
-                <p className="block text-md font-medium text-gray-700">Connect your Calendar</p>
-                <p className='text-sm text-gray-500 mb-2'>Coco will always be in sync with your google calendar.</p>
 				<div className='pt-2'>
 					<ConnectCalendar />
 				</div>
@@ -34,9 +36,9 @@ export function CalendarStep({ onComplete }: CalendarStepProps) {
 				<Button
 					type="submit"
 					disabled={isLoading}
-					className='h-12 w-full shadow-sm bg-teal-400 hover:bg-teal-400 hover:opacity-90'
+					className='h-12 w-full shadow-sm bg-teal-400 hover:bg-teal-400 hover:opacity-90 text-md'
 				>
-					{isLoading ? 'Saving...' : 'Continue'}
+					{isLoading ? 'Guardando...' : 'Continuar'}
 				</Button>
             </form>
         </div>
