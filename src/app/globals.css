@@ -83,3 +83,16 @@ input:-webkit-autofill:active {
     @apply bg-background text-foreground;
   }
 }
+
+   /* Completely hide scrollbar for specific elements, with increased specificity */
+   .scrollbar-hide,
+   .scrollbar-hide * {
+     scrollbar-width: none !important; /* Firefox */
+     -ms-overflow-style: none !important; /* IE and Edge */
+   }
+   .scrollbar-hide::-webkit-scrollbar,
+   .scrollbar-hide *::-webkit-scrollbar {
+     display: none !important; /* Chrome, Safari, Opera */
+     width: 0px !important;
+     background: transparent !important;
+   }

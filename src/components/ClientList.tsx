@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Plus, Users } from 'lucide-react'
+import Link from 'next/link'
+import { Plus, Users, ArrowUpRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -49,14 +50,6 @@ export function ClientList() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex items-center justify-between">
-				<h2 className="text-2xl font-bold">Clients</h2>
-				<Button onClick={() => setIsFormOpen(true)} className="flex items-center gap-2">
-					<Plus className="h-4 w-4" />
-					Add Client
-				</Button>
-			</div>
-
 			{clients.length === 0 ? (
 				<Card>
 					<CardHeader>
@@ -71,48 +64,58 @@ export function ClientList() {
 				</Card>
 			) : (
 				<Card>
-					<CardHeader>
-						<CardTitle>Your Clients</CardTitle>
-						<CardDescription>
-							Manage your client relationships and billing settings.
-						</CardDescription>
-					</CardHeader>
+					 <CardHeader className="flex flex-row items-center">
+              <div className="grid gap-1">
+                <CardTitle>Pacientes</CardTitle>
+                <CardDescription>
+                  Tu lista de pacientes activos.
+                </CardDescription>
+              </div>
+              <Button onClick={() => setIsFormOpen(true)} size="sm" className="ml-auto gap-1 bg-gray-100 text-gray-800 hover:bg-gray-200">
+				Añadir
+				<Plus className="h-5 w-5" />
+              </Button>
+            </CardHeader>
 					<CardContent>
-						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>Name</TableHead>
-									<TableHead>Email</TableHead>
-									<TableHead>Billing</TableHead>
-									<TableHead>Created</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{clients.map((client) => (
-									<TableRow key={client.id}>
-										<TableCell className="font-medium">{client.name}</TableCell>
-										<TableCell>{client.email}</TableCell>
-										<TableCell>
-											{client.should_bill ? (
-												<div className="flex items-center gap-2">
-													<Badge variant="secondary">
-														€{client.billing_amount}
-													</Badge>
-													<span className="text-sm text-gray-500">
-														{client.billing_type === 'recurring' ? client.billing_frequency : client.billing_type}
-													</span>
-												</div>
-											) : (
-												<Badge variant="outline">No billing</Badge>
-											)}
-										</TableCell>
-										<TableCell>
-											{client.created_at ? new Date(client.created_at).toLocaleDateString() : 'N/A'}
-										</TableCell>
+						<div className="max-h-[28rem] overflow-y-auto scrollbar-hide">
+							<Table>
+								<TableHeader>
+									<TableRow>
+										<TableHead>Paciente</TableHead>
+										<TableHead className="hidden xl:table-column">Billing</TableHead>
+										<TableHead className="hidden xl:table-column">Status</TableHead>
+										<TableHead className="hidden md:table-cell lg:hidden xl:table-column">Created</TableHead>
+										<TableHead className="text-right">Total facturado</TableHead>
 									</TableRow>
-								))}
-							</TableBody>
-						</Table>
+								</TableHeader>
+								<TableBody>
+									{clients.map((client) => (
+										<TableRow key={client.id}>
+											<TableCell>
+												<div className="font-medium">{client.name}</div>
+												<div className="hidden text-sm text-muted-foreground md:inline">
+													{client.email}
+												</div>
+											</TableCell>
+											<TableCell className="hidden xl:table-column">
+												{client.billing_type === 'recurring' ? client.billing_frequency : client.billing_type || 'N/A'}
+											</TableCell>
+											<TableCell className="hidden xl:table-column">
+												<Badge className="text-xs" variant={client.should_bill ? 'secondary' : 'outline'}>
+													{client.should_bill ? 'Active' : 'No billing'}
+												</Badge>
+											</TableCell>
+											<TableCell className="hidden md:table-cell lg:hidden xl:table-column">
+												{client.created_at ? new Date(client.created_at).toLocaleDateString() : 'N/A'}
+											</TableCell>
+											<TableCell className="text-right">
+												{client.billing_amount ? `€${client.billing_amount}` : '-'}
+											</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
+						</div>
 					</CardContent>
 				</Card>
 			)}

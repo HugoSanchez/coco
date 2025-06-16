@@ -88,10 +88,10 @@ export function ClientForm({ isOpen, onClose, onClientCreated }: ClientFormProps
       <SheetContent side="right" className="w-1/3 overflow-y-auto p-8 bg-gray-50 [&>button]:hidden">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-2xl font-bold">
-            Añade un nuevo cliente
+            Añade un nuevo paciente
           </SheetTitle>
 		  <SheetDescription>
-			Crea un nuevo cliente y configura las preferencias de facturación.
+			Crea un nuevo paciente y configura las preferencias de facturación.
 		  </SheetDescription>
         </SheetHeader>
 

@@ -315,9 +315,9 @@ export default function Dashboard() {
               </Table>
             </CardContent>
           </Card>
-          <Card x-chunk="dashboard-01-chunk-5">
+          <div x-chunk="dashboard-01-chunk-5">
             <ClientList />
-          </Card>
+          </div>
         </div>
       </main>
     </div>
