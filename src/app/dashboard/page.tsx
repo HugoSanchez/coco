@@ -128,7 +128,7 @@ export default function Dashboard() {
   }
 
   // If no clients, show placeholder
-  if (clients.length === 0 || false) {
+  if (!clients.length === 0 || false) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center">
 		<h2 className="text-2xl font-light max-w-lg text-center mb-4">Ya casi estamos listos, empieza añadiendo tu primer paciente</h2>
@@ -147,7 +147,7 @@ export default function Dashboard() {
 			<h1 className="text-3xl font-bold">Hola {profile?.name},</h1>
 			<h3 className="text-2xl">este es tu dashboard</h3>
 		</div>
-        <Button className='bg-emerald-500 hover:bg-emerald-600'>
+        <Button className='bg-teal-400 hover:bg-teal-500'>
             Calendar link
             <CopyIcon className="h-4 w-4 ml-2"/>
         </Button>
