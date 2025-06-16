@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { useUser } from '@/contexts/UserContext'
 import { supabase } from '@/lib/supabase'
 
 interface ClientFormProps {
@@ -19,6 +20,7 @@ interface ClientFormProps {
 
 export function ClientForm({ isOpen, onClose, onClientCreated }: ClientFormProps) {
   const [loading, setLoading] = useState(false)
+  const { user } = useUser()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -36,10 +38,11 @@ export function ClientForm({ isOpen, onClose, onClientCreated }: ClientFormProps
     setLoading(true)
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
+      if (!user) {
         throw new Error('Not authenticated')
       }
+
+      console.log('User from context:', user) // Debug log
 
       const payload = {
         name: formData.name,
@@ -53,18 +56,27 @@ export function ClientForm({ isOpen, onClose, onClientCreated }: ClientFormProps
         billingAdvanceDays: formData.billingAdvanceDays ? parseInt(formData.billingAdvanceDays) : 0
       }
 
+      console.log('Payload:', payload) // Debug log
+
       const response = await fetch('/api/clients', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Ensure cookies are sent
         body: JSON.stringify(payload)
       })
 
+      console.log('Response status:', response.status) // Debug log
+
       if (!response.ok) {
         const error = await response.json()
+        console.log('Error response:', error) // Debug log
         throw new Error(error.error || 'Failed to create client')
       }
+
+      const result = await response.json()
+      console.log('Success:', result) // Debug log
 
       // Reset form
       setFormData({
@@ -217,7 +229,7 @@ export function ClientForm({ isOpen, onClose, onClientCreated }: ClientFormProps
                       <Label htmlFor="billingTrigger">Cuándo enviar la factura</Label>
                       <Select value={formData.billingTrigger} onValueChange={(value) => handleInputChange('billingTrigger', value)}>
                         <SelectTrigger className="h-12">
-                          <SelectValue placeholder="Choose timing" />
+                          <SelectValue placeholder="Selecciona un timing" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="after_consultation">Después de la consulta (24h)</SelectItem>

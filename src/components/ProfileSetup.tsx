@@ -4,9 +4,9 @@ import React, { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { supabase } from "@/lib/supabase";
 import Image from 'next/image';
 import { useUser } from '@/contexts/UserContext';
+import { validateUsername, updateProfile, uploadProfilePicture } from '@/lib/db/profiles';
 
 interface ProfileSetupProps {
     onComplete: () => void;
@@ -31,23 +31,6 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
         }
     }, [profile])
 
-    const validateUsername = async (username: string) => {
-        if (username === profile?.username) return true
-
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('username')
-            .eq('username', username)
-            .single()
-
-        if (error?.code === 'PGRST116') {
-            // No matching username found - username is available
-            return true
-        }
-
-        return false
-    }
-
     const handleUsernameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const newUsername = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-')
         setUsername(newUsername)
@@ -57,7 +40,7 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
             return
         }
 
-        const isAvailable = await validateUsername(newUsername)
+        const isAvailable = await validateUsername(newUsername, profile?.username)
         if (!isAvailable) {
             setUsernameError('This username is already taken')
         } else {
@@ -74,40 +57,16 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
         try {
             let profile_picture_url = previewUrl
             if (profilePicture) {
-                const fileExt = profilePicture.name.split('.').pop();
-                const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-
-                console.log('Attempting upload to bucket: profile-pictures');
-                const { error: uploadError } = await supabase.storage
-                    .from('profile-pictures')
-                    .upload(fileName, profilePicture);
-
-                if (uploadError) {
-                    console.error('Upload error details:', uploadError);
-                    throw uploadError;
-                }
-
-                // Get the public URL using the proper method
-                const { data: { publicUrl } } = supabase.storage
-                    .from('profile-pictures')
-                    .getPublicUrl(fileName);
-
-                console.log('Public URL generated:', publicUrl);
-                profile_picture_url = publicUrl;
+                profile_picture_url = await uploadProfilePicture(user.id, profilePicture)
             }
 
-            const { error: profileError } = await supabase
-                .from('profiles')
-                .upsert({
-                    id: user.id,
-                    name,
-                    username: username.toLowerCase().replace(/\s+/g, '-'),
-                    description,
-                    email: user.email,
-                    profile_picture_url,
-                })
-
-            if (profileError) throw profileError
+            await updateProfile(user.id, {
+                name,
+                username: username.toLowerCase().replace(/\s+/g, '-'),
+                description,
+                email: user.email,
+                profile_picture_url,
+            })
 
             await refreshProfile() // Refresh the global profile state
             onComplete()

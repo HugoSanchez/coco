@@ -7,8 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ClientForm } from './ClientForm'
-import { supabase } from '@/lib/supabase'
 import { Tables } from '@/types/database.types'
+import { useUser } from '@/contexts/UserContext'
 
 type Client = Tables<'clients'>
 
@@ -16,17 +16,27 @@ export function ClientList() {
 	const [clients, setClients] = useState<Client[]>([])
 	const [loading, setLoading] = useState(true)
 	const [isFormOpen, setIsFormOpen] = useState(false)
+	const { user } = useUser()
 
 	const fetchClients = async () => {
-		try {
-			const { data: { session } } = await supabase.auth.getSession()
-			if (!session) return
 
-			const response = await fetch('/api/clients')
-			if (response.ok) {
-				const clientsData = await response.json()
-				setClients(clientsData)
+		try {
+			setLoading(true)
+
+			if (!user) {
+				throw new Error('Not authenticated')
 			}
+
+			const response = await fetch('/api/clients', {
+				credentials: 'include',
+			})
+
+			if (!response.ok) {
+				throw new Error('Failed to fetch clients')
+			}
+
+			const data = await response.json()
+			setClients(data)
 		} catch (error) {
 			console.error('Error fetching clients:', error)
 		} finally {
@@ -36,138 +46,92 @@ export function ClientList() {
 
 	useEffect(() => {
 		fetchClients()
-	}, [])
+	}, [user])
 
 	const handleClientCreated = () => {
-		fetchClients() // Refresh the list
-		setIsFormOpen(false) // Close the form
-	}
-
-	const getBillingDisplay = (client: Client) => {
-		if (!client.should_bill) return 'No billing'
-
-		if (client.billing_type === 'recurring') {
-			return `${client.billing_frequency} - $${client.billing_amount}`
-		} else if (client.billing_type === 'consultation_based') {
-			const timing = client.billing_trigger === 'before_consultation'
-				? `${client.billing_advance_days} days before`
-				: 'after consultation'
-			return `Per consultation (${timing}) - $${client.billing_amount}`
-		} else if (client.billing_type === 'project_based') {
-			return `Project billing - $${client.billing_amount}`
-		}
-
-		return 'Custom billing'
-	}
-
-	const getBillingBadgeColor = (type?: string | null) => {
-		switch (type) {
-			case 'recurring': return 'bg-blue-100 text-blue-800'
-			case 'consultation_based': return 'bg-green-100 text-green-800'
-			case 'project_based': return 'bg-purple-100 text-purple-800'
-			default: return 'bg-gray-100 text-gray-800'
-		}
+		setIsFormOpen(false)
+		fetchClients()
 	}
 
 	if (loading) {
-		return (
-		<Card>
-			<CardContent className="flex justify-center py-8">
-			<div className="text-gray-500">Loading clients...</div>
-			</CardContent>
-		</Card>
-		)
+		return <div>Loading clients...</div>
 	}
 
 	return (
-		<>
-		<Card>
-			<CardHeader>
+		<div className="space-y-6">
 			<div className="flex items-center justify-between">
-				<div>
-				<CardTitle className="flex items-center gap-2">
-					<Users className="h-5 w-5" />
-					Clients ({clients.length})
-				</CardTitle>
-				<CardDescription>
-					Manage your clients and their billing preferences
-				</CardDescription>
-				</div>
-				<Button onClick={() => setIsFormOpen(true)} className="flex items-center gap-2">
-				<Plus className="h-4 w-4" />
-				Add Client
-				</Button>
-			</div>
-			</CardHeader>
-			<CardContent>
-			{clients.length === 0 ? (
-				<div className="text-center py-8">
-				<Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-				<h3 className="text-lg font-medium text-gray-900 mb-2">No clients yet</h3>
-				<p className="text-gray-500 mb-4">Get started by adding your first client</p>
+				<h2 className="text-2xl font-bold">Clients</h2>
 				<Button onClick={() => setIsFormOpen(true)} className="flex items-center gap-2">
 					<Plus className="h-4 w-4" />
-					Add Your First Client
+					Add Client
 				</Button>
-				</div>
-			) : (
-				<div className="overflow-x-auto">
-				<Table>
-					<TableHeader>
-					<TableRow>
-						<TableHead>Name</TableHead>
-						<TableHead>Email</TableHead>
-						<TableHead>Billing</TableHead>
-						<TableHead>Type</TableHead>
-						<TableHead>Created</TableHead>
-					</TableRow>
-					</TableHeader>
-					<TableBody>
-					{clients.map((client) => (
-						<TableRow key={client.id}>
-						<TableCell>
-							<div>
-							<div className="font-medium">{client.name}</div>
-							{client.description && (
-								<div className="text-sm text-gray-500 truncate max-w-xs">
-								{client.description}
-								</div>
-							)}
-							</div>
-						</TableCell>
-						<TableCell>{client.email}</TableCell>
-						<TableCell>
-							<div className="text-sm">
-							{getBillingDisplay(client)}
-							</div>
-						</TableCell>
-						<TableCell>
-							<Badge
-							variant="secondary"
-							className={getBillingBadgeColor(client.billing_type)}
-							>
-							{client.billing_type?.replace('_', ' ') || 'none'}
-							</Badge>
-						</TableCell>
-						<TableCell>
-							<div className="text-sm text-gray-500">
-							{client.created_at ? new Date(client.created_at).toLocaleDateString() : 'N/A'}
-							</div>
-						</TableCell>
-						</TableRow>
-					))}
-					</TableBody>
-				</Table>
-				</div>
-			)}
-			</CardContent>
-		</Card>
+			</div>
 
-		<ClientForm
-			isOpen={isFormOpen}
-			onClose={() => setIsFormOpen(false)}
-			onClientCreated={handleClientCreated}
-		/>
-		</>
+			{clients.length === 0 ? (
+				<Card>
+					<CardHeader>
+						<CardTitle className="flex items-center gap-2">
+							<Users className="h-5 w-5" />
+							No clients yet
+						</CardTitle>
+						<CardDescription>
+							Add your first client to get started with billing and scheduling.
+						</CardDescription>
+					</CardHeader>
+				</Card>
+			) : (
+				<Card>
+					<CardHeader>
+						<CardTitle>Your Clients</CardTitle>
+						<CardDescription>
+							Manage your client relationships and billing settings.
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead>Name</TableHead>
+									<TableHead>Email</TableHead>
+									<TableHead>Billing</TableHead>
+									<TableHead>Created</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{clients.map((client) => (
+									<TableRow key={client.id}>
+										<TableCell className="font-medium">{client.name}</TableCell>
+										<TableCell>{client.email}</TableCell>
+										<TableCell>
+											{client.should_bill ? (
+												<div className="flex items-center gap-2">
+													<Badge variant="secondary">
+														€{client.billing_amount}
+													</Badge>
+													<span className="text-sm text-gray-500">
+														{client.billing_type === 'recurring' ? client.billing_frequency : client.billing_type}
+													</span>
+												</div>
+											) : (
+												<Badge variant="outline">No billing</Badge>
+											)}
+										</TableCell>
+										<TableCell>
+											{client.created_at ? new Date(client.created_at).toLocaleDateString() : 'N/A'}
+										</TableCell>
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
+					</CardContent>
+				</Card>
+			)}
+
+			<ClientForm
+				isOpen={isFormOpen}
+				onClose={() => setIsFormOpen(false)}
+				onClientCreated={handleClientCreated}
+			/>
+		</div>
 	)
 }
