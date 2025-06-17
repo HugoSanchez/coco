@@ -54,10 +54,10 @@ export default function Onboarding() {
     }, [searchParams, currentStep])
 
     const handlePrevious = () => {
-        setOnPrevious(true)
         if (currentStep > 0) {
-            setOnPrevious(true)
-            setCurrentStep(currentStep - 1)
+            const previousStep = currentStep - 1;
+            setCurrentStep(previousStep);
+            router.push(`/onboarding?step=${previousStep + 1}`);
         }
     }
 
@@ -80,11 +80,11 @@ export default function Onboarding() {
     }
 
     return (
-        <div className="container mx-auto lg:px-96 mt-16 py-2 bg-gray-50">
+        <div className="xl:px-96 md:px-44 px-6 mt-16 py-2 bg-gray-50">
             <OnboardingBreadcrumb
-            steps={steps}
-            currentStep={currentStep}
-            onStepClick={handleStepClick}
+				steps={steps}
+				currentStep={currentStep}
+				onStepClick={handleStepClick}
             />
             <div className="mt-12">
             	<CurrentStepComponent onComplete={handleStepComplete} />
@@ -98,7 +98,7 @@ export default function Onboarding() {
                         onClick={handlePrevious}
                         disabled={currentStep === 0}
                     >
-                        Previous
+                        Atrás
                     </Button>
                 )
             }

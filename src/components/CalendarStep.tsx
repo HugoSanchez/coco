@@ -25,7 +25,7 @@ export function CalendarStep({ onComplete }: CalendarStepProps) {
         <div>
 			<div>
 				<h2 className="text-2xl font-bold">2. Connecta tu calendario</h2>
-				<p className='text-md text-gray-500 mb-2'>Coco estará siempre sincronizado con tu calendario de Google de manera que te resulte fácil y automático agendar nuevas consultas.</p>
+				<p className='text-md text-gray-500 my-2'>Coco estará siempre sincronizado con tu calendario de Google de manera que te resulte fácil y automático agendar nuevas consultas.</p>
 			</div>
             <div className='mb-8'>
 				<div className='pt-2'>

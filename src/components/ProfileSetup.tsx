@@ -102,8 +102,8 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
             <form onSubmit={handleSubmit} className="space-y-8">
 				<div>
 					<h2 className="text-2xl font-bold">Crea tu perfil</h2>
-					<p className='text-sm text-gray-500 mb-2'>Facilita que tus pacientes sepan quién eres.</p>
-				</div>
+					<p className='text-md text-gray-500 my-2'>Añade la información necesaria para que tus pacientes te conozcan.</p>
+					</div>
                 <div>
                     <label htmlFor="name" className="block text-md font-medium text-gray-700">Foto de perfil</label>
                     <div className="mt-2 flex flex-col space-y-3">

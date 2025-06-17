@@ -32,7 +32,7 @@ export function BillingPreferencesStep({ onComplete }: BillingPreferencesStepPro
         setIsLoading(true);
         try {
             await saveBillingPreferences(user.id, billingPrefs);
-            toast({ title: 'Preferencias guardadas', description: 'Tus preferencias de facturación han sido guardadas.' });
+            // toast({ title: 'Preferencias guardadas', description: 'Tus preferencias de facturación han sido guardadas.' });
             onComplete();
         } catch (error: any) {
 			console.log(error);
@@ -59,7 +59,7 @@ export function BillingPreferencesStep({ onComplete }: BillingPreferencesStepPro
                 <Button
                     type="submit"
                     disabled={isLoading}
-                    className='h-12 w-full shadow-sm bg-teal-400 hover:bg-teal-400 hover:opacity-90 text-md'
+                    className='mt-8 h-12 w-full shadow-sm bg-teal-400 hover:bg-teal-400 hover:opacity-90 text-md'
                 >
                     {isLoading ? 'Guardando...' : 'Continuar'}
                 </Button>

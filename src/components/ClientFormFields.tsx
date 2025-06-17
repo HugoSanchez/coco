@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,9 +11,20 @@ import { UserPlus, ChevronDown, ChevronRight } from 'lucide-react'
 interface ClientFormFieldsProps {
   onSuccess: () => void
   onCancel?: () => void
+  hideSubmitButton?: boolean
+  onFormSubmit?: (e: React.FormEvent) => void
+  onSubmitFunction?: (submitFn: () => Promise<void>) => void
+  onLoadingChange?: (loading: boolean) => void
 }
 
-export function ClientFormFields({ onSuccess, onCancel }: ClientFormFieldsProps) {
+export function ClientFormFields({
+  onSuccess,
+  onCancel,
+  hideSubmitButton = false,
+  onFormSubmit,
+  onSubmitFunction,
+  onLoadingChange
+}: ClientFormFieldsProps) {
   const [loading, setLoading] = useState(false)
   const { user } = useUser()
   const [formData, setFormData] = useState({
@@ -28,9 +39,9 @@ export function ClientFormFields({ onSuccess, onCancel }: ClientFormFieldsProps)
     billingAdvanceDays: ''
   })
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const submitForm = useCallback(async () => {
     setLoading(true)
+    if (onLoadingChange) onLoadingChange(true)
     try {
       if (!user) throw new Error('Not authenticated')
       const payload = {
@@ -63,7 +74,25 @@ export function ClientFormFields({ onSuccess, onCancel }: ClientFormFieldsProps)
       alert(error instanceof Error ? error.message : 'Failed to create client')
     } finally {
       setLoading(false)
+      if (onLoadingChange) onLoadingChange(false)
     }
+  }, [user, formData, onSuccess, onLoadingChange])
+
+  // Expose the submit function to parent
+  useEffect(() => {
+    if (onSubmitFunction) {
+      onSubmitFunction(submitForm)
+    }
+  }, [onSubmitFunction, submitForm])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    if (onFormSubmit) {
+      onFormSubmit(e)
+      return
+    }
+
+    e.preventDefault()
+    await submitForm()
   }
 
   const handleInputChange = (field: string, value: string | boolean) => {
@@ -73,17 +102,17 @@ export function ClientFormFields({ onSuccess, onCancel }: ClientFormFieldsProps)
   return (
     <form onSubmit={handleSubmit} className="space-y-6 mt-6">
       {/* Basic Information */}
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="name">Nombre</Label>
-          <Input
-            id="name"
-            value={formData.name}
-            onChange={(e) => handleInputChange('name', e.target.value)}
-            placeholder="Nombre completo del cliente"
-            className="h-12"
-            required
-          />
+			<Label htmlFor="name">Nombre del paciente</Label>
+			<Input
+				id="name"
+				value={formData.name}
+				onChange={(e) => handleInputChange('name', e.target.value)}
+				placeholder="Nombre completo del cliente"
+				className="h-12"
+				required
+			/>
         </div>
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
@@ -205,17 +234,19 @@ export function ClientFormFields({ onSuccess, onCancel }: ClientFormFieldsProps)
         )}
       </div>
       {/* Actions */}
-      <div className="flex gap-3 pt-6">
-        <Button type="submit" disabled={loading} className="flex-1 text-md font-medium">
-          <UserPlus className="h-4 w-4 mr-2" />
-          {loading ? 'Guardando...' : 'Añadir'}
-        </Button>
-        {onCancel && (
-          <Button type="button" variant="outline" onClick={onCancel} className="flex-1 text-md font-medium">
-            Cancelar
+      {!hideSubmitButton && (
+        <div className="flex gap-3 pt-6">
+          <Button type="submit" disabled={loading} className="flex-1 text-md font-medium bg-teal-400 hover:bg-teal-400 hover:opacity-90">
+            <UserPlus className="h-4 w-4 mr-2" />
+            {loading ? 'Guardando...' : 'Añadir'}
           </Button>
-        )}
-      </div>
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel} className="flex-1 text-md font-medium">
+              Cancelar
+            </Button>
+          )}
+        </div>
+      )}
     </form>
   )
 }

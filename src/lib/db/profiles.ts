@@ -101,10 +101,14 @@ export async function saveBillingPreferences(userId: string, preferences: any) {
         user_id: userId,
         billing_amount: preferences.billingAmount,
         billing_type: preferences.billingType,
-        billing_frequency: preferences.billingFrequency,
         billing_advance_days: parseInt(preferences.billingAdvanceDays, 10) || 0,
         should_bill: preferences.shouldBill
     };
+
+    // Only include billing_frequency if it has a valid value
+    if (preferences.billingFrequency && preferences.billingFrequency.trim() !== '') {
+        billingData.billing_frequency = preferences.billingFrequency;
+    }
 
     // Only include billing_trigger if it has a valid value
     if (preferences.billingTrigger && preferences.billingTrigger.trim() !== '') {
@@ -113,7 +117,9 @@ export async function saveBillingPreferences(userId: string, preferences: any) {
 
     const { error } = await supabase
         .from('billing_preferences')
-        .upsert(billingData);
+        .upsert(billingData, {
+            onConflict: 'user_id'
+        });
     if (error) throw error;
 }
 
