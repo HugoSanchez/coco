@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { ConnectCalendar } from "@/components/ConnectCalendar"
 
-interface CalendarStepProps {
+interface CustomerStepProps {
     onComplete: () => void;
 }
 
-export function CalendarStep({ onComplete }: CalendarStepProps) {
+export function CustomerStep({ onComplete }: CustomerStepProps) {
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
 
@@ -24,8 +24,8 @@ export function CalendarStep({ onComplete }: CalendarStepProps) {
     return (
         <div>
 			<div>
-				<h2 className="text-2xl font-bold">2. Connecta tu calendario</h2>
-				<p className='text-md text-gray-500 mb-2'>Coco estará siempre sincronizado con tu calendario de Google de manera que te resulte fácil y automático agendar nuevas consultas.</p>
+				<h2 className="text-2xl font-bold">4. Añade tu primer cliente</h2>
+				<p className='text-md text-gray-500 mb-2'>Si tienes dudas, puedes empezar por añadirte a ti mismo/a para así poder testear nuestras funcionalidades!</p>
 			</div>
             <div className='mb-8'>
 				<div className='pt-2'>

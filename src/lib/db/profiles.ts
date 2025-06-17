@@ -96,4 +96,25 @@ export async function uploadProfilePicture(userId: string, file: File) {
     return publicUrl;
 }
 
+export async function saveBillingPreferences(userId: string, preferences: any) {
+    const billingData: any = {
+        user_id: userId,
+        billing_amount: preferences.billingAmount,
+        billing_type: preferences.billingType,
+        billing_frequency: preferences.billingFrequency,
+        billing_advance_days: parseInt(preferences.billingAdvanceDays, 10) || 0,
+        should_bill: preferences.shouldBill
+    };
+
+    // Only include billing_trigger if it has a valid value
+    if (preferences.billingTrigger && preferences.billingTrigger.trim() !== '') {
+        billingData.billing_trigger = preferences.billingTrigger;
+    }
+
+    const { error } = await supabase
+        .from('billing_preferences')
+        .upsert(billingData);
+    if (error) throw error;
+}
+
 // Add other profile-related queries here...

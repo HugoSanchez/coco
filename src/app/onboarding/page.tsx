@@ -5,8 +5,9 @@ import { ProfileSetup } from '@/components/ProfileSetup'
 import { WeeklyAvailability } from '@/components/WeeklyAvailability'
 import { CalendarStep } from '@/components/CalendarStep'
 import { OnboardingBreadcrumb } from '@/components/Breadcrumb'
+import { BillingPreferencesStep } from '@/components/BillingPreferencesStep'
+import { CustomerStep } from '@/components/CustomerStep'
 import { Button } from '@/components/ui/button'
-import { InfoIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
 
@@ -15,7 +16,8 @@ import { useSearchParams } from 'next/navigation'
 const steps = [
   { name: '1. Crea tu perfil', description: 'Help your costumers know who you are.', component: ProfileSetup },
   { name: '2. Connecta tu calendario', description: 'This way coco will always be in sync with your google calendar.', component: CalendarStep },
-  { name: '3. Añade tu disponibilidad', description: 'Set your availability', component: WeeklyAvailability },
+  { name: '3. Facturación', description: 'Set your availability', component: BillingPreferencesStep },
+  { name: '4. Tu primer paciente', description: 'If you have any questions, you can start by adding yourself to test our features!', component: CustomerStep },
 ]
 
 export default function Onboarding() {

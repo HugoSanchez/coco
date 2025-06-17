@@ -127,19 +127,6 @@ export default function Dashboard() {
     return <div>Loading...</div>
   }
 
-  // If no clients, show placeholder
-  if (!clients.length === 0 || false) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center">
-		<h2 className="text-2xl font-light max-w-lg text-center mb-4">Ya casi estamos listos, empieza añadiendo tu primer paciente</h2>
-		<Button className='my-2 px-8 py-4 text-lg bg-teal-500 hover:bg-teal-600'>
-			Añade tu primer paciente
-		</Button>
-		<p className="text-muted-foreground font-light text-sm max-w-sm text-center mt-4">¿Tienes dudas? Haz click aquí para añadirte a ti mismo y testear la funcionalidad. </p>
-      </div>
-    )
-  }
-
   return (
     <div className="flex min-h-screen w-full flex-col py-24">
       <header className="flex items-center justify-between px-4 md:px-16 pb-6">
