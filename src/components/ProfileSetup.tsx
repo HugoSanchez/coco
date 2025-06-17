@@ -7,13 +7,21 @@ import { Textarea } from "@/components/ui/textarea"
 import Image from 'next/image';
 import { useUser } from '@/contexts/UserContext';
 import { validateUsername, updateProfile, uploadProfilePicture } from '@/lib/db/profiles';
+import { useToast } from '@/components/ui/use-toast';
 
 interface ProfileSetupProps {
     onComplete: () => void;
+    title?: string;
+    subtitle?: string;
+    buttonText?: string;
+    loadingText?: string;
+    showSuccessToast?: boolean;
+    skipOnComplete?: boolean;
 }
 
-export function ProfileSetup({ onComplete }: ProfileSetupProps) {
+export function ProfileSetup({ onComplete, title, subtitle, buttonText, loadingText, showSuccessToast, skipOnComplete }: ProfileSetupProps) {
     const { user, profile, refreshProfile } = useUser()
+    const { toast } = useToast()
     const [name, setName] = useState('')
     const [username, setUsername] = useState('')
     const [description, setDescription] = useState('')
@@ -69,9 +77,28 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
             })
 
             await refreshProfile() // Refresh the global profile state
-            onComplete()
+
+            // Show success toast only if enabled
+            if (showSuccessToast) {
+                toast({
+                    title: "Perfil actualizado correctamente",
+                    color: 'success',
+                })
+            }
+
+            if (!skipOnComplete) {
+                onComplete()
+            }
         } catch (error) {
             console.error('Error:', error)
+            // Show error toast if there was an error and toasts are enabled
+            if (showSuccessToast) {
+                toast({
+                    title: "Error",
+                    description: "Hubo un problema al guardar los cambios. Inténtalo de nuevo.",
+                    color: 'error',
+                })
+            }
         } finally {
             setIsLoading(false)
         }
@@ -101,8 +128,8 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
         <div>
             <form onSubmit={handleSubmit} className="space-y-8">
 				<div>
-					<h2 className="text-2xl font-bold">Crea tu perfil</h2>
-					<p className='text-md text-gray-500 my-2'>Añade la información necesaria para que tus pacientes te conozcan.</p>
+					<h2 className="text-2xl font-bold">{title || 'Crea tu perfil'}</h2>
+					<p className='text-md text-gray-500 my-2'>{subtitle || 'Añade la información necesaria para que tus pacientes te conozcan.'}</p>
 					</div>
                 <div>
                     <label htmlFor="name" className="block text-md font-medium text-gray-700">Foto de perfil</label>
@@ -211,7 +238,7 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
 						disabled={isLoading || !name}
 						className='h-12 w-full shadow-sm bg-teal-400 hover:bg-teal-400 hover:opacity-90 text-md'
 					>
-						{isLoading ? 'Guardando...' : 'Continuar'}
+						{isLoading ? loadingText || 'Guardando...' : buttonText || 'Continuar'}
 					</Button>
                 </div>
             </form>
