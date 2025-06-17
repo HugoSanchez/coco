@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useUser } from '@/contexts/UserContext'
 import { createClient } from '@/lib/db/clients'
 import { UserPlus, ChevronDown, ChevronRight } from 'lucide-react'
@@ -38,6 +39,7 @@ export function ClientFormFields({
     billingTrigger: '',
     billingAdvanceDays: ''
   })
+  const [useDefaultBilling, setUseDefaultBilling] = useState(false)
 
   const submitForm = useCallback(async () => {
     setLoading(true)
@@ -99,6 +101,28 @@ export function ClientFormFields({
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
+  const getBillingRecurrenceValue = () => {
+    if (formData.billingType === 'consultation_based') {
+      return 'consultation_based'
+    } else if (formData.billingType === 'recurring') {
+      return formData.billingFrequency
+    }
+    return ''
+  }
+
+  const handleRecurrenceChange = (value: string) => {
+    if (value === 'consultation_based') {
+      handleInputChange('billingType', 'consultation_based')
+      handleInputChange('billingFrequency', '')
+    } else if (value === 'weekly') {
+      handleInputChange('billingType', 'recurring')
+      handleInputChange('billingFrequency', 'weekly')
+    } else if (value === 'monthly') {
+      handleInputChange('billingType', 'recurring')
+      handleInputChange('billingFrequency', 'monthly')
+    }
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6 mt-6">
       {/* Basic Information */}
@@ -140,96 +164,95 @@ export function ClientFormFields({
       </div>
       {/* Billing Configuration */}
       <div className="space-y-4">
-        <div
-          className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors"
-          onClick={() => handleInputChange('shouldBill', !formData.shouldBill)}
-        >
-          {formData.shouldBill ? (
-            <ChevronDown className="h-4 w-4 text-gray-600" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-gray-600" />
-          )}
-          <h3 className="text-lg font-medium">
-            Opciones de facturación
-          </h3>
+        <div className="flex items-center space-x-2 pt-2">
+          <Checkbox
+            id="useDefaultBilling"
+            checked={useDefaultBilling}
+			className='h-4 w-4'
+            onCheckedChange={(checked) => setUseDefaultBilling(checked === true)}
+          />
+          <Label
+            htmlFor="useDefaultBilling"
+            className="text-sm text-gray-700 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          >
+            Añadir condiciones de facturación particulares para este paciente
+          </Label>
         </div>
-        {formData.shouldBill && (
-          <div className="space-y-4 pl-6 border-l-2 border-gray-100">
-            <div className="space-y-2">
-              <Label htmlFor="billingAmount">Cantidad</Label>
-              <div className="relative">
-                <Input
-                  id="billingAmount"
-                  type="number"
-                  step="0.01"
-                  value={formData.billingAmount}
-                  onChange={(e) => handleInputChange('billingAmount', e.target.value)}
-                  placeholder="0.00"
-                  className="pr-8 h-12"
-                />
-                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500">
-                  €
-                </span>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="billingType">Tipo de facturación</Label>
-              <Select value={formData.billingType} onValueChange={(value) => handleInputChange('billingType', value)}>
-                <SelectTrigger className="h-12">
-                  <SelectValue placeholder="Selecciona un tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="consultation_based">Por Consulta</SelectItem>
-                  <SelectItem value="recurring">Recurrente (Mensual o Semanal)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {formData.billingType === 'recurring' && (
+
+        {useDefaultBilling && (
+          <div className="space-y-6 mt-6">
+            <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="billingFrequency">Frequency</Label>
-                <Select value={formData.billingFrequency} onValueChange={(value) => handleInputChange('billingFrequency', value)}>
+                <div>
+                  <label htmlFor="billingAmount" className="block text-md font-medium text-gray-700">Precio de la consulta</label>
+                  <p className='text-sm text-gray-500 mb-2'>Honorarios a aplicar por defecto en tus consultas.</p>
+                </div>
+                <div className="relative">
+                  <Input
+                    id="billingAmount"
+                    type="number"
+                    step="0.01"
+                    value={formData.billingAmount}
+                    onChange={(e) => handleInputChange('billingAmount', e.target.value)}
+                    placeholder="0.00"
+                    className="pr-8 h-12"
+                  />
+                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500">
+                    €
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <label htmlFor="billingRecurrence" className="block text-md font-medium text-gray-700">Recurrencia de facturación</label>
+                  <p className='text-sm text-gray-500 mb-2'>Selecciona la frecuencia con la que deseas facturar a tus pacientes.</p>
+                </div>
+                <Select value={getBillingRecurrenceValue()} onValueChange={handleRecurrenceChange}>
                   <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Choose frequency" />
+                    <SelectValue placeholder="Selecciona recurrencia" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                    <SelectItem value="quarterly">Quarterly</SelectItem>
-                    <SelectItem value="yearly">Yearly</SelectItem>
+                    <SelectItem value="consultation_based">Por Consulta <span className='text-xs text-gray-500'>- Enviar una factura antes o después de cada consulta</span></SelectItem>
+                    <SelectItem value="weekly">Semanal <span className='text-xs text-gray-500'>- Enviar una factura a final de semana</span></SelectItem>
+                    <SelectItem value="monthly">Mensual <span className='text-xs text-gray-500'>- Enviar una factura a final de mes</span></SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            )}
-            {formData.billingType === 'consultation_based' && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="billingTrigger">Cuándo enviar la factura</Label>
-                  <Select value={formData.billingTrigger} onValueChange={(value) => handleInputChange('billingTrigger', value)}>
-                    <SelectTrigger className="h-12">
-                      <SelectValue placeholder="Selecciona un timing" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="after_consultation">Después de la consulta (24h)</SelectItem>
-                      <SelectItem value="before_consultation">Antes de la consulta (días antes)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {formData.billingTrigger === 'before_consultation' && (
+              {/* Only show billingTrigger if consultation_based */}
+              {getBillingRecurrenceValue() === 'consultation_based' && (
+                <>
                   <div className="space-y-2">
-                    <Label htmlFor="billingAdvanceDays">Días de antelación</Label>
-                    <Input
-                      id="billingAdvanceDays"
-                      type="number"
-                      min="1"
-                      value={formData.billingAdvanceDays}
-                      onChange={(e) => handleInputChange('billingAdvanceDays', e.target.value)}
-                      placeholder="3"
-                      className="h-12"
-                    />
+                    <div>
+                      <label htmlFor="billingTrigger" className="block text-md font-medium text-gray-700">Cuándo enviar la factura</label>
+                      <p className='text-sm text-gray-500 mb-2'>Selecciona si quieres que enviemos la factura antes o después de la consulta.</p>
+                    </div>
+                    <Select value={formData.billingTrigger} onValueChange={(value) => handleInputChange('billingTrigger', value)}>
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Selecciona un timing" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="after_consultation">Después de la consulta <span className='text-xs text-gray-500'>- Enviaremos la factura hasta 24h después de la consulta</span></SelectItem>
+                        <SelectItem value="before_consultation">Antes de la consulta<span className='text-xs text-gray-500'>- Enviaremos la factura unos días antes de la consulta</span></SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
-              </>
-            )}
+                  {formData.billingTrigger === 'before_consultation' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="billingAdvanceDays">Días de antelación</Label>
+                      <Input
+                        id="billingAdvanceDays"
+                        type="number"
+                        min="1"
+                        value={formData.billingAdvanceDays}
+                        onChange={(e) => handleInputChange('billingAdvanceDays', e.target.value)}
+                        placeholder="3"
+                        className="h-12"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
