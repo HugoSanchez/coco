@@ -9,13 +9,15 @@ import { ClientList } from '@/components/ClientList'
 import { BookingsTable, Booking } from '@/components/BookingsTable'
 import {
   Activity,
-  ArrowUpRight,
+  FilterIcon,
+  FilterX,
   CircleUser,
   CreditCard,
   DollarSign,
   Search,
   Users,
-  CopyIcon
+  Plus,
+  ArrowUpRight
 } from "lucide-react"
 import {
   Avatar,
@@ -230,9 +232,9 @@ export default function Dashboard() {
 			<h1 className="text-3xl font-bold">Hola {profile?.name},</h1>
 			<h3 className="text-2xl">este es tu dashboard</h3>
 		</div>
-        <Button className='bg-teal-400 hover:bg-teal-500'>
-            Calendar link
-            <CopyIcon className="h-4 w-4 ml-2"/>
+        <Button className='font-light text-sm'>
+            Nueva Cita
+            <Plus className="h-5 w-5 ml-2"/>
         </Button>
       </header>
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:px-16">
@@ -296,15 +298,15 @@ export default function Dashboard() {
           >
             <CardHeader className="flex flex-row items-center">
               <div className="grid gap-2">
-                <CardTitle>Latest bookings</CardTitle>
+                <CardTitle>Listado de citas</CardTitle>
                 <CardDescription>
-                  Most recent appointment bookings.
+                  Listado de todas tus citas agendadas, con su estado de facturación y pago.
                 </CardDescription>
               </div>
-              <Button asChild size="sm" className="ml-auto gap-1">
+              <Button asChild size="sm" className="ml-auto gap-1 bg-gray-100 text-gray-800 hover:bg-gray-200">
                 <Link href="#">
-                  View All
-                  <ArrowUpRight className="h-4 w-4" />
+                  Filtros
+                  <FilterX className="h-4 w-4 ml-2" />
                 </Link>
               </Button>
             </CardHeader>

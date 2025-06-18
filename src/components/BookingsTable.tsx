@@ -21,8 +21,9 @@ import {
   MoreHorizontal,
   Calendar,
   X,
-  Filter,
-  Search
+  CircleCheck,
+  Search,
+  Loader
 } from "lucide-react"
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -110,59 +111,16 @@ export function BookingsTable({
 
   return (
     <div className="space-y-4 relative">
-      {/* Overlay when sidebar is open */}
-      {isFilterOpen && (
-        <div className="fixed inset-0 bg-black/20 z-40" />
-      )}
-
-      {/* Header with Filter Button */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold text-gray-900">Latest Bookings</h2>
-          <div className="text-sm text-gray-500">
-            {hasActiveFilters ? (
-              <>
-                Showing <span className="font-medium text-gray-900">{filteredBookings.length}</span> of{' '}
-                <span className="font-medium text-gray-900">{bookings.length}</span> bookings
-              </>
-            ) : (
-              `${bookings.length} total bookings`
-            )}
-          </div>
-        </div>
-
-        <Button
-          variant={hasActiveFilters ? "default" : "outline"}
-          size="sm"
-          onClick={() => setIsFilterOpen(true)}
-          className="gap-2"
-        >
-          <Filter className="h-4 w-4" />
-          Filters
-          {hasActiveFilters && (
-            <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-              {[
-                filters.customerSearch && 1,
-                filters.billingFilter !== 'all' && 1,
-                filters.paymentFilter !== 'all' && 1,
-                filters.startDate && 1,
-                filters.endDate && 1
-              ].filter(Boolean).length}
-            </Badge>
-          )}
-        </Button>
-      </div>
-
       {/* Table */}
-      <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+      <div className="bg-white rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow className="bg-gray-50/50">
-              <TableHead className="font-semibold">Customer</TableHead>
-              <TableHead className="hidden md:table-cell font-semibold">Date</TableHead>
-              <TableHead className="hidden sm:table-cell font-semibold">Billing</TableHead>
-              <TableHead className="hidden sm:table-cell font-semibold">Payment</TableHead>
-              <TableHead className="text-right font-semibold">Amount</TableHead>
+            <TableRow className=" border-b ">
+              <TableHead className="font-medium">Paciente</TableHead>
+              <TableHead className="hidden md:table-cell font-semibold">Fecha</TableHead>
+              <TableHead className="hidden sm:table-cell font-semibold">Factura</TableHead>
+              <TableHead className="hidden sm:table-cell font-semibold">Pago</TableHead>
+              <TableHead className="text-right font-semibold">Honorarios</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -205,46 +163,43 @@ export function BookingsTable({
 
                   <TableCell className="hidden md:table-cell">
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-gray-400" />
-                      <span>{format(booking.bookingDate, 'dd MMM yyyy', { locale: es })}</span>
+                      <span className='font-light'>{format(booking.bookingDate, 'dd MMM yyyy', { locale: es })}</span>
                     </div>
                   </TableCell>
 
                   <TableCell className="hidden sm:table-cell">
                     <Badge
                       variant="outline"
-                      className={`cursor-pointer transition-all duration-200 px-3 py-1 ${
-                        booking.billingStatus === 'billed'
-                          ? "bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100"
-                          : "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100"
-                      }`}
+                      className={`cursor-pointer transition-all duration-200 py-1 rounded-md text-gray-700 font-light border-gray-200 ${
+						booking.billingStatus === 'billed' ? '' : 'border-gray-200 text-gray-700'
+					  }`}
                       onClick={() => {
                         const newStatus = booking.billingStatus === 'pending' ? 'billed' : 'pending'
                         onStatusChange(booking.id, 'billing', newStatus)
                       }}
                     >
-                      {booking.billingStatus === 'billed' ? 'Enviada' : 'Pendiente'}
+					  {booking.billingStatus !== 'billed'? null : <CircleCheck className="h-4 w-4 text-white fill-teal-500 mr-2" /> }
+                      {booking.billingStatus === 'billed' ? 'Enviada' : 'Por enviar'}
                     </Badge>
                   </TableCell>
 
                   <TableCell className="hidden sm:table-cell">
                     <Badge
                       variant="outline"
-                      className={`cursor-pointer transition-all duration-200 px-3 py-1 ${
-                        booking.paymentStatus === 'paid'
-                          ? "bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100"
-                          : "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100"
-                      }`}
+                      className={`cursor-pointer transition-all duration-200 py-1 rounded-md text-gray-700 font-light border-gray-200 ${
+						booking.paymentStatus === 'paid' ? 'bg-teal-100 text-teal-700' : 'border-gray-200 text-gray-700'
+					  }`}
                       onClick={() => {
                         const newStatus = booking.paymentStatus === 'pending' ? 'paid' : 'pending'
                         onStatusChange(booking.id, 'payment', newStatus)
                       }}
                     >
-                      {booking.paymentStatus === 'paid' ? 'Realizado' : 'Pendiente'}
+						{booking.paymentStatus !== 'paid'? <Loader className="h-3 w-3 text-teal-500 mr-2" /> : <CircleCheck className="h-4 w-4 text-white fill-teal-500 mr-2" /> }
+                      	{booking.paymentStatus === 'paid' ? 'Realizado' : 'Pendiente'}
                     </Badge>
                   </TableCell>
 
-                  <TableCell className="text-right font-medium">
+                  <TableCell className="text-right font-light">
                     €{booking.amount.toFixed(2)}
                   </TableCell>
 
@@ -258,10 +213,10 @@ export function BookingsTable({
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
                           onClick={() => onCancelBooking(booking.id)}
-                          className="text-red-600 focus:text-red-600"
+                          className=""
                         >
                           <X className="mr-2 h-4 w-4" />
-                          Cancel Appointment
+                          Cancelar
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
