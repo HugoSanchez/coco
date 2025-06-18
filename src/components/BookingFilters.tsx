@@ -3,6 +3,12 @@
 import { useState } from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Calendar } from "@/components/ui/calendar"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import {
   Select,
   SelectContent,
@@ -10,9 +16,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
+import { cn } from "@/lib/utils"
+import { format } from "date-fns"
+import { es } from 'date-fns/locale'
 import {
   Search,
-  RotateCcw
+  RotateCcw,
+  CalendarIcon
 } from "lucide-react"
 
 export interface BookingFiltersState {
@@ -54,48 +65,104 @@ export function BookingFilters({
     filters.startDate !== '' ||
     filters.endDate !== ''
 
+  // Convert string dates to Date objects for the calendar
+  const startDate = filters.startDate ? new Date(filters.startDate) : undefined
+  const endDate = filters.endDate ? new Date(filters.endDate) : undefined
+
+  const handleStartDateSelect = (date: Date | undefined) => {
+    if (date) {
+      updateFilter('startDate', date.toISOString().split('T')[0])
+    } else {
+      updateFilter('startDate', '')
+    }
+  }
+
+  const handleEndDateSelect = (date: Date | undefined) => {
+    if (date) {
+      updateFilter('endDate', date.toISOString().split('T')[0])
+    } else {
+      updateFilter('endDate', '')
+    }
+  }
+
   return (
     <div className="space-y-6 pt-6">
       {/* Customer Search */}
       <div className="space-y-3">
-        <h3 className="font-semibold text-gray-900">Search Customer</h3>
+        <Label>Paciente</Label>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Name or email..."
+            placeholder="Nombre o email..."
             value={filters.customerSearch}
             onChange={(e) => updateFilter('customerSearch', e.target.value)}
-            className="pl-10"
+            className=""
           />
         </div>
       </div>
 
       {/* Date Range */}
       <div className="space-y-3">
-        <h3 className="font-semibold text-gray-900">Date Range</h3>
-        <div className="space-y-2">
+        <Label>Rango de fechas</Label>
+        <div className="space-y-3">
           <div>
-            <label className="text-sm text-gray-600 block mb-1">From</label>
-            <Input
-              type="date"
-              value={filters.startDate}
-              onChange={(e) => updateFilter('startDate', e.target.value)}
-            />
+            <label className="text-sm text-gray-600 block mb-2">Desde</label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !startDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {startDate ? format(startDate, "PPP", { locale: es }) : "Seleccionar fecha"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={startDate}
+                  onSelect={handleStartDateSelect}
+                  initialFocus
+                  locale={es}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
           <div>
-            <label className="text-sm text-gray-600 block mb-1">To</label>
-            <Input
-              type="date"
-              value={filters.endDate}
-              onChange={(e) => updateFilter('endDate', e.target.value)}
-            />
+            <label className="text-sm text-gray-600 block mb-2">Hasta</label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !endDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {endDate ? format(endDate, "PPP", { locale: es }) : "Seleccionar fecha"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={endDate}
+                  onSelect={handleEndDateSelect}
+                  initialFocus
+                  locale={es}
+                  disabled={(date) => startDate ? date < startDate : false}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
       </div>
 
       {/* Billing Status */}
       <div className="space-y-3">
-        <h3 className="font-semibold text-gray-900">Billing Status</h3>
+        <Label>Estado de facturación</Label>
         <Select
           value={filters.billingFilter}
           onValueChange={(value) => updateFilter('billingFilter', value as 'all' | 'pending' | 'billed')}
@@ -104,16 +171,16 @@ export function BookingFilters({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All billing</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="billed">Billed</SelectItem>
+            <SelectItem value="all">Todas</SelectItem>
+            <SelectItem value="pending">Pendiente</SelectItem>
+            <SelectItem value="billed">Enviada</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       {/* Payment Status */}
       <div className="space-y-3">
-        <h3 className="font-semibold text-gray-900">Payment Status</h3>
+        <Label>Estado de pago</Label>
         <Select
           value={filters.paymentFilter}
           onValueChange={(value) => updateFilter('paymentFilter', value as 'all' | 'pending' | 'paid')}
@@ -122,9 +189,9 @@ export function BookingFilters({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All payment</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="paid">Paid</SelectItem>
+            <SelectItem value="all">Todas</SelectItem>
+            <SelectItem value="pending">Pendiente</SelectItem>
+            <SelectItem value="paid">Pagado</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -135,10 +202,10 @@ export function BookingFilters({
           <Button
             variant="outline"
             onClick={clearAllFilters}
-            className="w-full"
+            className="w-full bg-red-300"
           >
             <RotateCcw className="h-4 w-4 mr-2" />
-            Clear Filters
+            Eliminar filtros
           </Button>
         </div>
       )}

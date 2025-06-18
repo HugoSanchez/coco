@@ -1,6 +1,5 @@
 'use client'
 
-import { useState, useMemo } from 'react'
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -27,8 +26,6 @@ import {
 } from "lucide-react"
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { SideSheet } from './SideSheet'
-import { BookingFilters, BookingFiltersState } from './BookingFilters'
 
 export interface Booking {
   id: string
@@ -53,53 +50,6 @@ export function BookingsTable({
   onStatusChange,
   onCancelBooking
 }: BookingsTableProps) {
-  const [isFilterOpen, setIsFilterOpen] = useState(false)
-  const [filters, setFilters] = useState<BookingFiltersState>({
-    customerSearch: '',
-    billingFilter: 'all',
-    paymentFilter: 'all',
-    startDate: '',
-    endDate: ''
-  })
-
-  // Filtered bookings logic
-  const filteredBookings = useMemo(() => {
-    return bookings.filter((booking) => {
-      // Customer search filter
-      const matchesCustomer = filters.customerSearch === '' ||
-        booking.customerName.toLowerCase().includes(filters.customerSearch.toLowerCase()) ||
-        booking.customerEmail.toLowerCase().includes(filters.customerSearch.toLowerCase())
-
-      // Billing status filter
-      const matchesBilling = filters.billingFilter === 'all' || booking.billingStatus === filters.billingFilter
-
-      // Payment status filter
-      const matchesPayment = filters.paymentFilter === 'all' || booking.paymentStatus === filters.paymentFilter
-
-      // Date range filter
-      let matchesDate = true
-      if (filters.startDate && filters.endDate) {
-        const start = new Date(filters.startDate)
-        const end = new Date(filters.endDate)
-        matchesDate = booking.bookingDate >= start && booking.bookingDate <= end
-      } else if (filters.startDate) {
-        const start = new Date(filters.startDate)
-        matchesDate = booking.bookingDate >= start
-      } else if (filters.endDate) {
-        const end = new Date(filters.endDate)
-        matchesDate = booking.bookingDate <= end
-      }
-
-      return matchesCustomer && matchesBilling && matchesPayment && matchesDate
-    })
-  }, [bookings, filters])
-
-  const hasActiveFilters =
-    filters.customerSearch !== '' ||
-    filters.billingFilter !== 'all' ||
-    filters.paymentFilter !== 'all' ||
-    filters.startDate !== '' ||
-    filters.endDate !== ''
 
   if (loading) {
     return (
@@ -125,34 +75,17 @@ export function BookingsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredBookings.length === 0 ? (
+            {bookings.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-12">
                   <div className="text-gray-400">
-                    {bookings.length === 0 ? (
-                      <div>
-                        <Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">No bookings found</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">No bookings match your filters</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setIsFilterOpen(true)}
-                          className="mt-2 text-blue-600 hover:text-blue-800"
-                        >
-                          Adjust filters
-                        </Button>
-                      </div>
-                    )}
+                    <Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No bookings found</p>
                   </div>
                 </TableCell>
               </TableRow>
             ) : (
-              filteredBookings.map((booking) => (
+              bookings.map((booking) => (
                 <TableRow key={booking.id} className="hover:bg-gray-50/50 transition-colors">
                   <TableCell>
                     <div className="font-medium">{booking.customerName}</div>
@@ -227,19 +160,6 @@ export function BookingsTable({
           </TableBody>
         </Table>
       </div>
-
-      {/* Filter Sidebar */}
-      <SideSheet
-        isOpen={isFilterOpen}
-        onClose={() => setIsFilterOpen(false)}
-        title="Filter Bookings"
-        description="Refine your booking results"
-      >
-        <BookingFilters
-          filters={filters}
-          onFiltersChange={setFilters}
-        />
-      </SideSheet>
     </div>
   )
 }

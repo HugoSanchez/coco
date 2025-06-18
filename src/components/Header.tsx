@@ -101,7 +101,7 @@ export default function Header() {
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						className='cursor-pointer'
-						onClick={() => router.push('/onboarding')}>
+						onClick={() => router.push('/settings')}>
 						Settings
 					</DropdownMenuItem>
 					<DropdownMenuItem

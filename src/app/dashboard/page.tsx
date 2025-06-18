@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from 'next/navigation'
 import Link from "next/link"
 import { ClientList } from '@/components/ClientList'
 import { BookingsTable, Booking } from '@/components/BookingsTable'
+import { SideSheet } from '@/components/SideSheet'
+import { BookingFilters, BookingFiltersState } from '@/components/BookingFilters'
 import {
   Activity,
   FilterIcon,
@@ -99,8 +101,48 @@ export default function Dashboard() {
   const [loadingClients, setLoadingClients] = useState(true)
   const [bookings, setBookings] = useState<Booking[]>(sampleBookings)
   const [loadingBookings, setLoadingBookings] = useState(false)
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [filters, setFilters] = useState<BookingFiltersState>({
+    customerSearch: '',
+    billingFilter: 'all',
+    paymentFilter: 'all',
+    startDate: '',
+    endDate: ''
+  })
   const { toast } = useToast()
   const router = useRouter()
+
+  // Filtered bookings logic
+  const filteredBookings = useMemo(() => {
+    return bookings.filter((booking) => {
+      // Customer search filter
+      const matchesCustomer = filters.customerSearch === '' ||
+        booking.customerName.toLowerCase().includes(filters.customerSearch.toLowerCase()) ||
+        booking.customerEmail.toLowerCase().includes(filters.customerSearch.toLowerCase())
+
+      // Billing status filter
+      const matchesBilling = filters.billingFilter === 'all' || booking.billingStatus === filters.billingFilter
+
+      // Payment status filter
+      const matchesPayment = filters.paymentFilter === 'all' || booking.paymentStatus === filters.paymentFilter
+
+      // Date range filter
+      let matchesDate = true
+      if (filters.startDate && filters.endDate) {
+        const start = new Date(filters.startDate)
+        const end = new Date(filters.endDate)
+        matchesDate = booking.bookingDate >= start && booking.bookingDate <= end
+      } else if (filters.startDate) {
+        const start = new Date(filters.startDate)
+        matchesDate = booking.bookingDate >= start
+      } else if (filters.endDate) {
+        const end = new Date(filters.endDate)
+        matchesDate = booking.bookingDate <= end
+      }
+
+      return matchesCustomer && matchesBilling && matchesPayment && matchesDate
+    })
+  }, [bookings, filters])
 
   useEffect(() => {
     const loadUser = async () => {
@@ -304,15 +346,15 @@ export default function Dashboard() {
                 </CardDescription>
               </div>
               <Button asChild size="sm" className="ml-auto gap-1 bg-gray-100 text-gray-800 hover:bg-gray-200">
-                <Link href="#">
+                <button onClick={() => setIsFilterOpen(true)}>
                   Filtros
                   <FilterX className="h-4 w-4 ml-2" />
-                </Link>
+                </button>
               </Button>
             </CardHeader>
             <CardContent>
               <BookingsTable
-                bookings={bookings}
+                bookings={filteredBookings}
                 loading={loadingBookings}
                 onStatusChange={handleStatusChange}
                 onCancelBooking={handleCancelBooking}
@@ -324,6 +366,19 @@ export default function Dashboard() {
           </div>
         </div>
       </main>
+
+      {/* Filter Sidebar */}
+      <SideSheet
+        isOpen={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        title="Filtros"
+        description="Filtra tus consultas por paciente, estado de facturación y estado de pago."
+      >
+        <BookingFilters
+          filters={filters}
+          onFiltersChange={setFilters}
+        />
+      </SideSheet>
     </div>
   )
 }
