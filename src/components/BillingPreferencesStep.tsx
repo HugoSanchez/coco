@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { ConnectCalendar } from "@/components/ConnectCalendar"
 import { BillingPreferencesForm, BillingPreferences } from "@/components/BillingPreferencesForm"
-import { saveBillingPreferences, getBillingPreferences } from '@/lib/db/profiles';
+import { saveBillingPreferences, getBillingPreferences } from '@/lib/db/billing';
 import { useUser } from '@/contexts/UserContext';
 
 interface BillingPreferencesStepProps {
@@ -112,6 +112,7 @@ export function BillingPreferencesStep({
 				<h2 className="text-2xl font-bold">{title}</h2>
 				<p className='text-md text-gray-500 my-2'>{subtitle}</p>
 			</div>
+
             <form onSubmit={handleSubmit} className='mb-8'>
 				<div className='pt-2'>
 					<BillingPreferencesForm
