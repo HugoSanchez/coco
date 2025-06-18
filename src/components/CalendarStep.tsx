@@ -7,9 +7,19 @@ import { ConnectCalendar } from "@/components/ConnectCalendar"
 
 interface CalendarStepProps {
     onComplete: () => void;
+    title?: string;
+    subtitle?: string;
+    buttonText?: string;
+    loadingText?: string;
 }
 
-export function CalendarStep({ onComplete }: CalendarStepProps) {
+export function CalendarStep({
+    onComplete,
+    title = "2. Connecta tu calendario",
+    subtitle = "Coco estará siempre sincronizado con tu calendario de Google de manera que te resulte fácil y automático agendar nuevas consultas.",
+    buttonText = "Continuar",
+    loadingText = "Guardando..."
+}: CalendarStepProps) {
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
 
@@ -24,8 +34,8 @@ export function CalendarStep({ onComplete }: CalendarStepProps) {
     return (
         <div>
 			<div>
-				<h2 className="text-2xl font-bold">2. Connecta tu calendario</h2>
-				<p className='text-md text-gray-500 my-2'>Coco estará siempre sincronizado con tu calendario de Google de manera que te resulte fácil y automático agendar nuevas consultas.</p>
+				<h2 className="text-2xl font-bold">{title}</h2>
+				<p className='text-md text-gray-500 my-2'>{subtitle}</p>
 			</div>
             <div className='mb-8'>
 				<div className='pt-2'>
@@ -38,7 +48,7 @@ export function CalendarStep({ onComplete }: CalendarStepProps) {
 					disabled={isLoading}
 					className='h-12 w-full shadow-sm bg-teal-400 hover:bg-teal-400 hover:opacity-90 text-md'
 				>
-					{isLoading ? 'Guardando...' : 'Continuar'}
+					{isLoading ? loadingText : buttonText}
 				</Button>
             </form>
         </div>

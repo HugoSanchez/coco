@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { User, Calendar, CreditCard, Settings } from 'lucide-react'
 import { ProfileSetup } from '@/components/ProfileSetup'
+import { CalendarStep } from '@/components/CalendarStep'
+import { BillingPreferencesStep } from '@/components/BillingPreferencesStep'
 
 type SettingsSection = 'profile' | 'calendar' | 'billing'
 
@@ -32,12 +34,8 @@ const settingsMenuItems = [
 ]
 
 export default function SettingsPage() {
-  const { user } = useUser()
+  const { user, loading } = useUser()
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile')
-
-  if (!user) {
-    redirect('/login')
-  }
 
   const renderSectionContent = () => {
     switch (activeSection) {
@@ -61,31 +59,34 @@ export default function SettingsPage() {
 
       case 'calendar':
         return (
-          <div>
-            <div className="mb-6">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2">Calendario</h2>
-              <p className="text-gray-600">Configura tus preferencias de calendario</p>
-            </div>
-
-            <div className="space-y-4">
-              <p className="text-gray-600">Calendar settings content will go here...</p>
-              {/* Calendar form components will be added here */}
-            </div>
+          <div className="">
+            <CalendarStep
+              title="Configuración de calendario"
+              subtitle="Mantén coco sincronizado con Google Calendar para gestionar tus citas automáticamente."
+              buttonText="Guardar"
+              loadingText="Guardando..."
+              onComplete={() => {
+                console.log('Calendar settings updated')
+              }}
+            />
           </div>
         )
 
       case 'billing':
         return (
-          <div>
-            <div className="mb-6">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2">Opciones de Facturación</h2>
-              <p className="text-gray-600">Configura tus preferencias de facturación por defecto</p>
-            </div>
-
-            <div className="space-y-4">
-              <p className="text-gray-600">Billing preferences form will go here...</p>
-              {/* BillingPreferencesForm component will be added here */}
-            </div>
+          <div className="">
+            <BillingPreferencesStep
+              title="Opciones de facturación"
+              subtitle="Configura tus preferencias de facturación por defecto para tus consultas."
+              buttonText="Guardar configuración"
+              loadingText="Guardando..."
+              showSuccessToast={true}
+              skipOnComplete={true}
+              onComplete={() => {
+                // This won't be called due to skipOnComplete=true
+                console.log('Billing preferences updated')
+              }}
+            />
           </div>
         )
 

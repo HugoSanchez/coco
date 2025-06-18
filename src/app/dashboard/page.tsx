@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from 'next/navigation'
 import Link from "next/link"
 import { ClientList } from '@/components/ClientList'
+import { BookingsTable, Booking } from '@/components/BookingsTable'
 import {
   Activity,
   ArrowUpRight,
@@ -39,14 +40,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { getClientsForUser, Client } from '@/lib/db/clients'
 
 interface UserProfile {
@@ -55,6 +48,45 @@ interface UserProfile {
   // Add other profile fields as needed
 }
 
+// Sample booking data - replace with real data from your API
+const sampleBookings: Booking[] = [
+  {
+    id: '1',
+    customerName: 'Liam Johnson',
+    customerEmail: 'liam@example.com',
+    bookingDate: new Date('2023-06-23'),
+    billingStatus: 'billed',
+    paymentStatus: 'paid',
+    amount: 150.00
+  },
+  {
+    id: '2',
+    customerName: 'Olivia Smith',
+    customerEmail: 'olivia@example.com',
+    bookingDate: new Date('2023-06-24'),
+    billingStatus: 'pending',
+    paymentStatus: 'pending',
+    amount: 150.00
+  },
+  {
+    id: '3',
+    customerName: 'Noah Williams',
+    customerEmail: 'noah@example.com',
+    bookingDate: new Date('2023-06-25'),
+    billingStatus: 'billed',
+    paymentStatus: 'pending',
+    amount: 150.00
+  },
+  {
+    id: '4',
+    customerName: 'Emma Brown',
+    customerEmail: 'emma@example.com',
+    bookingDate: new Date('2023-06-26'),
+    billingStatus: 'pending',
+    paymentStatus: 'pending',
+    amount: 150.00
+  }
+]
 
 export default function Dashboard() {
 
@@ -63,6 +95,8 @@ export default function Dashboard() {
   const [user, setUser] = useState<any | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [loadingClients, setLoadingClients] = useState(true)
+  const [bookings, setBookings] = useState<Booking[]>(sampleBookings)
+  const [loadingBookings, setLoadingBookings] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
 
@@ -122,6 +156,68 @@ export default function Dashboard() {
     }
     fetchClients()
   }, [user])
+
+  const handleStatusChange = async (bookingId: string, type: 'billing' | 'payment', status: string) => {
+    try {
+      // Update local state immediately for better UX
+      setBookings(prev => prev.map(booking =>
+        booking.id === bookingId
+          ? {
+              ...booking,
+              [type === 'billing' ? 'billingStatus' : 'paymentStatus']: status
+            }
+          : booking
+      ))
+
+      // TODO: Add API call to update status in database
+      // await updateBookingStatus(bookingId, type, status)
+
+      toast({
+        title: "Status updated",
+        description: `${type === 'billing' ? 'Billing' : 'Payment'} status updated to ${status}`,
+        color: 'success'
+      })
+    } catch (error) {
+      // Revert local state on error
+      setBookings(prev => prev.map(booking =>
+        booking.id === bookingId
+          ? {
+              ...booking,
+              [type === 'billing' ? 'billingStatus' : 'paymentStatus']:
+                type === 'billing' ? booking.billingStatus : booking.paymentStatus
+            }
+          : booking
+      ))
+
+      toast({
+        title: "Error",
+        description: "Failed to update status. Please try again.",
+        color: 'error'
+      })
+    }
+  }
+
+  const handleCancelBooking = async (bookingId: string) => {
+    try {
+      // TODO: Add confirmation dialog
+      // TODO: Add API call to cancel booking
+      // await cancelBooking(bookingId)
+
+      setBookings(prev => prev.filter(booking => booking.id !== bookingId))
+
+      toast({
+        title: "Booking cancelled",
+        description: "The appointment has been cancelled successfully.",
+        color: 'success'
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to cancel booking. Please try again.",
+        color: 'error'
+      })
+    }
+  }
 
   if (loading || loadingClients) {
     return <div>Loading...</div>
@@ -213,125 +309,12 @@ export default function Dashboard() {
               </Button>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Customer</TableHead>
-                    <TableHead className="hidden xl:table-column">
-                      Type
-                    </TableHead>
-                    <TableHead className="hidden xl:table-column">
-                      Status
-                    </TableHead>
-                    <TableHead className="hidden xl:table-column">
-                      Date
-                    </TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell>
-                      <div className="font-medium">Liam Johnson</div>
-                      <div className="hidden text-sm text-muted-foreground md:inline">
-                        liam@example.com
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden xl:table-column">
-                      Sale
-                    </TableCell>
-                    <TableCell className="hidden xl:table-column">
-                      <Badge className="text-xs" variant="outline">
-                        Approved
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell lg:hidden xl:table-column">
-                      2023-06-23
-                    </TableCell>
-                    <TableCell className="text-right">$150.00</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>
-                      <div className="font-medium">Olivia Smith</div>
-                      <div className="hidden text-sm text-muted-foreground md:inline">
-                        olivia@example.com
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden xl:table-column">
-                      Refund
-                    </TableCell>
-                    <TableCell className="hidden xl:table-column">
-                      <Badge className="text-xs" variant="outline">
-                        Declined
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell lg:hidden xl:table-column">
-                      2023-06-24
-                    </TableCell>
-                    <TableCell className="text-right">$150.00</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>
-                      <div className="font-medium">Noah Williams</div>
-                      <div className="hidden text-sm text-muted-foreground md:inline">
-                        noah@example.com
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden xl:table-column">
-                      Subscription
-                    </TableCell>
-                    <TableCell className="hidden xl:table-column">
-                      <Badge className="text-xs" variant="outline">
-                        Approved
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell lg:hidden xl:table-column">
-                      2023-06-25
-                    </TableCell>
-                    <TableCell className="text-right">$150.00</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>
-                      <div className="font-medium">Emma Brown</div>
-                      <div className="hidden text-sm text-muted-foreground md:inline">
-                        emma@example.com
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden xl:table-column">
-                      Sale
-                    </TableCell>
-                    <TableCell className="hidden xl:table-column">
-                      <Badge className="text-xs" variant="outline">
-                        Approved
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell lg:hidden xl:table-column">
-                      2023-06-26
-                    </TableCell>
-                    <TableCell className="text-right">$150.00</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>
-                      <div className="font-medium">Liam Johnson</div>
-                      <div className="hidden text-sm text-muted-foreground md:inline">
-                        liam@example.com
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden xl:table-column">
-                      Sale
-                    </TableCell>
-                    <TableCell className="hidden xl:table-column">
-                      <Badge className="text-xs" variant="outline">
-                        Approved
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell lg:hidden xl:table-column">
-                      2023-06-27
-                    </TableCell>
-                    <TableCell className="text-right">$150.00</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+              <BookingsTable
+                bookings={bookings}
+                loading={loadingBookings}
+                onStatusChange={handleStatusChange}
+                onCancelBooking={handleCancelBooking}
+              />
             </CardContent>
           </Card>
           <div x-chunk="dashboard-01-chunk-5">

@@ -123,4 +123,35 @@ export async function saveBillingPreferences(userId: string, preferences: any) {
     if (error) throw error;
 }
 
+export async function getBillingPreferences(userId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('billing_preferences')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+
+    if (error) {
+      // If no billing preferences found, return null (not an error)
+      if (error.code === 'PGRST116') {
+        return null
+      }
+      throw error
+    }
+
+    // Transform the database format to match the BillingPreferences interface
+    return {
+      shouldBill: data.should_bill,
+      billingAmount: data.billing_amount || '',
+      billingType: data.billing_type || '',
+      billingFrequency: data.billing_frequency || '',
+      billingTrigger: data.billing_trigger || '',
+      billingAdvanceDays: data.billing_advance_days?.toString() || ''
+    }
+  } catch (error) {
+    console.error('Error fetching billing preferences:', error)
+    throw new Error('Failed to fetch billing preferences')
+  }
+}
+
 // Add other profile-related queries here...
