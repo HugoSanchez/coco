@@ -44,6 +44,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { getClientsForUser, Client } from '@/lib/db/clients'
+import { BookingForm } from '@/components/BookingForm'
 
 interface UserProfile {
 	id: string
@@ -100,6 +101,7 @@ export default function Dashboard() {
 	const [bookings, setBookings] = useState<Booking[]>(sampleBookings)
 	const [loadingBookings, setLoadingBookings] = useState(false)
 	const [isFilterOpen, setIsFilterOpen] = useState(false)
+	const [isNewBookingOpen, setIsNewBookingOpen] = useState(false)
 	const [filters, setFilters] = useState<BookingFiltersState>({
 		customerSearch: '',
 		billingFilter: 'all',
@@ -309,9 +311,12 @@ export default function Dashboard() {
 					</h1>
 					<h3 className="text-2xl">este es tu dashboard</h3>
 				</div>
-				<Button className="font-light text-sm">
+				<Button
+					className="tracking-wide text-sm bg-teal-400 hover:bg-teal-400 hover:opacity-80"
+					onClick={() => setIsNewBookingOpen(true)}
+				>
+					<Plus className="h-5 w-5 mr-2" />
 					Nueva Cita
-					<Plus className="h-5 w-5 ml-2" />
 				</Button>
 			</header>
 			<main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:px-16">
@@ -387,12 +392,11 @@ export default function Dashboard() {
 								</CardDescription>
 							</div>
 							<Button
-								asChild
 								size="sm"
 								onClick={() => setIsFilterOpen(true)}
 								className="ml-auto gap-1 bg-gray-100 text-gray-800 hover:bg-gray-200"
 							>
-								Filtros
+								Filtrar
 								<FilterX className="h-4 w-4 ml-2" />
 							</Button>
 						</CardHeader>
@@ -424,6 +428,23 @@ export default function Dashboard() {
 				<BookingFilters
 					filters={filters}
 					onFiltersChange={setFilters}
+				/>
+			</SideSheet>
+
+			{/* New Booking Sidebar */}
+			<SideSheet
+				isOpen={isNewBookingOpen}
+				onClose={() => setIsNewBookingOpen(false)}
+				title="Nueva Cita"
+				description="Crea una nueva cita para uno de tus pacientes."
+			>
+				<BookingForm
+					clients={clients}
+					onSuccess={() => {
+						setIsNewBookingOpen(false)
+						// TODO: Refresh bookings list
+					}}
+					onCancel={() => setIsNewBookingOpen(false)}
 				/>
 			</SideSheet>
 		</div>
