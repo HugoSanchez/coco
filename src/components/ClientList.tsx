@@ -46,10 +46,8 @@ export function ClientList({ clients, loading }: { clients: Client[]; loading: b
 							<TableHeader>
 								<TableRow>
 									<TableHead>Paciente</TableHead>
-									<TableHead className="hidden xl:table-column">Billing</TableHead>
-									<TableHead className="hidden xl:table-column">Status</TableHead>
-									<TableHead className="hidden md:table-cell lg:hidden xl:table-column">Created</TableHead>
-									<TableHead className="text-right">Total facturado</TableHead>
+									<TableHead className="hidden md:table-cell">Created</TableHead>
+									<TableHead className="text-right">Actions</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
@@ -61,19 +59,13 @@ export function ClientList({ clients, loading }: { clients: Client[]; loading: b
 												{client.email}
 											</div>
 										</TableCell>
-										<TableCell className="hidden xl:table-column">
-											{client.billing_type === 'recurring' ? client.billing_frequency : client.billing_type || 'N/A'}
-										</TableCell>
-										<TableCell className="hidden xl:table-column">
-											<Badge className="text-xs" variant={client.should_bill ? 'secondary' : 'outline'}>
-												{client.should_bill ? 'Active' : 'No billing'}
-											</Badge>
-										</TableCell>
-										<TableCell className="hidden md:table-cell lg:hidden xl:table-column">
+										<TableCell className="hidden md:table-cell">
 											{client.created_at ? new Date(client.created_at).toLocaleDateString() : 'N/A'}
 										</TableCell>
 										<TableCell className="text-right">
-											{client.billing_amount ? `€${client.billing_amount}` : '-'}
+											<Button variant="ghost" size="sm">
+												View
+											</Button>
 										</TableCell>
 									</TableRow>
 								))}

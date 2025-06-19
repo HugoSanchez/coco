@@ -7,45 +7,140 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          operationName?: string
+          query?: string
+          variables?: Json
+          extensions?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
-      bookings: {
+      billing_settings: {
         Row: {
-          booker_email: string | null
-          booker_name: string | null
-          created_at: string
-          end_time: string | null
+          billing_advance_days: number | null
+          billing_amount: number | null
+          billing_frequency: string | null
+          billing_trigger: string | null
+          billing_type: string | null
+          booking_id: string | null
+          client_id: string | null
+          created_at: string | null
           id: string
-          schedule_id: string | null
-          start_time: string | null
-          status: string | null
+          is_default: boolean | null
+          should_bill: boolean | null
+          updated_at: string | null
+          user_id: string | null
         }
         Insert: {
-          booker_email?: string | null
-          booker_name?: string | null
-          created_at?: string
-          end_time?: string | null
+          billing_advance_days?: number | null
+          billing_amount?: number | null
+          billing_frequency?: string | null
+          billing_trigger?: string | null
+          billing_type?: string | null
+          booking_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
           id?: string
-          schedule_id?: string | null
-          start_time?: string | null
-          status?: string | null
+          is_default?: boolean | null
+          should_bill?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
-          booker_email?: string | null
-          booker_name?: string | null
-          created_at?: string
-          end_time?: string | null
+          billing_advance_days?: number | null
+          billing_amount?: number | null
+          billing_frequency?: string | null
+          billing_trigger?: string | null
+          billing_type?: string | null
+          booking_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
           id?: string
-          schedule_id?: string | null
-          start_time?: string | null
-          status?: string | null
+          is_default?: boolean | null
+          should_bill?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "bookings_schedule_id_fkey"
-            columns: ["schedule_id"]
+            foreignKeyName: "billing_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_settings_booking_id_fkey"
+            columns: ["booking_id"]
             isOneToOne: false
-            referencedRelation: "schedules"
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bookings: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          end_time: string
+          id: string
+          start_time: string
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          end_time: string
+          id?: string
+          start_time: string
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          end_time?: string
+          id?: string
+          start_time?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
@@ -103,47 +198,29 @@ export type Database = {
       }
       clients: {
         Row: {
-          billing_advance_days: number | null
-          billing_amount: number | null
-          billing_frequency: string | null
-          billing_trigger: string | null
-          billing_type: string | null
           created_at: string | null
           description: string | null
           email: string
           id: string
           name: string
-          should_bill: boolean | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
-          billing_advance_days?: number | null
-          billing_amount?: number | null
-          billing_frequency?: string | null
-          billing_trigger?: string | null
-          billing_type?: string | null
           created_at?: string | null
           description?: string | null
           email: string
           id?: string
           name: string
-          should_bill?: boolean | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
-          billing_advance_days?: number | null
-          billing_amount?: number | null
-          billing_frequency?: string | null
-          billing_trigger?: string | null
-          billing_type?: string | null
           created_at?: string | null
           description?: string | null
           email?: string
           id?: string
           name?: string
-          should_bill?: boolean | null
           updated_at?: string | null
           user_id?: string
         }
@@ -337,6 +414,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
