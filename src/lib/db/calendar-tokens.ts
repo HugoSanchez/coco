@@ -37,25 +37,29 @@ import { supabaseAdmin } from '../supabaseAdmin'
  * @returns Promise<boolean> - true if update successful
  * @throws Error if database update fails
  */
-export async function updateUserCalendarTokens(tokenResponse: any, userId: string, expiryDuration: number) {
+export async function updateUserCalendarTokens(
+	tokenResponse: any,
+	userId: string,
+	expiryDuration: number
+) {
 	// Update the user's calendar tokens using admin privileges
 	// This bypasses RLS since token refresh happens server-side
 	const { error: updateError } = await supabaseAdmin
-			.from('calendar_tokens')
-			.update({
-				access_token: tokenResponse.token, // New access token from OAuth refresh
-				expiry_date: expiryDuration // Updated expiry time (typically 1 hour from now)
-			})
-			.eq('user_id', userId); // Target specific user's tokens
+		.from('calendar_tokens')
+		.update({
+			access_token: tokenResponse.token, // New access token from OAuth refresh
+			expiry_date: expiryDuration // Updated expiry time (typically 1 hour from now)
+		})
+		.eq('user_id', userId) // Target specific user's tokens
 
-		// Handle any database errors that occur during the update
-		if (updateError) {
-			console.error('Error updating token in database:', updateError);
-			throw new Error('Failed to update token in database');
-		}
+	// Handle any database errors that occur during the update
+	if (updateError) {
+		console.error('Error updating token in database:', updateError)
+		throw new Error('Failed to update token in database')
+	}
 
 	// Return success indicator
-	return true;
+	return true
 }
 
 // TODO: Add additional calendar token management functions as needed:
@@ -64,5 +68,3 @@ export async function updateUserCalendarTokens(tokenResponse: any, userId: strin
 // - getUserCalendarTokens() - For retrieving tokens for API calls
 // - refreshExpiredTokens() - For automatic token refresh
 // - validateTokenExpiry() - For checking if tokens need refresh
-
-

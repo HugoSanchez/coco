@@ -88,7 +88,9 @@ export interface ClientBillingSettingsPayload {
  * @returns Promise<Client> - The created client object with generated ID
  * @throws Error if insertion fails or validation errors occur
  */
-export async function createClient(payload: CreateClientPayload): Promise<Client> {
+export async function createClient(
+	payload: CreateClientPayload
+): Promise<Client> {
 	const { data, error } = await supabase
 		.from('clients')
 		.insert([payload])
@@ -112,7 +114,9 @@ export async function createClient(payload: CreateClientPayload): Promise<Client
  * @returns Promise<any> - The created billing settings object
  * @throws Error if insertion fails or unique constraints are violated
  */
-export async function createClientBillingSettings(payload: ClientBillingSettingsPayload) {
+export async function createClientBillingSettings(
+	payload: ClientBillingSettingsPayload
+) {
 	// Prepare the billing data with the correct structure for the billing_settings table
 	const billingData = {
 		user_id: payload.user_id,
@@ -167,9 +171,9 @@ export async function createClientWithBilling(
 	// We check should_bill to ensure we don't create billing records for disabled billing
 	if (billingPayload && billingPayload.should_bill) {
 		await createClientBillingSettings({
-		user_id: clientPayload.user_id,
-		client_id: client.id, // Use the newly created client's ID
-		...billingPayload
+			user_id: clientPayload.user_id,
+			client_id: client.id, // Use the newly created client's ID
+			...billingPayload
 		})
 	}
 

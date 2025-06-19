@@ -11,7 +11,7 @@ export default function Auth() {
   const toast = useToast()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
-  
+
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()

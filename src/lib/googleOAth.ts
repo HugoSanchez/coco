@@ -12,5 +12,5 @@ if (!clientId || !clientSecret || !redirectUri) {
 export const oauth2Client = new google.auth.OAuth2(
 	clientId,
 	clientSecret,
-	redirectUri,
+	redirectUri
 )
