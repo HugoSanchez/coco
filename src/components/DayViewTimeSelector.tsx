@@ -177,7 +177,7 @@ export function DayViewTimeSelector({
 		: null
 
 	return (
-		<div className="space-y">
+		<div className="">
 			<div className="flex items-center justify-between">
 				<h4 className="font-medium text-gray-900">
 					{format(date, 'EEEE, MMMM d, yyyy')}
@@ -201,20 +201,15 @@ export function DayViewTimeSelector({
 				<div className="flex">
 					{/* Time Labels */}
 					<div
-						className="w-16 border-r border-gray-200"
-						style={{ paddingTop: '24px' }}
+						className="w-16 relative"
+						style={{ paddingTop: '2px' }}
 					>
 						{hours.map((hour, index) => (
 							<div
 								key={hour}
-								className="relative flex items-start justify-end pr-2 pt-1"
+								className="flex items-center justify-end pr-2"
 								style={{ height: `${60 * pixelsPerMinute}px` }}
 							>
-								{/* Align border with grid lines */}
-								<div
-									className="absolute left-0 right-0 border-b-2 border-gray-400"
-									style={{ top: '0px' }}
-								/>
 								<span className="text-xs text-gray-600 font-medium">
 									{formatTime(hour * 60)}
 								</span>
@@ -225,27 +220,30 @@ export function DayViewTimeSelector({
 					{/* Time Grid */}
 					<div
 						ref={containerRef}
-						className="flex-1 relative cursor-crosshair select-none"
+						className="flex-1 relative cursor-crosshair select-none bg-teal-100"
 						style={{
 							height: `${totalMinutes * pixelsPerMinute}px`,
-							paddingTop: '24px'
+							paddingTop: '2px'
 						}}
 						onMouseDown={handleMouseDown}
 						onMouseMove={handleMouseMove}
 						onMouseUp={handleMouseUp}
 						onMouseLeave={handleMouseUp}
 					>
-						{/* Hour Lines - made darker and thicker */}
+						{/* Hour Lines - extend across both columns */}
 						{hours.map((hour) => (
 							<div
 								key={hour}
-								className="absolute w-full border-b-2 border-gray-400"
+								className="absolute border-b border-gray-200"
 								style={{
 									top: `${
 										(hour - startHour) *
 										60 *
 										pixelsPerMinute
-									}px`
+									}px`,
+									left: '-64px', // Extend into the time labels column
+									right: '0px',
+									width: 'calc(100% + 64px)'
 								}}
 							/>
 						))}
