@@ -210,6 +210,41 @@ export async function createBooking(
 		.single()
 
 	if (error) throw error
+
+	// Auto-schedule billing actions if billing settings exist
+	if (billingSettingsId) {
+		try {
+			// Get billing settings to determine frequency and trigger
+			const { data: billingSettings, error: billingError } =
+				await supabase
+					.from('billing_settings')
+					.select(
+						'billing_frequency, billing_trigger, billing_advance_days'
+					)
+					.eq('id', billingSettingsId)
+					.single()
+
+			if (billingSettings && !billingError) {
+				// Import the function dynamically to avoid circular imports
+				const { autoScheduleBillingActions } = await import(
+					'./billing-schedule'
+				)
+
+				await autoScheduleBillingActions(
+					data.id,
+					data.start_time,
+					data.end_time,
+					billingSettings.billing_frequency || 'per_session',
+					billingSettings.billing_trigger,
+					billingSettings.billing_advance_days || 7
+				)
+			}
+		} catch (scheduleError) {
+			// Log error but don't fail the booking creation
+			console.error('Failed to schedule billing actions:', scheduleError)
+		}
+	}
+
 	return data
 }
 
