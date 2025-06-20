@@ -48,6 +48,7 @@ export interface CreateBookingPayload {
 	status?: string
 	billing_status?: 'pending' | 'billed' | 'cancelled' | 'failed'
 	payment_status?: 'pending' | 'paid' | 'overdue' | 'cancelled'
+	billing_settings_id?: string | null
 }
 
 /**
@@ -121,8 +122,52 @@ export async function getBookingsForDateRange(
 }
 
 /**
+ * Determines the appropriate billing settings for a booking
+ * Follows the billing hierarchy: booking-specific > client-specific > user default
+ *
+ * @param userId - UUID of the user
+ * @param clientId - UUID of the client
+ * @returns Promise<string|null> - Billing settings ID, or null if using defaults
+ */
+async function determineBillingSettings(
+	userId: string,
+	clientId: string
+): Promise<string | null> {
+	// First check for client-specific billing settings
+	const { data: clientSettings, error: clientError } = await supabase
+		.from('billing_settings')
+		.select('id')
+		.eq('user_id', userId)
+		.eq('client_id', clientId)
+		.is('booking_id', null)
+		.single()
+
+	if (clientSettings && !clientError) {
+		return clientSettings.id
+	}
+
+	// Fall back to user default settings
+	const { data: defaultSettings, error: defaultError } = await supabase
+		.from('billing_settings')
+		.select('id')
+		.eq('user_id', userId)
+		.is('client_id', null)
+		.is('booking_id', null)
+		.eq('is_default', true)
+		.single()
+
+	if (defaultSettings && !defaultError) {
+		return defaultSettings.id
+	}
+
+	// No specific billing settings found, use null (system defaults)
+	return null
+}
+
+/**
  * Creates a new booking in the database
  * Validates that the time slot doesn't conflict with existing bookings
+ * Automatically determines appropriate billing settings
  *
  * @param payload - Booking data to insert
  * @returns Promise<Booking> - The created booking object with generated ID
@@ -142,10 +187,20 @@ export async function createBooking(
 		throw new Error('Time slot conflicts with existing booking')
 	}
 
-	// Set default status if not provided
+	// Determine billing settings if not explicitly provided
+	let billingSettingsId = payload.billing_settings_id
+	if (billingSettingsId === undefined) {
+		billingSettingsId = await determineBillingSettings(
+			payload.user_id,
+			payload.client_id
+		)
+	}
+
+	// Set default values
 	const bookingData: BookingInsert = {
 		...payload,
-		status: payload.status || 'scheduled'
+		status: payload.status || 'scheduled',
+		billing_settings_id: billingSettingsId
 	}
 
 	const { data, error } = await supabase
@@ -297,9 +352,11 @@ export async function updateBookingBillingStatus(
 ): Promise<Booking> {
 	const updateData: any = { billing_status: billingStatus }
 
-	// Set billed_at timestamp when marking as billed
+	// Set billed_at timestamp when marking as billed, clear it otherwise
 	if (billingStatus === 'billed') {
 		updateData.billed_at = new Date().toISOString()
+	} else {
+		updateData.billed_at = null
 	}
 
 	const { data, error } = await supabase
@@ -327,9 +384,11 @@ export async function updateBookingPaymentStatus(
 ): Promise<Booking> {
 	const updateData: any = { payment_status: paymentStatus }
 
-	// Set paid_at timestamp when marking as paid
+	// Set paid_at timestamp when marking as paid, clear it otherwise
 	if (paymentStatus === 'paid') {
 		updateData.paid_at = new Date().toISOString()
+	} else {
+		updateData.paid_at = null
 	}
 
 	const { data, error } = await supabase
@@ -365,6 +424,37 @@ export async function getBookingsNeedingBilling(
 		.eq('status', 'scheduled')
 		.eq('billing_status', 'pending')
 		.order('start_time', { ascending: true })
+
+	if (error) throw error
+	return data || []
+}
+
+/**
+ * Gets bookings with their associated billing settings
+ * Useful for billing reports and calculating amounts
+ *
+ * @param userId - The UUID of the user whose bookings to fetch
+ * @returns Promise<Array> - Array of bookings with billing settings
+ * @throws Error if database operation fails
+ */
+export async function getBookingsWithBillingSettings(userId: string) {
+	const { data, error } = await supabase
+		.from('bookings')
+		.select(
+			`
+			*,
+			client:clients(id, name, email),
+			billing_settings:billing_settings(
+				id,
+				billing_amount,
+				billing_type,
+				billing_frequency,
+				should_bill
+			)
+		`
+		)
+		.eq('user_id', userId)
+		.order('start_time', { ascending: false })
 
 	if (error) throw error
 	return data || []
