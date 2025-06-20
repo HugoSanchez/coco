@@ -105,7 +105,17 @@ export function BookingForm({
 			end: endTime
 		}
 		setSelectedSlot(slot)
-		setCurrentStep(3)
+		// Remove auto-advance to step 3 - let user manually continue
+	}
+
+	const handleContinueToClient = () => {
+		if (selectedSlot) {
+			setCurrentStep(3)
+		}
+	}
+
+	const handleClearTimeSelection = () => {
+		setSelectedSlot(null)
 	}
 
 	const handleBack = () => {
@@ -194,9 +204,22 @@ export function BookingForm({
 						<DayViewTimeSelector
 							date={selectedDate}
 							onTimeSelect={handleSlotSelect}
+							onClearSelection={handleClearTimeSelection}
 							existingBookings={[]} // TODO: Pass real existing bookings
 						/>
 					</div>
+
+					{/* Continue button - only show when time is selected */}
+					{selectedSlot && (
+						<div className="pt-4">
+							<Button
+								onClick={handleContinueToClient}
+								className="w-full bg-teal-400 hover:bg-teal-400 hover:opacity-90 text-white"
+							>
+								Continuar
+							</Button>
+						</div>
+					)}
 				</div>
 			)}
 

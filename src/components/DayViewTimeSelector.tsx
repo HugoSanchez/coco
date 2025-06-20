@@ -8,10 +8,12 @@
 
 import { useState, useRef, useCallback } from 'react'
 import { format } from 'date-fns'
+import { es } from 'date-fns/locale'
 
 interface DayViewTimeSelectorProps {
 	date: Date
 	onTimeSelect: (startTime: string, endTime: string) => void
+	onClearSelection?: () => void
 	existingBookings?: Array<{ start: string; end: string; title?: string }>
 }
 
@@ -25,6 +27,7 @@ interface DragState {
 export function DayViewTimeSelector({
 	date,
 	onTimeSelect,
+	onClearSelection,
 	existingBookings = []
 }: DayViewTimeSelectorProps) {
 	const containerRef = useRef<HTMLDivElement>(null)
@@ -131,7 +134,7 @@ export function DayViewTimeSelector({
 	}, [dragState, date, onTimeSelect])
 
 	// Generate hour labels
-	const hours = []
+	const hours: number[] = []
 	for (let hour = startHour; hour < endHour; hour++) {
 		hours.push(hour)
 	}
@@ -166,7 +169,7 @@ export function DayViewTimeSelector({
 		  }
 		: null
 
-	// Calculate selected slot display
+	// Calculate selected slot display (reuse drag preview positioning)
 	const selectedSlotDisplay = selectedSlot
 		? {
 				top: timeToPixel(selectedSlot.start),
@@ -180,14 +183,24 @@ export function DayViewTimeSelector({
 		<div className="">
 			<div className="flex items-center justify-between">
 				<h4 className="font-medium text-gray-900">
-					{format(date, 'EEEE, MMMM d, yyyy')}
+					{format(date, "EEEE, d 'de' MMMM 'de' yyyy", {
+						locale: es
+					})
+						.replace(/^./, (c) => c.toUpperCase())
+						.replace(
+							/ de ([a-z])/,
+							(match, p1) => ` de ${p1.toUpperCase()}`
+						)}
 				</h4>
 				{selectedSlot && (
 					<button
-						onClick={() => setSelectedSlot(null)}
+						onClick={() => {
+							setSelectedSlot(null)
+							onClearSelection?.()
+						}}
 						className="text-sm text-gray-500 hover:text-gray-700"
 					>
-						Limpiar selección
+						Resetear
 					</button>
 				)}
 			</div>
@@ -197,7 +210,7 @@ export function DayViewTimeSelector({
 			</div>
 
 			{/* Day View Container */}
-			<div className="relative border border-gray-200 rounded-lg overflow-hidden max-h-96 overflow-y-auto">
+			<div className="relative border-2 border-gray-200 rounded-lg overflow-hidden max-h-96 overflow-y-auto">
 				<div className="flex">
 					{/* Time Labels */}
 					<div
@@ -271,68 +284,59 @@ export function DayViewTimeSelector({
 							</div>
 						))}
 
-						{/* Drag Preview */}
-						{dragPreview && (
+						{/* Drag Preview / Selected Slot - Unified */}
+						{(dragPreview || selectedSlotDisplay) && (
 							<div
-								className="absolute left-1 right-1 bg-teal-200 border border-teal-300 rounded opacity-75 z-20 flex items-center justify-center text-sm font-medium text-teal-800"
+								className={`absolute left-1 right-1 rounded z-20 flex items-center justify-center text-sm font-medium ${
+									dragPreview
+										? 'bg-teal-200 border border-teal-300 opacity-75 text-teal-800'
+										: 'bg-teal-100 border border-teal-300 text-teal-800'
+								}`}
 								style={{
-									top: `${dragPreview.top}px`,
-									height: `${dragPreview.height}px`
+									top: `${
+										dragPreview?.top ||
+										selectedSlotDisplay?.top
+									}px`,
+									height: `${
+										dragPreview?.height ||
+										selectedSlotDisplay?.height
+									}px`
 								}}
 							>
-								{formatTime(
-									Math.min(
-										dragState.startTime,
-										dragState.currentTime
-									)
-								)}{' '}
-								-{' '}
-								{formatTime(
-									Math.max(
-										dragState.startTime,
-										dragState.currentTime
-									)
+								{dragPreview ? (
+									// Show time range while dragging
+									<>
+										{formatTime(
+											Math.min(
+												dragState.startTime,
+												dragState.currentTime
+											)
+										)}{' '}
+										-{' '}
+										{formatTime(
+											Math.max(
+												dragState.startTime,
+												dragState.currentTime
+											)
+										)}
+									</>
+								) : (
+									// Show selected slot content
+									<div className="px-2 py-1 w-full">
+										<div className="text-center">
+											Nueva cita
+										</div>
+										<div className="text-teal-600 text-center">
+											{formatTime(selectedSlot!.start)} -{' '}
+											{formatTime(selectedSlot!.end)}
+										</div>
+									</div>
 								)}
-							</div>
-						)}
-
-						{/* Selected Slot */}
-						{selectedSlotDisplay && (
-							<div
-								className="absolute left-1 right-1 bg-teal-100 border-2 border-teal-400 rounded px-2 py-1 text-xs text-teal-800 font-medium z-30"
-								style={{
-									top: `${selectedSlotDisplay.top}px`,
-									height: `${selectedSlotDisplay.height}px`
-								}}
-							>
-								Nueva cita
-								<div className="text-teal-600">
-									{formatTime(selectedSlot!.start)} -{' '}
-									{formatTime(selectedSlot!.end)}
-								</div>
 							</div>
 						)}
 					</div>
 				</div>
 			</div>
-
-			{/* Selection Summary */}
-			{selectedSlot && (
-				<div className="bg-teal-50 border border-teal-200 rounded-lg p-3">
-					<div className="text-sm font-medium text-teal-800">
-						Horario seleccionado:
-					</div>
-					<div className="text-teal-700">
-						{formatTime(selectedSlot!.start)} -{' '}
-						{formatTime(selectedSlot!.end)} (
-						{Math.round(
-							((selectedSlot!.end - selectedSlot!.start) / 60) *
-								10
-						) / 10}{' '}
-						horas)
-					</div>
-				</div>
-			)}
 		</div>
 	)
 }
