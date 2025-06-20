@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -15,6 +15,7 @@ interface DayViewTimeSelectorProps {
 	onTimeSelect: (startTime: string, endTime: string) => void
 	onClearSelection?: () => void
 	existingBookings?: Array<{ start: string; end: string; title?: string }>
+	initialSelectedSlot?: { start: string; end: string } | null
 }
 
 interface DragState {
@@ -28,7 +29,8 @@ export function DayViewTimeSelector({
 	date,
 	onTimeSelect,
 	onClearSelection,
-	existingBookings = []
+	existingBookings = [],
+	initialSelectedSlot = null
 }: DayViewTimeSelectorProps) {
 	const containerRef = useRef<HTMLDivElement>(null)
 	const [dragState, setDragState] = useState<DragState>({
@@ -41,6 +43,24 @@ export function DayViewTimeSelector({
 		start: number
 		end: number
 	} | null>(null)
+
+	// Initialize selected slot from prop when component mounts or prop changes
+	useEffect(() => {
+		if (initialSelectedSlot) {
+			const startDate = new Date(initialSelectedSlot.start)
+			const endDate = new Date(initialSelectedSlot.end)
+			const startMinutes =
+				startDate.getHours() * 60 + startDate.getMinutes()
+			const endMinutes = endDate.getHours() * 60 + endDate.getMinutes()
+
+			setSelectedSlot({
+				start: startMinutes,
+				end: endMinutes
+			})
+		} else {
+			setSelectedSlot(null)
+		}
+	}, [initialSelectedSlot])
 
 	// Time range: 8 AM to 8 PM (12 hours = 720 minutes)
 	const startHour = 8

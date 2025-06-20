@@ -171,22 +171,36 @@ export async function checkBookingConflicts(
 	endTime: string,
 	excludeBookingId?: string
 ): Promise<Booking[]> {
+	// Build the base query
 	let query = supabase
 		.from('bookings')
 		.select('*')
 		.eq('user_id', userId)
 		.neq('status', 'cancelled') // Don't consider cancelled bookings as conflicts
-		.or(`start_time.lt.${endTime},end_time.gt.${startTime}`) // Overlapping time ranges
 
 	// Exclude a specific booking if provided (useful for updates)
 	if (excludeBookingId) {
 		query = query.neq('id', excludeBookingId)
 	}
 
-	const { data, error } = await query
+	// Execute query to get all non-cancelled bookings for the user
+	const { data: allBookings, error } = await query
 
 	if (error) throw error
-	return data || []
+
+	// Filter for overlapping bookings in JavaScript
+	// Two time ranges overlap if: start1 < end2 AND start2 < end1
+	const conflictingBookings = (allBookings || []).filter((booking) => {
+		const bookingStart = new Date(booking.start_time).getTime()
+		const bookingEnd = new Date(booking.end_time).getTime()
+		const newStart = new Date(startTime).getTime()
+		const newEnd = new Date(endTime).getTime()
+
+		// Check for overlap: booking starts before new booking ends AND booking ends after new booking starts
+		return bookingStart < newEnd && bookingEnd > newStart
+	})
+
+	return conflictingBookings
 }
 
 /**

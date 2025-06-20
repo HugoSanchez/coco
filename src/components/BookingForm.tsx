@@ -11,19 +11,14 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue
-} from '@/components/ui/select'
+import { ClientSearchSelect } from '@/components/ClientSearchSelect'
 import { Calendar as CalendarIcon, Clock, User, ArrowLeft } from 'lucide-react'
 import Calendar from '@/components/Calendar'
 import { DayViewTimeSelector } from '@/components/DayViewTimeSelector'
 import { TimeSlot } from '@/lib/calendar'
 import { useUser } from '@/contexts/UserContext'
 import { format, startOfMonth } from 'date-fns'
+import { es } from 'date-fns/locale'
 import { Label } from '@/components/ui/label'
 import { createBooking, CreateBookingPayload } from '@/lib/db/bookings'
 import { useToast } from '@/components/ui/use-toast'
@@ -151,7 +146,8 @@ export function BookingForm({
 			await createBooking(payload)
 			toast({
 				title: 'Cita creada exitosamente',
-				description: 'La cita se ha creado correctamente'
+				description: 'La cita se ha creado correctamente',
+				color: 'success'
 			})
 			onSuccess?.()
 		} catch (error) {
@@ -160,7 +156,8 @@ export function BookingForm({
 				title: 'Error al crear cita',
 				description:
 					'Hubo un error al crear la cita. Por favor, inténtelo más tarde',
-				variant: 'destructive'
+				variant: 'destructive',
+				color: 'error'
 			})
 		} finally {
 			setLoading(false)
@@ -206,6 +203,7 @@ export function BookingForm({
 							onTimeSelect={handleSlotSelect}
 							onClearSelection={handleClearTimeSelection}
 							existingBookings={[]} // TODO: Pass real existing bookings
+							initialSelectedSlot={selectedSlot}
 						/>
 					</div>
 
@@ -226,50 +224,28 @@ export function BookingForm({
 			{/* Step 3: Client Selection */}
 			{currentStep === 3 && selectedSlot && (
 				<div className="space-y-4">
-					<div className="flex items-center gap-2 mb-4">
-						<User className="h-5 w-5 text-teal-600" />
-						<div>
-							<h3 className="text-lg font-medium">
-								Selecciona un paciente
-							</h3>
-							<p className="text-sm text-gray-600">
-								{format(selectedDate!, 'EEEE, MMMM d')} a las{' '}
-								{format(new Date(selectedSlot.start), 'h:mm a')}
-							</p>
-						</div>
-					</div>
-
 					<form onSubmit={handleSubmit} className="space-y-4">
 						{/* Client Selection */}
 						<div className="space-y-2">
-							<label className="text-sm font-medium text-gray-700">
+							<Label className="text-md font-normal text-gray-700">
 								Paciente
-							</label>
-							<Select
+							</Label>
+							<ClientSearchSelect
+								clients={clients}
 								value={selectedClient}
 								onValueChange={setSelectedClient}
-							>
-								<SelectTrigger>
-									<SelectValue placeholder="Selecciona un paciente" />
-								</SelectTrigger>
-								<SelectContent>
-									{clients.map((client) => (
-										<SelectItem
-											key={client.id}
-											value={client.id}
-										>
-											{client.name} - {client.email}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+								placeholder="Buscar paciente..."
+							/>
 						</div>
 
 						{/* Notes */}
 						<div className="space-y-2">
-							<label className="text-sm font-medium text-gray-700">
-								Notas (opcional)
-							</label>
+							<Label className="text-md font-normal text-gray-700">
+								Notas{' '}
+								<span className="text-xs text-gray-500 font-normal">
+									(opcional)
+								</span>
+							</Label>
 							<Textarea
 								placeholder="Añade cualquier nota sobre la cita..."
 								value={notes}
@@ -279,6 +255,22 @@ export function BookingForm({
 						</div>
 
 						{/* Submit Button */}
+						<div>
+							<h3 className="text-sm mt-10">
+								{format(
+									selectedDate!,
+									"EEEE, d 'de' MMMM 'de' yyyy",
+									{ locale: es }
+								)
+									.replace(/^./, (c) => c.toUpperCase())
+									.replace(
+										/ de ([a-z])/,
+										(match, p1) => ` de ${p1.toUpperCase()}`
+									)}{' '}
+								a las{' '}
+								{format(new Date(selectedSlot.start), 'HH:mm')}
+							</h3>
+						</div>
 						<Button
 							type="submit"
 							disabled={loading || !selectedClient}
