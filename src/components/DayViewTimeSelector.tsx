@@ -220,7 +220,7 @@ export function DayViewTimeSelector({
 					{/* Time Grid */}
 					<div
 						ref={containerRef}
-						className="flex-1 relative cursor-crosshair select-none bg-teal-100"
+						className="flex-1 relative cursor-crosshair select-none bg-gray-100"
 						style={{
 							height: `${totalMinutes * pixelsPerMinute}px`,
 							paddingTop: '2px'

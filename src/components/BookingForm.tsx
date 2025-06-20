@@ -169,17 +169,7 @@ export function BookingForm({
 		<div className="space-y-6 py-6">
 			{/* Step Indicator */}
 			<div className="flex items-center justify-between mb-6">
-				{currentStep > 1 && (
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={handleBack}
-						className="flex items-center gap-2"
-					>
-						<ArrowLeft className="h-4 w-4" />
-						Atrás
-					</Button>
-				)}
+				{/* Remove the duplicate back button - it's now in the bottom navigation */}
 			</div>
 
 			{/* Step 1: Date Selection */}
@@ -277,17 +267,28 @@ export function BookingForm({
 				</div>
 			)}
 
-			{/* Cancel Button */}
+			{/* Bottom Navigation */}
 			<div className="pt-4 border-t border-gray-200">
-				<div className="flex gap-3">
-					<Button
-						type="button"
-						variant="outline"
-						onClick={resetForm}
-						className="flex-1"
-					>
-						Reiniciar
-					</Button>
+				<div className="flex items-center">
+					{/* Back Button - only show if not on first step */}
+					{currentStep > 1 && (
+						<Button
+							type="button"
+							variant="ghost"
+							onClick={handleBack}
+							className="flex-1 flex items-center justify-center gap-2 text-gray-600 hover:text-gray-800"
+						>
+							<ArrowLeft className="h-4 w-4" />
+							Atrás
+						</Button>
+					)}
+
+					{/* Vertical separator - only show if back button is visible */}
+					{currentStep > 1 && (
+						<div className="h-8 w-px bg-gray-300 mx-2"></div>
+					)}
+
+					{/* Cancel Button */}
 					{onCancel && (
 						<Button
 							type="button"
