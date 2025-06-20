@@ -59,13 +59,15 @@ export async function scheduleBillingAction(
 }
 
 /**
- * Gets all pending billing actions for a specific date with billing settings
- * Used by cron jobs to process daily billing tasks
+ * Gets all pending billing actions that should be processed now
+ * Used by cron jobs to process billing tasks that are due
  *
- * @param date - Date to process (YYYY-MM-DD)
+ * @param currentDateTime - Current datetime (ISO string, optional - defaults to now)
  * @returns Promise<Array> - Array of pending actions with billing frequency info
  */
-export async function getPendingBillingActions(date: string) {
+export async function getPendingBillingActions(currentDateTime?: string) {
+	const now = currentDateTime || new Date().toISOString()
+
 	const { data, error } = await supabase
 		.from('billing_schedule')
 		.select(
@@ -91,9 +93,9 @@ export async function getPendingBillingActions(date: string) {
       )
     `
 		)
-		.eq('scheduled_date', date)
+		.lte('scheduled_date', now) // Actions scheduled for now or earlier
 		.eq('status', 'pending')
-		.order('created_at', { ascending: true })
+		.order('scheduled_date', { ascending: true })
 
 	if (error) throw error
 	return data || []
@@ -173,16 +175,17 @@ function ensureFutureDate(date: Date): Date {
 }
 
 /**
- * Calculates the billing due date based on billing frequency and trigger
+ * Calculates when to send the bill based on billing frequency and trigger
+ * Returns full ISO datetime string for precise scheduling
  *
  * @param bookingStartTime - Start time of the booking (ISO string)
  * @param bookingEndTime - End time of the booking (ISO string)
- * @param billingFrequency - Billing frequency from settings
- * @param billingTrigger - When to bill ('before_consultation', 'after_consultation', or null for recurring)
- * @param billingAdvanceDays - Days before/after booking for per_session billing
- * @returns string - Due date in YYYY-MM-DD format
+ * @param billingFrequency - Billing frequency ('per_session', 'weekly', 'monthly')
+ * @param billingTrigger - When to bill ('before_consultation', 'after_consultation', or null)
+ * @param billingAdvanceDays - Days before booking for 'before_consultation' (default: 7)
+ * @returns string - ISO datetime string when to send the bill
  */
-function calculateBillingDueDate(
+function calculateBillingSendDateTime(
 	bookingStartTime: string,
 	bookingEndTime: string,
 	billingFrequency: string,
@@ -194,42 +197,43 @@ function calculateBillingDueDate(
 
 	switch (billingFrequency) {
 		case 'per_session':
-			let sessionDue: Date
-
 			if (billingTrigger === 'before_consultation') {
 				// X days before the booking
-				sessionDue = new Date(bookingStart)
-				sessionDue.setDate(sessionDue.getDate() - billingAdvanceDays)
+				const beforeDate = new Date(bookingStart)
+				beforeDate.setDate(beforeDate.getDate() - billingAdvanceDays)
+				beforeDate.setHours(9, 0, 0, 0) // Send at 9 AM
+				return ensureFutureDate(beforeDate).toISOString()
 			} else if (billingTrigger === 'after_consultation') {
-				// X days after the booking ends (or immediately if 0 days)
-				sessionDue = new Date(bookingEnd)
-				sessionDue.setDate(sessionDue.getDate() + billingAdvanceDays)
+				// Within the hour after consultation ends
+				const afterDate = new Date(bookingEnd)
+				afterDate.setMinutes(afterDate.getMinutes() + 30) // 30 minutes after
+				return ensureFutureDate(afterDate).toISOString()
 			} else {
 				// Default to before if trigger is unclear
-				sessionDue = new Date(bookingStart)
-				sessionDue.setDate(sessionDue.getDate() - billingAdvanceDays)
+				const defaultDate = new Date(bookingStart)
+				defaultDate.setDate(defaultDate.getDate() - billingAdvanceDays)
+				defaultDate.setHours(9, 0, 0, 0)
+				return ensureFutureDate(defaultDate).toISOString()
 			}
 
-			// Ensure the date is in the future
-			sessionDue = ensureFutureDate(sessionDue)
-			return sessionDue.toISOString().split('T')[0]
-
 		case 'weekly':
-			// End of the week containing the booking
+			// Last day of the week containing the booking
 			const weekEnd = new Date(bookingStart)
 			const dayOfWeek = weekEnd.getDay() // 0 = Sunday, 6 = Saturday
 			const daysToSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek
 			weekEnd.setDate(weekEnd.getDate() + daysToSunday)
-			return ensureFutureDate(weekEnd).toISOString().split('T')[0]
+			weekEnd.setHours(18, 0, 0, 0) // Send at 6 PM on Sunday
+			return ensureFutureDate(weekEnd).toISOString()
 
 		case 'monthly':
-			// End of the month containing the booking
+			// Last day of the month containing the booking
 			const monthEnd = new Date(
 				bookingStart.getFullYear(),
 				bookingStart.getMonth() + 1,
 				0
 			)
-			return ensureFutureDate(monthEnd).toISOString().split('T')[0]
+			monthEnd.setHours(18, 0, 0, 0) // Send at 6 PM on last day
+			return ensureFutureDate(monthEnd).toISOString()
 
 		default:
 			throw new Error(`Unknown billing frequency: ${billingFrequency}`)
@@ -237,16 +241,16 @@ function calculateBillingDueDate(
 }
 
 /**
- * Automatically schedules billing actions when a booking is created
- * Based on the booking's billing settings and frequency
+ * Automatically schedules billing action when a booking is created
+ * Creates a single entry for when to send the bill with payment instructions
  *
  * @param bookingId - UUID of the booking
  * @param bookingStartTime - Start time of the booking (ISO string)
  * @param bookingEndTime - End time of the booking (ISO string)
  * @param billingFrequency - Billing frequency ('per_session', 'weekly', 'monthly')
  * @param billingTrigger - When to bill ('before_consultation', 'after_consultation', or null)
- * @param billingAdvanceDays - Days before/after booking to send bill (default: 7)
- * @returns Promise<BillingScheduleEntry[]> - Array of created schedule entries
+ * @param billingAdvanceDays - Days before booking to send bill for 'before_consultation' (default: 7)
+ * @returns Promise<BillingScheduleEntry> - The created schedule entry
  */
 export async function autoScheduleBillingActions(
 	bookingId: string,
@@ -255,12 +259,9 @@ export async function autoScheduleBillingActions(
 	billingFrequency: string,
 	billingTrigger: string | null,
 	billingAdvanceDays: number = 7
-): Promise<BillingScheduleEntry[]> {
-	const bookingDate = new Date(bookingStartTime)
-	const scheduleEntries: BillingScheduleEntry[] = []
-
-	// Calculate billing due date based on frequency and trigger
-	const billDueDate = calculateBillingDueDate(
+): Promise<BillingScheduleEntry> {
+	// Calculate when to send the bill
+	const billDateTime = calculateBillingSendDateTime(
 		bookingStartTime,
 		bookingEndTime,
 		billingFrequency,
@@ -268,36 +269,14 @@ export async function autoScheduleBillingActions(
 		billingAdvanceDays
 	)
 
+	// Create single billing schedule entry
 	const billEntry = await scheduleBillingAction(
 		bookingId,
 		'send_bill',
-		billDueDate
+		billDateTime
 	)
-	scheduleEntries.push(billEntry)
 
-	// Schedule payment reminder (1 day after booking - same for all frequencies)
-	const reminderDate = new Date(bookingDate)
-	reminderDate.setDate(reminderDate.getDate() + 1)
-
-	const reminderEntry = await scheduleBillingAction(
-		bookingId,
-		'payment_reminder',
-		reminderDate.toISOString().split('T')[0]
-	)
-	scheduleEntries.push(reminderEntry)
-
-	// Schedule overdue notice (7 days after booking - same for all frequencies)
-	const overdueDate = new Date(bookingDate)
-	overdueDate.setDate(overdueDate.getDate() + 7)
-
-	const overdueEntry = await scheduleBillingAction(
-		bookingId,
-		'overdue_notice',
-		overdueDate.toISOString().split('T')[0]
-	)
-	scheduleEntries.push(overdueEntry)
-
-	return scheduleEntries
+	return billEntry
 }
 
 /**
@@ -322,11 +301,11 @@ export async function cancelBillingActions(bookingId: string): Promise<number> {
 /**
  * Groups pending billing actions by frequency for cron job processing
  *
- * @param date - Date to process (YYYY-MM-DD)
+ * @param currentDateTime - Current datetime (ISO string, optional - defaults to now)
  * @returns Promise<Object> - Grouped actions by billing frequency
  */
-export async function groupBillingActionsByFrequency(date: string) {
-	const actions = await getPendingBillingActions(date)
+export async function groupBillingActionsByFrequency(currentDateTime?: string) {
+	const actions = await getPendingBillingActions(currentDateTime)
 
 	const grouped = {
 		per_session: [] as any[],
