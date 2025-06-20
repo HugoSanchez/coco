@@ -37,6 +37,8 @@ export type BookingInsert = TablesInsert<'bookings'>
  * @property start_time - ISO string of booking start time
  * @property end_time - ISO string of booking end time
  * @property status - Optional booking status (defaults to 'scheduled')
+ * @property billing_status - Optional billing status (defaults to 'pending')
+ * @property payment_status - Optional payment status (defaults to 'pending')
  */
 export interface CreateBookingPayload {
 	user_id: string
@@ -44,6 +46,8 @@ export interface CreateBookingPayload {
 	start_time: string
 	end_time: string
 	status?: string
+	billing_status?: 'pending' | 'billed' | 'cancelled' | 'failed'
+	payment_status?: 'pending' | 'paid' | 'overdue' | 'cancelled'
 }
 
 /**
@@ -277,4 +281,91 @@ export async function getBookingById(
 	}
 
 	return data
+}
+
+/**
+ * Updates the billing status of a booking
+ *
+ * @param bookingId - The UUID of the booking to update
+ * @param billingStatus - The new billing status
+ * @returns Promise<Booking> - The updated booking object
+ * @throws Error if update fails
+ */
+export async function updateBookingBillingStatus(
+	bookingId: string,
+	billingStatus: 'pending' | 'billed' | 'cancelled' | 'failed'
+): Promise<Booking> {
+	const updateData: any = { billing_status: billingStatus }
+
+	// Set billed_at timestamp when marking as billed
+	if (billingStatus === 'billed') {
+		updateData.billed_at = new Date().toISOString()
+	}
+
+	const { data, error } = await supabase
+		.from('bookings')
+		.update(updateData)
+		.eq('id', bookingId)
+		.select()
+		.single()
+
+	if (error) throw error
+	return data
+}
+
+/**
+ * Updates the payment status of a booking
+ *
+ * @param bookingId - The UUID of the booking to update
+ * @param paymentStatus - The new payment status
+ * @returns Promise<Booking> - The updated booking object
+ * @throws Error if update fails
+ */
+export async function updateBookingPaymentStatus(
+	bookingId: string,
+	paymentStatus: 'pending' | 'paid' | 'overdue' | 'cancelled'
+): Promise<Booking> {
+	const updateData: any = { payment_status: paymentStatus }
+
+	// Set paid_at timestamp when marking as paid
+	if (paymentStatus === 'paid') {
+		updateData.paid_at = new Date().toISOString()
+	}
+
+	const { data, error } = await supabase
+		.from('bookings')
+		.update(updateData)
+		.eq('id', bookingId)
+		.select()
+		.single()
+
+	if (error) throw error
+	return data
+}
+
+/**
+ * Gets bookings that need billing (status: scheduled, billing_status: pending)
+ *
+ * @param userId - The UUID of the user whose bookings to check
+ * @returns Promise<BookingWithClient[]> - Array of bookings that need billing
+ * @throws Error if database operation fails
+ */
+export async function getBookingsNeedingBilling(
+	userId: string
+): Promise<BookingWithClient[]> {
+	const { data, error } = await supabase
+		.from('bookings')
+		.select(
+			`
+			*,
+			client:clients(id, name, email)
+		`
+		)
+		.eq('user_id', userId)
+		.eq('status', 'scheduled')
+		.eq('billing_status', 'pending')
+		.order('start_time', { ascending: true })
+
+	if (error) throw error
+	return data || []
 }

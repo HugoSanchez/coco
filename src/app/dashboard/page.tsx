@@ -44,6 +44,13 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { getClientsForUser, Client } from '@/lib/db/clients'
+import {
+	getBookingsForUser,
+	updateBookingBillingStatus,
+	updateBookingPaymentStatus,
+	updateBookingStatus,
+	BookingWithClient
+} from '@/lib/db/bookings'
 import { BookingForm } from '@/components/BookingForm'
 
 interface UserProfile {
@@ -52,45 +59,16 @@ interface UserProfile {
 	// Add other profile fields as needed
 }
 
-// Sample booking data - replace with real data from your API
-const sampleBookings: Booking[] = [
-	{
-		id: '1',
-		customerName: 'Liam Johnson',
-		customerEmail: 'liam@example.com',
-		bookingDate: new Date('2023-06-23'),
-		billingStatus: 'billed',
-		paymentStatus: 'paid',
-		amount: 150.0
-	},
-	{
-		id: '2',
-		customerName: 'Olivia Smith',
-		customerEmail: 'olivia@example.com',
-		bookingDate: new Date('2023-06-24'),
-		billingStatus: 'pending',
-		paymentStatus: 'pending',
-		amount: 150.0
-	},
-	{
-		id: '3',
-		customerName: 'Noah Williams',
-		customerEmail: 'noah@example.com',
-		bookingDate: new Date('2023-06-25'),
-		billingStatus: 'billed',
-		paymentStatus: 'pending',
-		amount: 150.0
-	},
-	{
-		id: '4',
-		customerName: 'Emma Brown',
-		customerEmail: 'emma@example.com',
-		bookingDate: new Date('2023-06-26'),
-		billingStatus: 'pending',
-		paymentStatus: 'pending',
-		amount: 150.0
-	}
-]
+// Transform database booking to component booking format
+const transformBooking = (dbBooking: any): Booking => ({
+	id: dbBooking.id,
+	customerName: dbBooking.client.name,
+	customerEmail: dbBooking.client.email,
+	bookingDate: new Date(dbBooking.start_time),
+	billingStatus: dbBooking.billing_status === 'billed' ? 'billed' : 'pending',
+	paymentStatus: dbBooking.payment_status === 'paid' ? 'paid' : 'pending',
+	amount: 150.0 // TODO: Add amount field to database or calculate from billing settings
+})
 
 export default function Dashboard() {
 	const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -98,7 +76,7 @@ export default function Dashboard() {
 	const [user, setUser] = useState<any | null>(null)
 	const [clients, setClients] = useState<Client[]>([])
 	const [loadingClients, setLoadingClients] = useState(true)
-	const [bookings, setBookings] = useState<Booking[]>(sampleBookings)
+	const [bookings, setBookings] = useState<Booking[]>([])
 	const [loadingBookings, setLoadingBookings] = useState(false)
 	const [isFilterOpen, setIsFilterOpen] = useState(false)
 	const [isNewBookingOpen, setIsNewBookingOpen] = useState(false)
@@ -203,6 +181,32 @@ export default function Dashboard() {
 	}, [user, toast])
 
 	useEffect(() => {
+		const fetchBookings = async () => {
+			if (!user) return
+
+			try {
+				setLoadingBookings(true)
+				const dbBookings = await getBookingsForUser(user.id)
+				const transformedBookings = dbBookings.map(transformBooking)
+				setBookings(transformedBookings)
+			} catch (error) {
+				console.error('Error loading bookings:', error)
+				toast({
+					title: 'Error',
+					description: 'Failed to load bookings.',
+					color: 'error'
+				})
+			} finally {
+				setLoadingBookings(false)
+			}
+		}
+
+		if (user) {
+			fetchBookings()
+		}
+	}, [user, toast])
+
+	useEffect(() => {
 		const fetchClients = async () => {
 			if (!user) return
 			setLoadingClients(true)
@@ -238,8 +242,18 @@ export default function Dashboard() {
 				)
 			)
 
-			// TODO: Add API call to update status in database
-			// await updateBookingStatus(bookingId, type, status)
+			// Update status in database
+			if (type === 'billing') {
+				await updateBookingBillingStatus(
+					bookingId,
+					status as 'pending' | 'billed' | 'cancelled' | 'failed'
+				)
+			} else {
+				await updateBookingPaymentStatus(
+					bookingId,
+					status as 'pending' | 'paid' | 'overdue' | 'cancelled'
+				)
+			}
 
 			toast({
 				title: 'Status updated',
@@ -276,10 +290,10 @@ export default function Dashboard() {
 
 	const handleCancelBooking = async (bookingId: string) => {
 		try {
-			// TODO: Add confirmation dialog
-			// TODO: Add API call to cancel booking
-			// await cancelBooking(bookingId)
+			// Update booking status to cancelled
+			await updateBookingStatus(bookingId, 'cancelled')
 
+			// Remove from local state (or update status to show as cancelled)
 			setBookings((prev) =>
 				prev.filter((booking) => booking.id !== bookingId)
 			)
@@ -440,9 +454,24 @@ export default function Dashboard() {
 			>
 				<BookingForm
 					clients={clients}
-					onSuccess={() => {
+					onSuccess={async () => {
 						setIsNewBookingOpen(false)
-						// TODO: Refresh bookings list
+						// Refresh bookings list
+						if (user) {
+							try {
+								const dbBookings = await getBookingsForUser(
+									user.id
+								)
+								const transformedBookings =
+									dbBookings.map(transformBooking)
+								setBookings(transformedBookings)
+							} catch (error) {
+								console.error(
+									'Error refreshing bookings:',
+									error
+								)
+							}
+						}
 					}}
 					onCancel={() => setIsNewBookingOpen(false)}
 				/>
