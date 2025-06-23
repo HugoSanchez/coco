@@ -8,7 +8,10 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
 	const requestUrl = new URL(request.url)
 	const code = requestUrl.searchParams.get('code')
-	let redirectTo = new URL('/onboarding', requestUrl.origin) // Default to onboarding
+	const redirectTo = requestUrl.searchParams.get('redirectTo')
+
+	// Default redirect logic
+	let finalRedirect = new URL('/onboarding', requestUrl.origin)
 
 	if (code) {
 		const supabase = createClient()
@@ -16,19 +19,24 @@ export async function GET(request: Request) {
 		if (error) console.log(error)
 
 		if (data?.user) {
-			// Check if the user has any clients, which indicates they are onboarded.
-			const { count } = await supabase
-				.from('clients')
-				.select('id', { count: 'exact', head: true })
-				.eq('user_id', data.user.id)
+			// If there's a specific redirect from middleware, use it
+			if (redirectTo) {
+				finalRedirect = new URL(redirectTo, requestUrl.origin)
+			} else {
+				// Check if the user has any clients, which indicates they are onboarded.
+				const { count } = await supabase
+					.from('clients')
+					.select('id', { count: 'exact', head: true })
+					.eq('user_id', data.user.id)
 
-			// If they have clients (count > 0), redirect to dashboard.
-			if (count && count > 0) {
-				redirectTo = new URL('/dashboard', requestUrl.origin)
+				// If they have clients (count > 0), redirect to dashboard.
+				if (count && count > 0) {
+					finalRedirect = new URL('/dashboard', requestUrl.origin)
+				}
 			}
 		}
 	}
 
 	// URL to redirect to after sign in process completes
-	return NextResponse.redirect(redirectTo)
+	return NextResponse.redirect(finalRedirect)
 }

@@ -24,15 +24,6 @@ export function TestApiButton() {
 			const getResponse = await fetch('/api/test')
 			const getData = await getResponse.json()
 			console.log('GET Response:', getData)
-
-			// Test POST request
-			const postResponse = await fetch('/api/test', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ test: 'data', timestamp: Date.now() })
-			})
-			const postData = await postResponse.json()
-			console.log('POST Response:', postData)
 		} catch (error) {
 			console.error('API Test Error:', error)
 		} finally {

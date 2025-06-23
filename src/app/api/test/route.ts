@@ -4,24 +4,21 @@ import { NextResponse } from 'next/server'
 export async function GET() {
 	const supabase = createClient()
 
-	// Get the user from the session
+	// Get the user from the session (middleware already verified they're authenticated)
 	const {
-		data: { user },
-		error
+		data: { user }
 	} = await supabase.auth.getUser()
-
-	if (error || !user) {
-		return NextResponse.json({ error: 'Unauthorized 86' }, { status: 401 })
-	}
 
 	// This is your protected data
 	return NextResponse.json({
 		message: 'This is protected data!',
-		user: {
-			id: user.id,
-			email: user.email,
-			user: user
-		},
+		user: user
+			? {
+					id: user.id,
+					email: user.email,
+					user: user
+			  }
+			: null,
 		timestamp: new Date().toISOString()
 	})
 }
