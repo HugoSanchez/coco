@@ -1,28 +1,29 @@
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
+import { Loader } from 'lucide-react'
+import { cva, type VariantProps } from 'class-variance-authority'
+import { cn } from '@/lib/utils'
 
-import { cn } from "@/lib/utils"
+const spinnerVariants = cva('animate-spin-slow text-primary', {
+	variants: {
+		size: {
+			sm: 'h-4 w-4 text-white',
+			md: 'h-8 w-8 text-white',
+			lg: 'h-12 w-12 text-white'
+		}
+	},
+	defaultVariants: {
+		size: 'sm'
+	}
+})
 
-export interface SpinnerProps
-  extends React.InputHTMLAttributes<HTMLInputElement> {
-    radius?: 'big' | 'small'
-  }
+interface SpinnerProps extends VariantProps<typeof spinnerVariants> {
+	className?: string
+}
 
-const Spinner = React.forwardRef<HTMLInputElement, SpinnerProps>(
-  ({ className, type, radius = 'big', ...props }, ref) => {
-    return (
-        <div
-            className={` ${radius == 'big' ? 'h-8 w-8' : 'h-4 w-4'} inline-block animate-spin rounded-full border-2 border-solid border-current border-e-transparent align-[-0.125em] text-surface motion-reduce:animate-[spin_1.5s_linear_infinite] dark:text-white`}
-            role="status">
-            <span
-            className="!absolute !-m-px !h-px !w-px !overflow-hidden !whitespace-nowrap !border-0 !p-0 ![clip:rect(0,0,0,0)]"
-            >Loading...</span
-            >
-      </div>
-    )
-  }
-)
-Spinner.displayName = "Spinner"
+const Spinner = ({ className, size }: SpinnerProps) => {
+	return <Loader className={cn(spinnerVariants({ size }), className)} />
+}
 
-export { Spinner }
+export { Spinner, spinnerVariants }
