@@ -52,6 +52,7 @@ import {
 	BookingWithClient
 } from '@/lib/db/bookings'
 import { BookingForm } from '@/components/BookingForm'
+import { TestApiButton } from '@/components/TestApiButton'
 
 interface UserProfile {
 	id: string
@@ -212,7 +213,7 @@ export default function Dashboard() {
 			setLoadingClients(true)
 			try {
 				const data = await getClientsForUser(user.id)
-				setClients(data)
+				setClients(data as Client[])
 			} catch (e) {
 				// handle error
 			} finally {
@@ -325,13 +326,16 @@ export default function Dashboard() {
 					</h1>
 					<h3 className="text-2xl">este es tu dashboard</h3>
 				</div>
-				<Button
-					className="tracking-wide text-sm bg-teal-400 hover:bg-teal-400 hover:opacity-80"
-					onClick={() => setIsNewBookingOpen(true)}
-				>
-					<Plus className="h-5 w-5 mr-2" />
-					Nueva Cita
-				</Button>
+				<div className="flex gap-2">
+					<TestApiButton />
+					<Button
+						className="tracking-wide text-sm bg-teal-400 hover:bg-teal-400 hover:opacity-80"
+						onClick={() => setIsNewBookingOpen(true)}
+					>
+						<Plus className="h-5 w-5 mr-2" />
+						Nueva Cita
+					</Button>
+				</div>
 			</header>
 			<main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:px-16">
 				<div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
@@ -425,7 +429,7 @@ export default function Dashboard() {
 					</Card>
 					<div x-chunk="dashboard-01-chunk-5">
 						<ClientList
-							clients={clients}
+							clients={clients as Client[]}
 							loading={loadingClients}
 						/>
 					</div>
@@ -453,7 +457,7 @@ export default function Dashboard() {
 				description="Crea una nueva cita para uno de tus pacientes."
 			>
 				<BookingForm
-					clients={clients}
+					clients={clients as any[]}
 					onSuccess={async () => {
 						setIsNewBookingOpen(false)
 						// Refresh bookings list

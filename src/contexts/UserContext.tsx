@@ -23,7 +23,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
 /**
@@ -39,12 +39,12 @@ import { useRouter } from 'next/navigation'
  * @property profile_picture_url - URL to user's profile picture (optional)
  */
 interface UserProfile {
-    id: string
-    name: string
-    username: string
-    email: string
-    description?: string
-    profile_picture_url?: string
+	id: string
+	name: string
+	username: string
+	email: string
+	description?: string
+	profile_picture_url?: string
 }
 
 /**
@@ -58,10 +58,10 @@ interface UserProfile {
  * @property refreshProfile - Function to manually refresh profile data
  */
 interface UserContextType {
-    user: any | null
-    profile: UserProfile | null
-    loading: boolean
-    refreshProfile: () => Promise<void>
+	user: any | null
+	profile: UserProfile | null
+	loading: boolean
+	refreshProfile: () => Promise<void>
 }
 
 // Create the React Context with undefined as default
@@ -84,101 +84,106 @@ const UserContext = createContext<UserContextType | undefined>(undefined)
  * @param children - React children components that need access to auth state
  */
 export function UserProvider({ children }: { children: React.ReactNode }) {
-    // Authentication state from Supabase (contains id, email, etc.)
-    const [user, setUser] = useState<any | null>(null)
+	// Authentication state from Supabase (contains id, email, etc.)
+	const [user, setUser] = useState<any | null>(null)
 
-    // Extended profile data from our profiles table
-    const [profile, setProfile] = useState<UserProfile | null>(null)
+	// Extended profile data from our profiles table
+	const [profile, setProfile] = useState<UserProfile | null>(null)
 
-    // Loading state for profile data fetching
-    const [loading, setLoading] = useState(true)
+	// Loading state for profile data fetching
+	const [loading, setLoading] = useState(true)
 
-    // Next.js router for navigation (used for logout redirect)
-    const router = useRouter()
+	// Next.js router for navigation (used for logout redirect)
+	const router = useRouter()
+	// Create supabase client using ssr.
+	const supabase = createClient()
 
-    // Effect: Set up authentication state listener
-    useEffect(() => {
-        /**
-         * Listen for authentication state changes
-         * This fires whenever the user logs in, logs out, or their session changes
-         */
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
-                // Update user state with the current session user (or null if logged out)
-                setUser(session?.user ?? null)
+	// Effect: Set up authentication state listener
+	useEffect(() => {
+		/**
+		 * Listen for authentication state changes
+		 * This fires whenever the user logs in, logs out, or their session changes
+		 */
+		const {
+			data: { subscription }
+		} = supabase.auth.onAuthStateChange(async (event, session) => {
+			// Update user state with the current session user (or null if logged out)
+			setUser(session?.user ?? null)
 
-                // If user logged out, clear profile and redirect to home
-                if (!session?.user) {
-                    setProfile(null)
-                    router.push('/') // Redirect to home page on logout
-                }
-            }
-        )
+			// If user logged out, clear profile and redirect to home
+			if (!session?.user) {
+				setProfile(null)
+				router.push('/') // Redirect to home page on logout
+			}
+		})
 
-        /**
-         * Get initial session state
-         * This handles the case where the user is already logged in when the app starts
-         * (e.g., refreshing the page, returning to the app)
-         */
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setUser(session?.user ?? null)
-        })
+		/**
+		 * Get initial session state
+		 * This handles the case where the user is already logged in when the app starts
+		 * (e.g., refreshing the page, returning to the app)
+		 */
+		supabase.auth.getSession().then(({ data: { session } }) => {
+			setUser(session?.user ?? null)
+		})
 
-        // Cleanup: Unsubscribe from auth state changes when component unmounts
-        return () => subscription.unsubscribe()
-    }, [router]) // Dependency: router (though it shouldn't change)
+		// Cleanup: Unsubscribe from auth state changes when component unmounts
+		return () => subscription.unsubscribe()
+	}, [router]) // Dependency: router (though it shouldn't change)
 
-    // Effect: Fetch profile data whenever user changes
-    useEffect(() => {
-        // Only fetch profile if user is authenticated
-        if (user) {
-            refreshProfile()
-        }
-    }, [user]) // Dependency: user state
+	// Effect: Fetch profile data whenever user changes
+	useEffect(() => {
+		// Only fetch profile if user is authenticated
+		if (user) {
+			console.log('user 2', user)
+			refreshProfile()
+		}
+	}, [user]) // Dependency: user state
 
-    /**
-     * Fetches the user's profile data from the profiles table
-     *
-     * This function:
-     * 1. Sets loading state to true
-     * 2. Queries the profiles table for the current user's data
-     * 3. Updates the profile state with the fetched data
-     * 4. Handles errors gracefully by setting profile to null
-     * 5. Always sets loading to false when complete
-     *
-     * Can be called manually to refresh profile data (e.g., after profile updates)
-     */
-    const refreshProfile = async () => {
-        try {
-            setLoading(true)
+	/**
+	 * Fetches the user's profile data from the profiles table
+	 *
+	 * This function:
+	 * 1. Sets loading state to true
+	 * 2. Queries the profiles table for the current user's data
+	 * 3. Updates the profile state with the fetched data
+	 * 4. Handles errors gracefully by setting profile to null
+	 * 5. Always sets loading to false when complete
+	 *
+	 * Can be called manually to refresh profile data (e.g., after profile updates)
+	 */
+	const refreshProfile = async () => {
+		try {
+			setLoading(true)
 
-            // Query profiles table for current user's profile data
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id) // Filter by current user's ID
-                .single() // Expect exactly one result
+			// Query profiles table for current user's profile data
+			const { data, error } = await supabase
+				.from('profiles')
+				.select('*')
+				.eq('id', user.id) // Filter by current user's ID
+				.single() // Expect exactly one result
 
-            if (error) throw error
+			if (error) throw error
 
-            // Update profile state with fetched data
-            setProfile(data)
-        } catch (error) {
-            // Log error and clear profile state if fetch fails
-            console.error('Error loading profile:', error)
-            setProfile(null)
-        } finally {
-            // Always clear loading state, regardless of success/failure
-            setLoading(false)
-        }
-    }
+			// Update profile state with fetched data
+			setProfile(data)
+		} catch (error) {
+			// Log error and clear profile state if fetch fails
+			console.error('Error loading profile:', error)
+			setProfile(null)
+		} finally {
+			// Always clear loading state, regardless of success/failure
+			setLoading(false)
+		}
+	}
 
-    // Provide the context value to all child components
-    return (
-        <UserContext.Provider value={{ user, profile, loading, refreshProfile }}>
-            {children}
-        </UserContext.Provider>
-    )
+	// Provide the context value to all child components
+	return (
+		<UserContext.Provider
+			value={{ user, profile, loading, refreshProfile }}
+		>
+			{children}
+		</UserContext.Provider>
+	)
 }
 
 /**
@@ -202,12 +207,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
  * @throws Error if used outside of a UserProvider
  */
 export function useUser() {
-    const context = useContext(UserContext)
+	const context = useContext(UserContext)
 
-    // Ensure hook is used within a UserProvider
-    if (context === undefined) {
-        throw new Error('useUser must be used within a UserProvider')
-    }
+	// Ensure hook is used within a UserProvider
+	if (context === undefined) {
+		throw new Error('useUser must be used within a UserProvider')
+	}
 
-    return context
+	return context
 }

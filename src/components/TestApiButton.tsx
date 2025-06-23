@@ -1,0 +1,52 @@
+'use client'
+import { supabase } from '@/lib/supabase'
+import { Button } from '@/components/ui/button'
+import { useState, useEffect } from 'react'
+
+export function TestApiButton() {
+	const [loading, setLoading] = useState(false)
+
+	useEffect(() => {
+		const getUser = async () => {
+			const {
+				data: { user }
+			} = await supabase.auth.getUser()
+			console.log('user', user)
+		}
+		getUser()
+	}, [])
+
+	const handleTestApi = async () => {
+		setLoading(true)
+		try {
+			// Test GET request
+			const getResponse = await fetch('/api/test')
+			const getData = await getResponse.json()
+			console.log('GET Response:', getData)
+
+			// Test POST request
+			const postResponse = await fetch('/api/test', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ test: 'data', timestamp: Date.now() })
+			})
+			const postData = await postResponse.json()
+			console.log('POST Response:', postData)
+		} catch (error) {
+			console.error('API Test Error:', error)
+		} finally {
+			setLoading(false)
+		}
+	}
+
+	return (
+		<Button
+			onClick={handleTestApi}
+			disabled={loading}
+			variant="outline"
+			className="tracking-wide text-sm"
+		>
+			{loading ? 'Testing...' : 'Test API'}
+		</Button>
+	)
+}
