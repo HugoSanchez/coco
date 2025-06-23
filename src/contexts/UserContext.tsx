@@ -135,7 +135,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 	useEffect(() => {
 		// Only fetch profile if user is authenticated
 		if (user) {
-			console.log('USER: ', user)
 			refreshProfile()
 		}
 	}, [user]) // Dependency: user state

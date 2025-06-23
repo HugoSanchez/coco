@@ -4,7 +4,6 @@ import { useEffect, useState, useMemo } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import { useToast } from '@/components/ui/use-toast'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { ClientList } from '@/components/ClientList'
 import { BookingsTable, Booking } from '@/components/BookingsTable'
 import { SideSheet } from '@/components/SideSheet'
@@ -14,18 +13,12 @@ import {
 } from '@/components/BookingFilters'
 import {
 	Activity,
-	FilterIcon,
 	FilterX,
-	CircleUser,
 	CreditCard,
 	DollarSign,
-	Search,
 	Users,
-	Plus,
-	ArrowUpRight
+	Plus
 } from 'lucide-react'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
 	Card,
@@ -34,22 +27,12 @@ import {
 	CardHeader,
 	CardTitle
 } from '@/components/ui/card'
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuLabel,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
 import { getClientsForUser, Client } from '@/lib/db/clients'
 import {
 	getBookingsForUser,
 	updateBookingBillingStatus,
 	updateBookingPaymentStatus,
-	updateBookingStatus,
-	BookingWithClient
+	updateBookingStatus
 } from '@/lib/db/bookings'
 import { BookingForm } from '@/components/BookingForm'
 import { Spinner } from '@/components/ui/spinner'
@@ -132,7 +115,6 @@ export default function Dashboard() {
 	}, [bookings, filters])
 
 	useEffect(() => {
-		console.log('I rendered')
 		const fetchBookings = async () => {
 			if (!user) return
 
