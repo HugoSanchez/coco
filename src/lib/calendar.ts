@@ -1,5 +1,5 @@
 import { google } from 'googleapis'
-import { supabaseAdmin as supabase } from './supabaseAdmin'
+import { createClient as createSupabaseClient } from '@/lib/supabase/client'
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 import { updateUserCalendarTokens } from './db/calendar-tokens'
 import { oauth2Client } from './googleOAth'
@@ -38,6 +38,8 @@ interface AvailabilitySettings {
 	meeting_price: number
 	currency: string
 }
+
+const supabase = createSupabaseClient()
 
 // Function to refresh the access token
 // This function is used to refresh the access token when it expires

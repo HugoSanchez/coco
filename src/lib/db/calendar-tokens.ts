@@ -18,7 +18,8 @@
  * 4. Repeat cycle to maintain calendar access
  */
 
-import { supabaseAdmin } from '../supabaseAdmin'
+import { createClient as createSupabaseClient } from '@/lib/supabase/client'
+const supabaseAdmin = createSupabaseClient()
 
 /**
  * Updates a user's calendar access tokens in the database

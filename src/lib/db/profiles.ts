@@ -18,7 +18,8 @@
  * - Public profile data can be accessed via username for booking pages
  */
 
-import { supabase } from '../supabase'
+import { createClient as createSupabaseClient } from '@/lib/supabase/client'
+const supabase = createSupabaseClient()
 
 /**
  * Extended user profile interface that includes associated schedule data

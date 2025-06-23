@@ -5,7 +5,8 @@
  * by pre-calculating when billing actions should occur instead of scanning all bookings.
  */
 
-import { supabase } from '@/lib/supabase'
+import { createClient as createSupabaseClient } from '@/lib/supabase/client'
+const supabase = createSupabaseClient()
 
 export type BillingScheduleAction =
 	| 'send_bill'

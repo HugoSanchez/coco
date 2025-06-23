@@ -20,7 +20,8 @@
  * - Override settings for specific bookings
  */
 
-import { supabase } from '../supabase'
+import { createClient as createSupabaseClient } from '@/lib/supabase/client'
+const supabase = createSupabaseClient()
 
 /**
  * Retrieves the user's default billing configuration

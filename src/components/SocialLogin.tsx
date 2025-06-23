@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
 import { FcGoogle } from 'react-icons/fc'
@@ -7,6 +7,7 @@ import { FcGoogle } from 'react-icons/fc'
 export function SocialLogin() {
 	const [isLoading, setIsLoading] = useState(false)
 	const toast = useToast()
+	const supabase = createClient()
 
 	const handleSocialLogin = async (provider: 'google' | 'apple') => {
 		setIsLoading(true)

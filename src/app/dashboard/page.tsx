@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useUser } from '@/contexts/UserContext'
 import { useToast } from '@/components/ui/use-toast'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -52,13 +52,8 @@ import {
 	BookingWithClient
 } from '@/lib/db/bookings'
 import { BookingForm } from '@/components/BookingForm'
+import { Spinner } from '@/components/ui/spinner'
 import { TestApiButton } from '@/components/TestApiButton'
-
-interface UserProfile {
-	id: string
-	name: string
-	// Add other profile fields as needed
-}
 
 // Transform database booking to component booking format
 const transformBooking = (dbBooking: any): Booking => ({
@@ -72,9 +67,7 @@ const transformBooking = (dbBooking: any): Booking => ({
 })
 
 export default function Dashboard() {
-	const [profile, setProfile] = useState<UserProfile | null>(null)
-	const [loading, setLoading] = useState(true)
-	const [user, setUser] = useState<any | null>(null)
+	const { user, profile, loading } = useUser()
 	const [clients, setClients] = useState<Client[]>([])
 	const [loadingClients, setLoadingClients] = useState(true)
 	const [bookings, setBookings] = useState<Booking[]>([])
@@ -139,49 +132,7 @@ export default function Dashboard() {
 	}, [bookings, filters])
 
 	useEffect(() => {
-		const loadUser = async () => {
-			const {
-				data: { user }
-			} = await supabase.auth.getUser()
-			if (!user || user === null) {
-				router.push('/')
-				throw new Error('No user')
-			} else setUser(user)
-		}
-		loadUser()
-	}, [router])
-
-	useEffect(() => {
-		const loadProfile = async () => {
-			try {
-				setLoading(true)
-				const { data, error } = await supabase
-					.from('profiles')
-					.select('*')
-					.eq('id', user.id)
-					.single()
-
-				if (error) throw error
-
-				setProfile(data)
-			} catch (error) {
-				console.error('Error loading profile:', error)
-				toast({
-					title: 'Error',
-					description: 'Failed to load user profile.',
-					variant: 'destructive'
-				})
-			} finally {
-				setLoading(false)
-			}
-		}
-
-		if (user) {
-			loadProfile()
-		}
-	}, [user, toast])
-
-	useEffect(() => {
+		console.log('I rendered')
 		const fetchBookings = async () => {
 			if (!user) return
 
@@ -220,7 +171,9 @@ export default function Dashboard() {
 				setLoadingClients(false)
 			}
 		}
-		fetchClients()
+		if (user) {
+			fetchClients()
+		}
 	}, [user])
 
 	const handleStatusChange = async (
@@ -261,7 +214,7 @@ export default function Dashboard() {
 				description: `${
 					type === 'billing' ? 'Billing' : 'Payment'
 				} status updated to ${status}`,
-				color: 'success'
+				variant: 'default'
 			})
 		} catch (error) {
 			// Revert local state on error
@@ -284,7 +237,7 @@ export default function Dashboard() {
 			toast({
 				title: 'Error',
 				description: 'Failed to update status. Please try again.',
-				color: 'error'
+				variant: 'destructive'
 			})
 		}
 	}
@@ -302,19 +255,33 @@ export default function Dashboard() {
 			toast({
 				title: 'Booking cancelled',
 				description: 'The appointment has been cancelled successfully.',
-				color: 'success'
+				variant: 'default'
 			})
 		} catch (error) {
 			toast({
 				title: 'Error',
 				description: 'Failed to cancel booking. Please try again.',
-				color: 'error'
+				variant: 'destructive'
 			})
 		}
 	}
 
-	if (loading || loadingClients) {
-		return <div>Loading...</div>
+	useEffect(() => {
+		if (!loading && !user) {
+			router.push('/login')
+		}
+	}, [loading, user, router])
+
+	if (loading) {
+		return (
+			<div className="flex h-screen w-full items-center justify-center">
+				<Spinner size="lg" />
+			</div>
+		)
+	}
+
+	if (!user) {
+		return null // Render nothing while the redirect occurs
 	}
 
 	return (

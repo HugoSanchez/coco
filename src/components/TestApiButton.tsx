@@ -1,10 +1,11 @@
 'use client'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { useState, useEffect } from 'react'
 
 export function TestApiButton() {
 	const [loading, setLoading] = useState(false)
+	const supabase = createClient()
 
 	useEffect(() => {
 		const getUser = async () => {

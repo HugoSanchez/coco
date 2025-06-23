@@ -23,7 +23,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
 /**
@@ -96,6 +96,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 	// Next.js router for navigation (used for logout redirect)
 	const router = useRouter()
 
+	// Supabase client
+	const supabase = createClient()
+
 	// Effect: Set up authentication state listener
 	useEffect(() => {
 		/**
@@ -132,6 +135,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 	useEffect(() => {
 		// Only fetch profile if user is authenticated
 		if (user) {
+			console.log('USER: ', user)
 			refreshProfile()
 		}
 	}, [user]) // Dependency: user state

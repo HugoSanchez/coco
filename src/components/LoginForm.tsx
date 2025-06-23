@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SocialLogin } from './SocialLogin'
@@ -9,7 +9,8 @@ import { useToast } from '@/components/ui/use-toast'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 
-export default function Auth() {
+export default function LoginForm() {
+	const supabase = createClient()
 	const { toast } = useToast()
 	const [email, setEmail] = useState('')
 	const [loading, setLoading] = useState(false)
@@ -26,7 +27,12 @@ export default function Auth() {
 		if (!isValidEmail) return
 
 		setLoading(true)
-		const { error } = await supabase.auth.signInWithOtp({ email })
+		const { error } = await supabase.auth.signInWithOtp({
+			email,
+			options: {
+				emailRedirectTo: `${window.location.origin}/api/auth/callback`
+			}
+		})
 
 		if (error) {
 			toast({
@@ -51,7 +57,7 @@ export default function Auth() {
 	return (
 		<div>
 			{isSubmitted ? (
-				<div className="text-center w-full max-w-lg">
+				<div className="text-center max-w-lg w-full">
 					<h1 className="text-3xl font-black mb-3 text-center">
 						¡Revisa tu correo!
 					</h1>
@@ -65,9 +71,9 @@ export default function Auth() {
 					<Button
 						variant="link"
 						onClick={handleReset}
-						className="mt-6 text-teal-500 hover:text-teal-600"
+						className="mt-2 text-teal-500 hover:text-teal-600"
 					>
-						Volver.
+						Volver a introducir mi email
 					</Button>
 				</div>
 			) : (

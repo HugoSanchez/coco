@@ -12,8 +12,9 @@
  * - Billing settings are stored separately in the billing_settings table
  */
 
-import { supabase } from '@/lib/supabase'
 import { Tables } from '@/types/database.types'
+import { createClient as createSupabaseClient } from '@/lib/supabase/client'
+const supabase = createSupabaseClient()
 
 /**
  * Type alias for the Client table row structure

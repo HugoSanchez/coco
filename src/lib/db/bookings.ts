@@ -12,8 +12,9 @@
  * - User scheduling: All bookings belong to a specific user
  */
 
-import { supabase } from '@/lib/supabase'
 import { Tables, TablesInsert } from '@/types/database.types'
+import { createClient as createSupabaseClient } from '@/lib/supabase/client'
+const supabase = createSupabaseClient()
 
 /**
  * Type alias for the Booking table row structure
