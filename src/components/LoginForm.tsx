@@ -9,21 +9,63 @@ import { useToast } from '@/components/ui/use-toast'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 
+/**
+ * LoginForm Component
+ *
+ * Handles user authentication via email OTP (One-Time Password). This component
+ * supports both new user signup and existing user login with a single email input.
+ *
+ * FEATURES:
+ * - Email validation with real-time feedback
+ * - OTP-based authentication via Supabase
+ * - Loading states and error handling
+ * - Success confirmation screen
+ * - Social login integration
+ *
+ * AUTHENTICATION FLOW:
+ * 1. User enters email and submits form
+ * 2. Email validation occurs client-side
+ * 3. Supabase sends OTP email to user
+ * 4. User clicks link in email to complete authentication
+ * 5. User is redirected based on onboarding status
+ *
+ * @component
+ * @example
+ * ```tsx
+ * <LoginForm />
+ * ```
+ */
 export default function LoginForm() {
 	const supabase = createClient()
 	const { toast } = useToast()
+
+	// Form state management
 	const [email, setEmail] = useState('')
 	const [loading, setLoading] = useState(false)
 	const [touched, setTouched] = useState(false)
 	const [isSubmitted, setIsSubmitted] = useState(false)
 
-	// Regex to check for a valid email format.
+	// Email validation regex - checks for basic email format
 	const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 
+	/**
+	 * Handles form submission for email authentication
+	 *
+	 * This function:
+	 * 1. Prevents default form submission
+	 * 2. Validates email format
+	 * 3. Sends OTP email via Supabase
+	 * 4. Handles success/error states
+	 * 5. Shows appropriate user feedback
+	 *
+	 * @param e - Form submission event
+	 * @returns Promise<void>
+	 */
 	const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault()
 		setTouched(true)
 
+		// Early return if email is invalid
 		if (!isValidEmail) return
 
 		setLoading(true)
@@ -46,17 +88,25 @@ export default function LoginForm() {
 		setLoading(false)
 	}
 
+	/**
+	 * Resets the form to its initial state
+	 *
+	 * Clears all form data and returns to the input screen
+	 * from the success confirmation screen.
+	 */
 	const handleReset = () => {
 		setEmail('')
 		setTouched(false)
 		setIsSubmitted(false)
 	}
 
+	// Determine if input should show error styling
 	const isInvalid = touched && !isValidEmail
 
 	return (
 		<div>
 			{isSubmitted ? (
+				// Success confirmation screen
 				<div className="text-center max-w-lg w-full">
 					<h1 className="text-3xl font-black mb-3 text-center">
 						¡Revisa tu correo!
@@ -77,6 +127,7 @@ export default function LoginForm() {
 					</Button>
 				</div>
 			) : (
+				// Main login form
 				<div className="w-full max-w-md p-10">
 					<div className="text-center">
 						<h1 className="text-4xl font-black mb-3 text-center">
@@ -119,6 +170,7 @@ export default function LoginForm() {
 						</Button>
 					</form>
 
+					{/* Social login section */}
 					<div className="space-y-4 mt-6">
 						<div className="relative">
 							<div className="absolute inset-0 flex items-center">

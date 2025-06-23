@@ -18,6 +18,16 @@ import {
 
 import { TimeSlot } from '@/lib/calendar'
 
+/**
+ * Props interface for the Calendar component
+ *
+ * @interface CalendarProps
+ * @property username - The username for the calendar (currently unused)
+ * @property selectedDay - The currently selected date
+ * @property onSelectDate - Callback function called when a date is selected
+ * @property availableSlots - Object mapping date keys to arrays of available time slots
+ * @property onMonthChange - Callback function called when the month changes
+ */
 interface CalendarProps {
 	username: string
 	selectedDay: Date | null
@@ -26,14 +36,54 @@ interface CalendarProps {
 	onMonthChange: (newMonth: Date) => void
 }
 
+/**
+ * Calendar Component
+ *
+ * A date selection calendar that displays available booking slots. Allows users
+ * to navigate between months and select dates that have available time slots.
+ *
+ * FEATURES:
+ * - Month navigation with previous/next buttons
+ * - Date selection with visual feedback
+ * - Highlights dates with available slots
+ * - Prevents selection of past dates
+ * - Responsive design for mobile and desktop
+ * - Week starts on Monday (European format)
+ *
+ * VISUAL STATES:
+ * - Available slots: Green background (emerald-100)
+ * - Selected date: Darker green background (emerald-200)
+ * - Today: Gray background
+ * - Past dates: Disabled and grayed out
+ * - Other month dates: Lighter text color
+ *
+ * @component
+ * @example
+ * ```tsx
+ * <Calendar
+ *   username="john-doe"
+ *   selectedDay={selectedDate}
+ *   onSelectDate={(date) => setSelectedDate(date)}
+ *   availableSlots={availableSlots}
+ *   onMonthChange={(month) => fetchSlotsForMonth(month)}
+ * />
+ * ```
+ */
 export default function Calendar({
 	onSelectDate,
 	onMonthChange,
 	selectedDay,
 	availableSlots
 }: CalendarProps) {
+	// State to track the currently displayed month
 	const [currentMonth, setCurrentMonth] = useState(new Date())
 
+	/**
+	 * Effect to ensure calendar doesn't show past months
+	 *
+	 * Sets the current month to at least the current month if it's
+	 * currently set to a past month.
+	 */
 	useEffect(() => {
 		// Ensure the initial month is set to the current month or later
 		const today = new Date()
@@ -43,27 +93,47 @@ export default function Calendar({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [])
 
+	/**
+	 * Navigate to the previous month
+	 *
+	 * Only allows navigation if the new month is not before the current month.
+	 * This prevents users from selecting dates in the past.
+	 */
 	const prevMonth = () => {
 		const newMonth = subMonths(currentMonth, 1)
+		// Only allow navigation if not going before current month
 		if (!isBefore(startOfMonth(newMonth), startOfMonth(new Date()))) {
 			onMonthChange(subMonths(currentMonth, 1))
 			setCurrentMonth(newMonth)
 		}
 	}
+
+	/**
+	 * Navigate to the next month
+	 *
+	 * Always allows forward navigation as future dates are valid.
+	 */
 	const nextMonth = () => {
 		const newMonth = addMonths(currentMonth, 1)
 		onMonthChange(newMonth)
 		setCurrentMonth(newMonth)
 	}
+
+	// Calculate the date range for the calendar grid
 	const monthStart = startOfMonth(currentMonth)
 	const monthEnd = endOfMonth(currentMonth)
+	// Start from Monday of the week containing the first day of the month
 	const startDate = startOfWeek(monthStart, { weekStartsOn: 1 })
+	// End on Sunday of the week containing the last day of the month
 	const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 })
+	// Generate array of all days to display in the grid
 	const days = eachDayOfInterval({ start: startDate, end: endDate })
 
 	return (
 		<div className="w-full">
+			{/* Month navigation header */}
 			<div className="flex items-center justify-between mb-4">
+				{/* Previous month button */}
 				<button
 					disabled={isSameMonth(currentMonth, new Date())}
 					onClick={prevMonth}
@@ -75,9 +145,13 @@ export default function Calendar({
 				>
 					<ChevronLeft className="h-5 w-5 text-gray-400" />
 				</button>
+
+				{/* Current month and year display */}
 				<h2 className="text-lg font-semibold text-gray-800">
 					{format(currentMonth, 'MMMM yyyy')}
 				</h2>
+
+				{/* Next month button */}
 				<button
 					onClick={nextMonth}
 					className="p-2 rounded-full bg-emerald-100"
@@ -85,7 +159,10 @@ export default function Calendar({
 					<ChevronRight className="h-5 w-5 text-gray-400" />
 				</button>
 			</div>
+
+			{/* Calendar grid */}
 			<div className="grid grid-cols-7 gap-1">
+				{/* Day of week headers */}
 				{['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map(
 					(day) => (
 						<div
@@ -96,7 +173,10 @@ export default function Calendar({
 						</div>
 					)
 				)}
+
+				{/* Calendar days */}
 				{days.map((day) => {
+					// Determine various states for the day
 					const isCurrentMonth = isSameMonth(day, currentMonth)
 					const isSelectable =
 						isCurrentMonth && !isBefore(day, new Date())
@@ -105,6 +185,7 @@ export default function Calendar({
 						availableSlots[dateKey] &&
 						availableSlots[dateKey].length > 0 &&
 						day >= new Date()
+
 					return (
 						<div
 							key={day.toString()}

@@ -16,8 +16,16 @@ import { createClient as createSupabaseClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/use-toast'
 import { Spinner } from '@/components/ui/spinner'
 
+/**
+ * Array of day abbreviations for the week
+ * Used for rendering day headers and managing availability data
+ */
 const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
+/**
+ * Comprehensive list of timezones with their GMT offsets
+ * Provides users with a wide range of timezone options for their availability
+ */
 const timezones = [
 	{ value: 'Etc/GMT', label: 'GMT/UTC+0' },
 	{ value: 'Europe/London', label: 'GMT+0 London' },
@@ -58,31 +66,83 @@ const timezones = [
 	{ value: 'Pacific/Niue', label: 'GMT-11 Niue' }
 ]
 
+/**
+ * Interface for a time slot with start and end times
+ *
+ * @interface TimeSlot
+ * @property start - Start time in HH:MM format
+ * @property end - End time in HH:MM format
+ */
 interface TimeSlot {
 	start: string
 	end: string
 }
 
+/**
+ * Interface for a day's availability configuration
+ *
+ * @interface DayAvailability
+ * @property isAvailable - Whether the day is available for bookings
+ * @property timeSlots - Array of time slots for the day
+ */
 interface DayAvailability {
 	isAvailable: boolean
 	timeSlots: TimeSlot[]
 }
 
-export function WeeklyAvailability({ onComplete }: { onComplete: () => void }) {
-	// State variables for the availability
+/**
+ * Props interface for the WeeklyAvailability component
+ *
+ * @interface WeeklyAvailabilityProps
+ * @property onComplete - Callback function called when availability is saved
+ */
+interface WeeklyAvailabilityProps {
+	onComplete: () => void
+}
+
+/**
+ * WeeklyAvailability Component
+ *
+ * A comprehensive component for configuring weekly availability, timezone,
+ * meeting duration, and pricing. This is a crucial part of the booking
+ * system setup that determines when users can be booked.
+ *
+ * FEATURES:
+ * - Weekly availability configuration (7 days)
+ * - Multiple time slots per day
+ * - Timezone selection with 40+ options
+ * - Meeting duration configuration
+ * - Pricing setup with currency selection
+ * - Auto-detection of user's timezone
+ * - Persistent storage in database
+ * - Loading and error states
+ *
+ * DATA STRUCTURE:
+ * - Availability stored as array of 7 DayAvailability objects
+ * - Each day has isAvailable boolean and timeSlots array
+ * - Time slots use 24-hour format (HH:MM)
+ *
+ * @component
+ * @example
+ * ```tsx
+ * <WeeklyAvailability onComplete={() => setCurrentStep(4)} />
+ * ```
+ */
+export function WeeklyAvailability({ onComplete }: WeeklyAvailabilityProps) {
+	// State variables for the availability configuration
 	const [availability, setAvailability] = useState<DayAvailability[]>(
 		daysOfWeek.map((day, index) => ({
-			isAvailable: index >= 1 && index <= 5, // Monday to Friday are true
-			timeSlots: [{ start: '09:00', end: '17:00' }]
+			isAvailable: index >= 1 && index <= 5, // Monday to Friday are true by default
+			timeSlots: [{ start: '09:00', end: '17:00' }] // Default 9 AM to 5 PM
 		}))
 	)
 
-	// Create a toast
+	// Create toast notification system
 	const toast = useToast()
-	// Create a Supabase client
+	// Create Supabase client for database operations
 	const supabase = createSupabaseClient()
 
-	// State variables for the form
+	// State variables for the form configuration
 	const [currency, setCurrency] = useState('EUR')
 	const [timeZone, setTimeZone] = useState('UTC/GMT+0')
 	const [meetingPrice, setMeetingPrice] = useState('0')
@@ -95,6 +155,12 @@ export function WeeklyAvailability({ onComplete }: { onComplete: () => void }) {
 	>('idle')
 	const [statusMessage, setStatusMessage] = useState<string>('')
 
+	/**
+	 * Effect to auto-detect and set user's timezone
+	 *
+	 * Uses the browser's timezone API to automatically select
+	 * the appropriate timezone from the available options.
+	 */
 	useEffect(() => {
 		// Set the time zone to the user's time zone
 		const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -106,6 +172,12 @@ export function WeeklyAvailability({ onComplete }: { onComplete: () => void }) {
 		}
 	}, [])
 
+	/**
+	 * Effect to load existing schedule data from database
+	 *
+	 * Fetches the user's saved schedule configuration and
+	 * populates the form with existing values.
+	 */
 	useEffect(() => {
 		// Fetch the user's schedule from the database
 		// and set the state variables to the schedule data
@@ -125,8 +197,14 @@ export function WeeklyAvailability({ onComplete }: { onComplete: () => void }) {
 		loadUserSchedule()
 	}, [])
 
-	// Get the user, then fetch their schedule
-	// from the database if it exists
+	/**
+	 * Fetches the user's schedule from the database
+	 *
+	 * Retrieves the current user's schedule configuration
+	 * from the 'schedules' table in Supabase.
+	 *
+	 * @returns Promise<ScheduleData | null> - The schedule data or null if not found
+	 */
 	const fetchUserSchedule = async () => {
 		const {
 			data: { user }
@@ -151,6 +229,11 @@ export function WeeklyAvailability({ onComplete }: { onComplete: () => void }) {
 		return data
 	}
 
+	/**
+	 * Toggles the availability of a specific day
+	 *
+	 * @param index - The index of the day to toggle (0-6, Sunday-Saturday)
+	 */
 	const handleDayToggle = (index: number) => {
 		// Toggle the availability of a day
 		setAvailability((prev) =>
@@ -160,6 +243,14 @@ export function WeeklyAvailability({ onComplete }: { onComplete: () => void }) {
 		)
 	}
 
+	/**
+	 * Updates the start or end time of a specific time slot
+	 *
+	 * @param dayIndex - The index of the day (0-6)
+	 * @param slotIndex - The index of the time slot within the day
+	 * @param field - Whether to update 'start' or 'end' time
+	 * @param value - The new time value in HH:MM format
+	 */
 	const handleTimeChange = (
 		dayIndex: number,
 		slotIndex: number,
@@ -183,6 +274,11 @@ export function WeeklyAvailability({ onComplete }: { onComplete: () => void }) {
 		)
 	}
 
+	/**
+	 * Adds a new time slot to a specific day
+	 *
+	 * @param dayIndex - The index of the day to add the slot to (0-6)
+	 */
 	const addTimeSlot = (dayIndex: number) => {
 		// Add a time slot to a day
 		setAvailability((prev) =>
@@ -192,7 +288,7 @@ export function WeeklyAvailability({ onComplete }: { onComplete: () => void }) {
 							...day,
 							timeSlots: [
 								...day.timeSlots,
-								{ start: '09:00', end: '17:00' }
+								{ start: '09:00', end: '17:00' } // Default new slot
 							]
 					  }
 					: day
