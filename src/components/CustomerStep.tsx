@@ -1,9 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
-import { ConnectCalendar } from '@/components/ConnectCalendar'
 import { ClientFormFields } from '@/components/ClientFormFields'
 
 /**

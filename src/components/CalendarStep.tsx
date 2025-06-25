@@ -99,8 +99,9 @@ export function CalendarStep({
 			<form onSubmit={handleSubmit} className="space-y-8">
 				<Button
 					type="submit"
+					variant="default"
 					disabled={isLoading}
-					className="h-12 w-full shadow-sm bg-teal-400 hover:bg-teal-400 hover:opacity-90 text-md"
+					className="h-12 w-full shadow-sm text-md"
 				>
 					{/* Show loading text or button text based on state */}
 					{isLoading ? loadingText : buttonText}

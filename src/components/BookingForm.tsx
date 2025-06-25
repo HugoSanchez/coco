@@ -211,8 +211,9 @@ export function BookingForm({
 					{selectedSlot && (
 						<div className="pt-4">
 							<Button
+								variant="default"
 								onClick={handleContinueToClient}
-								className="w-full bg-teal-400 hover:bg-teal-400 hover:opacity-90 text-white"
+								className="w-full bg-accent"
 							>
 								Continuar
 							</Button>
@@ -273,8 +274,9 @@ export function BookingForm({
 						</div>
 						<Button
 							type="submit"
+							variant="default"
 							disabled={loading || !selectedClient}
-							className="w-full bg-teal-400 hover:bg-teal-400 hover:opacity-90 text-white"
+							className="w-full"
 						>
 							{loading ? 'Creando cita...' : 'Crear Cita'}
 						</Button>

@@ -581,7 +581,7 @@ export function WeeklyAvailability({ onComplete }: WeeklyAvailabilityProps) {
 
 			<Button
 				onClick={handleSave}
-				className="h-12 w-full shadow-sm bg-teal-400 hover:bg-teal-400 hover:opacity-90 text-md"
+				className="h-12 w-full shadow-sm bg-accent hover:bg-accent hover:opacity-90 text-md"
 				disabled={saveStatus === 'loading'}
 			>
 				{saveStatus === 'loading' ? 'Guardando...' : 'Continuar'}

@@ -278,7 +278,7 @@ export default function Dashboard() {
 				<div className="flex gap-2">
 					<TestApiButton />
 					<Button
-						className="tracking-wide text-sm bg-teal-400 hover:bg-teal-400 hover:opacity-80"
+						variant="default"
 						onClick={() => setIsNewBookingOpen(true)}
 					>
 						<Plus className="h-5 w-5 mr-2" />

@@ -161,8 +161,9 @@ export default function LoginForm() {
 						/>
 						<Button
 							type="submit"
+							variant="default"
 							disabled={loading}
-							className={`w-full h-14 bg-teal-400 hover:bg-teal-500 hover:opacity-80 ${
+							className={`w-full h-14 ${
 								!isValidEmail ? 'cursor-not-allowed' : ''
 							}`}
 						>

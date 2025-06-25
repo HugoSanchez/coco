@@ -71,7 +71,7 @@ export function TestApiButton() {
 		<Button
 			onClick={handleTestApi}
 			disabled={loading}
-			variant="outline"
+			variant="default"
 			className="tracking-wide text-sm"
 		>
 			{loading ? 'Testing...' : 'Test API'}
