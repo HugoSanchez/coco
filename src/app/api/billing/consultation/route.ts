@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import {
+	sendBulkConsultationBills,
+	validateEmailConfig
+} from '@/lib/emails/email-service'
 
 /**
  * GET /api/billing/consultation
@@ -164,4 +168,228 @@ export async function GET() {
 	 * 3. Mark the billing_schedule entry as 'processed'
 	 */
 	return NextResponse.json(consultations)
+}
+
+/**
+ * POST /api/billing/consultation
+ *
+ * SEND CONSULTATION BILLING EMAILS
+ * ===============================
+ *
+ * Purpose:
+ * Finds all consultation bills due today and sends billing emails to clients.
+ * This endpoint handles the actual email sending for consultation billing.
+ *
+ * Request Body Options:
+ * - No body: Send emails for ALL consultation bills due today
+ * - { booking_ids: ["uuid1", "uuid2"] }: Send emails for specific bookings only
+ * - { dry_run: true }: Preview what emails would be sent without actually sending
+ *
+ * Email Flow:
+ * 1. Query consultation bills (same as GET endpoint)
+ * 2. Transform data into email format
+ * 3. Send emails via Resend
+ * 4. Update billing_schedule status to 'processed' for successful sends
+ *
+ * Response Format:
+ * {
+ *   success: true,
+ *   total: 5,
+ *   emails_sent: 4,
+ *   emails_failed: 1,
+ *   results: [...],
+ *   errors: [...]
+ * }
+ */
+export async function POST(request: Request) {
+	try {
+		// Parse request body (optional filters)
+		const body = await request.json().catch(() => ({}))
+		const { booking_ids, dry_run = false } = body
+
+		console.log('📧 [API] Processing consultation billing emails:', {
+			booking_ids,
+			dry_run
+		})
+
+		// =========================================================================
+		// VALIDATE EMAIL CONFIGURATION
+		// =========================================================================
+
+		const emailValidation = validateEmailConfig()
+		if (!emailValidation.isValid) {
+			return NextResponse.json(
+				{
+					success: false,
+					error: 'Email configuration invalid',
+					issues: emailValidation.issues
+				},
+				{ status: 400 }
+			)
+		}
+
+		// =========================================================================
+		// GET CONSULTATION BILLS (Same as GET endpoint)
+		// =========================================================================
+
+		const todayStr = new Date().toISOString().slice(0, 10)
+
+		const { data, error } = await supabase.rpc('get_consultation_billing', {
+			today_date: todayStr
+		})
+
+		if (error) {
+			return NextResponse.json(
+				{ success: false, error: error.message },
+				{ status: 500 }
+			)
+		}
+
+		// Transform data (same as GET endpoint)
+		let consultations = (data || []).map((row: any) => ({
+			booking_id: row.booking_id,
+			scheduled_date: row.scheduled_date,
+			consultation_date: row.consultation_date, // Add consultation date for email
+			client: {
+				id: row.client_id,
+				name: row.client_name,
+				email: row.client_email
+			},
+			billing_settings: {
+				id: row.billing_settings_id,
+				billing_amount: row.billing_amount,
+				billing_trigger: row.billing_trigger,
+				billing_advance_days: row.billing_advance_days
+			},
+			amount: row.billing_amount,
+			trigger: row.billing_trigger
+		}))
+
+		// Filter by specific booking IDs if provided
+		if (booking_ids && Array.isArray(booking_ids)) {
+			consultations = consultations.filter((c: any) =>
+				booking_ids.includes(c.booking_id)
+			)
+		}
+
+		if (consultations.length === 0) {
+			return NextResponse.json({
+				success: true,
+				message: 'No consultation bills to process',
+				total: 0,
+				emails_sent: 0,
+				emails_failed: 0,
+				results: [],
+				errors: []
+			})
+		}
+
+		// =========================================================================
+		// DRY RUN - Preview what would be sent
+		// =========================================================================
+
+		if (dry_run) {
+			const preview = consultations.map((consultation: any) => ({
+				booking_id: consultation.booking_id,
+				client_email: consultation.client.email,
+				client_name: consultation.client.name,
+				amount: consultation.amount,
+				trigger: consultation.trigger,
+				subject:
+					consultation.trigger === 'before_consultation'
+						? `Factura de Consulta - Pago Requerido | ${consultation.consultation_date}`
+						: `Factura de Consulta Completada | ${consultation.consultation_date}`
+			}))
+
+			return NextResponse.json({
+				success: true,
+				dry_run: true,
+				message: `Would send ${preview.length} emails`,
+				total: preview.length,
+				preview
+			})
+		}
+
+		// =========================================================================
+		// PREPARE EMAIL DATA
+		// =========================================================================
+
+		const emailData = consultations.map((consultation: any) => ({
+			to: consultation.client.email,
+			clientName: consultation.client.name,
+			consultationDate:
+				consultation.consultation_date || consultation.scheduled_date,
+			amount: consultation.amount,
+			billingTrigger: consultation.trigger,
+			practitionerName: 'Tu Profesional', // TODO: Get from user profile
+			bookingId: consultation.booking_id
+		}))
+
+		// =========================================================================
+		// SEND EMAILS
+		// =========================================================================
+
+		console.log(
+			`📧 [API] Sending ${emailData.length} consultation billing emails`
+		)
+
+		const emailResults = await sendBulkConsultationBills(emailData)
+
+		// =========================================================================
+		// UPDATE BILLING SCHEDULE STATUS
+		// =========================================================================
+
+		// Mark successful emails as 'processed' in billing_schedule
+		const successfulBookingIds = emailResults.results
+			.filter((r: any) => r.status === 'sent')
+			.map((r: any) => r.bookingId)
+
+		if (successfulBookingIds.length > 0) {
+			const { error: updateError } = await supabase
+				.from('billing_schedule')
+				.update({
+					status: 'processed',
+					processed_at: new Date().toISOString()
+				})
+				.in('booking_id', successfulBookingIds)
+
+			if (updateError) {
+				console.error(
+					'❌ [API] Failed to update billing_schedule status:',
+					updateError
+				)
+				// Don't fail the whole request, but log the error
+			} else {
+				console.log(
+					`✅ [API] Marked ${successfulBookingIds.length} billing entries as processed`
+				)
+			}
+		}
+
+		// =========================================================================
+		// API RESPONSE
+		// =========================================================================
+
+		return NextResponse.json({
+			success: true,
+			total: emailResults.total,
+			emails_sent: emailResults.successful,
+			emails_failed: emailResults.failed,
+			results: emailResults.results,
+			errors: emailResults.errors
+		})
+	} catch (error) {
+		console.error('❌ [API] Error in consultation billing:', error)
+
+		return NextResponse.json(
+			{
+				success: false,
+				error:
+					error instanceof Error
+						? error.message
+						: 'Unknown error occurred'
+			},
+			{ status: 500 }
+		)
+	}
 }

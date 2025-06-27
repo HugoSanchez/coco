@@ -99,8 +99,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 	// Supabase client
 	const supabase = createClient()
 
+	// TEMPORARY DEBUG: Track UserProvider mounting
+	useEffect(() => {
+		console.log(
+			'🔧 [DEBUG] UserProvider mounted, URL:',
+			window.location.href
+		)
+		console.log('🔧 [DEBUG] Initial auth setup starting...')
+	}, [])
+
 	// Effect: Set up authentication state listener
 	useEffect(() => {
+		console.log('🔧 [DEBUG] Setting up auth state listener...')
+
 		/**
 		 * Listen for authentication state changes
 		 * This fires whenever the user logs in, logs out, or their session changes
@@ -108,13 +119,38 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 		const {
 			data: { subscription }
 		} = supabase.auth.onAuthStateChange(async (event, session) => {
+			console.log('🔧 [DEBUG] Auth state change detected:', {
+				event,
+				hasSession: !!session,
+				hasUser: !!session?.user,
+				url: window.location.href,
+				timestamp: new Date().toISOString()
+			})
+
+			// Check if this is a token refresh event
+			if (event === 'TOKEN_REFRESHED') {
+				console.log(
+					'🔧 [DEBUG] Token refresh detected - this might trigger cookie error'
+				)
+			}
+
 			// Update user state with the current session user (or null if logged out)
 			setUser(session?.user ?? null)
 
 			// Only redirect to login on actual logout events, not on initial load
 			if (event === 'SIGNED_OUT') {
+				console.log(
+					'🔧 [DEBUG] User signed out, clearing profile and redirecting to login'
+				)
 				setProfile(null)
 				router.push('/login') // Redirect to login page on logout
+			}
+
+			// Log session expiry issues
+			if (!session && event !== 'SIGNED_OUT') {
+				console.log(
+					'🔧 [DEBUG] No session but not signed out - possible session expiry issue'
+				)
 			}
 		})
 
@@ -123,19 +159,44 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 		 * This handles the case where the user is already logged in when the app starts
 		 * (e.g., refreshing the page, returning to the app)
 		 */
-		supabase.auth.getSession().then(({ data: { session } }) => {
-			setUser(session?.user ?? null)
-		})
+		console.log('🔧 [DEBUG] Getting initial session...')
+		supabase.auth
+			.getSession()
+			.then(({ data: { session }, error }) => {
+				console.log('🔧 [DEBUG] Initial session result:', {
+					hasSession: !!session,
+					hasUser: !!session?.user,
+					error: error?.message,
+					url: window.location.href
+				})
+				setUser(session?.user ?? null)
+			})
+			.catch((err) => {
+				console.error('🔧 [DEBUG] Error getting initial session:', err)
+			})
 
 		// Cleanup: Unsubscribe from auth state changes when component unmounts
-		return () => subscription.unsubscribe()
+		return () => {
+			console.log('🔧 [DEBUG] Cleaning up auth listener')
+			subscription.unsubscribe()
+		}
 	}, [router]) // Dependency: router (though it shouldn't change)
 
 	// Effect: Fetch profile data whenever user changes
 	useEffect(() => {
+		console.log('🔧 [DEBUG] User state changed:', {
+			hasUser: !!user,
+			userId: user?.id,
+			url: window.location.href
+		})
+
 		// Only fetch profile if user is authenticated
 		if (user) {
+			console.log('🔧 [DEBUG] User exists, fetching profile...')
 			refreshProfile()
+		} else {
+			console.log('🔧 [DEBUG] No user, skipping profile fetch')
+			setLoading(false)
 		}
 	}, [user]) // Dependency: user state
 
@@ -153,6 +214,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 	 */
 	const refreshProfile = async () => {
 		try {
+			console.log(
+				'🔧 [DEBUG] Starting profile refresh for user:',
+				user?.id
+			)
 			setLoading(true)
 
 			// Query profiles table for current user's profile data
@@ -162,16 +227,26 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 				.eq('id', user.id) // Filter by current user's ID
 				.single() // Expect exactly one result
 
-			if (error) throw error
+			if (error) {
+				console.error('🔧 [DEBUG] Profile fetch error:', error)
+				throw error
+			}
 
+			console.log(
+				'🔧 [DEBUG] Profile fetched successfully:',
+				data?.name || 'unnamed'
+			)
 			// Update profile state with fetched data
 			setProfile(data)
 		} catch (error) {
 			// Log error and clear profile state if fetch fails
-			console.error('Error loading profile:', error)
+			console.error('🔧 [DEBUG] Error loading profile:', error)
 			setProfile(null)
 		} finally {
 			// Always clear loading state, regardless of success/failure
+			console.log(
+				'🔧 [DEBUG] Profile refresh complete, setting loading to false'
+			)
 			setLoading(false)
 		}
 	}

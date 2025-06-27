@@ -5,6 +5,7 @@ CREATE OR REPLACE FUNCTION get_consultation_billing(today_date DATE)
 RETURNS TABLE (
   booking_id UUID,
   scheduled_date DATE,
+  consultation_date DATE,
   client_id UUID,
   client_name TEXT,
   client_email TEXT,
@@ -19,6 +20,7 @@ AS $$
   SELECT
     bs.booking_id,
     bs.scheduled_date,
+    b.start_time::DATE as consultation_date,
     c.id as client_id,
     c.name as client_name,
     c.email as client_email,
