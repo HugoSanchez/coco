@@ -13,7 +13,7 @@ import { useState, useEffect } from 'react'
  * - User session data is accessible
  *
  * FEATURES:
- * - Tests the /api/test endpoint
+ * - Tests the /api/dev/test endpoint
  * - Logs user authentication state
  * - Provides loading state feedback
  * - Console logging for debugging
@@ -50,14 +50,14 @@ export function TestApiButton() {
 	/**
 	 * Handles the API test request
 	 *
-	 * Makes a GET request to the /api/test endpoint and logs the response
+	 * Makes a GET request to the /api/dev/test endpoint and logs the response
 	 * for debugging purposes. Includes error handling and loading state management.
 	 */
 	const handleTestApi = async () => {
 		setLoading(true)
 		try {
 			// Test GET request to protected API endpoint
-			const getResponse = await fetch('/api/test')
+			const getResponse = await fetch('/api/dev/test')
 			const getData = await getResponse.json()
 			console.log('GET Response:', getData)
 		} catch (error) {

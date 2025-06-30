@@ -34,6 +34,8 @@ export async function sendConsultationBillEmail({
 	amount,
 	billingTrigger,
 	practitionerName,
+	practitionerEmail,
+	practitionerImageUrl,
 	dueDate
 }: {
 	to: string
@@ -42,6 +44,8 @@ export async function sendConsultationBillEmail({
 	amount: number
 	billingTrigger: 'before_consultation' | 'after_consultation'
 	practitionerName?: string
+	practitionerEmail?: string
+	practitionerImageUrl?: string
 	dueDate?: string
 }) {
 	try {
@@ -53,6 +57,8 @@ export async function sendConsultationBillEmail({
 				amount,
 				billingTrigger,
 				practitionerName,
+				practitionerEmail,
+				practitionerImageUrl,
 				dueDate
 			})
 		)
@@ -120,6 +126,8 @@ export async function sendBulkConsultationBills(
 		amount: number
 		billingTrigger: 'before_consultation' | 'after_consultation'
 		practitionerName?: string
+		practitionerEmail?: string
+		practitionerImageUrl?: string
 		dueDate?: string
 		bookingId?: string
 	}>

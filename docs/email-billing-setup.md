@@ -57,10 +57,10 @@ Test that your email setup is working:
 
 ```bash
 # Test with default settings
-curl -X GET http://localhost:3000/api/test-email
+curl -X GET http://localhost:3000/api/dev/test-email
 
 # Send test email to your address
-curl -X POST http://localhost:3000/api/test-email \
+curl -X POST http://localhost:3000/api/dev/test-email \
   -H "Content-Type: application/json" \
   -d '{
     "to": "your-email@example.com",
@@ -277,8 +277,8 @@ const validation = validateEmailConfig()
 
 | Endpoint                    | Method | Purpose                             |
 | --------------------------- | ------ | ----------------------------------- |
-| `/api/test-email`           | GET    | Test email configuration            |
-| `/api/test-email`           | POST   | Send test email to specific address |
+| `/api/dev/test-email`       | GET    | Test email configuration            |
+| `/api/dev/test-email`       | POST   | Send test email to specific address |
 | `/api/billing/consultation` | GET    | Get consultation bills due today    |
 | `/api/billing/consultation` | POST   | Send consultation bill emails       |
 
@@ -290,7 +290,7 @@ If you need help setting up the email billing system:
 
 1. Check the troubleshooting section above
 2. Verify your environment variables are correct
-3. Test with the `/api/test-email` endpoint first
+3. Test with the `/api/dev/test-email` endpoint first
 4. Check server logs for detailed error messages
 
 The email billing system is designed to be reliable and easy to use. Once set up, it will handle all consultation billing automatically!

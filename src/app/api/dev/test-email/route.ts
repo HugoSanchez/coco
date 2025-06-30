@@ -6,7 +6,7 @@ import {
 } from '@/lib/emails/email-service'
 
 /**
- * GET /api/test-email
+ * GET /api/dev/test-email
  *
  * TEST EMAIL CONFIGURATION
  * ========================
@@ -65,6 +65,9 @@ export async function GET() {
 			amount: 80,
 			billingTrigger: 'before_consultation' as const,
 			practitionerName: 'Dr. María González',
+			practitionerEmail: 'maria.gonzalez@ejemplo.com',
+			practitionerImageUrl:
+				'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&h=150&fit=crop&crop=face',
 			dueDate: '2025-01-18'
 		}
 
@@ -122,7 +125,7 @@ export async function GET() {
 }
 
 /**
- * POST /api/test-email
+ * POST /api/dev/test-email
  *
  * SEND TEST EMAIL TO CUSTOM RECIPIENT
  * ===================================
@@ -150,7 +153,10 @@ export async function POST(request: Request) {
 
 		if (!to) {
 			return NextResponse.json(
-				{ success: false, error: 'Email address (to) is required' },
+				{
+					success: false,
+					error: 'Email address (to) is required'
+				},
 				{ status: 400 }
 			)
 		}
@@ -175,7 +181,10 @@ export async function POST(request: Request) {
 			consultationDate: new Date().toISOString().slice(0, 10),
 			amount,
 			billingTrigger,
-			practitionerName: 'Tu Profesional (Test)'
+			practitionerName: 'Dr. María González',
+			practitionerEmail: 'maria.gonzalez@ejemplo.com',
+			practitionerImageUrl:
+				'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=150&h=150&fit=crop&crop=face'
 		}
 
 		const result = await sendConsultationBillEmail(testEmail)

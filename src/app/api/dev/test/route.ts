@@ -17,7 +17,7 @@ export async function GET() {
 					id: user.id,
 					email: user.email,
 					user: user
-			  }
+				}
 			: null,
 		timestamp: new Date().toISOString()
 	})

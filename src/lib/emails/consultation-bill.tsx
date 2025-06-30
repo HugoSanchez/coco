@@ -12,12 +12,47 @@ import {
 	Column
 } from '@react-email/components'
 
+/**
+ * Format a date string to Spanish format
+ * Example: "2025-06-30" -> "30 de Junio de 2025"
+ */
+function formatDateToSpanish(dateString: string): string {
+	const monthNames = [
+		'Enero',
+		'Febrero',
+		'Marzo',
+		'Abril',
+		'Mayo',
+		'Junio',
+		'Julio',
+		'Agosto',
+		'Septiembre',
+		'Octubre',
+		'Noviembre',
+		'Diciembre'
+	]
+
+	try {
+		const date = new Date(dateString)
+		const day = date.getDate()
+		const month = monthNames[date.getMonth()]
+		const year = date.getFullYear()
+
+		return `${day} de ${month} de ${year}`
+	} catch (error) {
+		// Fallback to original string if parsing fails
+		return dateString
+	}
+}
+
 interface ConsultationBillEmailProps {
 	clientName: string
 	consultationDate: string
 	amount: number
 	billingTrigger: 'before_consultation' | 'after_consultation'
 	practitionerName?: string
+	practitionerEmail?: string
+	practitionerImageUrl?: string
 	dueDate?: string
 }
 
@@ -32,7 +67,9 @@ export default function ConsultationBillEmail({
 	consultationDate,
 	amount,
 	billingTrigger,
-	practitionerName = 'Tu Profesional',
+	practitionerName = 'Frencisco Tocadiscos',
+	practitionerEmail = 'contacto@tuprofesional.com',
+	practitionerImageUrl = 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=150&h=150&fit=crop&crop=face',
 	dueDate
 }: ConsultationBillEmailProps) {
 	const isBefore = billingTrigger === 'before_consultation'
@@ -52,16 +89,18 @@ export default function ConsultationBillEmail({
 				<Container style={container}>
 					{/* Header */}
 					<Section style={header}>
-						<Heading style={h1}>Factura de Consulta</Heading>
-						<Text style={subtitle}>{practitionerName}</Text>
+						<div style={headerContainer}>
+							<Heading style={h1}>Factura de Consulta</Heading>
+						</div>
 					</Section>
 
 					{/* Greeting */}
 					<Section style={{ ...section, paddingTop: '32px' }}>
 						<Text style={text}>Hola {clientName},</Text>
 						<Text style={text}>
-							{billingContext}. A continuación encontrarás los
-							detalles de tu factura:
+							Aquí tienes la factura y detalles de pago de tu{' '}
+							{isBefore ? '' : 'próxima'}
+							consulta con {' ' + practitionerName}
 						</Text>
 					</Section>
 
@@ -70,22 +109,11 @@ export default function ConsultationBillEmail({
 						<div style={billSection}>
 							<Row>
 								<Column style={labelColumn}>
-									<Text style={label}>Cliente:</Text>
-								</Column>
-								<Column style={valueColumn}>
-									<Text style={value}>{clientName}</Text>
-								</Column>
-							</Row>
-
-							<Row>
-								<Column style={labelColumn}>
-									<Text style={label}>
-										Fecha de Consulta:
-									</Text>
+									<Text style={label}>Profesional:</Text>
 								</Column>
 								<Column style={valueColumn}>
 									<Text style={value}>
-										{consultationDate}
+										{practitionerName}
 									</Text>
 								</Column>
 							</Row>
@@ -93,65 +121,52 @@ export default function ConsultationBillEmail({
 							<Row>
 								<Column style={labelColumn}>
 									<Text style={label}>
-										Tipo de Facturación:
+										Fecha de la Consulta:
 									</Text>
 								</Column>
 								<Column style={valueColumn}>
 									<Text style={value}>
-										{isBefore
-											? 'Pago Anticipado'
-											: 'Pago Post-Consulta'}
+										{formatDateToSpanish(consultationDate)}
 									</Text>
 								</Column>
 							</Row>
-
-							{dueDate && (
-								<Row>
-									<Column style={labelColumn}>
-										<Text style={label}>
-											Fecha de Vencimiento:
-										</Text>
-									</Column>
-									<Column style={valueColumn}>
-										<Text style={value}>{dueDate}</Text>
-									</Column>
-								</Row>
-							)}
-
-							<Hr style={hr} />
 
 							<Row>
 								<Column style={labelColumn}>
-									<Text style={totalLabel}>
-										Total a Pagar:
-									</Text>
+									<Text style={label}>Honorarios:</Text>
 								</Column>
 								<Column style={valueColumn}>
-									<Text style={totalValue}>${amount}</Text>
+									<Text style={value}>{amount}€</Text>
 								</Column>
 							</Row>
+						</div>
+					</Section>
+
+					{/* Payment Button */}
+					<Section style={section}>
+						<div style={buttonContainer}>
+							<div style={payButton}>
+								<Text style={buttonText}>Pagar Consulta</Text>
+							</div>
 						</div>
 					</Section>
 
 					{/* Instructions */}
 					<Section style={section}>
 						<Text style={text}>
-							{isBefore
-								? 'Por favor realiza el pago antes de tu cita para confirmar tu consulta.'
-								: 'Gracias por tu consulta. Por favor procede con el pago de los servicios recibidos.'}
-						</Text>
-						<Text style={text}>
 							Si tienes alguna pregunta sobre esta factura, no
-							dudes en contactarnos.
+							dudes en contactar con tu profesional:{' '}
+							{practitionerEmail}.
 						</Text>
 					</Section>
 
 					{/* Footer */}
 					<Section style={footer}>
-						<Text style={footerText}>
-							Gracias por confiar en nosotros.
-						</Text>
-						<Text style={footerText}>{practitionerName}</Text>
+						<div style={footerPractitionerInfo}>
+							<Text style={footerText}>
+								Gracias por confiar en nosotros.
+							</Text>
+						</div>
 					</Section>
 				</Container>
 			</Body>
@@ -182,17 +197,61 @@ const header = {
 	textAlign: 'center' as const
 }
 
+const headerContainer = {
+	display: 'flex',
+	flexDirection: 'column' as const,
+	justifyContent: 'center',
+	alignItems: 'center',
+	width: '100%'
+}
+
 const h1 = {
 	color: '#ffffff',
 	fontSize: '28px',
 	fontWeight: 'bold',
-	margin: '0 0 8px'
+	margin: '0 0 16px',
+	textAlign: 'center' as const,
+	width: '100%'
 }
 
 const subtitle = {
-	color: '#d1d5db',
+	color: '#ffffff',
 	fontSize: '16px',
-	margin: '0'
+	fontWeight: '400',
+	margin: '0',
+	textAlign: 'left' as const,
+	lineHeight: '24px'
+}
+
+const practitionerImage = {
+	width: '24px',
+	height: '24px',
+	borderRadius: '50%',
+	objectFit: 'cover' as const
+}
+
+const practitionerContainer = {
+	textAlign: 'center' as const,
+	width: '100%'
+}
+
+const practitionerTable = {
+	margin: '0 auto',
+	borderCollapse: 'collapse' as const,
+	borderSpacing: '0'
+}
+
+const practitionerImageCell = {
+	paddingRight: '12px',
+	verticalAlign: 'middle' as const,
+	lineHeight: '24px',
+	height: '24px'
+}
+
+const practitionerNameCell = {
+	verticalAlign: 'middle' as const,
+	lineHeight: '24px',
+	height: '24px'
 }
 
 const section = {
@@ -208,9 +267,9 @@ const text = {
 }
 
 const billSection = {
-	padding: '32px',
+	padding: '',
 	backgroundColor: '#ffffff',
-	border: '2px solid #f3f4f6',
+	border: '',
 	borderRadius: '12px',
 	margin: '0 0 32px 0',
 	boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
@@ -243,23 +302,11 @@ const value = {
 	margin: '0 0 12px'
 }
 
-const hr = {
-	borderColor: '#e5e7eb',
-	margin: '16px 0'
-}
-
-const totalLabel = {
+const totalValue = {
 	color: '#111827',
 	fontSize: '16px',
-	fontWeight: 'bold',
-	margin: '0'
-}
-
-const totalValue = {
-	color: '#059669',
-	fontSize: '28px',
-	fontWeight: 'bold',
-	margin: '0'
+	fontWeight: '300',
+	margin: '0 0 12px'
 }
 
 const footer = {
@@ -269,8 +316,41 @@ const footer = {
 	backgroundColor: '#f9fafb'
 }
 
+const footerPractitionerInfo = {
+	display: 'flex',
+	alignItems: 'center',
+	justifyContent: 'center',
+	gap: '16px',
+	textAlign: 'left' as const
+}
+
 const footerText = {
 	color: '#6b7280',
 	fontSize: '14px',
 	margin: '0 0 8px'
+}
+
+const buttonContainer = {
+	textAlign: 'center' as const,
+	margin: '0 0 24px'
+}
+
+const payButton = {
+	display: 'block',
+	width: '100%',
+	background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)',
+	borderRadius: '8px',
+	padding: '16px 32px',
+	textAlign: 'center' as const,
+	textDecoration: 'none',
+	cursor: 'pointer',
+	boxSizing: 'border-box' as const
+}
+
+const buttonText = {
+	color: '#ffffff',
+	fontSize: '16px',
+	fontWeight: '600',
+	margin: '0',
+	textDecoration: 'none'
 }

@@ -8,7 +8,7 @@ export async function middleware(request: NextRequest) {
 
 	// Define protected routes
 	const protectedPages = ['/dashboard', '/settings', '/onboarding']
-	const protectedApis = ['/api/test']
+	const protectedApis = ['/api/dev/test']
 
 	const isProtectedPage = protectedPages.some((route) =>
 		pathname.startsWith(route)
@@ -45,6 +45,6 @@ export const config = {
 		'/dashboard/:path*',
 		'/settings/:path*',
 		'/onboarding/:path*',
-		'/api/test'
+		'/api/dev/test'
 	]
 }
