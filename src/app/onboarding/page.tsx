@@ -6,6 +6,7 @@ import { WeeklyAvailability } from '@/components/WeeklyAvailability'
 import { CalendarStep } from '@/components/CalendarStep'
 import { OnboardingBreadcrumb } from '@/components/Breadcrumb'
 import { BillingPreferencesStep } from '@/components/BillingPreferencesStep'
+import { PaymentsStep } from '@/components/PaymentsStep'
 import { CustomerStep } from '@/components/CustomerStep'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
@@ -29,7 +30,12 @@ const steps = [
 		component: BillingPreferencesStep
 	},
 	{
-		name: '4. Tu primer paciente',
+		name: '4. Pagos',
+		description: 'Connect your payment account to receive payments.',
+		component: PaymentsStep
+	},
+	{
+		name: '5. Tu primer paciente',
 		description:
 			'If you have any questions, you can start by adding yourself to test our features!',
 		component: CustomerStep
