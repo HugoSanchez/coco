@@ -91,6 +91,31 @@ export async function POST(request: NextRequest) {
 			practitionerName
 		})
 
+		// Extract session ID from checkout URL
+		const sessionIdMatch = checkoutUrl.match(/\/cs_[^?]+/)
+		const stripeSessionId = sessionIdMatch
+			? sessionIdMatch[0].substring(1)
+			: null
+
+		// Save payment session to database
+		if (stripeSessionId) {
+			const { error: insertError } = await supabase
+				.from('payment_sessions')
+				.insert({
+					booking_id: bookingId,
+					stripe_session_id: stripeSessionId,
+					amount: amount,
+					status: 'pending'
+				})
+
+			if (insertError) {
+				console.error('Failed to save payment session:', insertError)
+				// Continue anyway - don't fail the checkout creation
+			} else {
+				console.log('✅ Payment session saved:', stripeSessionId)
+			}
+		}
+
 		return NextResponse.json({
 			success: true,
 			checkoutUrl,

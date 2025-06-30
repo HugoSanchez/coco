@@ -435,23 +435,45 @@ export async function POST(request: Request) {
 			.map((r: any) => r.bookingId)
 
 		if (successfulBookingIds.length > 0) {
-			const { error: updateError } = await supabase
+			// Update billing_schedule status to 'completed' (REQUIRED - prevents duplicate emails)
+			const { error: scheduleUpdateError } = await supabase
 				.from('billing_schedule')
 				.update({
-					status: 'processed',
+					status: 'completed',
 					processed_at: new Date().toISOString()
 				})
 				.in('booking_id', successfulBookingIds)
 
-			if (updateError) {
+			if (scheduleUpdateError) {
 				console.error(
 					'❌ [API] Failed to update billing_schedule status:',
-					updateError
+					scheduleUpdateError
 				)
 				// Don't fail the whole request, but log the error
 			} else {
 				console.log(
-					`✅ [API] Marked ${successfulBookingIds.length} billing entries as processed`
+					`✅ [API] Marked ${successfulBookingIds.length} billing_schedule entries as 'completed'`
+				)
+			}
+
+			// Also update booking billing status for tracking purposes
+			const { error: bookingUpdateError } = await supabase
+				.from('bookings')
+				.update({
+					billing_status: 'billed',
+					billed_at: new Date().toISOString()
+				})
+				.in('id', successfulBookingIds)
+
+			if (bookingUpdateError) {
+				console.error(
+					'❌ [API] Failed to update booking billing status:',
+					bookingUpdateError
+				)
+				// Don't fail the whole request, but log the error
+			} else {
+				console.log(
+					`✅ [API] Updated ${successfulBookingIds.length} bookings to 'billed' status`
 				)
 			}
 		}
