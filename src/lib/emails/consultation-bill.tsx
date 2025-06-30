@@ -54,6 +54,7 @@ interface ConsultationBillEmailProps {
 	practitionerEmail?: string
 	practitionerImageUrl?: string
 	dueDate?: string
+	paymentUrl?: string
 }
 
 /**
@@ -70,7 +71,8 @@ export default function ConsultationBillEmail({
 	practitionerName = 'Frencisco Tocadiscos',
 	practitionerEmail = 'contacto@tuprofesional.com',
 	practitionerImageUrl = 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=150&h=150&fit=crop&crop=face',
-	dueDate
+	dueDate,
+	paymentUrl
 }: ConsultationBillEmailProps) {
 	const isBefore = billingTrigger === 'before_consultation'
 	const billingContext = isBefore
@@ -145,9 +147,19 @@ export default function ConsultationBillEmail({
 					{/* Payment Button */}
 					<Section style={section}>
 						<div style={buttonContainer}>
-							<div style={payButton}>
-								<Text style={buttonText}>Pagar Consulta</Text>
-							</div>
+							{paymentUrl ? (
+								<a href={paymentUrl} style={payButton}>
+									<Text style={buttonText}>
+										Pagar Consulta
+									</Text>
+								</a>
+							) : (
+								<div style={payButton}>
+									<Text style={buttonText}>
+										Pagar Consulta
+									</Text>
+								</div>
+							)}
 						</div>
 					</Section>
 

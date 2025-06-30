@@ -12,7 +12,10 @@ RETURNS TABLE (
   billing_settings_id UUID,
   billing_amount NUMERIC,
   billing_trigger TEXT,
-  billing_advance_days INTEGER
+  billing_advance_days INTEGER,
+  user_id UUID,
+  practitioner_name TEXT,
+  practitioner_email TEXT
 )
 LANGUAGE SQL
 STABLE
@@ -27,11 +30,15 @@ AS $$
     billing.id as billing_settings_id,
     billing.billing_amount,
     billing.billing_trigger,
-    billing.billing_advance_days
+    billing.billing_advance_days,
+    b.user_id,
+    p.name as practitioner_name,
+    p.email as practitioner_email
   FROM billing_schedule bs
   JOIN bookings b ON bs.booking_id = b.id
   JOIN billing_settings billing ON b.billing_settings_id = billing.id
   JOIN clients c ON b.client_id = c.id
+  JOIN profiles p ON b.user_id = p.id
   WHERE
     bs.scheduled_date <= today_date
     AND bs.status = 'pending'

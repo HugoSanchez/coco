@@ -36,7 +36,8 @@ export async function sendConsultationBillEmail({
 	practitionerName,
 	practitionerEmail,
 	practitionerImageUrl,
-	dueDate
+	dueDate,
+	paymentUrl
 }: {
 	to: string
 	clientName: string
@@ -47,6 +48,7 @@ export async function sendConsultationBillEmail({
 	practitionerEmail?: string
 	practitionerImageUrl?: string
 	dueDate?: string
+	paymentUrl?: string
 }) {
 	try {
 		// Render the email template
@@ -59,7 +61,8 @@ export async function sendConsultationBillEmail({
 				practitionerName,
 				practitionerEmail,
 				practitionerImageUrl,
-				dueDate
+				dueDate,
+				paymentUrl
 			})
 		)
 
@@ -129,7 +132,7 @@ export async function sendBulkConsultationBills(
 		practitionerEmail?: string
 		practitionerImageUrl?: string
 		dueDate?: string
-		bookingId?: string
+		paymentUrl?: string
 	}>
 ) {
 	console.log(

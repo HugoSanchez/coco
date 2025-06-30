@@ -133,6 +133,14 @@ export async function GET() {
 		// Core billing schedule info
 		booking_id: row.booking_id,
 		scheduled_date: row.scheduled_date, // When this bill is due
+		consultation_date: row.consultation_date, // When the consultation is
+		user_id: row.user_id, // Practitioner's user ID
+
+		// Practitioner information (for email and payment links)
+		practitioner: {
+			name: row.practitioner_name,
+			email: row.practitioner_email
+		},
 
 		// Client information (for sending invoice)
 		client: {
@@ -250,6 +258,11 @@ export async function POST(request: Request) {
 			booking_id: row.booking_id,
 			scheduled_date: row.scheduled_date,
 			consultation_date: row.consultation_date, // Add consultation date for email
+			user_id: row.user_id, // Add user_id for payment link generation
+			practitioner: {
+				name: row.practitioner_name,
+				email: row.practitioner_email
+			},
 			client: {
 				id: row.client_id,
 				name: row.client_name,
@@ -311,19 +324,96 @@ export async function POST(request: Request) {
 		}
 
 		// =========================================================================
-		// PREPARE EMAIL DATA
+		// GENERATE PAYMENT LINKS
 		// =========================================================================
 
-		const emailData = consultations.map((consultation: any) => ({
-			to: consultation.client.email,
-			clientName: consultation.client.name,
-			consultationDate:
-				consultation.consultation_date || consultation.scheduled_date,
-			amount: consultation.amount,
-			billingTrigger: consultation.trigger,
-			practitionerName: 'Tu Profesional', // TODO: Get from user profile
-			bookingId: consultation.booking_id
-		}))
+		console.log('💳 Generating payment links for consultations...')
+
+		const emailData = []
+
+		for (const consultation of consultations) {
+			try {
+				// Call internal payment API to generate checkout URL
+				const paymentResponse = await fetch(
+					`${process.env.NEXT_PUBLIC_BASE_URL}/api/payments/stripe/create-checkout-internal`,
+					{
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+							Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+						},
+						body: JSON.stringify({
+							userId: consultation.user_id,
+							bookingId: consultation.booking_id,
+							clientEmail: consultation.client.email,
+							clientName: consultation.client.name,
+							consultationDate:
+								consultation.consultation_date ||
+								consultation.scheduled_date,
+							amount: consultation.amount,
+							practitionerName:
+								consultation.practitioner.name ||
+								'Tu Profesional'
+						})
+					}
+				)
+
+				let paymentUrl = undefined
+
+				if (paymentResponse.ok) {
+					const paymentData = await paymentResponse.json()
+					paymentUrl = paymentData.checkoutUrl
+					console.log(
+						`✅ Payment link generated for booking ${consultation.booking_id}`
+					)
+				} else {
+					const errorData = await paymentResponse.json()
+					console.warn(
+						`⚠️ Failed to generate payment link for booking ${consultation.booking_id}:`,
+						errorData.error
+					)
+				}
+
+				// Prepare email data (with or without payment link)
+				emailData.push({
+					to: consultation.client.email,
+					clientName: consultation.client.name,
+					consultationDate:
+						consultation.consultation_date ||
+						consultation.scheduled_date,
+					amount: consultation.amount,
+					billingTrigger: consultation.trigger,
+					practitionerName:
+						consultation.practitioner.name || 'Tu Profesional',
+					practitionerEmail: consultation.practitioner.email,
+					bookingId: consultation.booking_id,
+					userId: consultation.user_id,
+					paymentUrl // This will be undefined if payment link generation failed
+				})
+			} catch (error) {
+				console.error(
+					`❌ Error generating payment link for booking ${consultation.booking_id}:`,
+					error
+				)
+
+				// Add email data without payment link
+				emailData.push({
+					to: consultation.client.email,
+					clientName: consultation.client.name,
+					consultationDate:
+						consultation.consultation_date ||
+						consultation.scheduled_date,
+					amount: consultation.amount,
+					billingTrigger: consultation.trigger,
+					practitionerName:
+						consultation.practitioner.name || 'Tu Profesional',
+					practitionerEmail: consultation.practitioner.email,
+					bookingId: consultation.booking_id,
+					userId: consultation.user_id,
+					paymentUrl: undefined
+				})
+			}
+		}
 
 		// =========================================================================
 		// SEND EMAILS
