@@ -16,7 +16,7 @@ import {
 	isSunday
 } from 'date-fns'
 
-import { TimeSlot } from '@/lib/calendar'
+import { TimeSlot } from '@/lib/calendar/calendar'
 
 /**
  * Props interface for the Calendar component

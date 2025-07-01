@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { format } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
-import { TimeSlot } from '@/lib/calendar'
+import { TimeSlot } from '@/lib/calendar/calendar'
 import { FaApple, FaCheckCircle } from 'react-icons/fa'
 import { Spinner } from './ui/spinner'
 

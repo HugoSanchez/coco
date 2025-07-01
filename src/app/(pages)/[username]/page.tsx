@@ -10,19 +10,11 @@ import { Clock, ChevronLeft } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { Button } from '@/components/ui/button'
 import { parse, format, startOfMonth } from 'date-fns'
-import { TimeSlot } from '@/lib/calendar'
+import { TimeSlot } from '@/lib/calendar/calendar'
 import {
 	getUserProfileAndScheduleByUsername,
 	UserProfileWithSchedule
 } from '@/lib/db/profiles'
-
-interface UserProfile {
-	id: string
-	name: string
-	description: string
-	profile_picture_url?: string
-	meeting_duration: number
-}
 
 interface PageState {
 	isLoading: boolean

@@ -39,9 +39,7 @@ export function PaymentsStep({
 			}
 
 			try {
-				const response = await fetch(
-					'/api/payments/stripe/onboarding-status'
-				)
+				const response = await fetch('/api/payments/onboarding-status')
 				if (response.ok) {
 					const data = await response.json()
 					setHasStripeAccount(data.onboarding_completed || false)
@@ -72,7 +70,7 @@ export function PaymentsStep({
 			// Update the database to mark onboarding as completed
 			const updateOnboardingStatus = async () => {
 				try {
-					await fetch('/api/payments/stripe/update-onboarding', {
+					await fetch('/api/payments/update-onboarding', {
 						method: 'POST',
 						headers: {
 							'Content-Type': 'application/json'
@@ -125,15 +123,12 @@ export function PaymentsStep({
 		setIsLoading(true)
 		try {
 			// First, create the account
-			const createResponse = await fetch(
-				'/api/payments/stripe/create-account',
-				{
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					}
+			const createResponse = await fetch('/api/payments/create-account', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
 				}
-			)
+			})
 
 			const createData = await createResponse.json()
 
@@ -148,7 +143,7 @@ export function PaymentsStep({
 
 			// Now create the onboarding link
 			const onboardingResponse = await fetch(
-				'/api/payments/stripe/onboarding-link',
+				'/api/payments/onboarding-link',
 				{
 					method: 'POST',
 					headers: {

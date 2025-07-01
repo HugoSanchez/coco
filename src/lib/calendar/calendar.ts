@@ -1,8 +1,8 @@
 import { google } from 'googleapis'
 import { createClient as createSupabaseClient } from '@/lib/supabase/client'
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
-import { updateUserCalendarTokens } from './db/calendar-tokens'
-import { oauth2Client } from './googleOAth'
+import { updateUserCalendarTokens } from '../db/calendar-tokens'
+import { oauth2Client } from '../google'
 import {
 	parseISO,
 	isWithinInterval,

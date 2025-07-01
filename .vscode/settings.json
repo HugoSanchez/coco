@@ -3,6 +3,7 @@
 	"editor.defaultFormatter": "esbenp.prettier-vscode",
 	"editor.insertSpaces": false,
 	"editor.detectIndentation": false,
+	"explorer.compactFolders": false,
 	"[typescript]": {
 		"editor.defaultFormatter": "esbenp.prettier-vscode",
 		"editor.formatOnSave": true,
