@@ -5,26 +5,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
 export class StripeService {
 	/**
-	 * Test function to verify Stripe is properly configured
-	 */
-	async testConnection(): Promise<{ success: boolean; message: string }> {
-		try {
-			// Simple test: retrieve the account information
-			const account = await stripe.accounts.retrieve()
-			return {
-				success: true,
-				message: `Connected to Stripe account: ${account.id}`
-			}
-		} catch (error) {
-			return {
-				success: false,
-				message:
-					error instanceof Error ? error.message : 'Unknown error'
-			}
-		}
-	}
-
-	/**
 	 * Create a new Stripe Connect account for a practitioner
 	 */
 	async createConnectAccount(
@@ -137,7 +117,7 @@ export class StripeService {
 				success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
 				cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/payment/cancelled`,
 				payment_intent_data: {
-					application_fee_amount: Math.round(amount * 100 * 0.05), // 5% platform fee
+					application_fee_amount: Math.round(amount * 100 * 0.0), // 5% platform fee
 					on_behalf_of: practitionerStripeAccountId, // Fix for cross-region settlement
 					transfer_data: {
 						destination: practitionerStripeAccountId

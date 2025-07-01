@@ -177,29 +177,6 @@ export async function sendBulkConsultationBills(
 		errors
 	}
 }
-
-/**
- * Validate email configuration
- */
-export function validateEmailConfig() {
-	const issues = []
-
-	if (!process.env.RESEND_API_KEY) {
-		issues.push('RESEND_API_KEY environment variable is missing')
-	}
-
-	if (!process.env.EMAIL_FROM) {
-		issues.push(
-			'EMAIL_FROM environment variable is missing (will use default)'
-		)
-	}
-
-	return {
-		isValid: issues.length === 0,
-		issues
-	}
-}
-
 /**
  * Test if Resend client can be initialized
  */

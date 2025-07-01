@@ -1,9 +1,79 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import {
-	sendBulkConsultationBills,
-	validateEmailConfig
-} from '@/lib/emails/email-service'
+import { sendBulkConsultationBills } from '@/lib/emails/email-service'
+import { paymentOrchestrationService } from '@/lib/payments/payment-orchestration-service'
+import { updateBookingBillingStatus } from '@/lib/db/bookings'
+import { markBillingActionCompletedFromBookingId } from '@/lib/db/billing-schedule'
+
+/**
+ * Supabase client with service role key
+ * Bypasses RLS for admin operations
+ */
+const supabase = createClient(
+	process.env.NEXT_PUBLIC_SUPABASE_URL!,
+	process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+/**
+ * Get consultation billing HELPER FUNCTION
+ * @param todayStr - Today's date in YYYY-MM-DD format
+ * @returns - Array of consultation billing data
+ */
+async function getConsultationBilling(todayStr: string) {
+	/**
+	 * Call the get_consultation_billing() database function
+	 *
+	 * Why use a database function instead of PostgREST queries?
+	 * - PostgREST has issues with complex nested relationship filtering
+	 * - Functions give us reliable SQL with proper JOINs
+	 * - Better performance (single query vs multiple API calls)
+	 * - Easier to debug and test in SQL editor
+	 *
+	 * The function executes this SQL:
+	 * SELECT bs.booking_id, bs.scheduled_date, c.*, billing.*
+	 * FROM billing_schedule bs
+	 * JOIN bookings b ON bs.booking_id = b.id
+	 * JOIN billing_settings billing ON b.billing_settings_id = billing.id
+	 * JOIN clients c ON b.client_id = c.id
+	 * WHERE bs.scheduled_date <= today_date
+	 *   AND bs.status = 'pending'
+	 *   AND billing.billing_type = 'consultation_based'
+	 */
+	const { data, error } = await supabase.rpc('get_consultation_billing', {
+		today_date: todayStr
+	})
+
+	if (error) {
+		throw new Error(error.message)
+	}
+
+	/**
+	 * Map the data to the expected format
+	 */
+	return (data || []).map((row: any) => ({
+		booking_id: row.booking_id,
+		scheduled_date: row.scheduled_date,
+		consultation_date: row.consultation_date,
+		user_id: row.user_id,
+		practitioner: {
+			name: row.practitioner_name,
+			email: row.practitioner_email
+		},
+		client: {
+			id: row.client_id,
+			name: row.client_name,
+			email: row.client_email
+		},
+		billing_settings: {
+			id: row.billing_settings_id,
+			billing_amount: row.billing_amount,
+			billing_trigger: row.billing_trigger,
+			billing_advance_days: row.billing_advance_days
+		},
+		amount: row.billing_amount,
+		trigger: row.billing_trigger
+	}))
+}
 
 /**
  * GET /api/billing/consultation
@@ -41,139 +111,20 @@ import {
  * ]
  */
 
-/**
- * Supabase client with service role key
- * Bypasses RLS for admin operations
- */
-const supabase = createClient(
-	process.env.NEXT_PUBLIC_SUPABASE_URL!,
-	process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 export async function GET() {
-	// =========================================================================
-	// DATE CALCULATION
-	// =========================================================================
-
 	/**
 	 * Get today's date in YYYY-MM-DD format
 	 * This is used to find billing_schedule entries that are due today or overdue
 	 */
 	const todayStr = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
 
-	// =========================================================================
-	// DATABASE QUERY USING CUSTOM FUNCTION
-	// =========================================================================
-
 	/**
-	 * Call the get_consultation_billing() database function
-	 *
-	 * Why use a database function instead of PostgREST queries?
-	 * - PostgREST has issues with complex nested relationship filtering
-	 * - Functions give us reliable SQL with proper JOINs
-	 * - Better performance (single query vs multiple API calls)
-	 * - Easier to debug and test in SQL editor
-	 *
-	 * The function executes this SQL:
-	 * SELECT bs.booking_id, bs.scheduled_date, c.*, billing.*
-	 * FROM billing_schedule bs
-	 * JOIN bookings b ON bs.booking_id = b.id
-	 * JOIN billing_settings billing ON b.billing_settings_id = billing.id
-	 * JOIN clients c ON b.client_id = c.id
-	 * WHERE bs.scheduled_date <= today_date
-	 *   AND bs.status = 'pending'
-	 *   AND billing.billing_type = 'consultation_based'
+	 * Fetch DB for pending consultation billings
 	 */
-	const { data, error } = await supabase.rpc('get_consultation_billing', {
-		today_date: todayStr
-	})
-
-	// =========================================================================
-	// ERROR HANDLING
-	// =========================================================================
-
-	if (error) {
-		return NextResponse.json(
-			{ success: false, error: error.message },
-			{ status: 500 }
-		)
-	}
-
-	// =========================================================================
-	// DATA TRANSFORMATION
-	// =========================================================================
-
-	/**
-	 * Transform flat database result into structured API response
-	 *
-	 * Database function returns flat rows like:
-	 * {
-	 *   booking_id: "uuid",
-	 *   scheduled_date: "2025-01-18",
-	 *   client_id: "uuid",
-	 *   client_name: "Hugo Sanchez",
-	 *   client_email: "hugo@example.com",
-	 *   billing_settings_id: "uuid",
-	 *   billing_amount: 80,
-	 *   billing_trigger: "before_consultation",
-	 *   billing_advance_days: 7
-	 * }
-	 *
-	 * We transform this into nested objects for better API design:
-	 * {
-	 *   booking_id: "uuid",
-	 *   scheduled_date: "2025-01-18",
-	 *   client: { id: "uuid", name: "Hugo Sanchez", email: "hugo@example.com" },
-	 *   billing_settings: { id: "uuid", billing_amount: 80, ... },
-	 *   amount: 80,              // convenience field
-	 *   trigger: "before_consultation" // convenience field
-	 * }
-	 */
-	const consultations = (data || []).map((row: any) => ({
-		// Core billing schedule info
-		booking_id: row.booking_id,
-		scheduled_date: row.scheduled_date, // When this bill is due
-		consultation_date: row.consultation_date, // When the consultation is
-		user_id: row.user_id, // Practitioner's user ID
-
-		// Practitioner information (for email and payment links)
-		practitioner: {
-			name: row.practitioner_name,
-			email: row.practitioner_email
-		},
-
-		// Client information (for sending invoice)
-		client: {
-			id: row.client_id,
-			name: row.client_name,
-			email: row.client_email
-		},
-
-		// Billing configuration (for invoice details)
-		billing_settings: {
-			id: row.billing_settings_id,
-			billing_amount: row.billing_amount,
-			billing_trigger: row.billing_trigger,
-			billing_advance_days: row.billing_advance_days
-		},
-
-		// Convenience fields (commonly accessed values)
-		amount: row.billing_amount, // How much to bill
-		trigger: row.billing_trigger // When to bill (before/after consultation)
-	}))
-
-	// =========================================================================
-	// API RESPONSE
-	// =========================================================================
+	const consultations = await getConsultationBilling(todayStr)
 
 	/**
 	 * Return the consultation bills ready for processing
-	 *
-	 * Each item in the array represents a consultation that needs billing today.
-	 * The calling system (cron job, UI, etc.) can:
-	 * 1. Generate an invoice for each consultation
-	 * 2. Send email to client.email with the invoice
-	 * 3. Mark the billing_schedule entry as 'processed'
 	 */
 	return NextResponse.json(consultations)
 }
@@ -211,222 +162,85 @@ export async function GET() {
  */
 export async function POST(request: Request) {
 	try {
-		// Parse request body (optional filters)
-		const body = await request.json().catch(() => ({}))
-		const { booking_ids, dry_run = false } = body
-
-		console.log('📧 [API] Processing consultation billing emails:', {
-			booking_ids,
-			dry_run
-		})
-
 		// =========================================================================
-		// VALIDATE EMAIL CONFIGURATION
+		// 1. GET CONSULTATION BILLS (Same as GET endpoint)
 		// =========================================================================
 
-		const emailValidation = validateEmailConfig()
-		if (!emailValidation.isValid) {
-			return NextResponse.json(
-				{
-					success: false,
-					error: 'Email configuration invalid',
-					issues: emailValidation.issues
-				},
-				{ status: 400 }
-			)
-		}
-
-		// =========================================================================
-		// GET CONSULTATION BILLS (Same as GET endpoint)
-		// =========================================================================
-
+		// Get today's date in YYYY-MM-DD format
 		const todayStr = new Date().toISOString().slice(0, 10)
-
-		const { data, error } = await supabase.rpc('get_consultation_billing', {
-			today_date: todayStr
-		})
-
-		if (error) {
-			return NextResponse.json(
-				{ success: false, error: error.message },
-				{ status: 500 }
-			)
-		}
-
-		// Transform data (same as GET endpoint)
-		let consultations = (data || []).map((row: any) => ({
-			booking_id: row.booking_id,
-			scheduled_date: row.scheduled_date,
-			consultation_date: row.consultation_date, // Add consultation date for email
-			user_id: row.user_id, // Add user_id for payment link generation
-			practitioner: {
-				name: row.practitioner_name,
-				email: row.practitioner_email
-			},
-			client: {
-				id: row.client_id,
-				name: row.client_name,
-				email: row.client_email
-			},
-			billing_settings: {
-				id: row.billing_settings_id,
-				billing_amount: row.billing_amount,
-				billing_trigger: row.billing_trigger,
-				billing_advance_days: row.billing_advance_days
-			},
-			amount: row.billing_amount,
-			trigger: row.billing_trigger
-		}))
-
-		// Filter by specific booking IDs if provided
-		if (booking_ids && Array.isArray(booking_ids)) {
-			consultations = consultations.filter((c: any) =>
-				booking_ids.includes(c.booking_id)
-			)
-		}
-
+		// Get consultation billing
+		const consultations = await getConsultationBilling(todayStr)
+		// If no consultations to process, return success
 		if (consultations.length === 0) {
 			return NextResponse.json({
 				success: true,
-				message: 'No consultation bills to process',
-				total: 0,
-				emails_sent: 0,
-				emails_failed: 0,
-				results: [],
-				errors: []
+				message: 'No consultation bills to process'
 			})
 		}
 
 		// =========================================================================
-		// DRY RUN - Preview what would be sent
+		// 2. FOR EACH CONSULTATION, GENERATE PAYMENT LINKS
 		// =========================================================================
-
-		if (dry_run) {
-			const preview = consultations.map((consultation: any) => ({
-				booking_id: consultation.booking_id,
-				client_email: consultation.client.email,
-				client_name: consultation.client.name,
-				amount: consultation.amount,
-				trigger: consultation.trigger,
-				subject:
-					consultation.trigger === 'before_consultation'
-						? `Factura de Consulta - Pago Requerido | ${consultation.consultation_date}`
-						: `Factura de Consulta Completada | ${consultation.consultation_date}`
-			}))
-
-			return NextResponse.json({
-				success: true,
-				dry_run: true,
-				message: `Would send ${preview.length} emails`,
-				total: preview.length,
-				preview
-			})
-		}
-
-		// =========================================================================
-		// GENERATE PAYMENT LINKS
-		// =========================================================================
-
-		console.log('💳 Generating payment links for consultations...')
 
 		const emailData = []
-
+		// Loop through consultations and generate payment links
 		for (const consultation of consultations) {
 			try {
-				// Call internal payment API to generate checkout URL
-				const paymentResponse = await fetch(
-					`${process.env.NEXT_PUBLIC_BASE_URL}/api/payments/stripe/create-checkout-internal`,
-					{
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json',
-							Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
-						},
-						body: JSON.stringify({
+				// Generate payment link using orchestration service
+				const paymentResult =
+					// Call the service to generate the payment link
+					await paymentOrchestrationService.createConsultationCheckout(
+						{
+							// user_id is the practitioner's user_id
 							userId: consultation.user_id,
+							// booking_id is the booking_id to be billed
 							bookingId: consultation.booking_id,
+							// client_email is the client's email
 							clientEmail: consultation.client.email,
+							// client_name is the client's name
 							clientName: consultation.client.name,
-							consultationDate:
-								consultation.consultation_date ||
-								consultation.scheduled_date,
+							// consultation_date is the date of the consultation
+							consultationDate: consultation.consultation_date,
+							// amount is the amount to be billed
 							amount: consultation.amount,
-							practitionerName:
-								consultation.practitioner.name ||
-								'Tu Profesional'
-						})
-					}
-				)
-
-				let paymentUrl = undefined
-
-				if (paymentResponse.ok) {
-					const paymentData = await paymentResponse.json()
-					paymentUrl = paymentData.checkoutUrl
-					console.log(
-						`✅ Payment link generated for booking ${consultation.booking_id}`
+							// practitioner_name is the practitioner's name
+							practitionerName: consultation.practitioner.name
+						}
 					)
-				} else {
-					const errorData = await paymentResponse.json()
-					console.warn(
-						`⚠️ Failed to generate payment link for booking ${consultation.booking_id}:`,
-						errorData.error
-					)
+
+				// Check payment link creation was successful
+				if (paymentResult.success) {
+					// Add email data with payment link
+					emailData.push({
+						to: consultation.client.email,
+						clientName: consultation.client.name,
+						consultationDate: consultation.consultation_date,
+						amount: consultation.amount,
+						billingTrigger: consultation.trigger,
+						practitionerName: consultation.practitioner.name,
+						practitionerEmail: consultation.practitioner.email,
+						bookingId: consultation.booking_id,
+						userId: consultation.user_id,
+						paymentUrl: paymentResult.checkoutUrl
+					})
 				}
-
-				// Prepare email data (with or without payment link)
-				emailData.push({
-					to: consultation.client.email,
-					clientName: consultation.client.name,
-					consultationDate:
-						consultation.consultation_date ||
-						consultation.scheduled_date,
-					amount: consultation.amount,
-					billingTrigger: consultation.trigger,
-					practitionerName:
-						consultation.practitioner.name || 'Tu Profesional',
-					practitionerEmail: consultation.practitioner.email,
-					bookingId: consultation.booking_id,
-					userId: consultation.user_id,
-					paymentUrl // This will be undefined if payment link generation failed
-				})
 			} catch (error) {
 				console.error(
-					`❌ Error generating payment link for booking ${consultation.booking_id}:`,
+					`Error generating payment link for booking ${consultation.booking_id}:`,
 					error
 				)
-
-				// Add email data without payment link
-				emailData.push({
-					to: consultation.client.email,
-					clientName: consultation.client.name,
-					consultationDate:
-						consultation.consultation_date ||
-						consultation.scheduled_date,
-					amount: consultation.amount,
-					billingTrigger: consultation.trigger,
-					practitionerName:
-						consultation.practitioner.name || 'Tu Profesional',
-					practitionerEmail: consultation.practitioner.email,
-					bookingId: consultation.booking_id,
-					userId: consultation.user_id,
-					paymentUrl: undefined
-				})
 			}
 		}
 
 		// =========================================================================
-		// SEND EMAILS
+		// 3. SEND BULK EMAILS
 		// =========================================================================
 
-		console.log(
-			`📧 [API] Sending ${emailData.length} consultation billing emails`
-		)
-
+		// Send emails to clients using the email service in bulk
 		const emailResults = await sendBulkConsultationBills(emailData)
 
 		// =========================================================================
-		// UPDATE BILLING SCHEDULE STATUS
+		// 4. UPDATE BILLING SCHEDULE STATUS
 		// =========================================================================
 
 		// Mark successful emails as 'processed' in billing_schedule
@@ -434,52 +248,16 @@ export async function POST(request: Request) {
 			.filter((r: any) => r.status === 'sent')
 			.map((r: any) => r.bookingId)
 
-		if (successfulBookingIds.length > 0) {
-			// Update billing_schedule status to 'completed' (REQUIRED - prevents duplicate emails)
-			const { error: scheduleUpdateError } = await supabase
-				.from('billing_schedule')
-				.update({
-					status: 'completed',
-					processed_at: new Date().toISOString()
-				})
-				.in('booking_id', successfulBookingIds)
-
-			if (scheduleUpdateError) {
-				console.error(
-					'❌ [API] Failed to update billing_schedule status:',
-					scheduleUpdateError
-				)
-				// Don't fail the whole request, but log the error
-			} else {
-				console.log(
-					`✅ [API] Marked ${successfulBookingIds.length} billing_schedule entries as 'completed'`
-				)
-			}
-
-			// Also update booking billing status for tracking purposes
-			const { error: bookingUpdateError } = await supabase
-				.from('bookings')
-				.update({
-					billing_status: 'billed',
-					billed_at: new Date().toISOString()
-				})
-				.in('id', successfulBookingIds)
-
-			if (bookingUpdateError) {
-				console.error(
-					'❌ [API] Failed to update booking billing status:',
-					bookingUpdateError
-				)
-				// Don't fail the whole request, but log the error
-			} else {
-				console.log(
-					`✅ [API] Updated ${successfulBookingIds.length} bookings to 'billed' status`
-				)
-			}
+		// Mark billing schedule entries as completed and update booking status
+		for (const bookingId of successfulBookingIds) {
+			// Mark billing schedule as completed using the service function
+			await markBillingActionCompletedFromBookingId(bookingId)
+			// Update booking billing status using the service function
+			await updateBookingBillingStatus(bookingId, 'billed')
 		}
 
 		// =========================================================================
-		// API RESPONSE
+		// 5. RETURN API RESPONSE
 		// =========================================================================
 
 		return NextResponse.json({
@@ -491,8 +269,7 @@ export async function POST(request: Request) {
 			errors: emailResults.errors
 		})
 	} catch (error) {
-		console.error('❌ [API] Error in consultation billing:', error)
-
+		console.error('[API] Error in consultation billing:', error)
 		return NextResponse.json(
 			{
 				success: false,

@@ -125,6 +125,23 @@ export async function markBillingActionCompleted(
 	return data
 }
 
+export async function markBillingActionCompletedFromBookingId(
+	bookingId: string
+): Promise<BillingScheduleEntry[]> {
+	const { data, error } = await supabase
+		.from('billing_schedule')
+		.update({
+			status: 'completed',
+			processed_at: new Date().toISOString()
+		})
+		.eq('booking_id', bookingId)
+		.eq('status', 'pending') // Only update pending actions
+		.select()
+
+	if (error) throw error
+	return data || []
+}
+
 /**
  * Marks a billing action as failed and increments retry count
  *
@@ -337,12 +354,15 @@ export async function groupBillingActionsByFrequency(currentDateTime?: string) {
  * @returns Object - Actions grouped by client_id
  */
 function groupByClientId(actions: any[]) {
-	return actions.reduce((groups, action) => {
-		const clientId = action.booking?.client_id
-		if (!groups[clientId]) {
-			groups[clientId] = []
-		}
-		groups[clientId].push(action)
-		return groups
-	}, {} as Record<string, any[]>)
+	return actions.reduce(
+		(groups, action) => {
+			const clientId = action.booking?.client_id
+			if (!groups[clientId]) {
+				groups[clientId] = []
+			}
+			groups[clientId].push(action)
+			return groups
+		},
+		{} as Record<string, any[]>
+	)
 }
