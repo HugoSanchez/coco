@@ -3,13 +3,13 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
-import { ConnectCalendar } from '@/components/ConnectCalendar'
+import { Spinner } from '@/components/ui/spinner'
+import { useUser } from '@/contexts/UserContext'
+import { getBillingPreferences, saveBillingPreferences } from '@/lib/db/billing'
 import {
 	BillingPreferencesForm,
 	BillingPreferences
 } from '@/components/BillingPreferencesForm'
-import { saveBillingPreferences, getBillingPreferences } from '@/lib/db/billing'
-import { useUser } from '@/contexts/UserContext'
 
 interface BillingPreferencesStepProps {
 	onComplete: () => void
@@ -22,12 +22,8 @@ interface BillingPreferencesStepProps {
 }
 
 const defaultPrefs: BillingPreferences = {
-	shouldBill: false,
-	billingAmount: '',
-	billingType: '',
-	billingFrequency: '',
-	billingTrigger: '',
-	billingAdvanceDays: ''
+	billingType: 'in-advance',
+	billingAmount: '80'
 }
 
 export function BillingPreferencesStep({
@@ -36,7 +32,6 @@ export function BillingPreferencesStep({
 	subtitle = 'Podrás cambiar tus preferencias siempre que quieras. Además, podrás tener opciones de facturación especificas para cada paciente si lo necesitas.',
 	buttonText = 'Continuar',
 	loadingText = 'Guardando...',
-	showSuccessToast = false,
 	skipOnComplete = false
 }: BillingPreferencesStepProps) {
 	const [isLoading, setIsLoading] = useState(false)
@@ -49,69 +44,49 @@ export function BillingPreferencesStep({
 	// Fetch existing billing preferences when component mounts
 	useEffect(() => {
 		const fetchBillingPreferences = async () => {
+			// If user is not logged in, return;
 			if (!user?.id) return
-
-			try {
-				setIsLoadingPrefs(true)
-				const existingPrefs = await getBillingPreferences(user.id)
-
-				if (existingPrefs) {
-					setBillingPrefs(existingPrefs)
-				}
-			} catch (error) {
-				console.error('Error loading billing preferences:', error)
-				// Keep default preferences if loading fails
-			} finally {
-				setIsLoadingPrefs(false)
-			}
+			// Set loading state to true
+			setIsLoadingPrefs(true)
+			// Fetch existing billing preferences from DB
+			const existingPrefs = await getBillingPreferences(user.id)
+			// Set billing preferences if they exist
+			if (existingPrefs) setBillingPrefs(existingPrefs)
+			// Set loading state to false
+			setIsLoadingPrefs(false)
 		}
 
 		fetchBillingPreferences()
 	}, [user?.id])
 
 	const handleSubmit = async (e: React.FormEvent) => {
+		// Prevent default form submission
 		e.preventDefault()
+		// Set loading state to true
 		setIsLoading(true)
+		// Try to save billing preferences
 		try {
-			await saveBillingPreferences(user.id, billingPrefs)
-
-			if (showSuccessToast) {
-				toast({
-					title: 'Preferencias actualizadas',
-					description:
-						'Tus preferencias de facturación se han guardado correctamente.',
-					color: 'success'
-				})
-			}
-
-			if (!skipOnComplete) {
-				onComplete()
-			}
+			// Save billing preferences using the new unified system
+			await saveBillingPreferences(user?.id, billingPrefs)
+			// If skipOnComplete is false, call onComplete
+			if (!skipOnComplete) onComplete()
+			// catch any error and show error toast
 		} catch (error: any) {
+			// If error, log error
 			console.log(error)
-			if (showSuccessToast) {
-				toast({
-					title: 'Error',
-					description:
-						'Hubo un problema al guardar las preferencias. Inténtalo de nuevo.',
-					color: 'error'
-				})
-			} else {
-				toast({
-					title: 'Error',
-					description: error.message,
-					variant: 'destructive'
-				})
-			}
-		} finally {
-			setIsLoading(false)
+			// Show error toast
+			toast({
+				title: 'Error',
+				description: 'Hubo un problema al guardar las preferencias.',
+				color: 'error'
+			})
 		}
 	}
 
 	if (isLoadingPrefs) {
 		return (
 			<div className="flex items-center justify-center py-8">
-				<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+				<Spinner size="sm" />
 			</div>
 		)
 	}

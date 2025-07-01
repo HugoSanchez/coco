@@ -24,6 +24,35 @@ import { createClient as createSupabaseClient } from '@/lib/supabase/client'
 const supabase = createSupabaseClient()
 
 /**
+ * Billing types supported by the system
+ */
+export type BillingType = 'in-advance' | 'right-after' | 'monthly'
+
+/**
+ * Interface for billing settings
+ */
+export interface BillingSettings {
+	id: string
+	user_id: string
+	client_id: string | null
+	booking_id: string | null
+	billing_type: BillingType
+	billing_amount: number | null
+	currency: string
+	is_default: boolean
+	created_at: string
+	updated_at: string
+}
+
+/**
+ * Interface for simplified billing preferences (form format)
+ */
+export interface BillingPreferences {
+	billingType: BillingType
+	billingAmount: string
+}
+
+/**
  * Retrieves the user's default billing configuration
  *
  * Default settings are identified by:
@@ -32,9 +61,11 @@ const supabase = createSupabaseClient()
  * - is_default = true (explicitly marked as default)
  *
  * @param userId - UUID of the user whose default settings to fetch
- * @returns Promise<Object|null> - Billing preferences in form format, or null if none exist
+ * @returns Promise<BillingPreferences|null> - Billing preferences in form format, or null if none exist
  */
-export async function getBillingPreferences(userId: string) {
+export async function getBillingPreferences(
+	userId: string
+): Promise<BillingPreferences | null> {
 	try {
 		// Query for user's default billing settings with specific criteria
 		const { data, error } = await supabase
@@ -56,14 +87,9 @@ export async function getBillingPreferences(userId: string) {
 		}
 
 		// Transform database format to form-friendly format
-		// Convert numbers to strings for form inputs and provide defaults
 		return {
-			shouldBill: data.should_bill || false,
-			billingAmount: data.billing_amount?.toString() || '',
-			billingType: data.billing_type || '',
-			billingFrequency: data.billing_frequency || '',
-			billingTrigger: data.billing_trigger || '',
-			billingAdvanceDays: data.billing_advance_days?.toString() || '0'
+			billingType: data.billing_type,
+			billingAmount: data.billing_amount?.toString() || ''
 		}
 	} catch (error) {
 		console.error('Error in getBillingPreferences:', error)
@@ -83,20 +109,19 @@ export async function getBillingPreferences(userId: string) {
  *
  * @param userId - UUID of the user whose settings to save
  * @param preferences - Billing preferences object with form data
- * @returns Promise<Array> - The created or updated billing settings
+ * @returns Promise<BillingSettings[]> - The created or updated billing settings
  * @throws Error if the operation fails
  */
-export async function saveBillingPreferences(userId: string, preferences: any) {
+export async function saveBillingPreferences(
+	userId: string,
+	preferences: BillingPreferences
+): Promise<BillingSettings[]> {
 	try {
 		// Convert form data to database format
-		// Parse strings to appropriate types and handle null values
 		const billingData = {
-			should_bill: preferences.shouldBill || false,
 			billing_amount: parseFloat(preferences.billingAmount) || null,
-			billing_type: preferences.billingType || null,
-			billing_frequency: preferences.billingFrequency || null,
-			billing_trigger: preferences.billingTrigger || null,
-			billing_advance_days: parseInt(preferences.billingAdvanceDays) || 0
+			billing_type: preferences.billingType,
+			currency: 'EUR' // Default currency
 		}
 
 		// First, attempt to update existing default settings
@@ -151,12 +176,12 @@ export async function saveBillingPreferences(userId: string, preferences: any) {
  *
  * @param userId - UUID of the user (for data isolation)
  * @param clientId - UUID of the client whose settings to fetch
- * @returns Promise<Object|null> - Client billing settings, or null if none exist
+ * @returns Promise<BillingSettings|null> - Client billing settings, or null if none exist
  */
 export async function getClientBillingSettings(
 	userId: string,
 	clientId: string
-) {
+): Promise<BillingSettings | null> {
 	try {
 		const { data, error } = await supabase
 			.from('billing_settings')
@@ -190,9 +215,11 @@ export async function getClientBillingSettings(
  * Note: booking_id is globally unique, so we don't need to filter by user_id
  *
  * @param bookingId - UUID of the booking whose settings to fetch
- * @returns Promise<Object|null> - Booking billing settings, or null if none exist
+ * @returns Promise<BillingSettings|null> - Booking billing settings, or null if none exist
  */
-export async function getBookingBillingSettings(bookingId: string) {
+export async function getBookingBillingSettings(
+	bookingId: string
+): Promise<BillingSettings | null> {
 	try {
 		const { data, error } = await supabase
 			.from('billing_settings')
@@ -211,4 +238,123 @@ export async function getBookingBillingSettings(bookingId: string) {
 		console.error('Error in getBookingBillingSettings:', error)
 		return null
 	}
+}
+
+/**
+ * Creates or updates billing settings for a specific client
+ *
+ * @param userId - UUID of the user (for data isolation)
+ * @param clientId - UUID of the client
+ * @param billingType - The billing type to set
+ * @param billingAmount - The amount to charge
+ * @param currency - Currency code (defaults to EUR)
+ * @returns Promise<BillingSettings> - The created or updated billing settings
+ */
+export async function upsertClientBillingSettings(
+	userId: string,
+	clientId: string,
+	billingType: BillingType,
+	billingAmount: number,
+	currency: string = 'EUR'
+): Promise<BillingSettings> {
+	const { data, error } = await supabase
+		.from('billing_settings')
+		.upsert(
+			{
+				user_id: userId,
+				client_id: clientId,
+				booking_id: null,
+				billing_type: billingType,
+				billing_amount: billingAmount,
+				currency: currency,
+				is_default: false
+			},
+			{
+				onConflict: 'user_id,client_id',
+				ignoreDuplicates: false
+			}
+		)
+		.select()
+		.single()
+
+	if (error) throw error
+	return data
+}
+
+/**
+ * Creates billing settings for a specific booking
+ *
+ * @param bookingId - UUID of the booking
+ * @param userId - UUID of the user (for reference)
+ * @param billingType - The billing type to set
+ * @param billingAmount - The amount to charge
+ * @param currency - Currency code (defaults to EUR)
+ * @returns Promise<BillingSettings> - The created billing settings
+ */
+export async function createBookingBillingSettings(
+	bookingId: string,
+	userId: string,
+	billingType: BillingType,
+	billingAmount: number,
+	currency: string = 'EUR'
+): Promise<BillingSettings> {
+	const { data, error } = await supabase
+		.from('billing_settings')
+		.insert({
+			user_id: userId,
+			client_id: null,
+			booking_id: bookingId,
+			billing_type: billingType,
+			billing_amount: billingAmount,
+			currency: currency,
+			is_default: false
+		})
+		.select()
+		.single()
+
+	if (error) throw error
+	return data
+}
+
+/**
+ * Resolves billing settings using the hierarchy: booking > client > user default
+ *
+ * @param userId - UUID of the user
+ * @param clientId - Optional UUID of the client
+ * @param bookingId - Optional UUID of the booking
+ * @returns Promise<BillingSettings|null> - The resolved billing settings
+ */
+export async function resolveBillingSettings(
+	userId: string,
+	clientId?: string,
+	bookingId?: string
+): Promise<BillingSettings | null> {
+	// 1. Check for booking-specific settings (highest priority)
+	if (bookingId) {
+		const bookingSettings = await getBookingBillingSettings(bookingId)
+		if (bookingSettings) return bookingSettings
+	}
+
+	// 2. Check for client-specific settings (medium priority)
+	if (clientId) {
+		const clientSettings = await getClientBillingSettings(userId, clientId)
+		if (clientSettings) return clientSettings
+	}
+
+	// 3. Fall back to user default settings (lowest priority)
+	const { data, error } = await supabase
+		.from('billing_settings')
+		.select('*')
+		.eq('user_id', userId)
+		.is('client_id', null)
+		.is('booking_id', null)
+		.eq('is_default', true)
+		.single()
+
+	if (error && error.code !== 'PGRST116') {
+		console.error('Error fetching user default billing settings:', error)
+		return null
+	}
+
+	return data || null
 }

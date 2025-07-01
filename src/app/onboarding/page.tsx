@@ -19,7 +19,7 @@ const steps = [
 		component: ProfileSetup
 	},
 	{
-		name: '2. Connecta tu calendario',
+		name: '2. Calendario',
 		description:
 			'This way coco will always be in sync with your google calendar.',
 		component: CalendarStep

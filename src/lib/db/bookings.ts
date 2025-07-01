@@ -30,7 +30,7 @@ export type BookingInsert = TablesInsert<'bookings'>
 
 /**
  * Interface for creating a new booking
- * Contains all the essential booking information
+ * Contains all the essential booking information including billing details
  *
  * @interface CreateBookingPayload
  * @property user_id - UUID of the user who owns this booking
@@ -38,18 +38,22 @@ export type BookingInsert = TablesInsert<'bookings'>
  * @property start_time - ISO string of booking start time
  * @property end_time - ISO string of booking end time
  * @property status - Optional booking status (defaults to 'scheduled')
+ * @property billing_type - Type of billing for this booking
+ * @property billing_amount - Amount to charge for this booking
+ * @property billing_currency - Currency for billing (defaults to 'EUR')
  * @property billing_status - Optional billing status (defaults to 'pending')
- * @property payment_status - Optional payment status (defaults to 'pending')
  */
 export interface CreateBookingPayload {
 	user_id: string
 	client_id: string
 	start_time: string
 	end_time: string
-	status?: string
-	billing_status?: 'pending' | 'billed' | 'cancelled' | 'failed'
-	payment_status?: 'pending' | 'paid' | 'overdue' | 'cancelled'
-	billing_settings_id?: string | null
+	status?: 'pending' | 'scheduled' | 'completed' | 'canceled'
+	billing_type: 'in-advance' | 'right-after' | 'monthly'
+	billing_amount: number
+	billing_currency?: string
+	billing_status?: 'pending' | 'billed' | 'paid' | 'failed'
+	payment_session_id?: string | null
 }
 
 /**
@@ -188,20 +192,12 @@ export async function createBooking(
 		throw new Error('Time slot conflicts with existing booking')
 	}
 
-	// Determine billing settings if not explicitly provided
-	let billingSettingsId = payload.billing_settings_id
-	if (billingSettingsId === undefined) {
-		billingSettingsId = await determineBillingSettings(
-			payload.user_id,
-			payload.client_id
-		)
-	}
-
 	// Set default values
-	const bookingData: BookingInsert = {
+	const bookingData = {
 		...payload,
 		status: payload.status || 'scheduled',
-		billing_settings_id: billingSettingsId
+		billing_currency: payload.billing_currency || 'EUR',
+		billing_status: payload.billing_status || 'pending'
 	}
 
 	const { data, error } = await supabase
@@ -211,41 +207,6 @@ export async function createBooking(
 		.single()
 
 	if (error) throw error
-
-	// Auto-schedule billing actions if billing settings exist
-	if (billingSettingsId) {
-		try {
-			// Get billing settings to determine frequency and trigger
-			const { data: billingSettings, error: billingError } =
-				await supabase
-					.from('billing_settings')
-					.select(
-						'billing_frequency, billing_trigger, billing_advance_days'
-					)
-					.eq('id', billingSettingsId)
-					.single()
-
-			if (billingSettings && !billingError) {
-				// Import the function dynamically to avoid circular imports
-				const { autoScheduleBillingActions } = await import(
-					'./billing-schedule'
-				)
-
-				await autoScheduleBillingActions(
-					data.id,
-					data.start_time,
-					data.end_time,
-					billingSettings.billing_frequency || 'per_session',
-					billingSettings.billing_trigger,
-					billingSettings.billing_advance_days || 7
-				)
-			}
-		} catch (scheduleError) {
-			// Log error but don't fail the booking creation
-			console.error('Failed to schedule billing actions:', scheduleError)
-		}
-	}
-
 	return data
 }
 
@@ -436,62 +397,4 @@ export async function updateBookingPaymentStatus(
 
 	if (error) throw error
 	return data
-}
-
-/**
- * Gets bookings that need billing (status: scheduled, billing_status: pending)
- *
- * @param userId - The UUID of the user whose bookings to check
- * @returns Promise<BookingWithClient[]> - Array of bookings that need billing
- * @throws Error if database operation fails
- */
-export async function getBookingsNeedingBilling(
-	userId: string
-): Promise<BookingWithClient[]> {
-	const { data, error } = await supabase
-		.from('bookings')
-		.select(
-			`
-			*,
-			client:clients(id, name, email)
-		`
-		)
-		.eq('user_id', userId)
-		.eq('status', 'scheduled')
-		.eq('billing_status', 'pending')
-		.order('start_time', { ascending: true })
-
-	if (error) throw error
-	return data || []
-}
-
-/**
- * Gets bookings with their associated billing settings
- * Useful for billing reports and calculating amounts
- *
- * @param userId - The UUID of the user whose bookings to fetch
- * @returns Promise<Array> - Array of bookings with billing settings
- * @throws Error if database operation fails
- */
-export async function getBookingsWithBillingSettings(userId: string) {
-	const { data, error } = await supabase
-		.from('bookings')
-		.select(
-			`
-			*,
-			client:clients(id, name, email),
-			billing_settings:billing_settings(
-				id,
-				billing_amount,
-				billing_type,
-				billing_frequency,
-				should_bill
-			)
-		`
-		)
-		.eq('user_id', userId)
-		.order('start_time', { ascending: false })
-
-	if (error) throw error
-	return data || []
 }
