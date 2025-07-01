@@ -77,7 +77,7 @@ export default function BookingPage() {
 
 				// Fetch available slots
 				const response = await fetch(
-					`/api/available-slots?username=${username}&month=${monthToFetch.toISOString()}`
+					`/api/calendar/available-slots?username=${username}&month=${monthToFetch.toISOString()}`
 				)
 				if (!response.ok)
 					throw new Error('Failed to fetch available slots')
@@ -126,7 +126,7 @@ export default function BookingPage() {
 
 		try {
 			const response = await fetch(
-				`/api/available-slots?username=${username}&month=${newMonth.toISOString()}`
+				`/api/calendar/available-slots?username=${username}&month=${newMonth.toISOString()}`
 			)
 			if (!response.ok) throw new Error('Failed to fetch available slots')
 			const availableSlots = await response.json()

@@ -54,55 +54,6 @@ export function TestApiButton() {
 	 */
 	const handleTestApi = async () => {
 		setLoading(true)
-		try {
-			console.log('🧪 Starting complete payment flow test...')
-
-			// Step 1: Create test consultation data
-			console.log('📝 Creating test consultation bookings...')
-			const seedResponse = await fetch('/api/dev/seed-consultations')
-			const seedData = await seedResponse.json()
-
-			if (!seedResponse.ok) {
-				console.error('❌ Error creating test data:', seedData)
-				alert(`Error creating test data: ${seedData.error}`)
-				return
-			}
-
-			console.log('✅ Test bookings created:', seedData)
-			alert(`✅ Created ${seedData.count} test consultation bookings`)
-
-			// Step 2: Send consultation billing emails with payment links
-			console.log(
-				'📧 Sending consultation billing emails with payment links...'
-			)
-			const billingResponse = await fetch('/api/billing/consultation', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({}) // Send all pending bills
-			})
-
-			const billingData = await billingResponse.json()
-			console.log('📧 Billing response:', billingData)
-
-			if (!billingResponse.ok) {
-				console.error('❌ Error sending bills:', billingData)
-				alert(`Error sending bills: ${billingData.error}`)
-				return
-			}
-
-			// Success!
-			console.log('🎉 Payment flow test completed successfully!')
-			alert(
-				`🎉 Success!\n\n📧 Emails sent: ${billingData.emails_sent}\n❌ Failed: ${billingData.emails_failed}\n\nCheck your email service logs and Stripe dashboard.`
-			)
-		} catch (error) {
-			console.error('❌ Payment flow test error:', error)
-			alert(`❌ Test failed: ${error}`)
-		} finally {
-			setLoading(false)
-		}
 	}
 
 	return (

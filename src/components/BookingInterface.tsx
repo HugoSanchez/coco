@@ -55,7 +55,7 @@ export function BookingInterface({ userId }: BookingInterfaceProps) {
 
 		// Fetch available slots from API
 		const response = await fetch(
-			`/api/available-slots?userId=${userId}&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`
+			`/api/calendar/available-slots?userId=${userId}&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`
 		)
 		const data = await response.json()
 
