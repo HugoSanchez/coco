@@ -1,9 +1,15 @@
 /**
  * Booking Form Component - 3 Step Process
  *
- * Step 1: Select Date
- * Step 2: Select Time
- * Step 3: Select Client
+ * This component handles the complete booking creation flow with a multi-step process:
+ * Step 1: Date Selection - User picks a date from calendar
+ * Step 2: Time Selection - User picks available time slot for selected date
+ * Step 3: Client & Details - User selects client and adds optional notes
+ *
+ * The component integrates with the simplified billing system:
+ * - Automatically resolves billing settings (client-specific or user default)
+ * - Creates bookings with appropriate billing configuration
+ * - Handles different billing types (in-advance, right-after, monthly)
  */
 
 'use client'
@@ -17,22 +23,22 @@ import Calendar from '@/components/Calendar'
 import { DayViewTimeSelector } from '@/components/DayViewTimeSelector'
 import { TimeSlot } from '@/lib/calendar'
 import { useUser } from '@/contexts/UserContext'
-import { format, startOfMonth } from 'date-fns'
+import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Label } from '@/components/ui/label'
-import { createBooking, CreateBookingPayload } from '@/lib/db/bookings'
+import { createBookingSimple } from '@/lib/bookings/booking-orchestration-service'
 import { useToast } from '@/components/ui/use-toast'
 
 interface BookingFormProps {
-	onSuccess?: () => void
-	onCancel?: () => void
-	clients: Client[]
+	onSuccess?: () => void // Called when booking is successfully created
+	onCancel?: () => void // Called when user cancels the booking process
+	clients: Client[] // List of available clients to select from
 }
 
 interface Client {
-	id: string
-	name: string
-	email: string
+	id: string // Unique client identifier
+	name: string // Client's display name
+	email: string // Client's email address
 }
 
 export function BookingForm({
@@ -40,153 +46,161 @@ export function BookingForm({
 	onCancel,
 	clients
 }: BookingFormProps) {
-	const [currentStep, setCurrentStep] = useState(1)
-	const [loading, setLoading] = useState(false)
-	const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-	const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null)
-	const [selectedClient, setSelectedClient] = useState<string>('')
-	const [availableSlots, setAvailableSlots] = useState<{
-		[day: string]: TimeSlot[]
-	}>({})
-	const [currentMonth, setCurrentMonth] = useState<Date>(
-		startOfMonth(new Date())
-	)
-	const [notes, setNotes] = useState('')
-	const [userTimeZone] = useState(
-		Intl.DateTimeFormat().resolvedOptions().timeZone
-	)
+	// Step management state
+	const [currentStep, setCurrentStep] = useState(1) // Tracks which step user is on (1, 2, or 3)
+	const [loading, setLoading] = useState(false) // Loading state for booking creation
 
-	const { user, profile } = useUser()
-	const { toast } = useToast()
+	// Booking data state
+	const [selectedDate, setSelectedDate] = useState<Date | null>(null) // Date selected in step 1
+	const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null) // Time slot selected in step 2
+	const [selectedClient, setSelectedClient] = useState<string>('') // Client ID selected in step 3
+	const [notes, setNotes] = useState('') // Optional notes for the booking
 
-	// Fetch available slots when component mounts or month changes
-	useEffect(() => {
-		if (user && profile?.username) {
-			fetchAvailableSlots(currentMonth)
-		}
-	}, [user, profile, currentMonth])
+	// Context and utilities
+	const { user, profile } = useUser() // Current user and profile data
+	const { toast } = useToast() // Toast notification system
 
-	const fetchAvailableSlots = async (month: Date) => {
-		if (!profile?.username) return
-
-		try {
-			const response = await fetch(
-				`/api/available-slots?username=${
-					profile.username
-				}&month=${month.toISOString()}`
-			)
-			if (!response.ok) throw new Error('Failed to fetch available slots')
-			const slots = await response.json()
-			setAvailableSlots(slots)
-		} catch (error) {
-			console.error('Error fetching available slots:', error)
-		}
-	}
-
+	/**
+	 * Handles calendar month changes
+	 * Currently placeholder - can be extended to fetch availability for new month
+	 */
 	const handleMonthChange = async (newMonth: Date) => {
-		setCurrentMonth(newMonth)
-		await fetchAvailableSlots(newMonth)
+		// Month change handling can be implemented here if needed
 	}
 
+	/**
+	 * Step 1: Date Selection Handler
+	 * When user clicks on a date in the calendar, store it and advance to time selection
+	 */
 	const handleDateSelect = (date: Date) => {
 		setSelectedDate(date)
-		setCurrentStep(2)
+		setCurrentStep(2) // Auto-advance to time selection step
 	}
 
+	/**
+	 * Step 2: Time Slot Selection Handler
+	 * When user clicks on an available time slot, store it for booking creation
+	 * Note: Does NOT auto-advance to step 3 - user must manually continue
+	 */
 	const handleSlotSelect = (startTime: string, endTime: string) => {
-		// Convert to TimeSlot format for compatibility
+		// Convert to TimeSlot format for compatibility with existing interfaces
 		const slot: TimeSlot = {
 			start: startTime,
 			end: endTime
 		}
 		setSelectedSlot(slot)
-		// Remove auto-advance to step 3 - let user manually continue
+		// Intentionally NOT auto-advancing to give user time to review selection
 	}
 
+	/**
+	 * Manual progression from Step 2 to Step 3
+	 * Only enabled when user has selected a time slot
+	 */
 	const handleContinueToClient = () => {
 		if (selectedSlot) {
 			setCurrentStep(3)
 		}
 	}
 
+	/**
+	 * Clears the selected time slot in Step 2
+	 * Allows user to pick a different time without going back to Step 1
+	 */
 	const handleClearTimeSelection = () => {
 		setSelectedSlot(null)
 	}
 
+	/**
+	 * Navigation: Go back to previous step
+	 * Preserves data from current step when going backwards
+	 */
 	const handleBack = () => {
 		if (currentStep > 1) {
 			setCurrentStep(currentStep - 1)
 		}
 	}
 
+	/**
+	 * Step 3: Final booking submission
+	 *
+	 * Process:
+	 * 1. Validates that all required data is present
+	 * 2. Calls simplified booking service which handles:
+	 *    - Billing settings resolution (client-specific or user default)
+	 *    - Booking creation with appropriate billing configuration
+	 *    - Different handling based on billing type
+	 * 3. Shows success/error feedback
+	 * 4. Calls onSuccess callback to close form/refresh data
+	 */
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
 
+		// Validate required data before submission
 		if (!selectedClient) {
-			return
+			return // Form validation should prevent this, but extra safety check
 		}
 
 		setLoading(true)
 
 		try {
-			console.log('Creating new booking...', {
-				date: selectedDate,
-				slot: selectedSlot,
+			// Use the simplified booking service
+			// This handles all the complex billing logic internally:
+			// - Checks if client has specific billing settings
+			// - Falls back to user default billing if not
+			// - Creates booking with appropriate billing type and amount
+			// - Returns result with payment info if needed
+			const result = await createBookingSimple({
+				userId: user!.id,
 				clientId: selectedClient,
+				startTime: selectedSlot!.start,
+				endTime: selectedSlot!.end,
 				notes
 			})
 
-			const payload: CreateBookingPayload = {
-				user_id: user!.id,
-				client_id: selectedClient,
-				start_time: selectedSlot!.start,
-				end_time: selectedSlot!.end
-			}
-
-			await createBooking(payload)
+			// Show success notification
+			// Note: The simplified service returns whether payment is required,
+			// but for now we show the same success message regardless
 			toast({
-				title: 'Cita creada exitosamente',
+				title: 'Cita creada',
 				description: 'La cita se ha creado correctamente',
 				color: 'success'
 			})
+
+			// Notify parent component that booking was successful
+			// This typically closes the booking form and refreshes the booking list
 			onSuccess?.()
 		} catch (error) {
 			console.error('Error creating booking:', error)
+
+			// Show error notification with user-friendly message
 			toast({
 				title: 'Error al crear cita',
-				description:
-					'Hubo un error al crear la cita. Por favor, inténtelo más tarde',
+				description: 'Hubo un error al crear la cita.',
 				variant: 'destructive',
 				color: 'error'
 			})
 		} finally {
+			// Always reset loading state, regardless of success/failure
 			setLoading(false)
 		}
 	}
 
-	const resetForm = () => {
-		setCurrentStep(1)
-		setSelectedDate(null)
-		setSelectedSlot(null)
-		setSelectedClient('')
-		setNotes('')
-	}
-
 	return (
 		<div className="space-y-6 py-6">
-			{/* Step Indicator */}
+			{/* Step Indicator - Currently empty but could show progress dots */}
 			<div className="flex items-center justify-between mb-6">
-				{/* Remove the duplicate back button - it's now in the bottom navigation */}
+				{/* Future: Could add step indicator dots here */}
 			</div>
 
-			{/* Step 1: Date Selection */}
+			{/* ===== STEP 1: DATE SELECTION ===== */}
 			{currentStep === 1 && (
 				<div className="space-y-4">
 					<div className="">
+						{/* Main calendar component showing available dates */}
 						<Calendar
 							username={profile?.username || ''}
 							selectedDay={selectedDate}
-							availableSlots={availableSlots}
+							availableSlots={{}} // TODO: Pass real availability data
 							onSelectDate={handleDateSelect}
 							onMonthChange={handleMonthChange}
 						/>
@@ -194,20 +208,22 @@ export function BookingForm({
 				</div>
 			)}
 
-			{/* Step 2: Time Selection */}
+			{/* ===== STEP 2: TIME SELECTION ===== */}
 			{currentStep === 2 && selectedDate && (
 				<div className="space-y-4">
 					<div className="">
+						{/* Day view showing available time slots for selected date */}
 						<DayViewTimeSelector
 							date={selectedDate}
 							onTimeSelect={handleSlotSelect}
 							onClearSelection={handleClearTimeSelection}
-							existingBookings={[]} // TODO: Pass real existing bookings
+							existingBookings={[]} // TODO: Pass real existing bookings to show conflicts
 							initialSelectedSlot={selectedSlot}
 						/>
 					</div>
 
 					{/* Continue button - only show when time is selected */}
+					{/* User must manually continue to review their selection */}
 					{selectedSlot && (
 						<div className="pt-4">
 							<Button
@@ -222,15 +238,16 @@ export function BookingForm({
 				</div>
 			)}
 
-			{/* Step 3: Client Selection */}
+			{/* ===== STEP 3: CLIENT SELECTION & BOOKING DETAILS ===== */}
 			{currentStep === 3 && selectedSlot && (
 				<div className="space-y-4">
 					<form onSubmit={handleSubmit} className="space-y-4">
-						{/* Client Selection */}
+						{/* Client Selection Dropdown */}
 						<div className="space-y-2">
 							<Label className="text-md font-normal text-gray-700">
 								Paciente
 							</Label>
+							{/* Searchable dropdown for client selection */}
 							<ClientSearchSelect
 								clients={clients}
 								value={selectedClient}
@@ -239,7 +256,7 @@ export function BookingForm({
 							/>
 						</div>
 
-						{/* Notes */}
+						{/* Optional Notes Field */}
 						<div className="space-y-2">
 							<Label className="text-md font-normal text-gray-700">
 								Notas{' '}
@@ -255,27 +272,30 @@ export function BookingForm({
 							/>
 						</div>
 
-						{/* Submit Button */}
+						{/* Booking Summary */}
 						<div>
+							{/* Show formatted date and time for final confirmation */}
 							<h3 className="text-sm mt-10">
 								{format(
 									selectedDate!,
 									"EEEE, d 'de' MMMM 'de' yyyy",
 									{ locale: es }
 								)
-									.replace(/^./, (c) => c.toUpperCase())
+									.replace(/^./, (c) => c.toUpperCase()) // Capitalize first letter
 									.replace(
 										/ de ([a-z])/,
-										(match, p1) => ` de ${p1.toUpperCase()}`
+										(match, p1) => ` de ${p1.toUpperCase()}` // Capitalize month
 									)}{' '}
 								a las{' '}
 								{format(new Date(selectedSlot.start), 'HH:mm')}
 							</h3>
 						</div>
+
+						{/* Final Submit Button */}
 						<Button
 							type="submit"
 							variant="default"
-							disabled={loading || !selectedClient}
+							disabled={loading || !selectedClient} // Disabled until client selected
 							className="w-full"
 						>
 							{loading ? 'Creando cita...' : 'Crear Cita'}
@@ -284,7 +304,7 @@ export function BookingForm({
 				</div>
 			)}
 
-			{/* Bottom Navigation */}
+			{/* ===== BOTTOM NAVIGATION BAR ===== */}
 			<div className="pt-4 border-t border-gray-200">
 				<div className="flex items-center">
 					{/* Back Button - only show if not on first step */}
@@ -300,12 +320,12 @@ export function BookingForm({
 						</Button>
 					)}
 
-					{/* Vertical separator - only show if back button is visible */}
+					{/* Visual separator between back and cancel buttons */}
 					{currentStep > 1 && (
 						<div className="h-8 w-px bg-gray-300 mx-2"></div>
 					)}
 
-					{/* Cancel Button */}
+					{/* Cancel Button - available on all steps */}
 					{onCancel && (
 						<Button
 							type="button"

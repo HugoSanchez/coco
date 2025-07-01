@@ -30,7 +30,7 @@ export type BookingInsert = TablesInsert<'bookings'>
 
 /**
  * Interface for creating a new booking
- * Contains all the essential booking information including billing details
+ * Contains all the essential booking information
  *
  * @interface CreateBookingPayload
  * @property user_id - UUID of the user who owns this booking
@@ -38,10 +38,8 @@ export type BookingInsert = TablesInsert<'bookings'>
  * @property start_time - ISO string of booking start time
  * @property end_time - ISO string of booking end time
  * @property status - Optional booking status (defaults to 'scheduled')
- * @property billing_type - Type of billing for this booking
- * @property billing_amount - Amount to charge for this booking
- * @property billing_currency - Currency for billing (defaults to 'EUR')
  * @property billing_status - Optional billing status (defaults to 'pending')
+ * @property billing_settings_id - ID of the billing settings used for this booking (required)
  */
 export interface CreateBookingPayload {
 	user_id: string
@@ -49,11 +47,9 @@ export interface CreateBookingPayload {
 	start_time: string
 	end_time: string
 	status?: 'pending' | 'scheduled' | 'completed' | 'canceled'
-	billing_type: 'in-advance' | 'right-after' | 'monthly'
-	billing_amount: number
-	billing_currency?: string
 	billing_status?: 'pending' | 'billed' | 'paid' | 'failed'
 	payment_session_id?: string | null
+	billing_settings_id: string // Required - every booking must have billing settings
 }
 
 /**
@@ -196,7 +192,6 @@ export async function createBooking(
 	const bookingData = {
 		...payload,
 		status: payload.status || 'scheduled',
-		billing_currency: payload.billing_currency || 'EUR',
 		billing_status: payload.billing_status || 'pending'
 	}
 
