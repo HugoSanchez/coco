@@ -32,6 +32,7 @@ export function BillingPreferencesStep({
 	subtitle = 'Podrás cambiar tus preferencias siempre que quieras. Además, podrás tener opciones de facturación especificas para cada paciente si lo necesitas.',
 	buttonText = 'Continuar',
 	loadingText = 'Guardando...',
+	showSuccessToast = false,
 	skipOnComplete = false
 }: BillingPreferencesStepProps) {
 	const [isLoading, setIsLoading] = useState(false)
@@ -68,9 +69,19 @@ export function BillingPreferencesStep({
 		try {
 			// Save billing preferences using the new unified system
 			await saveBillingPreferences(user?.id, billingPrefs)
+
+			// Show success toast if enabled
+			if (showSuccessToast) {
+				toast({
+					title: 'Configuración guardada',
+					description:
+						'Preferencias de facturación actualizadas correctamente.',
+					color: 'success'
+				})
+			}
+
 			// If skipOnComplete is false, call onComplete
 			if (!skipOnComplete) onComplete()
-			// catch any error and show error toast
 		} catch (error: any) {
 			// If error, log error
 			console.log(error)
@@ -80,6 +91,9 @@ export function BillingPreferencesStep({
 				description: 'Hubo un problema al guardar las preferencias.',
 				color: 'error'
 			})
+		} finally {
+			// Always reset loading state regardless of success/failure
+			setIsLoading(false)
 		}
 	}
 

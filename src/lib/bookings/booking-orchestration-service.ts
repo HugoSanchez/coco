@@ -6,10 +6,11 @@
  * 2. User default billing settings (fallback)
  * 3. Auto-created default settings (if none exist)
  *
- * Bookings reference billing_settings via billing_settings_id for:
- * - Proper normalization (no duplicate billing data)
- * - Referential integrity (clear audit trail)
- * - Consistency (billing details stored in one place)
+ * Uses SNAPSHOT APPROACH:
+ * - Billing data is copied from billing_settings into the booking record
+ * - Bookings become independent of future billing settings changes
+ * - billing_settings_id is stored for audit trail
+ * - Original billing terms are preserved forever
  *
  * Based on billing type, calls the appropriate creation function.
  */
@@ -124,6 +125,9 @@ async function createInAdvanceBooking(
 		start_time: request.startTime,
 		end_time: request.endTime,
 		status: 'pending', // Pending until payment
+		billing_type: billing.type,
+		billing_amount: billing.amount,
+		billing_currency: billing.currency,
 		billing_settings_id: billing.id
 	}
 
@@ -154,6 +158,9 @@ async function createRightAfterBooking(
 		start_time: request.startTime,
 		end_time: request.endTime,
 		status: request.status || 'scheduled', // Confirmed immediately
+		billing_type: billing.type,
+		billing_amount: billing.amount,
+		billing_currency: billing.currency,
 		billing_settings_id: billing.id
 	}
 
@@ -179,6 +186,9 @@ async function createMonthlyBooking(
 		start_time: request.startTime,
 		end_time: request.endTime,
 		status: request.status || 'scheduled', // Confirmed immediately
+		billing_type: billing.type,
+		billing_amount: billing.amount,
+		billing_currency: billing.currency,
 		billing_settings_id: billing.id
 	}
 
@@ -194,23 +204,27 @@ async function createMonthlyBooking(
 /**
  * Main function: creates a booking based on billing type
  *
- * This function ensures proper referential integrity by:
- * 1. Resolving the specific billing settings record used (client-specific or user default)
- * 2. Linking the booking to that billing settings record via billing_settings_id
- * 3. This creates an audit trail showing exactly which billing configuration was used
+ * SNAPSHOT APPROACH ensures billing terms never change:
+ * 1. Resolves the current billing settings (client-specific or user default)
+ * 2. COPIES billing data from settings into the booking record
+ * 3. Stores billing_settings_id for audit trail (which template was used)
+ * 4. Future changes to billing_settings won't affect this booking
+ *
+ * Result: Each booking has its own independent billing configuration
  */
 export async function createBookingSimple(
 	request: CreateBookingRequest
 ): Promise<CreateBookingResult> {
 	try {
 		// Get billing settings (client-specific or user default)
-		// This returns the full record including ID for proper referential integrity
+		// This returns the current active billing configuration
 		const billing = await getBillingForBooking(
 			request.userId,
 			request.clientId
 		)
 
 		// Call appropriate function based on billing type
+		// Each function will COPY the billing data into the booking record
 		switch (billing.type) {
 			case 'in-advance':
 				return await createInAdvanceBooking(request, billing)
