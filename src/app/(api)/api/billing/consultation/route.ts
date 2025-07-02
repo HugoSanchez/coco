@@ -189,7 +189,7 @@ export async function POST(request: Request) {
 				// Generate payment link using orchestration service
 				const paymentResult =
 					// Call the service to generate the payment link
-					await paymentOrchestrationService.createConsultationCheckout(
+					await paymentOrchestrationService.orechestrateConsultationCheckout(
 						{
 							// user_id is the practitioner's user_id
 							userId: consultation.user_id,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
+import { markPaymentSessionCompleted } from '@/lib/db/payment-sessions'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 const supabase = createClient(
@@ -40,19 +41,14 @@ export async function POST(request: NextRequest) {
 			}
 
 			// Update payment session status
-			const { error: sessionError } = await supabase
-				.from('payment_sessions')
-				.update({
-					status: 'completed',
-					stripe_payment_intent_id: session.payment_intent as string,
-					completed_at: new Date().toISOString()
-				})
-				.eq('stripe_session_id', session.id)
-
-			if (sessionError) {
-				console.error('Failed to update payment session:', sessionError)
-			} else {
+			try {
+				await markPaymentSessionCompleted(
+					session.id,
+					session.payment_intent as string
+				)
 				console.log('✅ Updated payment session:', session.id)
+			} catch (sessionError) {
+				console.error('Failed to update payment session:', sessionError)
 			}
 
 			// Update booking payment status

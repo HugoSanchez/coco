@@ -58,47 +58,38 @@ export type Database = {
       }
       billing_settings: {
         Row: {
-          billing_advance_days: number | null
           billing_amount: number | null
-          billing_frequency: string | null
-          billing_trigger: string | null
-          billing_type: string | null
+          billing_type: string
           booking_id: string | null
           client_id: string | null
           created_at: string | null
+          currency: string
           id: string
           is_default: boolean | null
-          should_bill: boolean | null
           updated_at: string | null
           user_id: string | null
         }
         Insert: {
-          billing_advance_days?: number | null
           billing_amount?: number | null
-          billing_frequency?: string | null
-          billing_trigger?: string | null
-          billing_type?: string | null
+          billing_type: string
           booking_id?: string | null
           client_id?: string | null
           created_at?: string | null
+          currency?: string
           id?: string
           is_default?: boolean | null
-          should_bill?: boolean | null
           updated_at?: string | null
           user_id?: string | null
         }
         Update: {
-          billing_advance_days?: number | null
           billing_amount?: number | null
-          billing_frequency?: string | null
-          billing_trigger?: string | null
-          billing_type?: string | null
+          billing_type?: string
           booking_id?: string | null
           client_id?: string | null
           created_at?: string | null
+          currency?: string
           id?: string
           is_default?: boolean | null
-          should_bill?: boolean | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -129,14 +120,17 @@ export type Database = {
       bookings: {
         Row: {
           billed_at: string | null
+          billing_amount: number | null
+          billing_currency: string | null
           billing_settings_id: string | null
           billing_status: string | null
+          billing_type: string | null
           client_id: string
           created_at: string | null
           end_time: string
           id: string
           paid_at: string | null
-          payment_status: string | null
+          payment_session_id: string | null
           start_time: string
           status: string | null
           updated_at: string | null
@@ -144,14 +138,17 @@ export type Database = {
         }
         Insert: {
           billed_at?: string | null
+          billing_amount?: number | null
+          billing_currency?: string | null
           billing_settings_id?: string | null
           billing_status?: string | null
+          billing_type?: string | null
           client_id: string
           created_at?: string | null
           end_time: string
           id?: string
           paid_at?: string | null
-          payment_status?: string | null
+          payment_session_id?: string | null
           start_time: string
           status?: string | null
           updated_at?: string | null
@@ -159,14 +156,17 @@ export type Database = {
         }
         Update: {
           billed_at?: string | null
+          billing_amount?: number | null
+          billing_currency?: string | null
           billing_settings_id?: string | null
           billing_status?: string | null
+          billing_type?: string | null
           client_id?: string
           created_at?: string | null
           end_time?: string
           id?: string
           paid_at?: string | null
-          payment_status?: string | null
+          payment_session_id?: string | null
           start_time?: string
           status?: string | null
           updated_at?: string | null
@@ -185,6 +185,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_payment_session_id_fkey"
+            columns: ["payment_session_id"]
+            isOneToOne: false
+            referencedRelation: "payment_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -270,6 +277,47 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_sessions: {
+        Row: {
+          amount: number
+          booking_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          status: string
+          stripe_payment_intent_id: string | null
+          stripe_session_id: string
+        }
+        Insert: {
+          amount: number
+          booking_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          stripe_session_id: string
+        }
+        Update: {
+          amount?: number
+          booking_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_sessions_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -336,12 +384,67 @@ export type Database = {
         }
         Relationships: []
       }
+      stripe_accounts: {
+        Row: {
+          created_at: string | null
+          id: string
+          onboarding_completed: boolean | null
+          payments_enabled: boolean | null
+          stripe_account_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          onboarding_completed?: boolean | null
+          payments_enabled?: boolean | null
+          stripe_account_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          onboarding_completed?: boolean | null
+          payments_enabled?: boolean | null
+          stripe_account_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stripe_accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_consultation_billing: {
+        Args: { today_date: string }
+        Returns: {
+          booking_id: string
+          scheduled_date: string
+          consultation_date: string
+          client_id: string
+          client_name: string
+          client_email: string
+          billing_settings_id: string
+          billing_amount: number
+          billing_trigger: string
+          billing_advance_days: number
+          user_id: string
+          practitioner_name: string
+          practitioner_email: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

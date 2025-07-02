@@ -89,7 +89,10 @@ export class StripeService {
 		amount: number
 		bookingId: string
 		practitionerName: string
-	}): Promise<string> {
+	}): Promise<{
+		sessionId: string
+		checkoutUrl: string
+	}> {
 		try {
 			const session = await stripe.checkout.sessions.create({
 				payment_method_types: ['card'],
@@ -125,7 +128,10 @@ export class StripeService {
 				}
 			})
 
-			return session.url || ''
+			return {
+				sessionId: session.id,
+				checkoutUrl: session.url || ''
+			}
 		} catch (error) {
 			console.error('Error creating checkout session:', error)
 			throw new Error(
