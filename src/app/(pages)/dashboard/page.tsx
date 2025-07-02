@@ -46,7 +46,7 @@ const transformBooking = (dbBooking: any): Booking => ({
 	bookingDate: new Date(dbBooking.start_time),
 	billingStatus: dbBooking.billing_status === 'billed' ? 'billed' : 'pending',
 	paymentStatus: dbBooking.payment_status === 'paid' ? 'paid' : 'pending',
-	amount: 150.0 // TODO: Add amount field to database or calculate from billing settings
+	amount: dbBooking.billing_amount || 0 // Use actual billing amount from booking snapshot
 })
 
 export default function Dashboard() {
@@ -173,7 +173,7 @@ export default function Dashboard() {
 								[type === 'billing'
 									? 'billingStatus'
 									: 'paymentStatus']: status
-						  }
+							}
 						: booking
 				)
 			)
@@ -211,7 +211,7 @@ export default function Dashboard() {
 									type === 'billing'
 										? booking.billingStatus
 										: booking.paymentStatus
-						  }
+							}
 						: booking
 				)
 			)
