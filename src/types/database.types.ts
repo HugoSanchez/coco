@@ -1,3 +1,4 @@
+
 export type Json =
   | string
   | number
@@ -7,55 +8,33 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          operationName?: string
+          query?: string
+          variables?: Json
+          extensions?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
-      billing_schedule: {
-        Row: {
-          action_type: string
-          booking_id: string
-          created_at: string | null
-          id: string
-          max_retries: number | null
-          processed_at: string | null
-          retry_count: number | null
-          scheduled_date: string
-          status: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          action_type: string
-          booking_id: string
-          created_at?: string | null
-          id?: string
-          max_retries?: number | null
-          processed_at?: string | null
-          retry_count?: number | null
-          scheduled_date: string
-          status?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          action_type?: string
-          booking_id?: string
-          created_at?: string | null
-          id?: string
-          max_retries?: number | null
-          processed_at?: string | null
-          retry_count?: number | null
-          scheduled_date?: string
-          status?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "billing_schedule_booking_id_fkey"
-            columns: ["booking_id"]
-            isOneToOne: false
-            referencedRelation: "bookings"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       billing_settings: {
         Row: {
           billing_amount: number | null
@@ -110,6 +89,81 @@ export type Database = {
           },
           {
             foreignKeyName: "billing_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bills: {
+        Row: {
+          amount: number
+          bill_number: string
+          billing_type: string
+          booking_id: string
+          client_email: string
+          client_id: string | null
+          client_name: string
+          created_at: string
+          currency: string
+          due_date: string | null
+          id: string
+          notes: string | null
+          paid_at: string | null
+          sent_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          bill_number: string
+          billing_type: string
+          booking_id: string
+          client_email: string
+          client_id?: string | null
+          client_name: string
+          created_at?: string
+          currency?: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          bill_number?: string
+          billing_type?: string
+          booking_id?: string
+          client_email?: string
+          client_id?: string | null
+          client_name?: string
+          created_at?: string
+          currency?: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bills_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
@@ -427,23 +481,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_consultation_billing: {
-        Args: { today_date: string }
-        Returns: {
-          booking_id: string
-          scheduled_date: string
-          consultation_date: string
-          client_id: string
-          client_name: string
-          client_email: string
-          billing_settings_id: string
-          billing_amount: number
-          billing_trigger: string
-          billing_advance_days: number
-          user_id: string
-          practitioner_name: string
-          practitioner_email: string
-        }[]
+      generate_bill_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
     }
     Enums: {
@@ -561,6 +601,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

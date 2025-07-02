@@ -40,6 +40,27 @@ export async function getClientsForUser(userId: string): Promise<Client[]> {
 }
 
 /**
+ * Retrieves a specific client by ID
+ *
+ * @param clientId - The UUID of the client to retrieve
+ * @returns Promise<Client | null> - The client object or null if not found
+ * @throws Error if database operation fails
+ */
+export async function getClientById(clientId: string): Promise<Client | null> {
+	const { data, error } = await supabase
+		.from('clients')
+		.select('*')
+		.eq('id', clientId)
+		.single()
+
+	if (error) {
+		if (error.code === 'PGRST116') return null // Not found
+		throw error
+	}
+	return data
+}
+
+/**
  * Interface for client creation payload
  * Contains only the essential client information (no billing data)
  *

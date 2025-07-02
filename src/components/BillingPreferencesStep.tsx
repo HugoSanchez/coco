@@ -5,7 +5,10 @@ import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
 import { Spinner } from '@/components/ui/spinner'
 import { useUser } from '@/contexts/UserContext'
-import { getBillingPreferences, saveBillingPreferences } from '@/lib/db/billing'
+import {
+	getBillingPreferences,
+	saveBillingPreferences
+} from '@/lib/db/billing-settings'
 import {
 	BillingPreferencesForm,
 	BillingPreferences

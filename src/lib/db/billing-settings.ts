@@ -170,6 +170,42 @@ export async function getClientBillingSettings(
 }
 
 /**
+ * Retrieves user default billing settings (for booking orchestration)
+ * Returns the full billing settings record including ID for proper referential integrity
+ *
+ * @param userId - The UUID of the user whose default billing settings to fetch
+ * @returns Promise<BillingSettings | null> - The billing settings object or null if not found
+ * @throws Error if database operation fails
+ */
+export async function getUserDefaultBillingSettings(
+	userId: string
+): Promise<BillingSettings | null> {
+	try {
+		const { data, error } = await supabase
+			.from('billing_settings')
+			.select('*')
+			.eq('user_id', userId)
+			.is('client_id', null)
+			.is('booking_id', null)
+			.eq('is_default', true)
+			.single()
+
+		if (error) {
+			if (error.code === 'PGRST116') return null // Not found
+			console.error(
+				'Error fetching user default billing settings:',
+				error
+			)
+			return null
+		}
+		return data
+	} catch (error) {
+		console.error('Error in getUserDefaultBillingSettings:', error)
+		return null
+	}
+}
+
+/**
  * Creates or updates billing settings for a specific client
  *
  * @param userId - UUID of the user (for data isolation)

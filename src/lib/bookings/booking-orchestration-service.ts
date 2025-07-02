@@ -18,10 +18,10 @@
 import { createBooking, CreateBookingPayload, Booking } from '@/lib/db/bookings'
 import {
 	getClientBillingSettings,
-	getBillingPreferences
-} from '@/lib/db/billing'
-import { createClient as createSupabaseClient } from '@/lib/supabase/client'
-const supabase = createSupabaseClient()
+	getUserDefaultBillingSettings
+} from '@/lib/db/billing-settings'
+import { getClientById } from '@/lib/db/clients'
+import { createBill, CreateBillPayload, Bill } from '@/lib/db/bills'
 
 /**
  * Interface for creating a booking
@@ -40,6 +40,7 @@ export interface CreateBookingRequest {
  */
 export interface CreateBookingResult {
 	booking: Booking
+	bill: Bill
 	requiresPayment: boolean
 	paymentUrl?: string
 }
@@ -47,9 +48,9 @@ export interface CreateBookingResult {
 /**
  * Gets billing settings for a booking (client-specific or user default)
  * Returns the full billing settings record including ID for proper referential integrity
- * If no billing settings exist, creates default ones automatically
+ * Throws error if no billing settings exist (users must have billing settings configured)
  */
-async function getBillingForBooking(userId: string, clientId: string) {
+async function getAppropriateBillingSettings(userId: string, clientId: string) {
 	// Check if client has specific billing settings
 	const clientBilling = await getClientBillingSettings(userId, clientId)
 	if (clientBilling) {
@@ -61,17 +62,9 @@ async function getBillingForBooking(userId: string, clientId: string) {
 		}
 	}
 
-	// Fall back to user default - we need to get the full record, not just preferences
-	const { data: userDefaultSettings, error } = await supabase
-		.from('billing_settings')
-		.select('*')
-		.eq('user_id', userId)
-		.is('client_id', null)
-		.is('booking_id', null)
-		.eq('is_default', true)
-		.single()
-
-	if (userDefaultSettings && !error) {
+	// Fall back to user default billing settings
+	const userDefaultSettings = await getUserDefaultBillingSettings(userId)
+	if (userDefaultSettings) {
 		return {
 			id: userDefaultSettings.id,
 			type: userDefaultSettings.billing_type,
@@ -80,36 +73,40 @@ async function getBillingForBooking(userId: string, clientId: string) {
 		}
 	}
 
-	// No billing settings found - create default ones automatically
-	// This ensures billing_settings_id is never null
-	console.log('No billing settings found for user, creating defaults...')
+	// No billing settings found - this should not happen in production
+	throw new Error(
+		'No billing settings found for user or client. Please configure billing settings before creating bookings.'
+	)
+}
 
-	const { data: newDefaultSettings, error: createError } = await supabase
-		.from('billing_settings')
-		.insert({
-			user_id: userId,
-			client_id: null,
-			booking_id: null,
-			billing_type: 'right-after',
-			billing_amount: 0,
-			currency: 'EUR',
-			is_default: true
-		})
-		.select()
-		.single()
-
-	if (createError) {
-		throw new Error(
-			`Failed to create default billing settings: ${createError.message}`
-		)
+/**
+ * Creates a bill for a booking
+ * Inmediately after creating a booking, a bill is created for the booking
+ * This function handles that.
+ */
+async function createBillForBooking(
+	booking: Booking,
+	billing: any,
+	clientId: string
+): Promise<Bill> {
+	// Get client information
+	const client = await getClientById(clientId)
+	if (!client) {
+		throw new Error(`Client not found: ${clientId}`)
 	}
 
-	return {
-		id: newDefaultSettings.id,
-		type: newDefaultSettings.billing_type,
-		amount: newDefaultSettings.billing_amount || 0,
-		currency: newDefaultSettings.currency
+	const billPayload: CreateBillPayload = {
+		booking_id: booking.id,
+		user_id: booking.user_id,
+		client_id: clientId,
+		client_name: client.name,
+		client_email: client.email,
+		amount: billing.amount,
+		currency: billing.currency,
+		billing_type: billing.type as 'in-advance' | 'right-after' | 'monthly'
 	}
+
+	return await createBill(billPayload)
 }
 
 /**
@@ -133,11 +130,15 @@ async function createInAdvanceBooking(
 
 	const booking = await createBooking(bookingPayload)
 
+	// Create bill for this booking
+	const bill = await createBillForBooking(booking, billing, request.clientId)
+
 	// If amount > 0, requires payment
 	const requiresPayment = billing.amount > 0
 
 	return {
 		booking,
+		bill,
 		requiresPayment,
 		paymentUrl: requiresPayment
 			? `/payment/checkout/${booking.id}`
@@ -166,9 +167,13 @@ async function createRightAfterBooking(
 
 	const booking = await createBooking(bookingPayload)
 
+	// Create bill for this booking
+	const bill = await createBillForBooking(booking, billing, request.clientId)
+
 	// No immediate payment required
 	return {
 		booking,
+		bill,
 		requiresPayment: false
 	}
 }
@@ -194,9 +199,13 @@ async function createMonthlyBooking(
 
 	const booking = await createBooking(bookingPayload)
 
+	// Create bill for this booking
+	const bill = await createBillForBooking(booking, billing, request.clientId)
+
 	// No immediate payment required
 	return {
 		booking,
+		bill,
 		requiresPayment: false
 	}
 }
@@ -218,7 +227,7 @@ export async function createBookingSimple(
 	try {
 		// Get billing settings (client-specific or user default)
 		// This returns the current active billing configuration
-		const billing = await getBillingForBooking(
+		const billing = await getAppropriateBillingSettings(
 			request.userId,
 			request.clientId
 		)
