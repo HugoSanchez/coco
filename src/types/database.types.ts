@@ -173,54 +173,30 @@ export type Database = {
       }
       bookings: {
         Row: {
-          billed_at: string | null
-          billing_amount: number | null
-          billing_currency: string | null
-          billing_settings_id: string | null
-          billing_status: string | null
-          billing_type: string | null
           client_id: string
           created_at: string | null
           end_time: string
           id: string
-          paid_at: string | null
-          payment_session_id: string | null
           start_time: string
           status: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
-          billed_at?: string | null
-          billing_amount?: number | null
-          billing_currency?: string | null
-          billing_settings_id?: string | null
-          billing_status?: string | null
-          billing_type?: string | null
           client_id: string
           created_at?: string | null
           end_time: string
           id?: string
-          paid_at?: string | null
-          payment_session_id?: string | null
           start_time: string
           status?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
-          billed_at?: string | null
-          billing_amount?: number | null
-          billing_currency?: string | null
-          billing_settings_id?: string | null
-          billing_status?: string | null
-          billing_type?: string | null
           client_id?: string
           created_at?: string | null
           end_time?: string
           id?: string
-          paid_at?: string | null
-          payment_session_id?: string | null
           start_time?: string
           status?: string | null
           updated_at?: string | null
@@ -228,24 +204,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "bookings_billing_settings_id_fkey"
-            columns: ["billing_settings_id"]
-            isOneToOne: false
-            referencedRelation: "billing_settings"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "bookings_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bookings_payment_session_id_fkey"
-            columns: ["payment_session_id"]
-            isOneToOne: false
-            referencedRelation: "payment_sessions"
             referencedColumns: ["id"]
           },
         ]

@@ -31,8 +31,8 @@ export type BookingInsert = TablesInsert<'bookings'>
 /**
  * Interface for creating a new booking
  *
- * Uses snapshot approach: billing data is copied from billing_settings into the booking
- * at creation time, making bookings independent of future billing settings changes.
+ * Ultra-clean booking interface: focused purely on scheduling.
+ * Billing and payment details are tracked in separate tables.
  *
  * @interface CreateBookingPayload
  * @property user_id - UUID of the user who owns this booking
@@ -40,11 +40,6 @@ export type BookingInsert = TablesInsert<'bookings'>
  * @property start_time - ISO string of booking start time
  * @property end_time - ISO string of booking end time
  * @property status - Optional booking status (defaults to 'scheduled')
- * @property billing_status - Optional billing status (defaults to 'pending')
- * @property billing_type - Snapshot of billing type at booking creation time
- * @property billing_amount - Snapshot of billing amount at booking creation time
- * @property billing_currency - Snapshot of billing currency at booking creation time
- * @property billing_settings_id - Reference to billing_settings for audit trail (optional)
  */
 export interface CreateBookingPayload {
 	user_id: string
@@ -52,12 +47,6 @@ export interface CreateBookingPayload {
 	start_time: string
 	end_time: string
 	status?: 'pending' | 'scheduled' | 'completed' | 'canceled'
-	billing_status?: 'pending' | 'billed' | 'paid' | 'failed'
-	payment_session_id?: string | null
-	billing_type: 'in-advance' | 'right-after' | 'monthly'
-	billing_amount: number
-	billing_currency?: string
-	billing_settings_id?: string | null // Optional since we store data in booking itself
 }
 
 /**
@@ -131,49 +120,6 @@ export async function getBookingsForDateRange(
 }
 
 /**
- * Determines the appropriate billing settings for a booking
- * Follows the billing hierarchy: booking-specific > client-specific > user default
- *
- * @param userId - UUID of the user
- * @param clientId - UUID of the client
- * @returns Promise<string|null> - Billing settings ID, or null if using defaults
- */
-async function determineBillingSettings(
-	userId: string,
-	clientId: string
-): Promise<string | null> {
-	// First check for client-specific billing settings
-	const { data: clientSettings, error: clientError } = await supabase
-		.from('billing_settings')
-		.select('id')
-		.eq('user_id', userId)
-		.eq('client_id', clientId)
-		.is('booking_id', null)
-		.single()
-
-	if (clientSettings && !clientError) {
-		return clientSettings.id
-	}
-
-	// Fall back to user default settings
-	const { data: defaultSettings, error: defaultError } = await supabase
-		.from('billing_settings')
-		.select('id')
-		.eq('user_id', userId)
-		.is('client_id', null)
-		.is('booking_id', null)
-		.eq('is_default', true)
-		.single()
-
-	if (defaultSettings && !defaultError) {
-		return defaultSettings.id
-	}
-
-	// No specific billing settings found, use null (system defaults)
-	return null
-}
-
-/**
  * Creates a new booking in the database
  * Validates that the time slot doesn't conflict with existing bookings
  * Automatically determines appropriate billing settings
@@ -199,9 +145,7 @@ export async function createBooking(
 	// Set default values
 	const bookingData = {
 		...payload,
-		status: payload.status || 'scheduled',
-		billing_currency: payload.billing_currency || 'EUR',
-		billing_status: payload.billing_status || 'pending'
+		status: payload.status || 'scheduled'
 	}
 
 	const { data, error } = await supabase
@@ -336,69 +280,5 @@ export async function getBookingById(
 		throw error
 	}
 
-	return data
-}
-
-/**
- * Updates the billing status of a booking
- *
- * @param bookingId - The UUID of the booking to update
- * @param billingStatus - The new billing status
- * @returns Promise<Booking> - The updated booking object
- * @throws Error if update fails
- */
-export async function updateBookingBillingStatus(
-	bookingId: string,
-	billingStatus: 'pending' | 'billed' | 'cancelled' | 'failed'
-): Promise<Booking> {
-	const updateData: any = { billing_status: billingStatus }
-
-	// Set billed_at timestamp when marking as billed, clear it otherwise
-	if (billingStatus === 'billed') {
-		updateData.billed_at = new Date().toISOString()
-	} else {
-		updateData.billed_at = null
-	}
-
-	const { data, error } = await supabase
-		.from('bookings')
-		.update(updateData)
-		.eq('id', bookingId)
-		.select()
-		.single()
-
-	if (error) throw error
-	return data
-}
-
-/**
- * Updates the payment status of a booking
- *
- * @param bookingId - The UUID of the booking to update
- * @param paymentStatus - The new payment status
- * @returns Promise<Booking> - The updated booking object
- * @throws Error if update fails
- */
-export async function updateBookingPaymentStatus(
-	bookingId: string,
-	paymentStatus: 'pending' | 'paid' | 'overdue' | 'cancelled'
-): Promise<Booking> {
-	const updateData: any = { payment_status: paymentStatus }
-
-	// Set paid_at timestamp when marking as paid, clear it otherwise
-	if (paymentStatus === 'paid') {
-		updateData.paid_at = new Date().toISOString()
-	} else {
-		updateData.paid_at = null
-	}
-
-	const { data, error } = await supabase
-		.from('bookings')
-		.update(updateData)
-		.eq('id', bookingId)
-		.select()
-		.single()
-
-	if (error) throw error
 	return data
 }

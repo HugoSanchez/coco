@@ -121,11 +121,7 @@ async function createInAdvanceBooking(
 		client_id: request.clientId,
 		start_time: request.startTime,
 		end_time: request.endTime,
-		status: 'pending', // Pending until payment
-		billing_type: billing.type,
-		billing_amount: billing.amount,
-		billing_currency: billing.currency,
-		billing_settings_id: billing.id
+		status: 'pending' // Pending until payment
 	}
 
 	const booking = await createBooking(bookingPayload)
@@ -158,11 +154,7 @@ async function createRightAfterBooking(
 		client_id: request.clientId,
 		start_time: request.startTime,
 		end_time: request.endTime,
-		status: request.status || 'scheduled', // Confirmed immediately
-		billing_type: billing.type,
-		billing_amount: billing.amount,
-		billing_currency: billing.currency,
-		billing_settings_id: billing.id
+		status: request.status || 'scheduled' // Confirmed immediately
 	}
 
 	const booking = await createBooking(bookingPayload)
@@ -190,11 +182,7 @@ async function createMonthlyBooking(
 		client_id: request.clientId,
 		start_time: request.startTime,
 		end_time: request.endTime,
-		status: request.status || 'scheduled', // Confirmed immediately
-		billing_type: billing.type,
-		billing_amount: billing.amount,
-		billing_currency: billing.currency,
-		billing_settings_id: billing.id
+		status: request.status || 'scheduled' // Confirmed immediately
 	}
 
 	const booking = await createBooking(bookingPayload)
@@ -213,13 +201,13 @@ async function createMonthlyBooking(
 /**
  * Main function: creates a booking based on billing type
  *
- * SNAPSHOT APPROACH ensures billing terms never change:
+ * ULTRA-CLEAN SEPARATION APPROACH:
  * 1. Resolves the current billing settings (client-specific or user default)
- * 2. COPIES billing data from settings into the booking record
- * 3. Stores billing_settings_id for audit trail (which template was used)
- * 4. Future changes to billing_settings won't affect this booking
+ * 2. Creates clean booking record (scheduling only)
+ * 3. Creates separate bill record with all billing details
+ * 4. Zero coupling between scheduling and financial concerns
  *
- * Result: Each booking has its own independent billing configuration
+ * Result: Perfect separation between scheduling (bookings) and financial (bills) domains
  */
 export async function createBookingSimple(
 	request: CreateBookingRequest
