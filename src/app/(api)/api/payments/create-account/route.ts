@@ -1,21 +1,29 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { stripeService } from '@/lib/payments/stripe-service'
+import { hasStripeAccount, createStripeAccount } from '@/lib/db/stripe-accounts'
+import { getUserEmail } from '@/lib/db/profiles'
 
+/**
+ * POST /api/payments/create-account
+ *
+ * Creates a new Stripe Connect account for the authenticated user.
+ * This is the first step in enabling payments - users need a Connect account
+ * before they can accept payments for their consultations.
+ *
+ * Flow:
+ * 1. Validates user is authenticated and has a profile
+ * 2. Checks they don't already have a Stripe account
+ * 3. Creates Stripe Connect account with their email
+ * 4. Saves account details to our database
+ *
+ * Next steps after this: User completes Stripe onboarding via separate endpoint
+ */
 export async function POST() {
 	try {
-		// Check if Stripe secret key is configured
-		if (!process.env.STRIPE_SECRET_KEY) {
-			console.error('STRIPE_SECRET_KEY is not configured')
-			return NextResponse.json(
-				{ error: 'Stripe is not configured' },
-				{ status: 500 }
-			)
-		}
-
+		// Step 1: Authenticate the user
 		const supabase = createClient()
 
-		// Get current user
 		const {
 			data: { user },
 			error: authError
@@ -24,39 +32,32 @@ export async function POST() {
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 		}
 
-		// Get user profile to access email
-		const { data: profile, error: profileError } = await supabase
-			.from('profiles')
-			.select('email')
-			.eq('id', user.id)
-			.single()
+		// Step 2: Get user's email from their profile
+		const userEmail = await getUserEmail(user.id)
 
-		if (profileError || !profile) {
+		if (!userEmail) {
 			return NextResponse.json(
 				{ error: 'Profile not found' },
 				{ status: 404 }
 			)
 		}
 
-		// Check if user already has a Stripe account
-		const { data: existingAccount } = await supabase
-			.from('stripe_accounts')
-			.select('*')
-			.eq('user_id', user.id)
-			.single()
+		// Step 3: Check if user already has a Stripe account (prevent duplicates)
+		// This is a security measure to prevent users from creating multiple accounts
+		const userHasAccount = await hasStripeAccount(user.id)
 
-		if (existingAccount) {
+		if (userHasAccount) {
 			return NextResponse.json(
 				{
-					error: 'Stripe account already exists',
-					accountId: existingAccount.stripe_account_id
+					error: 'Stripe account already exists'
 				},
 				{ status: 400 }
 			)
 		}
 
-		// Create Stripe Connect account
-		const result = await stripeService.createConnectAccount(profile.email)
+		// Step 4: Create Stripe Connect account with Stripe
+		// This creates the account but doesn't complete onboarding yet
+		const result = await stripeService.createConnectAccount(userEmail)
 
 		if (!result.success) {
 			return NextResponse.json(
@@ -68,28 +69,17 @@ export async function POST() {
 			)
 		}
 
-		// Save to database
-		const { data: stripeAccount, error: dbError } = await supabase
-			.from('stripe_accounts')
-			.insert({
-				user_id: user.id,
-				stripe_account_id: result.accountId!,
-				onboarding_completed: false,
-				payments_enabled: false
-			})
-			.select()
-			.single()
+		// Step 5: Save Stripe account info to our database
+		// Account starts in pending state - user must complete onboarding
+		const stripeAccount = await createStripeAccount({
+			user_id: user.id,
+			stripe_account_id: result.accountId!,
+			onboarding_completed: false, // Will be updated after onboarding
+			payments_enabled: false // Will be enabled after verification
+		})
 
-		if (dbError) {
-			return NextResponse.json(
-				{
-					error: 'Failed to save account to database',
-					details: dbError.message
-				},
-				{ status: 500 }
-			)
-		}
-
+		// Return success with account details
+		// Frontend can now call /api/payments/onboarding-link to start onboarding
 		return NextResponse.json({
 			success: true,
 			message: 'Stripe Connect account created successfully',
@@ -97,9 +87,10 @@ export async function POST() {
 			stripeAccount
 		})
 	} catch (error) {
+		// Catch any errors from auth, database operations, or Stripe API calls
 		console.error('Error creating Stripe account:', error)
 
-		// Log more details about the error
+		// Log more details about the error for debugging
 		if (error instanceof Error) {
 			console.error('Error message:', error.message)
 			console.error('Error stack:', error.stack)

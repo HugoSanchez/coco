@@ -204,9 +204,51 @@ export async function uploadProfilePicture(userId: string, file: File) {
 	return publicUrl
 }
 
+/**
+ * Retrieves a user's profile by their user ID
+ *
+ * @param userId - UUID of the user whose profile to fetch
+ * @returns Promise<Profile | null> - User profile or null if not found
+ * @throws Error if database operation fails
+ */
+export async function getProfileById(userId: string): Promise<Profile | null> {
+	const { data: profile, error } = await supabase
+		.from('profiles')
+		.select('*')
+		.eq('id', userId)
+		.single()
+
+	if (error) {
+		if (error.code === 'PGRST116') return null // Not found
+		throw error
+	}
+	return profile
+}
+
+/**
+ * Retrieves a user's email by their user ID
+ * Convenience function for cases where only email is needed
+ *
+ * @param userId - UUID of the user whose email to fetch
+ * @returns Promise<string | null> - User email or null if not found
+ * @throws Error if database operation fails
+ */
+export async function getUserEmail(userId: string): Promise<string | null> {
+	const { data: profile, error } = await supabase
+		.from('profiles')
+		.select('email')
+		.eq('id', userId)
+		.single()
+
+	if (error) {
+		if (error.code === 'PGRST116') return null // Not found
+		throw error
+	}
+	return profile.email
+}
+
 // TODO: Add additional profile-related functions as needed:
 // - deleteProfile()
-// - getProfileById()
 // - searchProfiles()
 // - updateLastActive()
 // - getProfileStats()

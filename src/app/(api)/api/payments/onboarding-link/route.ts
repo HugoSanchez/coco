@@ -1,12 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { stripeService } from '@/lib/payments/stripe-service'
+import { getStripeAccountByUserId } from '@/lib/db/stripe-accounts'
 
+/**
+ * POST /api/payments/onboarding-link
+ *
+ * Creates a Stripe onboarding link for practitioners to complete their account setup.
+ * This is the second step after creating a Stripe Connect account - users need to
+ * complete Stripe's verification process before they can accept payments.
+ *
+ * Flow:
+ * 1. Authenticates the practitioner
+ * 2. Retrieves their existing Stripe account from database
+ * 3. Validates onboarding hasn't already been completed
+ * 4. Generates return/refresh URLs for the onboarding flow
+ * 5. Creates Stripe onboarding link with proper redirects
+ * 6. Returns onboarding URL for user to complete verification
+ *
+ * After completing onboarding, users return to the frontend which calls
+ * the update-onboarding endpoint to mark their account as ready.
+ */
 export async function POST(request: NextRequest) {
 	try {
 		const supabase = createClient()
 
-		// Get current user
+		// Step 1: Authenticate the practitioner
+		// Only authenticated users can request onboarding links
 		const {
 			data: { user },
 			error: authError
@@ -15,21 +35,19 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 		}
 
-		// Get user's Stripe account
-		const { data: stripeAccount, error: accountError } = await supabase
-			.from('stripe_accounts')
-			.select('*')
-			.eq('user_id', user.id)
-			.single()
+		// Step 2: Retrieve practitioner's Stripe account from database
+		// User must have created a Stripe account first
+		const stripeAccount = await getStripeAccountByUserId(user.id)
 
-		if (accountError || !stripeAccount) {
+		if (!stripeAccount) {
 			return NextResponse.json(
 				{ error: 'No Stripe account found. Please create one first.' },
 				{ status: 404 }
 			)
 		}
 
-		// If onboarding is already completed, return error
+		// Step 3: Validate onboarding hasn't already been completed
+		// Prevent users from going through onboarding multiple times
 		if (stripeAccount.onboarding_completed) {
 			return NextResponse.json(
 				{ error: 'Onboarding already completed' },
@@ -37,12 +55,14 @@ export async function POST(request: NextRequest) {
 			)
 		}
 
-		// Get the current URL for return/refresh URLs
+		// Step 4: Generate return and refresh URLs for onboarding flow
+		// These URLs determine where Stripe redirects the user after onboarding
 		const origin = request.headers.get('origin') || 'http://localhost:3000'
 		const returnUrl = `${origin}/onboarding?step=4&stripe_onboarding=success`
 		const refreshUrl = `${origin}/onboarding?step=4&stripe_onboarding=refresh`
 
-		// Create onboarding link
+		// Step 5: Create Stripe onboarding link
+		// This generates a secure URL for the user to complete verification
 		const result = await stripeService.createOnboardingLink(
 			stripeAccount.stripe_account_id,
 			returnUrl,
@@ -59,15 +79,17 @@ export async function POST(request: NextRequest) {
 			)
 		}
 
+		// Return onboarding URL for user to complete verification
 		return NextResponse.json({
 			success: true,
 			url: result.url,
 			message: 'Onboarding link created successfully'
 		})
 	} catch (error) {
+		// Catch any errors from auth, database operations, or Stripe API calls
 		console.error('Error creating onboarding link:', error)
 
-		// Log more details about the error
+		// Log more details about the error for debugging
 		if (error instanceof Error) {
 			console.error('Error message:', error.message)
 			console.error('Error stack:', error.stack)
