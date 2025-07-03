@@ -29,25 +29,46 @@ import {
 } from '@/components/ui/card'
 import { getClientsForUser, Client } from '@/lib/db/clients'
 import {
-	getBookingsForUser,
-	updateBookingBillingStatus,
-	updateBookingPaymentStatus,
-	updateBookingStatus
+	getBookingsWithBills,
+	updateBookingStatus,
+	BookingWithBills,
+	PaginatedBookingsResult,
+	PaginationOptions
 } from '@/lib/db/bookings'
 import { BookingForm } from '@/components/BookingForm'
 import { Spinner } from '@/components/ui/spinner'
 import { TestApiButton } from '@/components/TestApiButton'
 
-// Transform database booking to component booking format
-const transformBooking = (dbBooking: any): Booking => ({
-	id: dbBooking.id,
-	customerName: dbBooking.client.name,
-	customerEmail: dbBooking.client.email,
-	bookingDate: new Date(dbBooking.start_time),
-	billingStatus: dbBooking.billing_status === 'billed' ? 'billed' : 'pending',
-	paymentStatus: dbBooking.payment_status === 'paid' ? 'paid' : 'pending',
-	amount: dbBooking.billing_amount || 0 // Use actual billing amount from booking snapshot
-})
+// Transform database booking with bills to component booking format
+const transformBooking = (dbBooking: BookingWithBills): Booking => {
+	// Ensure status is one of the expected values
+	const validStatuses = [
+		'pending',
+		'scheduled',
+		'completed',
+		'cancelled'
+	] as const
+	const status = validStatuses.includes(dbBooking.status as any)
+		? (dbBooking.status as
+				| 'pending'
+				| 'scheduled'
+				| 'completed'
+				| 'cancelled')
+		: 'pending'
+
+	return {
+		id: dbBooking.id,
+		customerName: dbBooking.client.name,
+		customerEmail: dbBooking.client.email,
+		bookingDate: new Date(dbBooking.start_time),
+		startTime: new Date(dbBooking.start_time),
+		status,
+		billing_status: dbBooking.billing_status,
+		payment_status: dbBooking.payment_status,
+		amount: dbBooking.bill?.amount || 0,
+		currency: dbBooking.bill?.currency || 'EUR'
+	}
+}
 
 export default function Dashboard() {
 	const { user, profile, loading } = useUser()
@@ -55,12 +76,14 @@ export default function Dashboard() {
 	const [loadingClients, setLoadingClients] = useState(true)
 	const [bookings, setBookings] = useState<Booking[]>([])
 	const [loadingBookings, setLoadingBookings] = useState(false)
+	const [loadingMore, setLoadingMore] = useState(false)
+	const [hasMore, setHasMore] = useState(false)
+	const [offset, setOffset] = useState(0)
 	const [isFilterOpen, setIsFilterOpen] = useState(false)
 	const [isNewBookingOpen, setIsNewBookingOpen] = useState(false)
 	const [filters, setFilters] = useState<BookingFiltersState>({
 		customerSearch: '',
-		billingFilter: 'all',
-		paymentFilter: 'all',
+		statusFilter: 'all',
 		startDate: '',
 		endDate: ''
 	})
@@ -80,15 +103,10 @@ export default function Dashboard() {
 					.toLowerCase()
 					.includes(filters.customerSearch.toLowerCase())
 
-			// Billing status filter
-			const matchesBilling =
-				filters.billingFilter === 'all' ||
-				booking.billingStatus === filters.billingFilter
-
-			// Payment status filter
-			const matchesPayment =
-				filters.paymentFilter === 'all' ||
-				booking.paymentStatus === filters.paymentFilter
+			// Status filter
+			const matchesStatus =
+				filters.statusFilter === 'all' ||
+				booking.status === filters.statusFilter
 
 			// Date range filter
 			let matchesDate = true
@@ -105,12 +123,7 @@ export default function Dashboard() {
 				matchesDate = booking.bookingDate <= end
 			}
 
-			return (
-				matchesCustomer &&
-				matchesBilling &&
-				matchesPayment &&
-				matchesDate
-			)
+			return matchesCustomer && matchesStatus && matchesDate
 		})
 	}, [bookings, filters])
 
@@ -120,15 +133,21 @@ export default function Dashboard() {
 
 			try {
 				setLoadingBookings(true)
-				const dbBookings = await getBookingsForUser(user.id)
-				const transformedBookings = dbBookings.map(transformBooking)
+				const result = await getBookingsWithBills(user.id, {
+					limit: 10,
+					offset: 0
+				})
+				const transformedBookings =
+					result.bookings.map(transformBooking)
 				setBookings(transformedBookings)
+				setHasMore(result.hasMore)
+				setOffset(10)
 			} catch (error) {
 				console.error('Error loading bookings:', error)
 				toast({
 					title: 'Error',
 					description: 'Failed to load bookings.',
-					color: 'error'
+					variant: 'destructive'
 				})
 			} finally {
 				setLoadingBookings(false)
@@ -158,44 +177,23 @@ export default function Dashboard() {
 		}
 	}, [user])
 
-	const handleStatusChange = async (
-		bookingId: string,
-		type: 'billing' | 'payment',
-		status: string
-	) => {
+	const handleStatusChange = async (bookingId: string, status: string) => {
 		try {
 			// Update local state immediately for better UX
 			setBookings((prev) =>
 				prev.map((booking) =>
 					booking.id === bookingId
-						? {
-								...booking,
-								[type === 'billing'
-									? 'billingStatus'
-									: 'paymentStatus']: status
-							}
+						? { ...booking, status: status as any }
 						: booking
 				)
 			)
 
 			// Update status in database
-			if (type === 'billing') {
-				await updateBookingBillingStatus(
-					bookingId,
-					status as 'pending' | 'billed' | 'cancelled' | 'failed'
-				)
-			} else {
-				await updateBookingPaymentStatus(
-					bookingId,
-					status as 'pending' | 'paid' | 'overdue' | 'cancelled'
-				)
-			}
+			await updateBookingStatus(bookingId, status)
 
 			toast({
 				title: 'Status updated',
-				description: `${
-					type === 'billing' ? 'Billing' : 'Payment'
-				} status updated to ${status}`,
+				description: `Booking status updated to ${status}`,
 				variant: 'default'
 			})
 		} catch (error) {
@@ -203,15 +201,7 @@ export default function Dashboard() {
 			setBookings((prev) =>
 				prev.map((booking) =>
 					booking.id === bookingId
-						? {
-								...booking,
-								[type === 'billing'
-									? 'billingStatus'
-									: 'paymentStatus']:
-									type === 'billing'
-										? booking.billingStatus
-										: booking.paymentStatus
-							}
+						? { ...booking, status: booking.status }
 						: booking
 				)
 			)
@@ -248,11 +238,78 @@ export default function Dashboard() {
 		}
 	}
 
+	const loadMoreBookings = async () => {
+		if (!user || loadingMore || !hasMore) return
+
+		try {
+			setLoadingMore(true)
+			const result = await getBookingsWithBills(user.id, {
+				limit: 10,
+				offset: offset
+			})
+			const transformedBookings = result.bookings.map(transformBooking)
+
+			// Append new bookings to existing ones
+			setBookings((prev) => [...prev, ...transformedBookings])
+			setHasMore(result.hasMore)
+			setOffset((prev) => prev + 10)
+		} catch (error) {
+			console.error('Error loading more bookings:', error)
+			toast({
+				title: 'Error',
+				description: 'Failed to load more bookings.',
+				variant: 'destructive'
+			})
+		} finally {
+			setLoadingMore(false)
+		}
+	}
+
 	useEffect(() => {
 		if (!loading && !user) {
 			router.push('/login')
 		}
 	}, [loading, user, router])
+
+	// Reset pagination and refetch when filters change
+	useEffect(() => {
+		const refetchWithFilters = async () => {
+			if (!user) return
+
+			try {
+				setLoadingBookings(true)
+				const result = await getBookingsWithBills(user.id, {
+					limit: 10,
+					offset: 0
+				})
+				const transformedBookings =
+					result.bookings.map(transformBooking)
+				setBookings(transformedBookings)
+				setHasMore(result.hasMore)
+				setOffset(10)
+			} catch (error) {
+				console.error('Error loading bookings:', error)
+				toast({
+					title: 'Error',
+					description: 'Failed to load bookings.',
+					variant: 'destructive'
+				})
+			} finally {
+				setLoadingBookings(false)
+			}
+		}
+
+		// Only refetch if we have active filters (not on initial load)
+		if (
+			user &&
+			(filters.customerSearch ||
+				filters.statusFilter !== 'all' ||
+				filters.startDate ||
+				filters.endDate)
+		) {
+			refetchWithFilters()
+		}
+	}, [filters, user, toast])
 
 	if (loading) {
 		return (
@@ -374,6 +431,29 @@ export default function Dashboard() {
 								onStatusChange={handleStatusChange}
 								onCancelBooking={handleCancelBooking}
 							/>
+							{/* Load More Button */}
+							{hasMore && !loadingBookings && (
+								<div className="flex justify-center pt-4">
+									<Button
+										variant="outline"
+										onClick={loadMoreBookings}
+										disabled={loadingMore}
+										className="w-40"
+									>
+										{loadingMore ? (
+											<>
+												<Spinner
+													size="sm"
+													className="mr-2"
+												/>
+												Cargando...
+											</>
+										) : (
+											'Cargar más'
+										)}
+									</Button>
+								</div>
+							)}
 						</CardContent>
 					</Card>
 					<div x-chunk="dashboard-01-chunk-5">
@@ -412,12 +492,15 @@ export default function Dashboard() {
 						// Refresh bookings list
 						if (user) {
 							try {
-								const dbBookings = await getBookingsForUser(
-									user.id
+								const result = await getBookingsWithBills(
+									user.id,
+									{ limit: 10, offset: 0 }
 								)
 								const transformedBookings =
-									dbBookings.map(transformBooking)
+									result.bookings.map(transformBooking)
 								setBookings(transformedBookings)
+								setHasMore(result.hasMore)
+								setOffset(10)
 							} catch (error) {
 								console.error(
 									'Error refreshing bookings:',

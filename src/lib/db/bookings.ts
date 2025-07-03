@@ -62,6 +62,55 @@ export interface BookingWithClient extends Booking {
 }
 
 /**
+ * Interface for booking with complete dashboard data
+ * Includes client, bill, and derived billing/payment status information
+ */
+export interface BookingWithBills extends Booking {
+	client: {
+		id: string
+		name: string
+		email: string
+	}
+	bill?: {
+		id: string
+		amount: number
+		currency: string
+		status: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled'
+		created_at: string
+		due_date: string | null
+		sent_at: string | null
+		paid_at: string | null
+	} | null
+	// Derived statuses for easy UI consumption
+	billing_status: 'not_generated' | 'pending' | 'sent' | 'canceled'
+	payment_status:
+		| 'not_applicable'
+		| 'pending'
+		| 'paid'
+		| 'disputed'
+		| 'canceled'
+}
+
+/**
+ * Interface for paginated booking results
+ * Used when fetching bookings with pagination support
+ */
+export interface PaginatedBookingsResult {
+	bookings: BookingWithBills[]
+	hasMore: boolean
+	total?: number // Optional: total count for debugging/UI
+}
+
+/**
+ * Interface for pagination options
+ * Used to configure pagination behavior
+ */
+export interface PaginationOptions {
+	limit?: number
+	offset?: number
+}
+
+/**
  * Retrieves all bookings for a specific user, ordered by start time (newest first)
  * Includes related client information
  *
@@ -220,4 +269,110 @@ export async function getBookingById(
 	}
 
 	return data
+}
+
+/**
+ * Retrieves bookings for a user with complete billing information and pagination support
+ * Perfect for dashboard tables that need comprehensive booking data with efficient loading
+ *
+ * @param userId - The UUID of the user whose bookings to fetch
+ * @param options - Optional pagination configuration
+ * @returns Promise<PaginatedBookingsResult> - Object with bookings array and pagination metadata
+ * @throws Error if database operation fails
+ */
+export async function getBookingsWithBills(
+	userId: string,
+	options: PaginationOptions = {}
+): Promise<PaginatedBookingsResult> {
+	const { limit = 10, offset = 0 } = options
+
+	// Fetch one extra record to determine if there are more results
+	const fetchLimit = limit + 1
+
+	const { data, error } = await supabase
+		.from('bookings')
+		.select(
+			`
+			*,
+			client:clients(id, name, email),
+			bill:bills(
+				id,
+				amount,
+				currency,
+				status,
+				created_at,
+				due_date,
+				sent_at,
+				paid_at
+			)
+		`
+		)
+		.eq('user_id', userId)
+		.order('created_at', { ascending: false })
+		.range(offset, offset + fetchLimit - 1)
+
+	if (error) throw error
+
+	const allResults = data || []
+
+	// Check if there are more results beyond our limit
+	const hasMore = allResults.length > limit
+
+	// Remove the extra record we fetched for hasMore detection
+	const bookings = hasMore ? allResults.slice(0, limit) : allResults
+
+	// Transform the data to include derived statuses
+	const bookingsWithBills: BookingWithBills[] = bookings.map((booking) => {
+		const bill = Array.isArray(booking.bill)
+			? booking.bill[0]
+			: booking.bill
+
+		// Derive billing and payment statuses from bill status
+		let billing_status: BookingWithBills['billing_status']
+		let payment_status: BookingWithBills['payment_status']
+
+		if (!bill) {
+			billing_status = 'not_generated'
+			payment_status = 'not_applicable'
+		} else {
+			switch (bill.status) {
+				case 'pending':
+					billing_status = 'pending'
+					payment_status = 'pending'
+					break
+				case 'sent':
+					billing_status = 'sent'
+					payment_status = 'pending'
+					break
+				case 'paid':
+					billing_status = 'sent'
+					payment_status = 'paid'
+					break
+				case 'disputed':
+					billing_status = 'sent'
+					payment_status = 'disputed'
+					break
+				case 'canceled':
+					billing_status = 'canceled'
+					payment_status = 'canceled'
+					break
+				default:
+					billing_status = 'not_generated'
+					payment_status = 'not_applicable'
+			}
+		}
+
+		return {
+			...booking,
+			bill: bill || null,
+			billing_status,
+			payment_status
+		}
+	})
+
+	return {
+		bookings: bookingsWithBills,
+		hasMore,
+		total: undefined // Can be added later if needed for UI
+	}
 }

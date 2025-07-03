@@ -34,20 +34,124 @@ export interface Booking {
 	customerName: string
 	customerEmail: string
 	bookingDate: Date
-	billingStatus: 'pending' | 'billed'
-	paymentStatus: 'pending' | 'paid'
+	startTime?: Date // Optional for backward compatibility
+	status: 'pending' | 'scheduled' | 'completed' | 'cancelled'
+	billing_status: 'not_generated' | 'pending' | 'sent' | 'canceled'
+	payment_status:
+		| 'not_applicable'
+		| 'pending'
+		| 'paid'
+		| 'disputed'
+		| 'canceled'
 	amount: number
+	currency?: string
 }
 
 interface BookingsTableProps {
 	bookings: Booking[]
 	loading?: boolean
-	onStatusChange: (
-		bookingId: string,
-		type: 'billing' | 'payment',
-		status: string
-	) => void
+	onStatusChange: (bookingId: string, status: string) => void
 	onCancelBooking: (bookingId: string) => void
+}
+
+// Status labels in Spanish
+const getStatusLabel = (status: string) => {
+	switch (status) {
+		case 'pending':
+			return 'Por confirmar'
+		case 'scheduled':
+			return 'Confirmada'
+		case 'completed':
+			return 'Completada'
+		case 'cancelled':
+			return 'Cancelada'
+		default:
+			return status
+	}
+}
+
+// Status colors
+const getStatusColor = (status: string) => {
+	switch (status) {
+		case 'pending':
+			return 'bg-gray-100 text-gray-700 border-gray-200 font-normal'
+		case 'scheduled':
+			return 'bg-teal-100 text-teal-700 border-teal-200'
+		case 'completed':
+			return 'bg-green-100 text-green-700 border-green-200'
+		case 'cancelled':
+			return 'bg-gray-100 text-gray-700 border-gray-200'
+		default:
+			return 'bg-gray-100 text-gray-700 border-gray-200'
+	}
+}
+
+// Billing status labels in Spanish
+const getBillingStatusLabel = (status: string) => {
+	switch (status) {
+		case 'not_generated':
+			return 'No generada'
+		case 'pending':
+			return 'Pendiente'
+		case 'sent':
+			return 'Enviada'
+		case 'canceled':
+			return 'Cancelada'
+		default:
+			return status
+	}
+}
+
+// Billing status colors
+const getBillingStatusColor = (status: string) => {
+	switch (status) {
+		case 'not_generated':
+			return 'bg-gray-100 text-gray-600 border-gray-200'
+		case 'pending':
+			return 'bg-yellow-100 text-yellow-700 border-yellow-200'
+		case 'sent':
+			return 'bg-blue-100 text-blue-700 border-blue-200'
+		case 'canceled':
+			return 'bg-gray-100 text-gray-700 border-gray-200'
+		default:
+			return 'bg-gray-100 text-gray-700 border-gray-200'
+	}
+}
+
+// Payment status labels in Spanish
+const getPaymentStatusLabel = (status: string) => {
+	switch (status) {
+		case 'not_applicable':
+			return 'N/A'
+		case 'pending':
+			return 'Pendiente'
+		case 'paid':
+			return 'Pagado'
+		case 'disputed':
+			return 'Disputado'
+		case 'canceled':
+			return 'Cancelado'
+		default:
+			return status
+	}
+}
+
+// Payment status colors
+const getPaymentStatusColor = (status: string) => {
+	switch (status) {
+		case 'not_applicable':
+			return 'bg-gray-100 text-gray-500 border-gray-200'
+		case 'pending':
+			return 'bg-yellow-100 text-yellow-700 border-yellow-200'
+		case 'paid':
+			return 'bg-green-100 text-green-700 border-green-200'
+		case 'disputed':
+			return 'bg-red-100 text-red-700 border-red-200'
+		case 'canceled':
+			return 'bg-gray-100 text-gray-700 border-gray-200'
+		default:
+			return 'bg-gray-100 text-gray-700 border-gray-200'
+	}
 }
 
 export function BookingsTable({
@@ -71,19 +175,19 @@ export function BookingsTable({
 				<Table>
 					<TableHeader>
 						<TableRow className=" border-b ">
-							<TableHead className="font-medium">
+							<TableHead className="font-medium w-[150px]">
 								Paciente
 							</TableHead>
-							<TableHead className="hidden md:table-cell font-semibold">
+							<TableHead className="hidden md:table-cell font-semibold w-[140px] text-center">
 								Fecha
 							</TableHead>
-							<TableHead className="hidden sm:table-cell font-semibold">
-								Factura
+							<TableHead className="hidden sm:table-cell font-semibold w-[100px] text-center">
+								Hora
 							</TableHead>
-							<TableHead className="hidden sm:table-cell font-semibold">
-								Pago
+							<TableHead className="hidden sm:table-cell font-semibold w-[160px] text-center">
+								Estado
 							</TableHead>
-							<TableHead className="text-right font-semibold">
+							<TableHead className="text-right font-semibold w-[120px]">
 								Honorarios
 							</TableHead>
 							<TableHead className="w-[50px]"></TableHead>
@@ -108,99 +212,58 @@ export function BookingsTable({
 							bookings.map((booking) => (
 								<TableRow
 									key={booking.id}
-									className="hover:bg-gray-50/50 transition-colors"
+									className="hover:bg-gray-50/50 transition-colors h-14"
 								>
-									<TableCell>
+									{/* Client */}
+									<TableCell className="py-2">
 										<div className="font-medium">
 											{booking.customerName}
 										</div>
-										<div className="hidden text-sm text-muted-foreground md:inline">
-											{booking.customerEmail}
-										</div>
 									</TableCell>
 
-									<TableCell className="hidden md:table-cell">
-										<div className="flex items-center gap-2">
-											<span className="font-light">
-												{format(
+									{/* Date */}
+									<TableCell className="hidden md:table-cell text-center py-2">
+										<span className="font-light">
+											{format(
+												booking.bookingDate,
+												'dd MMM yyyy',
+												{ locale: es }
+											)}
+										</span>
+									</TableCell>
+
+									{/* Time */}
+									<TableCell className="hidden sm:table-cell text-center py-2">
+										<span className="font-light">
+											{format(
+												booking.startTime ||
 													booking.bookingDate,
-													'dd MMM yyyy',
-													{ locale: es }
-												)}
-											</span>
-										</div>
+												'HH:mm'
+											)}
+											h
+										</span>
 									</TableCell>
 
-									<TableCell className="hidden sm:table-cell">
+									{/* Booking Status */}
+									<TableCell className="hidden sm:table-cell text-center py-2">
 										<Badge
 											variant="outline"
-											className={`cursor-pointer transition-all duration-200 py-1 rounded-md text-gray-700 font-light border-gray-200 ${
-												booking.billingStatus ===
-												'billed'
-													? ''
-													: 'border-gray-200 text-gray-700'
-											}`}
-											onClick={() => {
-												const newStatus =
-													booking.billingStatus ===
-													'pending'
-														? 'billed'
-														: 'pending'
-												onStatusChange(
-													booking.id,
-													'billing',
-													newStatus
-												)
-											}}
-										>
-											{booking.billingStatus !==
-											'billed' ? null : (
-												<CircleCheck className="h-4 w-4 text-white fill-teal-500 mr-2" />
+											className={getStatusColor(
+												booking.status
 											)}
-											{booking.billingStatus === 'billed'
-												? 'Enviada'
-												: 'Por enviar'}
+										>
+											{getStatusLabel(booking.status)}
 										</Badge>
 									</TableCell>
 
-									<TableCell className="hidden sm:table-cell">
-										<Badge
-											variant="outline"
-											className={`cursor-pointer transition-all duration-200 py-1 rounded-md text-gray-700 font-light border-gray-200 ${
-												booking.paymentStatus === 'paid'
-													? 'bg-teal-100 text-teal-700'
-													: 'border-gray-200 text-gray-700'
-											}`}
-											onClick={() => {
-												const newStatus =
-													booking.paymentStatus ===
-													'pending'
-														? 'paid'
-														: 'pending'
-												onStatusChange(
-													booking.id,
-													'payment',
-													newStatus
-												)
-											}}
-										>
-											{booking.paymentStatus !==
-											'paid' ? (
-												<Loader className="h-3 w-3 text-teal-500 mr-2" />
-											) : (
-												<CircleCheck className="h-4 w-4 text-white fill-teal-500 mr-2" />
-											)}
-											{booking.paymentStatus === 'paid'
-												? 'Realizado'
-												: 'Pendiente'}
-										</Badge>
+									{/* Amount */}
+									<TableCell className="text-right font-light py-2">
+										{booking.currency || 'EUR'}{' '}
+										{booking.amount.toFixed(2)}
 									</TableCell>
 
-									<TableCell className="text-right font-light">
-										€{booking.amount.toFixed(2)}
-									</TableCell>
-
-									<TableCell className="text-right">
+									{/* Actions */}
+									<TableCell className="text-right py-2">
 										<DropdownMenu>
 											<DropdownMenuTrigger asChild>
 												<Button
