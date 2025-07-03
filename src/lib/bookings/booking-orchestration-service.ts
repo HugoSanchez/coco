@@ -29,6 +29,8 @@ import {
 } from '@/lib/db/bills'
 import { sendConsultationBillEmail } from '@/lib/emails/email-service'
 import { getProfileById } from '@/lib/db/profiles'
+import { paymentOrchestrationService } from '@/lib/payments/payment-orchestration-service'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
  * Interface for creating a booking
@@ -57,9 +59,17 @@ export interface CreateBookingResult {
  * Returns the full billing settings record including ID for proper referential integrity
  * Throws error if no billing settings exist (users must have billing settings configured)
  */
-async function getAppropriateBillingSettings(userId: string, clientId: string) {
+async function getAppropriateBillingSettings(
+	userId: string,
+	clientId: string,
+	supabaseClient?: SupabaseClient
+) {
 	// Check if client has specific billing settings
-	const clientBilling = await getClientBillingSettings(userId, clientId)
+	const clientBilling = await getClientBillingSettings(
+		userId,
+		clientId,
+		supabaseClient
+	)
 
 	if (clientBilling) {
 		return {
@@ -71,7 +81,10 @@ async function getAppropriateBillingSettings(userId: string, clientId: string) {
 	}
 
 	// Fall back to user default billing settings
-	const userDefaultSettings = await getUserDefaultBillingSettings(userId)
+	const userDefaultSettings = await getUserDefaultBillingSettings(
+		userId,
+		supabaseClient
+	)
 
 	if (userDefaultSettings) {
 		return {
@@ -96,10 +109,11 @@ async function getAppropriateBillingSettings(userId: string, clientId: string) {
 async function createBillForBooking(
 	booking: Booking,
 	billing: any,
-	clientId: string
+	clientId: string,
+	supabaseClient?: SupabaseClient
 ): Promise<Bill> {
 	// Get client information
-	const client = await getClientById(clientId)
+	const client = await getClientById(clientId, supabaseClient)
 	if (!client) {
 		throw new Error(`Client not found: ${clientId}`)
 	}
@@ -115,7 +129,7 @@ async function createBillForBooking(
 		billing_type: billing.type as 'in-advance' | 'right-after' | 'monthly'
 	}
 
-	return await createBill(billPayload)
+	return await createBill(billPayload, supabaseClient)
 }
 
 /**
@@ -124,7 +138,8 @@ async function createBillForBooking(
  */
 async function createInAdvanceBooking(
 	request: CreateBookingRequest,
-	billing: any
+	billing: any,
+	supabaseClient?: SupabaseClient
 ): Promise<CreateBookingResult> {
 	const bookingPayload: CreateBookingPayload = {
 		user_id: request.userId,
@@ -134,10 +149,15 @@ async function createInAdvanceBooking(
 		status: 'pending' // Pending until payment
 	}
 
-	const booking = await createBooking(bookingPayload)
+	const booking = await createBooking(bookingPayload, supabaseClient)
 
 	// Create bill for this booking with 'pending' status
-	const bill = await createBillForBooking(booking, billing, request.clientId)
+	const bill = await createBillForBooking(
+		booking,
+		billing,
+		request.clientId,
+		supabaseClient
+	)
 
 	// If amount > 0, requires payment - create payment session and send email
 	const requiresPayment = billing.amount > 0
@@ -145,8 +165,11 @@ async function createInAdvanceBooking(
 	if (requiresPayment) {
 		try {
 			// Get client and practitioner info for payment session
-			const client = await getClientById(request.clientId)
-			const practitioner = await getProfileById(request.userId)
+			const client = await getClientById(request.clientId, supabaseClient)
+			const practitioner = await getProfileById(
+				request.userId,
+				supabaseClient
+			)
 
 			if (!client) {
 				throw new Error(`Client not found: ${request.clientId}`)
@@ -158,30 +181,21 @@ async function createInAdvanceBooking(
 				)
 			}
 
-			// Create Stripe checkout session via API route
-			const response = await fetch('/api/payments/create-checkout', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					bookingId: booking.id,
-					clientEmail: client.email,
-					clientName: client.name,
-					consultationDate: request.startTime,
-					amount: billing.amount,
-					practitionerName: practitioner.name || 'Your Practitioner'
-				})
-			})
-
-			if (!response.ok) {
-				const errorData = await response.json()
-				throw new Error(
-					`Payment session creation failed: ${errorData.error}`
+			// Create Stripe checkout session directly using payment orchestration service
+			const paymentResult =
+				await paymentOrchestrationService.orechestrateConsultationCheckout(
+					{
+						userId: request.userId,
+						bookingId: booking.id,
+						clientEmail: client.email,
+						clientName: client.name,
+						consultationDate: request.startTime,
+						amount: billing.amount,
+						practitionerName:
+							practitioner.name || 'Your Practitioner',
+						supabaseClient
+					}
 				)
-			}
-
-			const paymentResult = await response.json()
 
 			if (paymentResult.success && paymentResult.checkoutUrl) {
 				// Send consultation bill email with payment link
@@ -200,21 +214,10 @@ async function createInAdvanceBooking(
 
 				if (emailResult.success) {
 					// Update bill status to 'sent' since email was delivered
-					await updateBillStatus(bill.id, 'sent')
-
-					console.log(
-						`✅ [BOOKING] In-advance booking created with payment link sent:`,
-						{
-							bookingId: booking.id,
-							billId: bill.id,
-							clientEmail: client.email,
-							amount: billing.amount
-						}
-					)
+					await updateBillStatus(bill.id, 'sent', supabaseClient)
 				} else {
 					console.error(
-						`❌ [BOOKING] Email failed for booking ${booking.id}:`,
-						emailResult.error
+						`Email failed for booking ${booking.id}: ${emailResult.error}`
 					)
 					// Note: We don't throw here to avoid breaking the booking creation
 					// The bill remains in 'pending' status, indicating email wasn't sent
@@ -233,8 +236,7 @@ async function createInAdvanceBooking(
 			}
 		} catch (error) {
 			console.error(
-				`❌ [BOOKING] Error in payment flow for booking ${booking.id}:`,
-				error
+				`Error in payment flow for booking ${booking.id}: ${error instanceof Error ? error.message : 'Unknown error'}`
 			)
 			// Even if payment/email fails, we return the created booking and bill
 			// This allows the user to retry payment or contact client manually
@@ -260,7 +262,8 @@ async function createInAdvanceBooking(
  */
 async function createRightAfterBooking(
 	request: CreateBookingRequest,
-	billing: any
+	billing: any,
+	supabaseClient?: SupabaseClient
 ): Promise<CreateBookingResult> {
 	const bookingPayload: CreateBookingPayload = {
 		user_id: request.userId,
@@ -270,10 +273,15 @@ async function createRightAfterBooking(
 		status: request.status || 'scheduled' // Confirmed immediately
 	}
 
-	const booking = await createBooking(bookingPayload)
+	const booking = await createBooking(bookingPayload, supabaseClient)
 
 	// Create bill for this booking
-	const bill = await createBillForBooking(booking, billing, request.clientId)
+	const bill = await createBillForBooking(
+		booking,
+		billing,
+		request.clientId,
+		supabaseClient
+	)
 
 	// No immediate payment required
 	return {
@@ -288,7 +296,8 @@ async function createRightAfterBooking(
  */
 async function createMonthlyBooking(
 	request: CreateBookingRequest,
-	billing: any
+	billing: any,
+	supabaseClient?: SupabaseClient
 ): Promise<CreateBookingResult> {
 	const bookingPayload: CreateBookingPayload = {
 		user_id: request.userId,
@@ -298,10 +307,15 @@ async function createMonthlyBooking(
 		status: request.status || 'scheduled' // Confirmed immediately
 	}
 
-	const booking = await createBooking(bookingPayload)
+	const booking = await createBooking(bookingPayload, supabaseClient)
 
 	// Create bill for this booking
-	const bill = await createBillForBooking(booking, billing, request.clientId)
+	const bill = await createBillForBooking(
+		booking,
+		billing,
+		request.clientId,
+		supabaseClient
+	)
 
 	// No immediate payment required
 	return {
@@ -323,27 +337,41 @@ async function createMonthlyBooking(
  * Result: Perfect separation between scheduling (bookings) and financial (bills) domains
  */
 export async function createBookingSimple(
-	request: CreateBookingRequest
+	request: CreateBookingRequest,
+	supabaseClient?: SupabaseClient
 ): Promise<CreateBookingResult> {
 	try {
 		// Get billing settings (client-specific or user default)
 		// This returns the current active billing configuration
 		const billing = await getAppropriateBillingSettings(
 			request.userId,
-			request.clientId
+			request.clientId,
+			supabaseClient
 		)
 
 		// Call appropriate function based on billing type
 		// Each function will COPY the billing data into the booking record
 		switch (billing.type) {
 			case 'in-advance':
-				return await createInAdvanceBooking(request, billing)
+				return await createInAdvanceBooking(
+					request,
+					billing,
+					supabaseClient
+				)
 
 			case 'right-after':
-				return await createRightAfterBooking(request, billing)
+				return await createRightAfterBooking(
+					request,
+					billing,
+					supabaseClient
+				)
 
 			case 'monthly':
-				return await createMonthlyBooking(request, billing)
+				return await createMonthlyBooking(
+					request,
+					billing,
+					supabaseClient
+				)
 
 			default:
 				throw new Error(`Unknown billing type: ${billing.type}`)

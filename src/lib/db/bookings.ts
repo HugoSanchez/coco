@@ -14,6 +14,7 @@
 
 import { Tables, TablesInsert } from '@/types/database.types'
 import { createClient as createSupabaseClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 const supabase = createSupabaseClient()
 
 /**
@@ -184,11 +185,13 @@ export async function getBookingsForDateRange(
  * Note: Time slot conflicts are prevented at the UI level via DayViewTimeSelector
  *
  * @param payload - Booking data to insert
+ * @param supabaseClient - Optional SupabaseClient instance to use for insertion
  * @returns Promise<Booking> - The created booking object with generated ID
  * @throws Error if insertion fails or validation errors occur
  */
 export async function createBooking(
-	payload: CreateBookingPayload
+	payload: CreateBookingPayload,
+	supabaseClient?: SupabaseClient
 ): Promise<Booking> {
 	// Set default values
 	const bookingData = {
@@ -196,7 +199,10 @@ export async function createBooking(
 		status: payload.status || 'scheduled'
 	}
 
-	const { data, error } = await supabase
+	// Use provided client or fall back to default
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
 		.from('bookings')
 		.insert([bookingData])
 		.select()

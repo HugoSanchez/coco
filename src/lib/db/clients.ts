@@ -14,6 +14,7 @@
 
 import { Tables } from '@/types/database.types'
 import { createClient as createSupabaseClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 const supabase = createSupabaseClient()
 
 /**
@@ -43,11 +44,18 @@ export async function getClientsForUser(userId: string): Promise<Client[]> {
  * Retrieves a specific client by ID
  *
  * @param clientId - The UUID of the client to retrieve
+ * @param supabaseClient - Optional SupabaseClient instance
  * @returns Promise<Client | null> - The client object or null if not found
  * @throws Error if database operation fails
  */
-export async function getClientById(clientId: string): Promise<Client | null> {
-	const { data, error } = await supabase
+export async function getClientById(
+	clientId: string,
+	supabaseClient?: SupabaseClient
+): Promise<Client | null> {
+	// Use provided client or fall back to default
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
 		.from('clients')
 		.select('*')
 		.eq('id', clientId)

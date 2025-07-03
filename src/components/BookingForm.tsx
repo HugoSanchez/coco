@@ -26,7 +26,7 @@ import { useUser } from '@/contexts/UserContext'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Label } from '@/components/ui/label'
-import { createBookingSimple } from '@/lib/bookings/booking-orchestration-service'
+// Removed direct import - now using API route
 import { useToast } from '@/components/ui/use-toast'
 import { getBookingsForDateRange } from '@/lib/db/bookings'
 
@@ -194,28 +194,49 @@ export function BookingForm({
 		setLoading(true)
 
 		try {
-			// Use the simplified booking service
-			// This handles all the complex billing logic internally:
-			// - Checks if client has specific billing settings
-			// - Falls back to user default billing if not
-			// - Creates booking with appropriate billing type and amount
+			// Call our new server-side booking API
+			// This handles all the complex billing logic server-side:
+			// - Authentication and proper environment variable access
+			// - Billing settings resolution (client-specific or user default)
+			// - Booking creation with appropriate billing configuration
+			// - Payment link generation and email sending
 			// - Returns result with payment info if needed
-			const result = await createBookingSimple({
-				userId: user!.id,
-				clientId: selectedClient,
-				startTime: selectedSlot!.start,
-				endTime: selectedSlot!.end,
-				notes
+			const response = await fetch('/api/bookings/create', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					clientId: selectedClient,
+					startTime: selectedSlot!.start,
+					endTime: selectedSlot!.end,
+					notes
+				})
 			})
 
+			if (!response.ok) {
+				const errorData = await response.json()
+				throw new Error(errorData.error || 'Failed to create booking')
+			}
+
+			const result = await response.json()
+
 			// Show success notification
-			// Note: The simplified service returns whether payment is required,
-			// but for now we show the same success message regardless
-			toast({
-				title: 'Cita creada',
-				description: 'La cita se ha creado correctamente',
-				color: 'success'
-			})
+			// Enhanced to show payment info if required
+			if (result.requiresPayment && result.paymentUrl) {
+				toast({
+					title: 'Cita creada con enlace de pago',
+					description:
+						'Se ha enviado un enlace de pago al cliente por email',
+					color: 'success'
+				})
+			} else {
+				toast({
+					title: 'Cita creada',
+					description: 'La cita se ha creado correctamente',
+					color: 'success'
+				})
+			}
 
 			// Notify parent component that booking was successful
 			// This typically closes the booking form and refreshes the booking list

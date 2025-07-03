@@ -19,6 +19,7 @@
  */
 
 import { createClient as createSupabaseClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 const supabase = createSupabaseClient()
 
 /**
@@ -211,8 +212,14 @@ export async function uploadProfilePicture(userId: string, file: File) {
  * @returns Promise<Profile | null> - User profile or null if not found
  * @throws Error if database operation fails
  */
-export async function getProfileById(userId: string): Promise<Profile | null> {
-	const { data: profile, error } = await supabase
+export async function getProfileById(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<Profile | null> {
+	// Use provided client or fall back to default
+	const client = supabaseClient || supabase
+
+	const { data: profile, error } = await client
 		.from('profiles')
 		.select('*')
 		.eq('id', userId)

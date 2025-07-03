@@ -16,6 +16,7 @@
 
 import { Tables, TablesInsert, TablesUpdate } from '@/types/database.types'
 import { createClient as createSupabaseClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 const supabase = createSupabaseClient()
 
 /**
@@ -85,10 +86,14 @@ export interface BillWithBooking extends Bill {
  * Creates a new bill in the database
  *
  * @param payload - Bill data to insert
+ * @param supabaseClient - Optional SupabaseClient instance
  * @returns Promise<Bill> - The created bill object with generated ID
  * @throws Error if insertion fails or validation errors occur
  */
-export async function createBill(payload: CreateBillPayload): Promise<Bill> {
+export async function createBill(
+	payload: CreateBillPayload,
+	supabaseClient?: SupabaseClient
+): Promise<Bill> {
 	const billData = {
 		booking_id: payload.booking_id,
 		user_id: payload.user_id,
@@ -102,7 +107,10 @@ export async function createBill(payload: CreateBillPayload): Promise<Bill> {
 		status: 'pending' as const
 	}
 
-	const { data, error } = await supabase
+	// Use provided client or fall back to default
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
 		.from('bills')
 		.insert([billData])
 		.select()
@@ -310,12 +318,14 @@ export async function getBillsByStatus(
  *
  * @param billId - The UUID of the bill to update
  * @param status - The new status for the bill
+ * @param supabaseClient - Optional SupabaseClient instance
  * @returns Promise<Bill> - The updated bill object
  * @throws Error if update fails or bill not found
  */
 export async function updateBillStatus(
 	billId: string,
-	status: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled'
+	status: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled',
+	supabaseClient?: SupabaseClient
 ): Promise<Bill> {
 	const updateData: any = { status }
 
@@ -326,7 +336,10 @@ export async function updateBillStatus(
 		updateData.paid_at = new Date().toISOString()
 	}
 
-	const { data, error } = await supabase
+	// Use provided client or fall back to default
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
 		.from('bills')
 		.update(updateData)
 		.eq('id', billId)

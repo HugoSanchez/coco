@@ -11,6 +11,7 @@
  */
 
 import { createClient as createSupabaseClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 const supabase = createSupabaseClient()
 
 /**
@@ -146,10 +147,14 @@ export async function saveBillingPreferences(
  */
 export async function getClientBillingSettings(
 	userId: string,
-	clientId: string
+	clientId: string,
+	supabaseClient?: SupabaseClient
 ): Promise<BillingSettings | null> {
 	try {
-		const { data, error } = await supabase
+		// Use provided client or fall back to default
+		const client = supabaseClient || supabase
+
+		const { data, error } = await client
 			.from('billing_settings')
 			.select('*')
 			.eq('user_id', userId)
@@ -178,10 +183,14 @@ export async function getClientBillingSettings(
  * @throws Error if database operation fails
  */
 export async function getUserDefaultBillingSettings(
-	userId: string
+	userId: string,
+	supabaseClient?: SupabaseClient
 ): Promise<BillingSettings | null> {
 	try {
-		const { data, error } = await supabase
+		// Use provided client or fall back to default
+		const client = supabaseClient || supabase
+
+		const { data, error } = await client
 			.from('billing_settings')
 			.select('*')
 			.eq('user_id', userId)
