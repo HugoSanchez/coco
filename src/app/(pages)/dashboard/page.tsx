@@ -315,9 +315,9 @@ export default function Dashboard() {
 					<h3 className="text-2xl">este es tu dashboard</h3>
 				</div>
 				<div className="flex gap-2">
-					<TestApiButton />
 					<Button
 						variant="default"
+						className="text-md"
 						onClick={() => setIsNewBookingOpen(true)}
 					>
 						<Plus className="h-5 w-5 mr-2" />

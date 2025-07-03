@@ -21,7 +21,14 @@ import {
 	getUserDefaultBillingSettings
 } from '@/lib/db/billing-settings'
 import { getClientById } from '@/lib/db/clients'
-import { createBill, CreateBillPayload, Bill } from '@/lib/db/bills'
+import {
+	createBill,
+	CreateBillPayload,
+	Bill,
+	updateBillStatus
+} from '@/lib/db/bills'
+import { sendConsultationBillEmail } from '@/lib/emails/email-service'
+import { getProfileById } from '@/lib/db/profiles'
 
 /**
  * Interface for creating a booking
@@ -113,6 +120,7 @@ async function createBillForBooking(
 
 /**
  * Creates a booking with in-advance payment
+ * Enhanced with complete payment link generation and email sending
  */
 async function createInAdvanceBooking(
 	request: CreateBookingRequest,
@@ -128,19 +136,122 @@ async function createInAdvanceBooking(
 
 	const booking = await createBooking(bookingPayload)
 
-	// Create bill for this booking
+	// Create bill for this booking with 'pending' status
 	const bill = await createBillForBooking(booking, billing, request.clientId)
 
-	// If amount > 0, requires payment
+	// If amount > 0, requires payment - create payment session and send email
 	const requiresPayment = billing.amount > 0
 
+	if (requiresPayment) {
+		try {
+			// Get client and practitioner info for payment session
+			const client = await getClientById(request.clientId)
+			const practitioner = await getProfileById(request.userId)
+
+			if (!client) {
+				throw new Error(`Client not found: ${request.clientId}`)
+			}
+
+			if (!practitioner) {
+				throw new Error(
+					`Practitioner profile not found: ${request.userId}`
+				)
+			}
+
+			// Create Stripe checkout session via API route
+			const response = await fetch('/api/payments/create-checkout', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					bookingId: booking.id,
+					clientEmail: client.email,
+					clientName: client.name,
+					consultationDate: request.startTime,
+					amount: billing.amount,
+					practitionerName: practitioner.name || 'Your Practitioner'
+				})
+			})
+
+			if (!response.ok) {
+				const errorData = await response.json()
+				throw new Error(
+					`Payment session creation failed: ${errorData.error}`
+				)
+			}
+
+			const paymentResult = await response.json()
+
+			if (paymentResult.success && paymentResult.checkoutUrl) {
+				// Send consultation bill email with payment link
+				const emailResult = await sendConsultationBillEmail({
+					to: client.email,
+					clientName: client.name,
+					consultationDate: request.startTime,
+					amount: billing.amount,
+					billingTrigger: 'before_consultation',
+					practitionerName: practitioner.name || 'Your Practitioner',
+					practitionerEmail: practitioner.email,
+					practitionerImageUrl:
+						practitioner.profile_picture_url || undefined,
+					paymentUrl: paymentResult.checkoutUrl
+				})
+
+				if (emailResult.success) {
+					// Update bill status to 'sent' since email was delivered
+					await updateBillStatus(bill.id, 'sent')
+
+					console.log(
+						`✅ [BOOKING] In-advance booking created with payment link sent:`,
+						{
+							bookingId: booking.id,
+							billId: bill.id,
+							clientEmail: client.email,
+							amount: billing.amount
+						}
+					)
+				} else {
+					console.error(
+						`❌ [BOOKING] Email failed for booking ${booking.id}:`,
+						emailResult.error
+					)
+					// Note: We don't throw here to avoid breaking the booking creation
+					// The bill remains in 'pending' status, indicating email wasn't sent
+				}
+
+				return {
+					booking,
+					bill,
+					requiresPayment: true,
+					paymentUrl: paymentResult.checkoutUrl
+				}
+			} else {
+				throw new Error(
+					`Payment session creation failed: ${paymentResult.error}`
+				)
+			}
+		} catch (error) {
+			console.error(
+				`❌ [BOOKING] Error in payment flow for booking ${booking.id}:`,
+				error
+			)
+			// Even if payment/email fails, we return the created booking and bill
+			// This allows the user to retry payment or contact client manually
+			return {
+				booking,
+				bill,
+				requiresPayment: true,
+				paymentUrl: undefined // No payment URL due to error
+			}
+		}
+	}
+
+	// No payment required (amount = 0), mark as scheduled immediately
 	return {
 		booking,
 		bill,
-		requiresPayment,
-		paymentUrl: requiresPayment
-			? `/payment/checkout/${booking.id}`
-			: undefined
+		requiresPayment: false
 	}
 }
 

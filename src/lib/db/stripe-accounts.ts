@@ -15,6 +15,7 @@
 
 import { Tables, TablesInsert, TablesUpdate } from '@/types/database.types'
 import { createClient as createSupabaseClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 const supabase = createSupabaseClient()
 
 /**
@@ -159,19 +160,28 @@ export async function getStripeAccountByUserId(
  * @throws Error if database operation fails
  */
 export async function getStripeAccountForPayments(
-	userId: string
+	userId: string,
+	supabaseClient?: SupabaseClient
 ): Promise<StripeAccountForPayments | null> {
-	const { data, error } = await supabase
+	console.log('🔍 [DEBUG] Querying stripe_accounts for userId:', userId)
+
+	// Use provided client or fall back to default
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
 		.from('stripe_accounts')
 		.select('stripe_account_id, onboarding_completed, payments_enabled')
 		.eq('user_id', userId)
-		.single()
+
+	console.log('🔍 [DEBUG] Query result:', { data, error })
 
 	if (error) {
-		if (error.code === 'PGRST116') return null // Not found
+		console.error('Error fetching Stripe account for payments:', error)
 		throw error
 	}
-	return data
+
+	// Return first result or null if no results
+	return data && data.length > 0 ? data[0] : null
 }
 
 /**

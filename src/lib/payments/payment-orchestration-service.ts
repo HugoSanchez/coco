@@ -14,6 +14,7 @@
 import { stripeService } from './stripe-service'
 import { createPaymentSession } from '@/lib/db/payment-sessions'
 import { getStripeAccountForPayments } from '@/lib/db/stripe-accounts'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export class PaymentOrchestrationService {
 	/**
@@ -36,6 +37,7 @@ export class PaymentOrchestrationService {
 	 * @param params.consultationDate - Date/time of the consultation
 	 * @param params.amount - Payment amount in euros (will be converted to cents)
 	 * @param params.practitionerName - Name of the practitioner for display
+	 * @param params.supabaseClient - Optional Supabase client for database operations
 	 *
 	 * @returns Promise resolving to operation result with success flag and either checkoutUrl or error
 	 */
@@ -46,7 +48,8 @@ export class PaymentOrchestrationService {
 		clientName,
 		consultationDate,
 		amount,
-		practitionerName
+		practitionerName,
+		supabaseClient
 	}: {
 		userId: string
 		bookingId: string
@@ -55,6 +58,7 @@ export class PaymentOrchestrationService {
 		consultationDate: string
 		amount: number
 		practitionerName: string
+		supabaseClient?: SupabaseClient
 	}): Promise<{
 		success: boolean
 		checkoutUrl?: string
@@ -65,7 +69,27 @@ export class PaymentOrchestrationService {
 			// =============================================
 			// We need to ensure the practitioner has a Stripe Connect account
 			// that is fully onboarded and enabled for payments.
-			const stripeAccount = await getStripeAccountForPayments(userId)
+			console.log(
+				'🔍 [DEBUG] Looking up Stripe account for userId:',
+				userId
+			)
+
+			const stripeAccount = await getStripeAccountForPayments(
+				userId,
+				supabaseClient
+			)
+
+			console.log('🔍 [DEBUG] Stripe account lookup result:', {
+				found: !!stripeAccount,
+				stripeAccount: stripeAccount
+					? {
+							stripe_account_id: stripeAccount.stripe_account_id,
+							onboarding_completed:
+								stripeAccount.onboarding_completed,
+							payments_enabled: stripeAccount.payments_enabled
+						}
+					: null
+			})
 
 			// Check if account exists and is ready for payments
 			// Both onboarding_completed and payments_enabled must be true
@@ -74,11 +98,18 @@ export class PaymentOrchestrationService {
 				!stripeAccount.onboarding_completed ||
 				!stripeAccount.payments_enabled
 			) {
+				const errorMessage = !stripeAccount
+					? 'Stripe account not found for practitioner'
+					: 'Stripe account not ready for payments'
+
+				console.log(
+					'🔍 [DEBUG] Stripe account validation failed:',
+					errorMessage
+				)
+
 				return {
 					success: false,
-					error: !stripeAccount
-						? 'Stripe account not found for practitioner'
-						: 'Stripe account not ready for payments'
+					error: errorMessage
 				}
 			}
 
