@@ -53,6 +53,7 @@ export interface CreateBookingResult {
 async function getAppropriateBillingSettings(userId: string, clientId: string) {
 	// Check if client has specific billing settings
 	const clientBilling = await getClientBillingSettings(userId, clientId)
+
 	if (clientBilling) {
 		return {
 			id: clientBilling.id,
@@ -64,6 +65,7 @@ async function getAppropriateBillingSettings(userId: string, clientId: string) {
 
 	// Fall back to user default billing settings
 	const userDefaultSettings = await getUserDefaultBillingSettings(userId)
+
 	if (userDefaultSettings) {
 		return {
 			id: userDefaultSettings.id,

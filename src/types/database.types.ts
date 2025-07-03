@@ -99,7 +99,6 @@ export type Database = {
       bills: {
         Row: {
           amount: number
-          bill_number: string
           billing_type: string
           booking_id: string
           client_email: string
@@ -118,7 +117,6 @@ export type Database = {
         }
         Insert: {
           amount: number
-          bill_number: string
           billing_type: string
           booking_id: string
           client_email: string
@@ -137,7 +135,6 @@ export type Database = {
         }
         Update: {
           amount?: number
-          bill_number?: string
           billing_type?: string
           booking_id?: string
           client_email?: string
@@ -443,10 +440,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      generate_bill_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never

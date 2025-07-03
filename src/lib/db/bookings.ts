@@ -121,27 +121,15 @@ export async function getBookingsForDateRange(
 
 /**
  * Creates a new booking in the database
- * Validates that the time slot doesn't conflict with existing bookings
- * Automatically determines appropriate billing settings
+ * Note: Time slot conflicts are prevented at the UI level via DayViewTimeSelector
  *
  * @param payload - Booking data to insert
  * @returns Promise<Booking> - The created booking object with generated ID
- * @throws Error if insertion fails, validation errors occur, or time conflicts exist
+ * @throws Error if insertion fails or validation errors occur
  */
 export async function createBooking(
 	payload: CreateBookingPayload
 ): Promise<Booking> {
-	// Check for time conflicts before creating the booking
-	const conflicts = await checkBookingConflicts(
-		payload.user_id,
-		payload.start_time,
-		payload.end_time
-	)
-
-	if (conflicts.length > 0) {
-		throw new Error('Time slot conflicts with existing booking')
-	}
-
 	// Set default values
 	const bookingData = {
 		...payload,
@@ -156,55 +144,6 @@ export async function createBooking(
 
 	if (error) throw error
 	return data
-}
-
-/**
- * Checks for booking conflicts in a given time range
- * Used to prevent double-booking
- *
- * @param userId - The UUID of the user to check conflicts for
- * @param startTime - Start time to check (ISO string)
- * @param endTime - End time to check (ISO string)
- * @param excludeBookingId - Optional booking ID to exclude from conflict check (for updates)
- * @returns Promise<Booking[]> - Array of conflicting bookings
- * @throws Error if database operation fails
- */
-export async function checkBookingConflicts(
-	userId: string,
-	startTime: string,
-	endTime: string,
-	excludeBookingId?: string
-): Promise<Booking[]> {
-	// Build the base query
-	let query = supabase
-		.from('bookings')
-		.select('*')
-		.eq('user_id', userId)
-		.neq('status', 'cancelled') // Don't consider cancelled bookings as conflicts
-
-	// Exclude a specific booking if provided (useful for updates)
-	if (excludeBookingId) {
-		query = query.neq('id', excludeBookingId)
-	}
-
-	// Execute query to get all non-cancelled bookings for the user
-	const { data: allBookings, error } = await query
-
-	if (error) throw error
-
-	// Filter for overlapping bookings in JavaScript
-	// Two time ranges overlap if: start1 < end2 AND start2 < end1
-	const conflictingBookings = (allBookings || []).filter((booking) => {
-		const bookingStart = new Date(booking.start_time).getTime()
-		const bookingEnd = new Date(booking.end_time).getTime()
-		const newStart = new Date(startTime).getTime()
-		const newEnd = new Date(endTime).getTime()
-
-		// Check for overlap: booking starts before new booking ends AND booking ends after new booking starts
-		return bookingStart < newEnd && bookingEnd > newStart
-	})
-
-	return conflictingBookings
 }
 
 /**

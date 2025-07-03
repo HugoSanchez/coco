@@ -186,7 +186,7 @@ export function DayViewTimeSelector({
 						timeToPixel(
 							Math.min(dragState.startTime, dragState.currentTime)
 						) || 15 * pixelsPerMinute
-		  }
+			}
 		: null
 
 	// Calculate selected slot display (reuse drag preview positioning)
@@ -196,7 +196,7 @@ export function DayViewTimeSelector({
 				height:
 					timeToPixel(selectedSlot.end) -
 					timeToPixel(selectedSlot.start)
-		  }
+			}
 		: null
 
 	return (
@@ -240,10 +240,10 @@ export function DayViewTimeSelector({
 						{hours.map((hour, index) => (
 							<div
 								key={hour}
-								className="flex items-center justify-end pr-2"
+								className="flex items-center justify-center bg-white border-r-2 border-gray-300"
 								style={{ height: `${60 * pixelsPerMinute}px` }}
 							>
-								<span className="text-xs text-gray-600 font-medium">
+								<span className="text-sm text-gray-600 font-medium">
 									{formatTime(hour * 60)}
 								</span>
 							</div>
@@ -253,7 +253,7 @@ export function DayViewTimeSelector({
 					{/* Time Grid */}
 					<div
 						ref={containerRef}
-						className="flex-1 relative cursor-crosshair select-none bg-gray-100"
+						className="flex-1 relative cursor-crosshair select-none bg-gray-50"
 						style={{
 							height: `${totalMinutes * pixelsPerMinute}px`,
 							paddingTop: '2px'
@@ -294,7 +294,7 @@ export function DayViewTimeSelector({
 						{bookingBlocks.map((block, index) => (
 							<div
 								key={index}
-								className="absolute left-1 right-1 bg-red-100 border border-red-200 rounded px-2 py-1 text-xs text-red-700 z-10"
+								className="absolute left-1 right-1 bg-red-50 border border-red-200 rounded px-2 py-1 text-xs text-gray-700 z-10"
 								style={{
 									top: `${block.top}px`,
 									height: `${block.height}px`

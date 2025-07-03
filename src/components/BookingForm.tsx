@@ -28,6 +28,7 @@ import { es } from 'date-fns/locale'
 import { Label } from '@/components/ui/label'
 import { createBookingSimple } from '@/lib/bookings/booking-orchestration-service'
 import { useToast } from '@/components/ui/use-toast'
+import { getBookingsForDateRange } from '@/lib/db/bookings'
 
 interface BookingFormProps {
 	onSuccess?: () => void // Called when booking is successfully created
@@ -52,13 +53,62 @@ export function BookingForm({
 
 	// Booking data state
 	const [selectedDate, setSelectedDate] = useState<Date | null>(null) // Date selected in step 1
-	const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null) // Time slot selected in step 2
+	const [selectedSlot, setSelectedSlot] = useState<{
+		start: string
+		end: string
+	} | null>(null) // Time slot selected in step 2
 	const [selectedClient, setSelectedClient] = useState<string>('') // Client ID selected in step 3
 	const [notes, setNotes] = useState('') // Optional notes for the booking
+	const [existingBookings, setExistingBookings] = useState<
+		Array<{ start: string; end: string; title?: string }>
+	>([])
 
 	// Context and utilities
 	const { user, profile } = useUser() // Current user and profile data
 	const { toast } = useToast() // Toast notification system
+
+	// Re-fetch existing bookings when returning to step 2 if date is already selected
+	useEffect(() => {
+		if (
+			currentStep === 2 &&
+			selectedDate &&
+			existingBookings.length === 0
+		) {
+			fetchExistingBookings(selectedDate)
+		}
+	}, [currentStep, selectedDate])
+
+	// Fetch existing bookings when date changes
+	const fetchExistingBookings = async (date: Date) => {
+		if (!user?.id) return
+
+		try {
+			// Get start and end of the selected day
+			const startOfDay = new Date(date)
+			startOfDay.setHours(0, 0, 0, 0)
+
+			const endOfDay = new Date(date)
+			endOfDay.setHours(23, 59, 59, 999)
+
+			const bookings = await getBookingsForDateRange(
+				user.id,
+				startOfDay.toISOString(),
+				endOfDay.toISOString()
+			)
+
+			// Transform bookings to the format expected by DayViewTimeSelector
+			const formattedBookings = bookings.map((booking) => ({
+				start: booking.start_time,
+				end: booking.end_time,
+				title: `Ocupado - ${booking.client?.name || 'Cliente'}`
+			}))
+
+			setExistingBookings(formattedBookings)
+		} catch (error) {
+			console.error('Error fetching existing bookings:', error)
+			setExistingBookings([])
+		}
+	}
 
 	/**
 	 * Handles calendar month changes
@@ -72,8 +122,9 @@ export function BookingForm({
 	 * Step 1: Date Selection Handler
 	 * When user clicks on a date in the calendar, store it and advance to time selection
 	 */
-	const handleDateSelect = (date: Date) => {
+	const handleDateSelect = async (date: Date) => {
 		setSelectedDate(date)
+		await fetchExistingBookings(date) // Fetch existing bookings for the selected date
 		setCurrentStep(2) // Auto-advance to time selection step
 	}
 
@@ -217,7 +268,7 @@ export function BookingForm({
 							date={selectedDate}
 							onTimeSelect={handleSlotSelect}
 							onClearSelection={handleClearTimeSelection}
-							existingBookings={[]} // TODO: Pass real existing bookings to show conflicts
+							existingBookings={existingBookings}
 							initialSelectedSlot={selectedSlot}
 						/>
 					</div>

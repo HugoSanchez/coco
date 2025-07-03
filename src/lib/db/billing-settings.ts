@@ -155,16 +155,16 @@ export async function getClientBillingSettings(
 			.eq('user_id', userId)
 			.eq('client_id', clientId)
 			.is('booking_id', null)
-			.single()
+			.maybeSingle() // Use maybeSingle() instead of single() to handle no results gracefully
 
-		if (error && error.code !== 'PGRST116') {
-			console.error('Error fetching client billing settings:', error)
+		if (error) {
+			console.error('❌ Error fetching client billing settings:', error)
 			return null
 		}
 
 		return data
 	} catch (error) {
-		console.error('Error in getClientBillingSettings:', error)
+		console.error('❌ Exception in getClientBillingSettings:', error)
 		return null
 	}
 }
@@ -191,16 +191,19 @@ export async function getUserDefaultBillingSettings(
 			.single()
 
 		if (error) {
-			if (error.code === 'PGRST116') return null // Not found
+			if (error.code === 'PGRST116') {
+				return null // Not found
+			}
 			console.error(
-				'Error fetching user default billing settings:',
+				'❌ Error fetching user default billing settings:',
 				error
 			)
 			return null
 		}
+
 		return data
 	} catch (error) {
-		console.error('Error in getUserDefaultBillingSettings:', error)
+		console.error('❌ Exception in getUserDefaultBillingSettings:', error)
 		return null
 	}
 }
