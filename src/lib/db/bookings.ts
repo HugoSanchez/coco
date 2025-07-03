@@ -111,6 +111,17 @@ export interface PaginationOptions {
 }
 
 /**
+ * Interface for booking filters
+ * Used to filter bookings at the database level
+ */
+export interface BookingFilterOptions {
+	customerSearch?: string
+	statusFilter?: 'all' | 'pending' | 'scheduled' | 'completed' | 'cancelled'
+	startDate?: string
+	endDate?: string
+}
+
+/**
  * Retrieves all bookings for a specific user, ordered by start time (newest first)
  * Includes related client information
  *
@@ -277,19 +288,22 @@ export async function getBookingById(
  *
  * @param userId - The UUID of the user whose bookings to fetch
  * @param options - Optional pagination configuration
+ * @param filters - Optional filters to apply at database level
  * @returns Promise<PaginatedBookingsResult> - Object with bookings array and pagination metadata
  * @throws Error if database operation fails
  */
 export async function getBookingsWithBills(
 	userId: string,
-	options: PaginationOptions = {}
+	options: PaginationOptions = {},
+	filters: BookingFilterOptions = {}
 ): Promise<PaginatedBookingsResult> {
 	const { limit = 10, offset = 0 } = options
+	const { customerSearch, statusFilter, startDate, endDate } = filters
 
 	// Fetch one extra record to determine if there are more results
 	const fetchLimit = limit + 1
 
-	const { data, error } = await supabase
+	let query = supabase
 		.from('bookings')
 		.select(
 			`
@@ -308,6 +322,28 @@ export async function getBookingsWithBills(
 		`
 		)
 		.eq('user_id', userId)
+
+	// Apply filters
+	if (customerSearch) {
+		query = query.or(
+			`client.name.ilike.%${customerSearch}%,client.email.ilike.%${customerSearch}%`
+		)
+	}
+
+	if (statusFilter && statusFilter !== 'all') {
+		query = query.eq('status', statusFilter)
+	}
+
+	if (startDate) {
+		query = query.gte('start_time', startDate)
+	}
+
+	if (endDate) {
+		query = query.lte('start_time', endDate)
+	}
+
+	// Apply ordering and pagination
+	const { data, error } = await query
 		.order('created_at', { ascending: false })
 		.range(offset, offset + fetchLimit - 1)
 

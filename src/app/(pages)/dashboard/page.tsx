@@ -33,7 +33,8 @@ import {
 	updateBookingStatus,
 	BookingWithBills,
 	PaginatedBookingsResult,
-	PaginationOptions
+	PaginationOptions,
+	BookingFilterOptions
 } from '@/lib/db/bookings'
 import { BookingForm } from '@/components/BookingForm'
 import { Spinner } from '@/components/ui/spinner'
@@ -90,53 +91,22 @@ export default function Dashboard() {
 	const { toast } = useToast()
 	const router = useRouter()
 
-	// Filtered bookings logic
-	const filteredBookings = useMemo(() => {
-		return bookings.filter((booking) => {
-			// Customer search filter
-			const matchesCustomer =
-				filters.customerSearch === '' ||
-				booking.customerName
-					.toLowerCase()
-					.includes(filters.customerSearch.toLowerCase()) ||
-				booking.customerEmail
-					.toLowerCase()
-					.includes(filters.customerSearch.toLowerCase())
-
-			// Status filter
-			const matchesStatus =
-				filters.statusFilter === 'all' ||
-				booking.status === filters.statusFilter
-
-			// Date range filter
-			let matchesDate = true
-			if (filters.startDate && filters.endDate) {
-				const start = new Date(filters.startDate)
-				const end = new Date(filters.endDate)
-				matchesDate =
-					booking.bookingDate >= start && booking.bookingDate <= end
-			} else if (filters.startDate) {
-				const start = new Date(filters.startDate)
-				matchesDate = booking.bookingDate >= start
-			} else if (filters.endDate) {
-				const end = new Date(filters.endDate)
-				matchesDate = booking.bookingDate <= end
-			}
-
-			return matchesCustomer && matchesStatus && matchesDate
-		})
-	}, [bookings, filters])
-
 	useEffect(() => {
 		const fetchBookings = async () => {
 			if (!user) return
 
 			try {
 				setLoadingBookings(true)
-				const result = await getBookingsWithBills(user.id, {
-					limit: 10,
-					offset: 0
-				})
+				const result = await getBookingsWithBills(
+					user.id,
+					{ limit: 10, offset: 0 },
+					{
+						customerSearch: filters.customerSearch || undefined,
+						statusFilter: filters.statusFilter,
+						startDate: filters.startDate || undefined,
+						endDate: filters.endDate || undefined
+					}
+				)
 				const transformedBookings =
 					result.bookings.map(transformBooking)
 				setBookings(transformedBookings)
@@ -157,7 +127,7 @@ export default function Dashboard() {
 		if (user) {
 			fetchBookings()
 		}
-	}, [user, toast])
+	}, [user, filters, toast])
 
 	useEffect(() => {
 		const fetchClients = async () => {
@@ -243,10 +213,16 @@ export default function Dashboard() {
 
 		try {
 			setLoadingMore(true)
-			const result = await getBookingsWithBills(user.id, {
-				limit: 10,
-				offset: offset
-			})
+			const result = await getBookingsWithBills(
+				user.id,
+				{ limit: 10, offset: offset },
+				{
+					customerSearch: filters.customerSearch || undefined,
+					statusFilter: filters.statusFilter,
+					startDate: filters.startDate || undefined,
+					endDate: filters.endDate || undefined
+				}
+			)
 			const transformedBookings = result.bookings.map(transformBooking)
 
 			// Append new bookings to existing ones
@@ -278,10 +254,16 @@ export default function Dashboard() {
 
 			try {
 				setLoadingBookings(true)
-				const result = await getBookingsWithBills(user.id, {
-					limit: 10,
-					offset: 0
-				})
+				const result = await getBookingsWithBills(
+					user.id,
+					{ limit: 10, offset: 0 },
+					{
+						customerSearch: filters.customerSearch || undefined,
+						statusFilter: filters.statusFilter,
+						startDate: filters.startDate || undefined,
+						endDate: filters.endDate || undefined
+					}
+				)
 				const transformedBookings =
 					result.bookings.map(transformBooking)
 				setBookings(transformedBookings)
@@ -426,7 +408,7 @@ export default function Dashboard() {
 						</CardHeader>
 						<CardContent>
 							<BookingsTable
-								bookings={filteredBookings}
+								bookings={bookings}
 								loading={loadingBookings}
 								onStatusChange={handleStatusChange}
 								onCancelBooking={handleCancelBooking}

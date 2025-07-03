@@ -16,18 +16,10 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import {
-	MoreHorizontal,
-	Calendar,
-	X,
-	CircleCheck,
-	Search,
-	Loader,
-	CreditCard
-} from 'lucide-react'
+import { Spinner } from '@/components/ui/spinner'
+import { MoreHorizontal, Calendar, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { TestPaymentButton } from './TestPaymentButton'
 
 export interface Booking {
 	id: string
@@ -163,7 +155,7 @@ export function BookingsTable({
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center py-8">
-				<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+				<Spinner />
 			</div>
 		)
 	}
@@ -258,8 +250,10 @@ export function BookingsTable({
 
 									{/* Amount */}
 									<TableCell className="text-right font-light py-2">
-										{booking.currency || 'EUR'}{' '}
-										{booking.amount.toFixed(2)}
+										<span className="font-semibold">
+											{booking.amount.toFixed(2)}{' '}
+											{booking.currency || 'EUR'}
+										</span>
 									</TableCell>
 
 									{/* Actions */}
@@ -274,16 +268,6 @@ export function BookingsTable({
 												</Button>
 											</DropdownMenuTrigger>
 											<DropdownMenuContent align="end">
-												<DropdownMenuItem asChild>
-													<div className="flex items-center w-full px-2 py-1.5">
-														<CreditCard className="mr-2 h-4 w-4" />
-														<TestPaymentButton
-															bookingId={
-																booking.id
-															}
-														/>
-													</div>
-												</DropdownMenuItem>
 												<DropdownMenuItem
 													onClick={() =>
 														onCancelBooking(
@@ -292,8 +276,7 @@ export function BookingsTable({
 													}
 													className=""
 												>
-													<X className="mr-2 h-4 w-4" />
-													Cancelar
+													Cancelar cita
 												</DropdownMenuItem>
 											</DropdownMenuContent>
 										</DropdownMenu>
