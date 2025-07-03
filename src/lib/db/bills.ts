@@ -485,8 +485,13 @@ export async function updateBillNotes(
  * @returns Promise<void>
  * @throws Error if deletion fails or bill not found
  */
-export async function deleteBill(billId: string): Promise<void> {
-	const { error } = await supabase.from('bills').delete().eq('id', billId)
+export async function deleteBill(
+	billId: string,
+	supabaseClient?: SupabaseClient
+): Promise<void> {
+	const client = supabaseClient || supabase
+
+	const { error } = await client.from('bills').delete().eq('id', billId)
 
 	if (error) throw error
 }

@@ -15,7 +15,12 @@
  * Based on billing type, calls the appropriate creation function.
  */
 
-import { createBooking, CreateBookingPayload, Booking } from '@/lib/db/bookings'
+import {
+	createBooking,
+	CreateBookingPayload,
+	Booking,
+	deleteBooking
+} from '@/lib/db/bookings'
 import {
 	getClientBillingSettings,
 	getUserDefaultBillingSettings
@@ -25,7 +30,8 @@ import {
 	createBill,
 	CreateBillPayload,
 	Bill,
-	updateBillStatus
+	updateBillStatus,
+	deleteBill
 } from '@/lib/db/bills'
 import { sendConsultationBillEmail } from '@/lib/emails/email-service'
 import { getProfileById } from '@/lib/db/profiles'
@@ -216,11 +222,10 @@ async function createInAdvanceBooking(
 					// Update bill status to 'sent' since email was delivered
 					await updateBillStatus(bill.id, 'sent', supabaseClient)
 				} else {
-					console.error(
-						`Email failed for booking ${booking.id}: ${emailResult.error}`
+					// Email failed - throw error to trigger cleanup
+					throw new Error(
+						`Email sending failed: ${emailResult.error}`
 					)
-					// Note: We don't throw here to avoid breaking the booking creation
-					// The bill remains in 'pending' status, indicating email wasn't sent
 				}
 
 				return {
@@ -238,14 +243,21 @@ async function createInAdvanceBooking(
 			console.error(
 				`Error in payment flow for booking ${booking.id}: ${error instanceof Error ? error.message : 'Unknown error'}`
 			)
-			// Even if payment/email fails, we return the created booking and bill
-			// This allows the user to retry payment or contact client manually
-			return {
-				booking,
-				bill,
-				requiresPayment: true,
-				paymentUrl: undefined // No payment URL due to error
+
+			// Cleanup: Delete the booking and bill we created
+			try {
+				await deleteBooking(booking.id, supabaseClient)
+				await deleteBill(bill.id, supabaseClient)
+			} catch (cleanupError) {
+				console.error(
+					`Cleanup failed for booking ${booking.id}:`,
+					cleanupError
+				)
+				// Don't throw cleanup errors - original error is more important
 			}
+
+			// Re-throw the original error so the API route can handle it
+			throw error
 		}
 	}
 

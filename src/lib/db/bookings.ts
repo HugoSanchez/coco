@@ -247,11 +247,13 @@ export async function updateBookingStatus(
  * @returns Promise<void>
  * @throws Error if deletion fails or booking not found
  */
-export async function deleteBooking(bookingId: string): Promise<void> {
-	const { error } = await supabase
-		.from('bookings')
-		.delete()
-		.eq('id', bookingId)
+export async function deleteBooking(
+	bookingId: string,
+	supabaseClient?: SupabaseClient
+): Promise<void> {
+	const client = supabaseClient || supabase
+
+	const { error } = await client.from('bookings').delete().eq('id', bookingId)
 
 	if (error) throw error
 }
