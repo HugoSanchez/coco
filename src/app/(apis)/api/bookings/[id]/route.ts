@@ -32,7 +32,6 @@ export async function GET(
 			process.env.NEXT_PUBLIC_SUPABASE_URL!,
 			process.env.SUPABASE_SERVICE_ROLE_KEY!
 		)
-		console.log('BOOKING ID:', bookingId)
 
 		// First, let's try a simple query without joins to see if the booking exists
 		const { data: simpleBooking, error: simpleError } = await supabase
@@ -40,9 +39,6 @@ export async function GET(
 			.select('*')
 			.eq('id', bookingId)
 			.single()
-
-		console.log('SIMPLE BOOKING:', simpleBooking)
-		console.log('SIMPLE ERROR:', simpleError)
 
 		// If simple booking doesn't work, return early with debug info
 		if (simpleError || !simpleBooking) {
@@ -55,7 +51,7 @@ export async function GET(
 			})
 		}
 
-		// Since foreign key relationships aren't set up, let's do separate queries
+		// Get booking information
 		const booking = simpleBooking
 
 		// Get client information
@@ -78,10 +74,6 @@ export async function GET(
 			.select('amount, currency')
 			.eq('booking_id', booking.id)
 
-		console.log('CLIENT:', client)
-		console.log('PRACTITIONER:', practitioner)
-		console.log('BILLS:', bills)
-
 		// Format the response for display
 		const response = {
 			bookingId: booking.id,
@@ -93,8 +85,6 @@ export async function GET(
 			amount: bills?.[0]?.amount || 0,
 			currency: bills?.[0]?.currency || 'EUR'
 		}
-
-		console.log('RESPONSE:', response)
 
 		return NextResponse.json(response)
 	} catch (error) {

@@ -56,7 +56,7 @@ export default function Header() {
 
 	// Determine current page context for conditional rendering
 	const isBookingPage = /^\/[^\/]+$/.test(pathname) // Matches single-level routes like /username
-	const isDashboard = pathname === '/dashboard'
+	const shouldNotRenderSearchBar = pathname === '/payment/success'
 
 	/**
 	 * Effect to handle scroll-based header styling
@@ -101,7 +101,7 @@ export default function Header() {
 	 */
 	const renderSearchBar = () => {
 		// Only show search on dashboard for authenticated users
-		if (!isDashboard || !user) return null
+		if (shouldNotRenderSearchBar || !user) return null
 
 		return (
 			<form className="ml-auto flex-1 sm:flex-initial mx-4">
@@ -218,8 +218,8 @@ export default function Header() {
 
 				{/* Right side content: search bar and user menu */}
 				<>
-					{isDashboard && renderSearchBar()}
-					{user && renderUserMenu()}
+					{!shouldNotRenderSearchBar && renderSearchBar()}
+					{user && !shouldNotRenderSearchBar && renderUserMenu()}
 				</>
 			</div>
 		</header>
