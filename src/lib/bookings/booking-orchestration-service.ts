@@ -36,6 +36,7 @@ import {
 import { sendConsultationBillEmail } from '@/lib/emails/email-service'
 import { getProfileById } from '@/lib/db/profiles'
 import { paymentOrchestrationService } from '@/lib/payments/payment-orchestration-service'
+import { createEmailCommunication } from '@/lib/db/email-communications'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
@@ -221,11 +222,61 @@ async function createInAdvanceBooking(
 				if (emailResult.success) {
 					// Update bill status to 'sent' since email was delivered
 					await updateBillStatus(bill.id, 'sent', supabaseClient)
+
+					// Track successful email communication
+					try {
+						await createEmailCommunication(
+							{
+								user_id: booking.user_id,
+								client_id: booking.client_id,
+								bill_id: bill.id,
+								booking_id: booking.id,
+								email_type: 'consultation_bill',
+								recipient_email: client.email,
+								recipient_name: client.name,
+								status: 'sent'
+							},
+							supabaseClient
+						)
+					} catch (trackingError) {
+						// Log tracking failure but don't break the flow
+						console.error(
+							'Failed to track successful email:',
+							trackingError
+						)
+					}
 				} else {
+					// Track failed email communication
+					try {
+						await createEmailCommunication(
+							{
+								user_id: booking.user_id,
+								client_id: booking.client_id,
+								bill_id: bill.id,
+								booking_id: booking.id,
+								email_type: 'consultation_bill',
+								recipient_email: client.email,
+								recipient_name: client.name,
+								status: 'failed',
+								error_message:
+									emailResult.error || 'Email sending failed'
+							},
+							supabaseClient
+						)
+					} catch (trackingError) {
+						// Log tracking failure but don't break the flow
+						console.error(
+							'Failed to track failed email:',
+							trackingError
+						)
+					}
+
 					// Email failed - throw error to trigger cleanup
-					throw new Error(
-						`Email sending failed: ${emailResult.error}`
+					const emailError = new Error(
+						`EMAIL_SEND_FAILED: Unable to send payment email to ${client.email}`
 					)
+					emailError.name = 'EmailSendError'
+					throw emailError
 				}
 
 				return {

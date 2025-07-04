@@ -209,8 +209,11 @@ export default function Header() {
 		>
 			<div className="mx-auto px-6 md:px-16 h-full flex justify-between items-center">
 				{/* Logo/brand link */}
-				<Link href="/" className="text-xl font-bold text-primary">
-					coco
+				<Link
+					href="/"
+					className="text-xl font-black text-primary tracking-wide"
+				>
+					momo.
 				</Link>
 
 				{/* Right side content: search bar and user menu */}

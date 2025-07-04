@@ -163,8 +163,6 @@ export async function getStripeAccountForPayments(
 	userId: string,
 	supabaseClient?: SupabaseClient
 ): Promise<StripeAccountForPayments | null> {
-	console.log('🔍 [DEBUG] Querying stripe_accounts for userId:', userId)
-
 	// Use provided client or fall back to default
 	const client = supabaseClient || supabase
 
@@ -172,8 +170,6 @@ export async function getStripeAccountForPayments(
 		.from('stripe_accounts')
 		.select('stripe_account_id, onboarding_completed, payments_enabled')
 		.eq('user_id', userId)
-
-	console.log('🔍 [DEBUG] Query result:', { data, error })
 
 	if (error) {
 		console.error('Error fetching Stripe account for payments:', error)

@@ -216,38 +216,45 @@ export function BookingForm({
 
 			if (!response.ok) {
 				const errorData = await response.json()
-				throw new Error(errorData.error || 'Failed to create booking')
+				throw new Error(
+					errorData.details ||
+						errorData.error ||
+						'Failed to create booking'
+				)
 			}
 
 			const result = await response.json()
 
-			// Show success notification
-			// Enhanced to show payment info if required
-			if (result.requiresPayment && result.paymentUrl) {
-				toast({
-					title: 'Cita creada con enlace de pago',
-					description:
-						'Se ha enviado un enlace de pago al cliente por email',
-					color: 'success'
-				})
-			} else {
-				toast({
-					title: 'Cita creada',
-					description: 'La cita se ha creado correctamente',
-					color: 'success'
-				})
-			}
+			toast({
+				title: '¡Bravo!',
+				description: 'La cita se ha creado correctamente',
+				color: 'success'
+			})
 
 			// Notify parent component that booking was successful
 			// This typically closes the booking form and refreshes the booking list
 			onSuccess?.()
 		} catch (error) {
 			console.error('Error creating booking:', error)
+			let errorMessage = 'Hubo un error al crear la cita.'
+			let title = 'Error al crear cita'
+			let description = errorMessage
 
-			// Show error notification with user-friendly message
+			if (error instanceof Error) {
+				errorMessage = error.message
+			}
+			// Check if this is an email sending error
+			const isEmailError = errorMessage.includes('EMAIL_SEND_FAILED')
+
+			if (isEmailError) {
+				title = 'Error al enviar email de confirmación'
+				description =
+					'Por favor revisa que la dirección de email sea correcta.'
+			}
+
 			toast({
-				title: 'Error al crear cita',
-				description: 'Hubo un error al crear la cita.',
+				title,
+				description,
 				variant: 'destructive',
 				color: 'error'
 			})

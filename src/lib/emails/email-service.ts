@@ -83,10 +83,7 @@ export async function sendConsultationBillEmail({
 		})
 
 		if (result.error) {
-			console.error(
-				'❌ [EMAIL] Failed to send consultation bill:',
-				result.error
-			)
+			console.error('Email sending failed:', result.error.message)
 			throw new Error(`Failed to send email: ${result.error.message}`)
 		}
 
@@ -104,7 +101,10 @@ export async function sendConsultationBillEmail({
 			message: 'Email sent successfully'
 		}
 	} catch (error) {
-		console.error('❌ [EMAIL] Error sending consultation bill:', error)
+		console.error(
+			'Error sending consultation bill:',
+			error instanceof Error ? error.message : 'Unknown error'
+		)
 
 		return {
 			success: false,
