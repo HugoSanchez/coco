@@ -117,7 +117,7 @@ export class StripeService {
 					client_name: clientName,
 					practitioner_name: practitionerName
 				},
-				success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+				success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/payment/success?booking_id=${bookingId}`,
 				cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/payment/cancelled`,
 				payment_intent_data: {
 					application_fee_amount: Math.round(amount * 100 * 0.0), // 5% platform fee
