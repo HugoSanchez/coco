@@ -213,7 +213,7 @@ export default function Header() {
 					href="/"
 					className="text-xl font-black text-primary tracking-wider"
 				>
-					momo<span className="text-teal-500">.</span>
+					momo.
 				</Link>
 
 				{/* Right side content: search bar and user menu */}

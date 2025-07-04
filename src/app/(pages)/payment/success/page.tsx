@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
+import confetti from 'canvas-confetti'
 import {
 	Card,
 	CardContent,
@@ -29,6 +30,7 @@ export default function BookingConfirmationPage() {
 			const data = await response.json()
 			setBookingDetails(data)
 			setLoading(false)
+			confetti({ particleCount: 20 })
 		} catch (err) {
 			setError('No se pudieron cargar los detalles de la cita')
 			setLoading(false)
