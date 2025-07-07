@@ -211,9 +211,9 @@ export default function Header() {
 				{/* Logo/brand link */}
 				<Link
 					href="/"
-					className="text-xl font-black text-primary tracking-wider"
+					className="text-xl font-bold text-primary tracking-wide"
 				>
-					momo.
+					coco.
 				</Link>
 
 				{/* Right side content: search bar and user menu */}

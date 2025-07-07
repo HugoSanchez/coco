@@ -87,14 +87,6 @@ export async function sendConsultationBillEmail({
 			throw new Error(`Failed to send email: ${result.error.message}`)
 		}
 
-		console.log(`✅ [EMAIL] Consultation bill sent successfully:`, {
-			emailId: result.data?.id,
-			to,
-			clientName,
-			billingTrigger,
-			amount
-		})
-
 		return {
 			success: true,
 			emailId: result.data?.id,

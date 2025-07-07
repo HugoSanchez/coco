@@ -149,8 +149,13 @@ export async function getBillById(billId: string): Promise<Bill | null> {
  * @returns Promise<Bill[]> - Array of bills for the booking
  * @throws Error if database operation fails
  */
-export async function getBillsForBooking(bookingId: string): Promise<Bill[]> {
-	const { data, error } = await supabase
+export async function getBillsForBooking(
+	bookingId: string,
+	supabaseClient?: SupabaseClient
+): Promise<Bill[]> {
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
 		.from('bills')
 		.select('*')
 		.eq('booking_id', bookingId)
@@ -381,8 +386,13 @@ export async function markBillAsSent(billId: string): Promise<Bill> {
  * @returns Promise<Bill> - The updated bill object
  * @throws Error if update fails or bill not found
  */
-export async function markBillAsPaid(billId: string): Promise<Bill> {
-	const { data, error } = await supabase
+export async function markBillAsPaid(
+	billId: string,
+	supabaseClient?: SupabaseClient
+): Promise<Bill> {
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
 		.from('bills')
 		.update({
 			status: 'paid',
@@ -535,4 +545,17 @@ export async function getBillsDueForReminder(userId?: string): Promise<Bill[]> {
 
 	if (error) throw error
 	return data || []
+}
+
+export async function getBillForBookingAndMarkAsPaid(
+	bookingId: string,
+	supabaseClient?: SupabaseClient
+): Promise<Bill> {
+	const bills = await getBillsForBooking(bookingId, supabaseClient)
+	if (!bills || bills.length === 0) {
+		console.log('Bill not found')
+		throw new Error('Bill not found')
+	}
+	await markBillAsPaid(bills[0].id, supabaseClient)
+	return bills[0]
 }

@@ -223,9 +223,12 @@ export async function createBooking(
  */
 export async function updateBookingStatus(
 	bookingId: string,
-	status: string
+	status: string,
+	supabaseClient?: SupabaseClient
 ): Promise<Booking> {
-	const { data, error } = await supabase
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
 		.from('bookings')
 		.update({
 			status,
@@ -235,7 +238,10 @@ export async function updateBookingStatus(
 		.select()
 		.single()
 
-	if (error) throw error
+	if (error) {
+		console.log('Error updating booking status', error)
+		throw error
+	}
 	return data
 }
 
