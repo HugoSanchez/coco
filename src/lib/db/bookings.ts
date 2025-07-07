@@ -268,13 +268,17 @@ export async function deleteBooking(
  * Retrieves a single booking by ID with client information
  *
  * @param bookingId - UUID of the booking to retrieve
+ * @param supabaseClient - Optional SupabaseClient instance to use
  * @returns Promise<BookingWithClient | null> - The booking object with client data, or null if not found
  * @throws Error if database operation fails
  */
 export async function getBookingById(
-	bookingId: string
+	bookingId: string,
+	supabaseClient?: SupabaseClient
 ): Promise<BookingWithClient | null> {
-	const { data, error } = await supabase
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
 		.from('bookings')
 		.select(
 			`

@@ -49,6 +49,9 @@ export class PaymentOrchestrationService {
 		consultationDate,
 		amount,
 		practitionerName,
+		practitionerEmail,
+		startTime,
+		endTime,
 		supabaseClient
 	}: {
 		userId: string
@@ -58,6 +61,9 @@ export class PaymentOrchestrationService {
 		consultationDate: string
 		amount: number
 		practitionerName: string
+		practitionerEmail: string
+		startTime: string
+		endTime: string
 		supabaseClient?: SupabaseClient
 	}): Promise<{
 		success: boolean
@@ -105,7 +111,11 @@ export class PaymentOrchestrationService {
 					consultationDate,
 					amount,
 					bookingId,
-					practitionerName
+					practitionerName,
+					practitionerEmail,
+					practitionerUserId: userId,
+					startTime,
+					endTime
 				})
 
 			// STEP 3: Track payment session in our database

@@ -3,11 +3,11 @@ import { createClient } from '@supabase/supabase-js'
 import { oauth2Client } from '@/lib/google'
 
 // GET /api/auth/google-calendar
-// It generates the URL for the Google Calendar API authorization flow
+// It generates the URL for the Google Calendar API authorization flow with event creation permissions
 export async function GET() {
 	const authUrl = oauth2Client.generateAuthUrl({
 		scope: [
-			'https://www.googleapis.com/auth/calendar.readonly',
+			'https://www.googleapis.com/auth/calendar.events',
 			'https://www.googleapis.com/auth/userinfo.email',
 			'https://www.googleapis.com/auth/userinfo.profile'
 		],

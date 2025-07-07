@@ -19,7 +19,9 @@
  */
 
 import { createClient as createSupabaseClient } from '@/lib/supabase/client'
-const supabaseAdmin = createSupabaseClient()
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+const supabase = createSupabaseClient()
 
 /**
  * Updates a user's calendar access tokens in the database
@@ -41,11 +43,13 @@ const supabaseAdmin = createSupabaseClient()
 export async function updateUserCalendarTokens(
 	tokenResponse: any,
 	userId: string,
-	expiryDuration: number
+	expiryDuration: number,
+	supabaseClient?: SupabaseClient
 ) {
-	// Update the user's calendar tokens using admin privileges
-	// This bypasses RLS since token refresh happens server-side
-	const { error: updateError } = await supabaseAdmin
+	const client = supabaseClient || supabase
+
+	// Update the user's calendar tokens
+	const { error: updateError } = await client
 		.from('calendar_tokens')
 		.update({
 			access_token: tokenResponse.token, // New access token from OAuth refresh
@@ -61,6 +65,42 @@ export async function updateUserCalendarTokens(
 
 	// Return success indicator
 	return true
+}
+
+/**
+ * Retrieves calendar tokens for a specific user
+ * Used for calendar API operations that require authentication
+ *
+ * @param userId - UUID of the user whose tokens to retrieve
+ * @param supabaseClient - Optional SupabaseClient instance (required for backend operations)
+ * @returns Promise with calendar tokens or null if not found
+ * @throws Error if database operation fails
+ */
+export async function getUserCalendarTokens(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<{
+	access_token: string
+	refresh_token: string
+	expiry_date: number | null
+} | null> {
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
+		.from('calendar_tokens')
+		.select('access_token, refresh_token, expiry_date')
+		.eq('user_id', userId)
+		.single()
+
+	if (error) {
+		if (error.code === 'PGRST116') {
+			// No rows returned - user hasn't connected calendar
+			return null
+		}
+		throw error
+	}
+
+	return data
 }
 
 // TODO: Add additional calendar token management functions as needed:

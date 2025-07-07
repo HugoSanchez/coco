@@ -80,7 +80,11 @@ export class StripeService {
 		consultationDate,
 		amount,
 		bookingId,
-		practitionerName
+		practitionerName,
+		practitionerEmail,
+		practitionerUserId,
+		startTime,
+		endTime
 	}: {
 		practitionerStripeAccountId: string
 		clientEmail: string
@@ -89,6 +93,10 @@ export class StripeService {
 		amount: number
 		bookingId: string
 		practitionerName: string
+		practitionerEmail: string
+		practitionerUserId: string
+		startTime: string
+		endTime: string
 	}): Promise<{
 		sessionId: string
 		checkoutUrl: string
@@ -115,7 +123,11 @@ export class StripeService {
 					booking_id: bookingId,
 					consultation_date: consultationDate,
 					client_name: clientName,
-					practitioner_name: practitionerName
+					practitioner_name: practitionerName,
+					practitioner_email: practitionerEmail,
+					practitioner_user_id: practitionerUserId,
+					start_time: startTime,
+					end_time: endTime
 				},
 				success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/payment/success?booking_id=${bookingId}`,
 				cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/payment/cancelled`,

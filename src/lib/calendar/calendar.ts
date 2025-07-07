@@ -1,7 +1,11 @@
 import { google } from 'googleapis'
 import { createClient as createSupabaseClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
-import { updateUserCalendarTokens } from '../db/calendar-tokens'
+import {
+	updateUserCalendarTokens,
+	getUserCalendarTokens
+} from '../db/calendar-tokens'
 import { oauth2Client } from '../google'
 import {
 	parseISO,
@@ -45,15 +49,17 @@ const supabase = createSupabaseClient()
 // This function is used to refresh the access token when it expires
 // It takes the user's ID and the refresh token as arguments
 // It returns the new access token from Google.
-async function refreshToken(userId: string, refreshToken: string) {
-	console.log('Attempting to refresh token...')
+async function refreshToken(
+	userId: string,
+	refreshToken: string,
+	supabaseClient?: SupabaseClient
+) {
 	// Set the credentials to the refresh token
 	oauth2Client.setCredentials({ refresh_token: refreshToken })
 
 	try {
 		// Ask Google for a new access token
 		const tokenResponse = await oauth2Client.getAccessToken()
-		console.log('Refresh successful')
 		// If unsuccessful, throw an error
 		if (!tokenResponse.token)
 			throw new Error('No access token returned after refresh')
@@ -67,17 +73,13 @@ async function refreshToken(userId: string, refreshToken: string) {
 			await updateUserCalendarTokens(
 				tokenResponse,
 				userId,
-				expiryDuration
+				expiryDuration,
+				supabaseClient
 			)
 			// and return token
 			return tokenResponse.token
 		}
 	} catch (error: any) {
-		console.error('Token refresh error:', {
-			message: error.message,
-			code: error.code,
-			status: error.status
-		})
 		throw error
 	}
 }
@@ -223,7 +225,8 @@ export async function getAvailableSlots(username: string, month: Date) {
 		// Call the refreshToken function to get a new access token
 		const newAccessToken = await refreshToken(
 			userId,
-			calendarTokens.refresh_token
+			calendarTokens.refresh_token,
+			undefined // No supabaseClient needed for public function
 		)
 		// Set the new access token
 		oauth2Client.setCredentials({
@@ -267,5 +270,182 @@ export async function getAvailableSlots(username: string, month: Date) {
 		throw new Error(
 			'Calendar access failed. Please reconnect your Google Calendar.'
 		)
+	}
+}
+
+/**
+ * Interface for creating a calendar event with booking details
+ */
+export interface CreateCalendarEventPayload {
+	userId: string // Practitioner's auth user ID
+	clientName: string
+	clientEmail: string
+	practitionerName: string
+	practitionerEmail: string
+	startTime: string // ISO string
+	endTime: string // ISO string
+	bookingNotes?: string
+}
+
+/**
+ * Result of calendar event creation
+ */
+export interface CalendarEventResult {
+	success: boolean
+	googleEventId?: string
+	googleMeetLink?: string
+	error?: string
+}
+
+/**
+ * Creates a Google Calendar event with client invite and Google Meet link
+ * This function handles the complete flow of creating an event in the practitioner's calendar
+ * and automatically sending an invitation to the client.
+ *
+ * @param payload - Event creation data including user, client, and booking details
+ * @returns Promise<CalendarEventResult> - Result containing event ID and Meet link or error
+ */
+export async function createCalendarEventWithInvite(
+	payload: CreateCalendarEventPayload,
+	supabaseClient?: SupabaseClient
+): Promise<CalendarEventResult> {
+	const {
+		userId,
+		clientName,
+		clientEmail,
+		practitionerName,
+		practitionerEmail,
+		startTime,
+		endTime,
+		bookingNotes
+	} = payload
+
+	try {
+		// Fetch user's calendar tokens
+		const calendarTokens = await getUserCalendarTokens(
+			userId,
+			supabaseClient
+		)
+
+		if (!calendarTokens) {
+			throw new Error('Calendar tokens not found')
+		}
+
+		// Non-null assertion since we've checked above
+		const tokens = calendarTokens!
+
+		// Check if the access token is expired and refresh if needed
+		const now = Date.now()
+		if (
+			(tokens.expiry_date && tokens.expiry_date < now) ||
+			true // Force refresh for now to ensure fresh tokens
+		) {
+			const newAccessToken = await refreshToken(
+				userId,
+				tokens.refresh_token,
+				supabaseClient
+			)
+			oauth2Client.setCredentials({
+				access_token: newAccessToken,
+				refresh_token: tokens.refresh_token
+			})
+		} else {
+			oauth2Client.setCredentials({
+				access_token: tokens.access_token,
+				refresh_token: tokens.refresh_token
+			})
+		}
+
+		// Create calendar instance
+		const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
+
+		// Generate unique conference request ID
+		const conferenceRequestId = `booking-${Date.now()}-${Math.random()
+			.toString(36)
+			.substring(2, 15)}`
+
+		// Create the event object
+		const eventData = {
+			summary: `${clientName} - ${practitionerName}`,
+			description: bookingNotes
+				? `Consultation appointment.\n\nNotes: ${bookingNotes}`
+				: 'Consultation appointment.',
+			start: {
+				dateTime: startTime,
+				timeZone: 'UTC'
+			},
+			end: {
+				dateTime: endTime,
+				timeZone: 'UTC'
+			},
+			attendees: [
+				{
+					email: practitionerEmail,
+					responseStatus: 'accepted'
+				},
+				{
+					email: clientEmail,
+					responseStatus: 'needsAction'
+				}
+			],
+			conferenceData: {
+				createRequest: {
+					requestId: conferenceRequestId,
+					conferenceSolutionKey: {
+						type: 'hangoutsMeet'
+					}
+				}
+			},
+			reminders: {
+				useDefault: false,
+				overrides: [
+					{ method: 'email', minutes: 24 * 60 }, // 24 hours before
+					{ method: 'popup', minutes: 30 } // 30 minutes before
+				]
+			},
+			guestsCanModify: false,
+			guestsCanInviteOthers: false,
+			guestsCanSeeOtherGuests: false
+		}
+
+		// Create the event
+		const response = await calendar.events.insert({
+			calendarId: 'primary',
+			requestBody: eventData,
+			conferenceDataVersion: 1, // Required for conference creation
+			sendUpdates: 'all' // Send invitations to all attendees
+		})
+
+		const createdEvent = response.data
+
+		if (!createdEvent.id) {
+			throw new Error(
+				'Failed to create calendar event: No event ID returned'
+			)
+		}
+
+		// Extract Google Meet link
+		const googleMeetLink =
+			createdEvent.conferenceData?.entryPoints?.find(
+				(entry) => entry.entryPointType === 'video'
+			)?.uri || null
+
+		return {
+			success: true,
+			googleEventId: createdEvent.id,
+			googleMeetLink: googleMeetLink || undefined
+		}
+	} catch (error: any) {
+		console.error('Calendar event creation error:', {
+			message: error.message,
+			code: error.code,
+			status: error.status,
+			userId
+		})
+
+		return {
+			success: false,
+			error: `Failed to create calendar event: ${error.message}`
+		}
 	}
 }

@@ -200,6 +200,9 @@ async function createInAdvanceBooking(
 						amount: billing.amount,
 						practitionerName:
 							practitioner.name || 'Your Practitioner',
+						practitionerEmail: practitioner.email,
+						startTime: request.startTime,
+						endTime: request.endTime,
 						supabaseClient
 					}
 				)
