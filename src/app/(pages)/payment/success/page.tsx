@@ -80,7 +80,8 @@ export default function BookingConfirmationPage() {
 								day: 'numeric',
 								hour: '2-digit',
 								minute: '2-digit'
-							})}{' '}
+							})}
+							{'h '}
 						</span>
 						está confirmada. En breves recibirás un email con los
 						detalles.
