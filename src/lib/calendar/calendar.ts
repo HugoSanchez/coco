@@ -530,3 +530,58 @@ export async function updatePendingToConfirmed(
 		}
 	}
 }
+
+/**
+ * Fetches Google Calendar events for a specific day
+ * Returns external calendar events (meetings, appointments, etc.) to show as "busy" time
+ *
+ * @param userId - Practitioner's user ID
+ * @param date - Date to fetch events for
+ * @param supabaseClient - Optional Supabase client for backend operations
+ * @returns Promise<Array> - Array of events formatted for DayViewTimeSelector
+ */
+export async function getGoogleCalendarEventsForDay(
+	userId: string,
+	date: Date,
+	supabaseClient?: SupabaseClient
+): Promise<Array<{ start: string; end: string; title: string; type: string }>> {
+	try {
+		// Get authenticated calendar client
+		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+
+		// Set up date range for the specific day
+		const startOfDay = new Date(date)
+		startOfDay.setHours(0, 0, 0, 0)
+
+		const endOfDay = new Date(date)
+		endOfDay.setHours(23, 59, 59, 999)
+
+		// Fetch events for the day
+		const response = await calendar.events.list({
+			calendarId: 'primary',
+			timeMin: startOfDay.toISOString(),
+			timeMax: endOfDay.toISOString(),
+			singleEvents: true,
+			orderBy: 'startTime'
+		})
+
+		const events = response.data.items || []
+
+		// Transform events to the format expected by DayViewTimeSelector
+		return events
+			.filter((event) => {
+				// Only include events with time data (skip all-day events)
+				return event.start?.dateTime && event.end?.dateTime
+			})
+			.map((event) => ({
+				start: event.start!.dateTime!,
+				end: event.end!.dateTime!,
+				title: 'Busy', // Generic title for privacy
+				type: 'external' // Mark as external calendar event
+			}))
+	} catch (error: any) {
+		// Silent failure - if Google Calendar access fails, just return empty array
+		console.error('Failed to fetch Google Calendar events:', error.message)
+		return []
+	}
+}

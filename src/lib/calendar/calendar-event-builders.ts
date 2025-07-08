@@ -63,13 +63,6 @@ export function buildFullEventData({
 				}
 			}
 		},
-		reminders: {
-			useDefault: false,
-			overrides: [
-				{ method: 'email', minutes: 24 * 60 }, // 24 hours before
-				{ method: 'popup', minutes: 30 } // 30 minutes before
-			]
-		},
 		guestsCanModify: false,
 		guestsCanInviteOthers: false,
 		guestsCanSeeOtherGuests: false
@@ -112,13 +105,6 @@ export function buildPendingEventData({
 				responseStatus: 'accepted'
 			}
 		],
-		// No conference data (Google Meet) for pending events
-		reminders: {
-			useDefault: false,
-			overrides: [
-				{ method: 'popup', minutes: 15 } // Just a simple reminder for practitioner
-			]
-		},
 		// Restrict guest permissions since this is just a placeholder
 		guestsCanModify: false,
 		guestsCanInviteOthers: false,
@@ -174,14 +160,6 @@ export function buildConfirmedEventData({
 					type: 'hangoutsMeet'
 				}
 			}
-		},
-		// Enhanced reminders for confirmed appointments
-		reminders: {
-			useDefault: false,
-			overrides: [
-				{ method: 'email', minutes: 24 * 60 }, // 24 hours before
-				{ method: 'popup', minutes: 30 } // 30 minutes before
-			]
 		},
 		// Guest permissions for confirmed appointments
 		guestsCanModify: false,

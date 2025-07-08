@@ -26,9 +26,7 @@ import { useUser } from '@/contexts/UserContext'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Label } from '@/components/ui/label'
-// Removed direct import - now using API route
 import { useToast } from '@/components/ui/use-toast'
-import { getBookingsForDateRange } from '@/lib/db/bookings'
 
 interface BookingFormProps {
 	onSuccess?: () => void // Called when booking is successfully created
@@ -83,27 +81,9 @@ export function BookingForm({
 		if (!user?.id) return
 
 		try {
-			// Get start and end of the selected day
-			const startOfDay = new Date(date)
-			startOfDay.setHours(0, 0, 0, 0)
-
-			const endOfDay = new Date(date)
-			endOfDay.setHours(23, 59, 59, 999)
-
-			const bookings = await getBookingsForDateRange(
-				user.id,
-				startOfDay.toISOString(),
-				endOfDay.toISOString()
-			)
-
-			// Transform bookings to the format expected by DayViewTimeSelector
-			const formattedBookings = bookings.map((booking) => ({
-				start: booking.start_time,
-				end: booking.end_time,
-				title: `Ocupado - ${booking.client?.name || 'Cliente'}`
-			}))
-
-			setExistingBookings(formattedBookings)
+			// For now, just set empty array to get the app working again
+			// We can add back the Google Calendar integration step by step
+			setExistingBookings([])
 		} catch (error) {
 			console.error('Error fetching existing bookings:', error)
 			setExistingBookings([])
