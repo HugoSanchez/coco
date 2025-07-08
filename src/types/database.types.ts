@@ -193,6 +193,7 @@ export type Database = {
           booking_id: string
           created_at: string | null
           event_status: string
+          event_type: string
           google_event_id: string
           google_meet_link: string | null
           id: string
@@ -203,6 +204,7 @@ export type Database = {
           booking_id: string
           created_at?: string | null
           event_status?: string
+          event_type?: string
           google_event_id: string
           google_meet_link?: string | null
           id?: string
@@ -213,6 +215,7 @@ export type Database = {
           booking_id?: string
           created_at?: string | null
           event_status?: string
+          event_type?: string
           google_event_id?: string
           google_meet_link?: string | null
           id?: string

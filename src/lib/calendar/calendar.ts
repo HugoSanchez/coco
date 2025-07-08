@@ -1,12 +1,45 @@
+/**
+ * Google Calendar Integration Service
+ *
+ * This module provides comprehensive Google Calendar integration for booking appointments
+ * with a two-phase calendar event system:
+ *
+ * PHASE 1 - PENDING EVENTS (during payment processing):
+ * - Creates placeholder events to prevent double-booking
+ * - Light green color, no client invitations, no Google Meet
+ * - Title format: "[Client Name] - Pending"
+ *
+ * PHASE 2 - CONFIRMED EVENTS (after successful payment):
+ * - Converts pending events to full appointments
+ * - Dark green color, client invitations, Google Meet links
+ * - Title format: "[Client Name] - [Practitioner Name]"
+ *
+ * FEATURES:
+ * - Automatic Google Calendar OAuth token refresh
+ * - Google Meet conference room generation
+ * - Email invitations and reminders
+ * - Professional appointment formatting
+ * - Availability slot calculation
+ * - Two-way calendar synchronization
+ *
+ * USAGE PATTERNS:
+ * 1. Booking creation → createPendingCalendarEvent()
+ * 2. Payment success → updatePendingToConfirmed()
+ * 3. Direct booking → createCalendarEventWithInvite() (skip pending)
+ */
+
 import { google } from 'googleapis'
 import { createClient as createSupabaseClient } from '@/lib/supabase/client'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
+import { getUserEmail } from '../db/profiles'
+import { getAuthenticatedCalendar } from '../google'
 import {
-	updateUserCalendarTokens,
-	getUserCalendarTokens
-} from '../db/calendar-tokens'
-import { oauth2Client } from '../google'
+	buildFullEventData,
+	buildPendingEventData,
+	buildConfirmedEventData,
+	generateConferenceRequestId
+} from './calendar-event-builders'
 import {
 	parseISO,
 	isWithinInterval,
@@ -44,45 +77,6 @@ interface AvailabilitySettings {
 }
 
 const supabase = createSupabaseClient()
-
-// Function to refresh the access token
-// This function is used to refresh the access token when it expires
-// It takes the user's ID and the refresh token as arguments
-// It returns the new access token from Google.
-async function refreshToken(
-	userId: string,
-	refreshToken: string,
-	supabaseClient?: SupabaseClient
-) {
-	// Set the credentials to the refresh token
-	oauth2Client.setCredentials({ refresh_token: refreshToken })
-
-	try {
-		// Ask Google for a new access token
-		const tokenResponse = await oauth2Client.getAccessToken()
-		// If unsuccessful, throw an error
-		if (!tokenResponse.token)
-			throw new Error('No access token returned after refresh')
-		// Else,
-		else {
-			// Extract expiry duration (defaults to 1 hour if not provided)
-			const expiryDuration = oauth2Client.credentials.expiry_date
-				? oauth2Client.credentials.expiry_date - Date.now()
-				: 3600 * 1000
-			// update the token in the database
-			await updateUserCalendarTokens(
-				tokenResponse,
-				userId,
-				expiryDuration,
-				supabaseClient
-			)
-			// and return token
-			return tokenResponse.token
-		}
-	} catch (error: any) {
-		throw error
-	}
-}
 
 function calculateAvailableSlots(
 	availabilitySettings: AvailabilitySettings,
@@ -203,47 +197,9 @@ export async function getAvailableSlots(username: string, month: Date) {
 		throw new Error('Availability settings not found')
 	}
 
-	// Fetch user's calendar tokens
-	const { data: calendarTokens, error: tokensError } = await supabase
-		.from('calendar_tokens')
-		.select('*')
-		.eq('user_id', userId)
-		.single()
-
-	if (tokensError) {
-		throw new Error('Calendar tokens not found')
-	}
-
-	// Get the current time
-	const now = Date.now()
-	// Check if the access token is expired
-	if (
-		(calendarTokens.expiry_date && calendarTokens.expiry_date < now) ||
-		true
-	) {
-		console.log('Access token expired, refreshing...')
-		// Call the refreshToken function to get a new access token
-		const newAccessToken = await refreshToken(
-			userId,
-			calendarTokens.refresh_token,
-			undefined // No supabaseClient needed for public function
-		)
-		// Set the new access token
-		oauth2Client.setCredentials({
-			access_token: newAccessToken,
-			refresh_token: calendarTokens.refresh_token
-		})
-	} else {
-		// If tokens are not expired, just set the access token
-		oauth2Client.setCredentials({
-			access_token: calendarTokens.access_token,
-			refresh_token: calendarTokens.refresh_token
-		})
-	}
-
 	try {
-		// Create a calendar instance with the OAuth2 client
-		const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
+		// Get authenticated calendar client using the new helper
+		const calendar = await getAuthenticatedCalendar(userId)
 		// Now proceed with the calendar events fetch
 		const monthStart = startOfMonth(month)
 		const monthEnd = endOfMonth(month)
@@ -274,7 +230,8 @@ export async function getAvailableSlots(username: string, month: Date) {
 }
 
 /**
- * Interface for creating a calendar event with booking details
+ * Interface for creating a full calendar event with booking details
+ * Used for confirmed appointments with client invitations
  */
 export interface CreateCalendarEventPayload {
 	userId: string // Practitioner's auth user ID
@@ -285,6 +242,30 @@ export interface CreateCalendarEventPayload {
 	startTime: string // ISO string
 	endTime: string // ISO string
 	bookingNotes?: string
+}
+
+/**
+ * Interface for creating a pending calendar event (placeholder)
+ * Used for temporary calendar blocking before payment confirmation
+ */
+export interface CreatePendingCalendarEventPayload {
+	userId: string // Practitioner's auth user ID
+	clientName: string
+	practitionerEmail: string // Practitioner's email for calendar attendee
+	startTime: string // ISO string
+	endTime: string // ISO string
+}
+
+/**
+ * Interface for updating a pending event to confirmed status
+ * Used to convert placeholder events to full appointments after payment
+ */
+export interface UpdatePendingToConfirmedPayload {
+	googleEventId: string // Existing Google Calendar event ID
+	userId: string // Practitioner's auth user ID
+	clientEmail: string
+	practitionerName: string
+	practitionerEmail: string
 }
 
 /**
@@ -321,92 +302,23 @@ export async function createCalendarEventWithInvite(
 	} = payload
 
 	try {
-		// Fetch user's calendar tokens
-		const calendarTokens = await getUserCalendarTokens(
-			userId,
-			supabaseClient
-		)
-
-		if (!calendarTokens) {
-			throw new Error('Calendar tokens not found')
-		}
-
-		// Non-null assertion since we've checked above
-		const tokens = calendarTokens!
-
-		// Check if the access token is expired and refresh if needed
-		const now = Date.now()
-		if (
-			(tokens.expiry_date && tokens.expiry_date < now) ||
-			true // Force refresh for now to ensure fresh tokens
-		) {
-			const newAccessToken = await refreshToken(
-				userId,
-				tokens.refresh_token,
-				supabaseClient
-			)
-			oauth2Client.setCredentials({
-				access_token: newAccessToken,
-				refresh_token: tokens.refresh_token
-			})
-		} else {
-			oauth2Client.setCredentials({
-				access_token: tokens.access_token,
-				refresh_token: tokens.refresh_token
-			})
-		}
-
-		// Create calendar instance
-		const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
+		// Get authenticated calendar client using the new helper
+		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
 
 		// Generate unique conference request ID
-		const conferenceRequestId = `booking-${Date.now()}-${Math.random()
-			.toString(36)
-			.substring(2, 15)}`
+		const conferenceRequestId = generateConferenceRequestId('booking')
 
-		// Create the event object
-		const eventData = {
-			summary: `${clientName} - ${practitionerName}`,
-			description: bookingNotes
-				? `Consultation appointment.\n\nNotes: ${bookingNotes}`
-				: 'Consultation appointment.',
-			start: {
-				dateTime: startTime,
-				timeZone: 'UTC'
-			},
-			end: {
-				dateTime: endTime,
-				timeZone: 'UTC'
-			},
-			attendees: [
-				{
-					email: practitionerEmail,
-					responseStatus: 'accepted'
-				},
-				{
-					email: clientEmail,
-					responseStatus: 'needsAction'
-				}
-			],
-			conferenceData: {
-				createRequest: {
-					requestId: conferenceRequestId,
-					conferenceSolutionKey: {
-						type: 'hangoutsMeet'
-					}
-				}
-			},
-			reminders: {
-				useDefault: false,
-				overrides: [
-					{ method: 'email', minutes: 24 * 60 }, // 24 hours before
-					{ method: 'popup', minutes: 30 } // 30 minutes before
-				]
-			},
-			guestsCanModify: false,
-			guestsCanInviteOthers: false,
-			guestsCanSeeOtherGuests: false
-		}
+		// Create the event object using the builder
+		const eventData = buildFullEventData({
+			clientName,
+			clientEmail,
+			practitionerName,
+			practitionerEmail,
+			startTime,
+			endTime,
+			bookingNotes,
+			conferenceRequestId
+		})
 
 		// Create the event
 		const response = await calendar.events.insert({
@@ -424,16 +336,9 @@ export async function createCalendarEventWithInvite(
 			)
 		}
 
-		// Extract Google Meet link
-		const googleMeetLink =
-			createdEvent.conferenceData?.entryPoints?.find(
-				(entry) => entry.entryPointType === 'video'
-			)?.uri || null
-
 		return {
 			success: true,
-			googleEventId: createdEvent.id,
-			googleMeetLink: googleMeetLink || undefined
+			googleEventId: createdEvent.id
 		}
 	} catch (error: any) {
 		console.error('Calendar event creation error:', {
@@ -446,6 +351,182 @@ export async function createCalendarEventWithInvite(
 		return {
 			success: false,
 			error: `Failed to create calendar event: ${error.message}`
+		}
+	}
+}
+
+/**
+ * Creates a pending (placeholder) Google Calendar event for booking reservation
+ *
+ * This function creates a temporary calendar event that reserves the time slot
+ * while payment is being processed. The event serves as a visual indicator
+ * to prevent double-booking and shows pending status to the practitioner.
+ *
+ * Event characteristics:
+ * - Light green color (Google Calendar Color ID 2)
+ * - Only practitioner as attendee (no client invitation)
+ * - No Google Meet link
+ * - Title format: "[Client Name] - Pending"
+ * - No email notifications sent
+ *
+ * @param payload - Pending event creation data
+ * @param supabaseClient - Optional SupabaseClient for backend operations
+ * @returns Promise<CalendarEventResult> - Result with Google event ID or error
+ */
+export async function createPendingCalendarEvent(
+	payload: CreatePendingCalendarEventPayload,
+	supabaseClient?: SupabaseClient
+): Promise<CalendarEventResult> {
+	const { userId, clientName, practitionerEmail, startTime, endTime } =
+		payload
+
+	try {
+		// Get authenticated calendar client using the new helper
+		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+
+		// Create the pending event object using the builder
+		const eventData = buildPendingEventData({
+			clientName,
+			practitionerEmail,
+			startTime,
+			endTime
+		})
+
+		// Create the pending event in Google Calendar
+		const response = await calendar.events.insert({
+			calendarId: 'primary',
+			requestBody: eventData,
+			sendUpdates: 'none' // Don't send any notifications for pending events
+		})
+
+		const createdEvent = response.data
+
+		if (!createdEvent.id) {
+			throw new Error(
+				'Failed to create pending calendar event: No event ID returned'
+			)
+		}
+
+		return {
+			success: true,
+			googleEventId: createdEvent.id,
+			googleMeetLink: undefined // No meet link for pending events
+		}
+	} catch (error: any) {
+		console.error('Pending calendar event creation error:', {
+			message: error.message,
+			code: error.code,
+			status: error.status,
+			userId
+		})
+
+		return {
+			success: false,
+			error: `Failed to create pending calendar event: ${error.message}`
+		}
+	}
+}
+
+/**
+ * Updates a pending calendar event to confirmed status after successful payment
+ *
+ * This function takes an existing placeholder event and transforms it into
+ * a full appointment with client invitation, Google Meet link, and updated
+ * visual styling. This provides a seamless transition from pending to confirmed.
+ *
+ * Updates applied:
+ * - Title: Remove "- Pending", add practitioner name
+ * - Color: Change to dark green (Google Calendar Color ID 10)
+ * - Attendees: Add client email with invitation
+ * - Conference: Add Google Meet link
+ * - Notifications: Send invitation emails to client
+ *
+ * @param payload - Event update data including Google event ID and attendee info
+ * @param supabaseClient - Optional SupabaseClient for backend operations
+ * @returns Promise<CalendarEventResult> - Result with updated event details or error
+ */
+export async function updatePendingToConfirmed(
+	payload: UpdatePendingToConfirmedPayload,
+	supabaseClient?: SupabaseClient
+): Promise<CalendarEventResult> {
+	const {
+		googleEventId,
+		userId,
+		clientEmail,
+		practitionerName,
+		practitionerEmail
+	} = payload
+
+	try {
+		// Get authenticated calendar client using the new helper
+		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+
+		// First, get the current event to extract client name from title
+		const currentEvent = await calendar.events.get({
+			calendarId: 'primary',
+			eventId: googleEventId
+		})
+
+		// Extract client name by removing " - Pending" from the current title
+		const currentTitle = currentEvent.data.summary || ''
+		const clientName = currentTitle.replace(' - Pending', '')
+
+		// Preserve the original start and end times from the existing event
+		const originalStart = currentEvent.data.start
+		const originalEnd = currentEvent.data.end
+
+		if (!originalStart || !originalEnd) {
+			throw new Error('Original event missing start or end time')
+		}
+
+		// Generate unique conference request ID for Google Meet
+		const conferenceRequestId = generateConferenceRequestId('confirmed')
+
+		// Prepare the updated event data using the builder
+		const updatedEventData = buildConfirmedEventData({
+			clientName,
+			clientEmail,
+			practitionerName,
+			practitionerEmail,
+			originalStart,
+			originalEnd,
+			conferenceRequestId
+		})
+
+		// Update the existing event in Google Calendar
+		const response = await calendar.events.update({
+			calendarId: 'primary',
+			eventId: googleEventId,
+			requestBody: updatedEventData,
+			conferenceDataVersion: 1, // Required for Google Meet creation
+			sendUpdates: 'all' // Send invitations to all attendees (especially the client)
+		})
+
+		const updatedEvent = response.data
+
+		// Extract Google Meet link from the updated event
+		const googleMeetLink =
+			updatedEvent.conferenceData?.entryPoints?.find(
+				(entry) => entry.entryPointType === 'video'
+			)?.uri || undefined
+
+		return {
+			success: true,
+			googleEventId: updatedEvent.id!,
+			googleMeetLink
+		}
+	} catch (error: any) {
+		console.error('Calendar event update error:', {
+			message: error.message,
+			code: error.code,
+			status: error.status,
+			googleEventId,
+			userId
+		})
+
+		return {
+			success: false,
+			error: `Failed to update calendar event: ${error.message}`
 		}
 	}
 }

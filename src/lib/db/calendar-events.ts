@@ -47,6 +47,7 @@ export interface CreateCalendarEventPayload {
 	google_event_id: string
 	google_meet_link?: string
 	event_status?: 'created' | 'updated' | 'cancelled'
+	event_type?: 'pending' | 'confirmed'
 }
 
 /**
@@ -65,7 +66,8 @@ export async function createCalendarEvent(
 	// Set default values
 	const calendarEventData = {
 		...payload,
-		event_status: payload.event_status || 'created'
+		event_status: payload.event_status || 'created',
+		event_type: payload.event_type || 'pending'
 	}
 
 	// Use provided client or fall back to default
@@ -159,6 +161,37 @@ export async function updateCalendarEventStatus(
 		.from('calendar_events')
 		.update({
 			event_status: status,
+			updated_at: new Date().toISOString()
+		})
+		.eq('id', calendarEventId)
+		.select()
+		.single()
+
+	if (error) throw error
+	return data
+}
+
+/**
+ * Updates a calendar event's type (pending to confirmed)
+ * Used when converting placeholder events to full appointments after payment
+ *
+ * @param calendarEventId - UUID of the calendar event to update
+ * @param eventType - New event type ('pending' or 'confirmed')
+ * @param supabaseClient - Optional SupabaseClient instance
+ * @returns Promise<CalendarEvent> - The updated calendar event record
+ * @throws Error if update fails or calendar event not found
+ */
+export async function updateCalendarEventType(
+	calendarEventId: string,
+	eventType: 'pending' | 'confirmed',
+	supabaseClient?: SupabaseClient
+): Promise<CalendarEvent> {
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
+		.from('calendar_events')
+		.update({
+			event_type: eventType,
 			updated_at: new Date().toISOString()
 		})
 		.eq('id', calendarEventId)

@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { markPaymentSessionCompleted } from '@/lib/db/payment-sessions'
 import { updateBookingStatus } from '@/lib/db/bookings'
 import { getBillForBookingAndMarkAsPaid } from '@/lib/db/bills'
-import { createCalendarEvent } from '@/lib/db/calendar-events'
-import { createCalendarEventWithInvite } from '@/lib/calendar/calendar'
+import {
+	createCalendarEvent,
+	getCalendarEventsForBooking,
+	updateCalendarEventType
+} from '@/lib/db/calendar-events'
+import { updatePendingToConfirmed } from '@/lib/calendar/calendar'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 
@@ -60,7 +64,7 @@ export async function POST(request: NextRequest) {
 			await getBillForBookingAndMarkAsPaid(bookingId, supabase)
 
 			///////////////////////////////////////////////////////////
-			///// 4. Create Google Calendar event
+			///// 4. Update pending calendar event to confirmed
 			///////////////////////////////////////////////////////////
 			try {
 				// Extract all needed data from session metadata (no database calls needed!)
@@ -98,45 +102,73 @@ export async function POST(request: NextRequest) {
 					return NextResponse.json({ received: true })
 				}
 
-				// Create calendar event with invite
-				const calendarResult = await createCalendarEventWithInvite(
+				// Find the existing pending calendar event for this booking
+				const existingEvents = await getCalendarEventsForBooking(
+					bookingId,
+					supabase
+				)
+				const pendingEvent = existingEvents.find(
+					(event) => event.event_type === 'pending'
+				)
+
+				if (!pendingEvent) {
+					console.error(
+						`No pending calendar event found for booking ${bookingId}`
+					)
+					return NextResponse.json({ received: true })
+				}
+
+				// Update the pending event to confirmed with full appointment details
+				const calendarResult = await updatePendingToConfirmed(
 					{
+						googleEventId: pendingEvent.google_event_id,
 						userId: practitionerUserId,
-						clientName,
 						clientEmail,
 						practitionerName,
-						practitionerEmail,
-						startTime,
-						endTime
+						practitionerEmail
 					},
 					supabase
 				)
 
 				if (calendarResult.success && calendarResult.googleEventId) {
-					// Store calendar event in database
-					await createCalendarEvent(
-						{
-							booking_id: bookingId,
-							user_id: practitionerUserId,
-							google_event_id: calendarResult.googleEventId,
-							google_meet_link: calendarResult.googleMeetLink
-						},
+					// Update the calendar event record in database to confirmed status
+					await updateCalendarEventType(
+						pendingEvent.id,
+						'confirmed',
 						supabase
 					)
 
+					// Update the Google Meet link and status separately if needed
+					if (calendarResult.googleMeetLink) {
+						const { error: updateError } = await supabase
+							.from('calendar_events')
+							.update({
+								google_meet_link: calendarResult.googleMeetLink,
+								event_status: 'updated'
+							})
+							.eq('id', pendingEvent.id)
+
+						if (updateError) {
+							console.error(
+								`Failed to update Meet link for event ${pendingEvent.id}:`,
+								updateError
+							)
+						}
+					}
+
 					console.log(
-						`Calendar event created for booking ${bookingId}: ${calendarResult.googleEventId}`
+						`Calendar event updated from pending to confirmed for booking ${bookingId}: ${calendarResult.googleEventId}`
 					)
 				} else {
 					console.error(
-						`Failed to create calendar event for booking ${bookingId}:`,
+						`Failed to update calendar event for booking ${bookingId}:`,
 						calendarResult.error
 					)
 				}
 			} catch (calendarError) {
-				// Don't fail the webhook if calendar creation fails
+				// Don't fail the webhook if calendar update fails
 				console.error(
-					`Calendar creation error for booking ${bookingId}:`,
+					`Calendar update error for booking ${bookingId}:`,
 					calendarError
 				)
 			}

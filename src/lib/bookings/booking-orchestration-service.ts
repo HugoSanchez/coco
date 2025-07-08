@@ -37,6 +37,8 @@ import { sendConsultationBillEmail } from '@/lib/emails/email-service'
 import { getProfileById } from '@/lib/db/profiles'
 import { paymentOrchestrationService } from '@/lib/payments/payment-orchestration-service'
 import { createEmailCommunication } from '@/lib/db/email-communications'
+import { createPendingCalendarEvent } from '@/lib/calendar/calendar'
+import { createCalendarEvent } from '@/lib/db/calendar-events'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
@@ -165,6 +167,64 @@ async function createInAdvanceBooking(
 		request.clientId,
 		supabaseClient
 	)
+
+	// Create pending calendar event to reserve the time slot
+	// This prevents double-booking while payment is being processed
+	try {
+		const client = await getClientById(request.clientId, supabaseClient)
+		const practitioner = await getProfileById(
+			request.userId,
+			supabaseClient
+		)
+
+		if (!client) {
+			throw new Error(`Client not found: ${request.clientId}`)
+		}
+
+		if (!practitioner) {
+			throw new Error(`Practitioner profile not found: ${request.userId}`)
+		}
+
+		const pendingEventResult = await createPendingCalendarEvent(
+			{
+				userId: request.userId,
+				clientName: client.name,
+				practitionerEmail: practitioner.email,
+				startTime: request.startTime,
+				endTime: request.endTime
+			},
+			supabaseClient
+		)
+
+		if (pendingEventResult.success && pendingEventResult.googleEventId) {
+			// Store the pending calendar event in database
+			await createCalendarEvent(
+				{
+					booking_id: booking.id,
+					user_id: request.userId,
+					google_event_id: pendingEventResult.googleEventId,
+					event_type: 'pending',
+					event_status: 'created'
+				},
+				supabaseClient
+			)
+
+			console.log(
+				`Pending calendar event created for booking ${booking.id}: ${pendingEventResult.googleEventId}`
+			)
+		} else {
+			console.error(
+				`Failed to create pending calendar event for booking ${booking.id}:`,
+				pendingEventResult.error
+			)
+		}
+	} catch (calendarError) {
+		// Don't fail the booking creation if calendar event fails
+		console.error(
+			`Pending calendar creation error for booking ${booking.id}:`,
+			calendarError
+		)
+	}
 
 	// If amount > 0, requires payment - create payment session and send email
 	const requiresPayment = billing.amount > 0
