@@ -155,15 +155,18 @@ export async function getBookingsForUser(
  * @param userId - The UUID of the user whose bookings to fetch
  * @param startDate - Start of date range (ISO string)
  * @param endDate - End of date range (ISO string)
+ * @param supabaseClient - Optional SupabaseClient instance for server-side usage
  * @returns Promise<BookingWithClient[]> - Array of bookings in the date range
  * @throws Error if database operation fails
  */
 export async function getBookingsForDateRange(
 	userId: string,
 	startDate: string,
-	endDate: string
+	endDate: string,
+	supabaseClient?: SupabaseClient
 ): Promise<BookingWithClient[]> {
-	const { data, error } = await supabase
+	const client = supabaseClient || supabase
+	const { data, error } = await client
 		.from('bookings')
 		.select(
 			`

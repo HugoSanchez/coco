@@ -14,7 +14,14 @@ interface DayViewTimeSelectorProps {
 	date: Date
 	onTimeSelect: (startTime: string, endTime: string) => void
 	onClearSelection?: () => void
-	existingBookings?: Array<{ start: string; end: string; title?: string }>
+	existingBookings?: Array<{
+		start: string
+		end: string
+		title?: string
+		type?: string
+		status?: 'pending' | 'confirmed'
+		bookingId?: string
+	}>
 	initialSelectedSlot?: { start: string; end: string } | null
 }
 
@@ -169,7 +176,9 @@ export function DayViewTimeSelector({
 		return {
 			top: timeToPixel(startMinutes),
 			height: timeToPixel(endMinutes) - timeToPixel(startMinutes),
-			title: booking.title || 'Ocupado'
+			title: booking.title || 'Ocupado',
+			type: booking.type || 'system',
+			status: booking.status
 		}
 	})
 
@@ -291,18 +300,47 @@ export function DayViewTimeSelector({
 						))}
 
 						{/* Existing Bookings */}
-						{bookingBlocks.map((block, index) => (
-							<div
-								key={index}
-								className="absolute left-1 right-1 bg-red-50 border border-red-200 rounded px-2 py-1 text-xs text-gray-700 z-10"
-								style={{
-									top: `${block.top}px`,
-									height: `${block.height}px`
-								}}
-							>
-								{block.title}
-							</div>
-						))}
+						{bookingBlocks.map((block, index) => {
+							// Style based on event type and status
+							let className =
+								'absolute left-1 right-1 rounded px-2 py-1 text-xs z-10 '
+
+							if (block.type === 'external') {
+								className +=
+									'bg-gray-100 border border-gray-300 text-gray-600'
+							} else if (block.status === 'pending') {
+								className +=
+									'bg-yellow-50 border border-yellow-200 text-yellow-700'
+							} else {
+								className +=
+									'bg-red-50 border border-red-200 text-gray-700'
+							}
+
+							return (
+								<div
+									key={index}
+									className={className}
+									style={{
+										top: `${block.top}px`,
+										height: `${block.height}px`
+									}}
+									title={
+										block.type === 'external'
+											? 'Busy'
+											: `${block.title} - ${block.status === 'pending' ? 'Pendiente' : 'Confirmado'}`
+									}
+								>
+									<div>{block.title}</div>
+									{block.type === 'system' && (
+										<div className="text-xs opacity-75">
+											{block.status === 'pending'
+												? 'Pendiente'
+												: 'Confirmado'}
+										</div>
+									)}
+								</div>
+							)
+						})}
 
 						{/* Drag Preview / Selected Slot - Unified */}
 						{(dragPreview || selectedSlotDisplay) && (

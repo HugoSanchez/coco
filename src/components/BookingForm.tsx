@@ -58,7 +58,14 @@ export function BookingForm({
 	const [selectedClient, setSelectedClient] = useState<string>('') // Client ID selected in step 3
 	const [notes, setNotes] = useState('') // Optional notes for the booking
 	const [existingBookings, setExistingBookings] = useState<
-		Array<{ start: string; end: string; title?: string }>
+		Array<{
+			start: string
+			end: string
+			title?: string
+			type?: string
+			status?: 'pending' | 'confirmed'
+			bookingId?: string
+		}>
 	>([])
 
 	// Context and utilities
@@ -81,9 +88,24 @@ export function BookingForm({
 		if (!user?.id) return
 
 		try {
-			// For now, just set empty array to get the app working again
-			// We can add back the Google Calendar integration step by step
-			setExistingBookings([])
+			// Get start and end of the selected day
+			const startOfDay = new Date(date)
+			startOfDay.setHours(0, 0, 0, 0)
+
+			const endOfDay = new Date(date)
+			endOfDay.setHours(23, 59, 59, 999)
+
+			// Call our API endpoint to get combined events
+			const response = await fetch(
+				`/api/calendar/events?start=${startOfDay.toISOString()}&end=${endOfDay.toISOString()}`
+			)
+
+			if (!response.ok) {
+				throw new Error('Failed to fetch calendar events')
+			}
+
+			const data = await response.json()
+			setExistingBookings(data.events || [])
 		} catch (error) {
 			console.error('Error fetching existing bookings:', error)
 			setExistingBookings([])

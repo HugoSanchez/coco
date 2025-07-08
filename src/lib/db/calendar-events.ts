@@ -249,3 +249,24 @@ export async function getCalendarEventsForUser(
 	if (error) throw error
 	return data || []
 }
+
+/**
+ * Get Google Calendar event IDs for a user to filter out duplicates
+ * Simple approach - just return the IDs we need to exclude
+ */
+export async function getSystemGoogleEventIds(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<string[]> {
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
+		.from('calendar_events')
+		.select('google_event_id')
+		.eq('user_id', userId)
+		.not('google_event_id', 'is', null)
+
+	if (error) throw error
+
+	return (data || []).map((item) => item.google_event_id).filter(Boolean)
+}

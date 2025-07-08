@@ -544,7 +544,15 @@ export async function getGoogleCalendarEventsForDay(
 	userId: string,
 	date: Date,
 	supabaseClient?: SupabaseClient
-): Promise<Array<{ start: string; end: string; title: string; type: string }>> {
+): Promise<
+	Array<{
+		start: string
+		end: string
+		title: string
+		type: string
+		googleEventId: string
+	}>
+> {
 	try {
 		// Get authenticated calendar client
 		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
@@ -571,13 +579,14 @@ export async function getGoogleCalendarEventsForDay(
 		return events
 			.filter((event) => {
 				// Only include events with time data (skip all-day events)
-				return event.start?.dateTime && event.end?.dateTime
+				return event.start?.dateTime && event.end?.dateTime && event.id
 			})
 			.map((event) => ({
 				start: event.start!.dateTime!,
 				end: event.end!.dateTime!,
 				title: 'Busy', // Generic title for privacy
-				type: 'external' // Mark as external calendar event
+				type: 'external', // Mark as external calendar event
+				googleEventId: event.id! // Include Google event ID for filtering
 			}))
 	} catch (error: any) {
 		// Silent failure - if Google Calendar access fails, just return empty array
