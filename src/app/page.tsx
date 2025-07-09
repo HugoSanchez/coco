@@ -10,6 +10,7 @@ import {
 	TrendingUp,
 	Zap,
 	Target,
+	CheckCircle,
 	BarChart3,
 	ChevronDown,
 	ChevronUp
@@ -274,13 +275,16 @@ export default function LandingPage() {
 								Diseñado para profesionales de la salud
 							</Badge>
 						</div>
-						<h2 className="text-3xl md:text-4xl lg:text-5xl font-normal text-gray-900 mb-8 max-w-3xl mx-auto leading-tight">
-							Pónselo fácil a tus pacientes
+						<h2
+							style={{ lineHeight: 1.2 }}
+							className="text-3xl md:text-4xl lg:text-5xl font-normal text-gray-900 mb-8 max-w-3xl mx-auto"
+						>
+							Digitaliza tu consulta
 						</h2>
-						<p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed font-light">
-							Con coco, tanto la agenda como el cobro se gestionan
-							de forma automática, haciendo que puedas dedicar tu
-							tiempo a lo que realmente importa.
+						<p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed font-light">
+							Coco automatiza tanto la gestión de tu agenda como
+							el cobro de tus honorarios, haciendo que puedas
+							dedicar tu tiempo a lo que realmente importa.
 						</p>
 					</motion.div>
 
@@ -288,39 +292,21 @@ export default function LandingPage() {
 						{[
 							{
 								icon: Target,
-								title: 'Sencillo',
+								title: 'Evita malentendidos',
 								description:
-									'Crea una cita en tres sencillos pasos y olvídate del resto: dedica tu tiempo a lo que realmente importa.'
+									'Con coco tus pacientes y tú estaréis siempre en la misma página.'
 							},
 							{
 								icon: Users,
-								title: 'Rápido',
+								title: 'Olvídate de impagos',
 								description:
-									'Tendrás tu cuenta operativa y funcionando en menos de 10 minutos con tu calendario y pasarela de pagos integradas.'
+									'Crea una cita en tres sencillos pasos y olvídate del resto, coco lo tiene todo controlado.'
 							},
 							{
 								icon: Shield,
-								title: 'Seguro',
+								title: 'Tus cuentas, cuadradas',
 								description:
-									'Los pagos se proocesan a traves de Stripe, la pasarela de pagos más utilizada en el mundo.'
-							},
-							{
-								icon: BarChart3,
-								title: 'Reporting integrado',
-								description:
-									'Coco te permite tener visibilidad sobre tu facturación, clientes, impagos, y generar reportes a medida.'
-							},
-							{
-								icon: TrendingUp,
-								title: 'Google Calendar integrado',
-								description:
-									'Olvídate de mal entendidos, ahora tus pacientes y tu estaréis siempre en la misma página.'
-							},
-							{
-								icon: Zap,
-								title: 'Stripe integrado',
-								description:
-									'Stripe permite a tus pacientes pagar por tus consultas igual que pagan por cualquier otro servicio online, incluido Google y Apple Pay.'
+									'Deja de dedicarle horas a cuadrar tus cuentas, coco te lo pone muy fácil.'
 							}
 						].map((benefit, index) => (
 							<motion.div
@@ -333,24 +319,18 @@ export default function LandingPage() {
 								}}
 								viewport={{ once: true }}
 								className={`text-left font-light p-8 lg:p-12 bg-white ${
-									// Right border for all except last column
-									(index + 1) % 3 !== 0
-										? 'border-r border-gray-200'
+									index == 1
+										? 'sm:border-y lg:border-y-0 lg:border-x border-gray-200'
 										: ''
-								} ${
-									// Bottom border for top row
-									index < 3 ? 'border-b border-gray-200' : ''
 								}`}
 							>
-								<div className="mb-6">
-									<benefit.icon
-										className="w-5 h-5 text-gray-700"
-										strokeWidth={1}
-									/>
+								<div className="mb-6 flex flex-row items-center space-x-2">
+									<CheckCircle className="w-5 h-5 text-gray-800 mr-2" />
+									<h3 className="text-xl font-semibold text-gray-900 leading-tight">
+										{benefit.title}
+									</h3>
 								</div>
-								<h3 className="text-xl font-semibold text-gray-900 mb-4 leading-tight">
-									{benefit.title}
-								</h3>
+
 								<p className="text-gray-600 leading-relaxed text-base">
 									{benefit.description}
 								</p>
@@ -375,15 +355,19 @@ export default function LandingPage() {
 								className="text-3xl md:text-4xl lg:text-5xl font-normal text-gray-900 max-w-4xl"
 								style={{ lineHeight: '1.2' }}
 							>
-								Tu trabajo es mejorar la vida de tus pacientes,{' '}
 								<span className="text-gray-400 font-light">
-									nosotros te facilitamos el cobro de
-									honorarios. Empieza hoy.
+									En menos de 10 minutos tendrás
+								</span>{' '}
+								tu propia agenda virtual con pasarela de pago
+								integrada.
+								<span className="text-gray-400 font-light">
+									{' '}
+									Así de fácil
 								</span>
 							</h2>
 						</div>
 						<div className="flex-shrink-0 lg:ml-8 lg:mt-2">
-							<Button className="bg-gray-100 hover:bg-gray-200 text-gray-900 px-8 py-3 rounded-full text-base font-normal">
+							<Button className="bg-teal-400 hover:bg-teal-400/90 text-white px-8 py-3 rounded-full text-base font-normal">
 								Pruébalo
 								<ArrowRight className="ml-2 w-4 h-4" />
 							</Button>
@@ -404,7 +388,7 @@ export default function LandingPage() {
 					>
 						<div className="flex justify-center mb-8">
 							<Badge className="text-gray-600 bg-white border border-gray-200 px-4 py-2 rounded-full text-sm font-normal tracking-wide">
-								Features
+								Nuestras funcionalidades
 							</Badge>
 						</div>
 						<h2
@@ -609,21 +593,52 @@ export default function LandingPage() {
 							viewport={{ once: true }}
 							className="bg-white rounded-2xl border border-gray-100 overflow-hidden"
 						>
-							<div className="bg-gray-50 p-8 flex items-center justify-center min-h-[200px]">
-								<div className="text-center w-full">
-									<div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-										<span className="text-orange-600 text-2xl">
-											🔔
-										</span>
-									</div>
-									<div className="space-y-2">
-										<div className="flex items-center justify-center space-x-2">
-											<div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-											<div className="w-3 h-3 bg-green-400 rounded-full"></div>
-											<div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+							<div className="bg-gray-50 py-8 px-4 flex items-center justify-center min-h-[200px]">
+								<div className="w-full max-w-sm space-y-2">
+									{/* Reminder Card 1 - Payment Pending */}
+
+									{/* Reminder Card 2 - Payment Received */}
+									<div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200 opacity-75">
+										<div className="flex items-center justify-between">
+											<div className="flex items-center space-x-2">
+												<div className="text-xs font-medium text-gray-900 lg:mr-4">
+													10:30
+												</div>
+												<div>
+													<p className="text-xs font-medium text-gray-900">
+														Carlos R.
+													</p>
+													<p className="text-xs text-gray-500">
+														Pago recibido
+													</p>
+												</div>
+											</div>
+											<span className="text-xs px-2 lg:px-4 py-1 rounded-full bg-teal-100 text-teal-700">
+												Pagado
+											</span>
 										</div>
-										<div className="h-2 bg-gray-200 rounded w-3/4 mx-auto"></div>
-										<div className="h-2 bg-gray-200 rounded w-1/2 mx-auto"></div>
+									</div>
+
+									{/* Reminder Card 3 - Upcoming Reminder */}
+									<div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200 opacity-50">
+										<div className="flex items-center justify-between">
+											<div className="flex items-center space-x-2">
+												<div className="text-xs font-medium text-gray-900 lg:mr-4">
+													12:00
+												</div>
+												<div>
+													<p className="text-xs font-medium text-gray-900">
+														Ana L.
+													</p>
+													<p className="text-xs text-gray-500">
+														Próximo recordatorio
+													</p>
+												</div>
+											</div>
+											<span className="text-xs px-2 lg:px-4 py-1 rounded-full bg-gray-200 text-gray-700">
+												2 días
+											</span>
+										</div>
 									</div>
 								</div>
 							</div>
@@ -631,9 +646,10 @@ export default function LandingPage() {
 								<h3 className="text-lg font-semibold text-gray-900 mb-2">
 									Recordatorios inteligentes
 								</h3>
-								<p className="text-gray-600 text-sm leading-relaxed">
-									Deja de perseguir impagos, nosotros lo
-									hacemos por ti
+								<p className="text-gray-600 text-sm font-light leading-relaxed">
+									En un único dashboard tendrás visibilidad
+									sobre toda tu agenda y estado de facturación
+									de tus consultas
 								</p>
 							</div>
 						</motion.div>
@@ -646,32 +662,45 @@ export default function LandingPage() {
 							viewport={{ once: true }}
 							className="bg-white rounded-2xl border border-gray-100 overflow-hidden"
 						>
-							<div className="bg-gray-50 p-8 flex items-center justify-center min-h-[200px]">
-								<div className="text-center">
-									<div className="flex items-center justify-center space-x-3 mb-4">
-										<div className="w-12 h-8 bg-gray-300 rounded border-2 border-gray-400 flex items-center justify-center">
-											<div className="w-6 h-3 bg-blue-500 rounded-sm"></div>
-										</div>
-										<div className="w-4 h-8 bg-gray-300 rounded border-2 border-gray-400 flex items-center justify-center">
-											<div className="w-1 h-4 bg-blue-500 rounded-sm"></div>
-										</div>
-										<div className="w-6 h-4 bg-gray-300 rounded-full border-2 border-gray-400 flex items-center justify-center">
-											<div className="w-2 h-1 bg-blue-500 rounded-sm"></div>
+							<div className="bg-gray-50 py-16 px-4 flex items-center justify-center min-h-[200px]">
+								<div className="relative">
+									{/* Desktop/Tablet Device */}
+									<div className="relative bg-white rounded-xl shadow-lg border border-gray-200 w-32 h-20 p-2">
+										{/* Blue dot indicator */}
+										<div className="absolute top-2 left-2 w-1.5 h-1.5 bg-teal-500 rounded-full"></div>
+
+										{/* Content bars */}
+										<div className="mt-3 space-y-1">
+											<div className="h-1.5 bg-gray-200 rounded-full w-20"></div>
+											<div className="h-1.5 bg-gray-200 rounded-full w-16"></div>
+											<div className="h-1.5 bg-gray-200 rounded-full w-12"></div>
+											<div className="h-2 bg-teal-500 rounded-full w-10 mt-2"></div>
 										</div>
 									</div>
-									<div className="space-y-1">
-										<div className="h-2 bg-blue-200 rounded w-full"></div>
-										<div className="h-2 bg-gray-200 rounded w-3/4 mx-auto"></div>
-										<div className="h-2 bg-green-200 rounded w-1/2 mx-auto"></div>
+
+									{/* Mobile Device - Overlapping */}
+									<div className="absolute -bottom-2 -right-4 bg-white rounded-lg shadow-lg border border-gray-200 w-16 h-24 p-1.5">
+										{/* teal dot indicator */}
+										<div className="absolute top-1.5 left-1.5 w-1 h-1 bg-teal-500 rounded-full"></div>
+
+										{/* Content bars */}
+										<div className="mt-2 space-y-1">
+											<div className="h-1 bg-gray-200 rounded-full w-10"></div>
+											<div className="h-1 bg-gray-200 rounded-full w-8"></div>
+											<div className="h-1 bg-gray-200 rounded-full w-6"></div>
+											<div className="h-1.5 bg-teal-500 rounded-full w-7 mt-1.5"></div>
+										</div>
 									</div>
 								</div>
 							</div>
 							<div className="p-6">
 								<h3 className="text-lg font-semibold text-gray-900 mb-2">
-									Diseño responsive
+									Diseño moderno y responsive
 								</h3>
 								<p className="text-gray-600 text-sm leading-relaxed">
-									Gestiona tu día a día estés donde estés
+									Coco se adapta tanto a ti como tus
+									pacientes, facilitándote la gestión estés
+									donde estés.
 								</p>
 							</div>
 						</motion.div>
@@ -680,8 +709,8 @@ export default function LandingPage() {
 			</section>
 
 			{/* Cómo funciona Section */}
-			<section className="py-32 px-6 bg-white">
-				<div className="max-w-4xl mx-auto">
+			<section className="py-10 px-6 bg-white">
+				<div className="max-w-6xl mx-auto">
 					<motion.div
 						initial={{ y: 30, opacity: 0 }}
 						whileInView={{ y: 0, opacity: 1 }}
@@ -689,7 +718,7 @@ export default function LandingPage() {
 						viewport={{ once: true }}
 						className="mb-16"
 					>
-						<h2 className="text-2xl font-normal text-gray-900 mb-16">
+						<h2 className="text-lg font-light text-gray-900 mb-6">
 							Cómo funciona
 						</h2>
 
@@ -755,146 +784,44 @@ export default function LandingPage() {
 				</div>
 			</section>
 
-			{/* Features Section */}
-			<section className="py-20 px-6 bg-gray-50">
-				<div className="max-w-4xl mx-auto text-center">
+			{/* CTA Section */}
+			<section className="pt-20 pb-44 px-6 bg-white">
+				<div className="max-w-7xl mx-auto px-6 lg:px-8">
 					<motion.div
 						initial={{ y: 30, opacity: 0 }}
 						whileInView={{ y: 0, opacity: 1 }}
 						transition={{ duration: 0.6 }}
 						viewport={{ once: true }}
+						className="flex flex-col lg:flex-row lg:items-start lg:justify-between"
 					>
-						<p className="text-sm text-gray-500 mb-4 uppercase tracking-wide">
-							En menos de 5 minutos tendrás tu
-						</p>
-						<h2 className="text-3xl md:text-4xl font-light text-gray-900 mb-12">
-							propia agenda virtual con plataforma
-							<br />
-							de pago integrada
-						</h2>
-					</motion.div>
-
-					<div className="grid md:grid-cols-3 gap-8 mt-16">
-						{[
-							{
-								icon: Calendar,
-								title: 'Conecta tu calendario',
-								description:
-									'Sincroniza automáticamente con Google Calendar, Outlook y otros calendarios populares.'
-							},
-							{
-								icon: Check,
-								title: 'Completalo',
-								description:
-									'Añade tu información profesional, servicios y tarifas en pocos pasos.'
-							},
-							{
-								icon: ArrowRight,
-								title: 'No pierdas una cita',
-								description:
-									'Recibe notificaciones automáticas y gestiona tus citas desde cualquier dispositivo.'
-							}
-						].map((feature, index) => (
-							<motion.div
-								key={index}
-								initial={{ y: 30, opacity: 0 }}
-								whileInView={{ y: 0, opacity: 1 }}
-								transition={{
-									duration: 0.6,
-									delay: index * 0.1
-								}}
-								viewport={{ once: true }}
-								className="text-center"
+						<div className="mb-8 lg:mb-0 flex-1">
+							<h2
+								className="text-3xl md:text-4xl lg:text-5xl font-normal text-gray-900 max-w-4xl"
+								style={{ lineHeight: '1.2' }}
 							>
-								<div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-									<feature.icon className="w-6 h-6 text-green-600" />
-								</div>
-								<h3 className="text-lg font-medium text-gray-900 mb-3">
-									{feature.title}
-								</h3>
-								<p className="text-gray-600 text-sm leading-relaxed">
-									{feature.description}
-								</p>
-							</motion.div>
-						))}
-					</div>
-				</div>
-			</section>
-
-			{/* Steps Section */}
-			<section className="py-20 px-6">
-				<div className="max-w-2xl mx-auto">
-					<motion.div
-						initial={{ y: 30, opacity: 0 }}
-						whileInView={{ y: 0, opacity: 1 }}
-						transition={{ duration: 0.6 }}
-						viewport={{ once: true }}
-						className="text-center mb-12"
-					>
-						<h2 className="text-2xl md:text-3xl font-light text-gray-900 mb-4">
-							Tu trabajo se mejora la vida de tus pacientes.
-						</h2>
-						<p className="text-gray-600">
-							Nosotros te ayudamos a que el tuyo sea más fácil.
-						</p>
-					</motion.div>
-
-					<div className="space-y-6">
-						{[
-							'Crea tu calendario',
-							'Compártelo',
-							'No pierdas una cita'
-						].map((step, index) => (
-							<motion.div
-								key={index}
-								initial={{ x: -30, opacity: 0 }}
-								whileInView={{ x: 0, opacity: 1 }}
-								transition={{
-									duration: 0.6,
-									delay: index * 0.1
-								}}
-								viewport={{ once: true }}
-								className="flex items-center space-x-4 p-4 rounded-lg hover:bg-gray-50 transition-colors"
-							>
-								<div className="w-8 h-8 bg-gray-900 text-white rounded-full flex items-center justify-center text-sm font-medium">
-									{index + 1}
-								</div>
-								<span className="text-lg text-gray-900">
-									{step}
+								Tu trabajo es mejorar la vida de tus pacientes,{' '}
+								<span className="text-gray-400 font-light">
+									nosotros te facilitamos el cobro de
+									honorarios. Empieza hoy.
 								</span>
-							</motion.div>
-						))}
-					</div>
-				</div>
-			</section>
-
-			{/* FAQ Section */}
-			<section className="py-20 px-32 bg-white min-h-[400px] text-white">
-				<div className="max-w-2xl text-center">
-					<motion.div
-						initial={{ y: 30, opacity: 0 }}
-						whileInView={{ y: 0, opacity: 1 }}
-						transition={{ duration: 0.6 }}
-						viewport={{ once: true }}
-					>
-						<h2
-							style={{ lineHeight: 1.2 }}
-							className="text-2xl md:text-6xl font-normal text-left mb-4 text-gray-900"
-						>
-							¿Quieres saber más o tienes alguna duda?{' '}
-						</h2>
-						<h2 className="text-2xl md:text-6xl font-normal text-left mb-4 text-gray-400 cursor-pointer hover:text-gray-500 transition-colors">
-							Escríbenos
-						</h2>
+							</h2>
+						</div>
+						<div className="flex-shrink-0 lg:ml-8 lg:mt-2">
+							<Button className="bg-teal-400 hover:bg-teal-400/90 text-white px-8 py-3 rounded-full text-base font-normal">
+								Pruébalo
+								<ArrowRight className="ml-2 w-4 h-4" />
+							</Button>
+						</div>
 					</motion.div>
 				</div>
 			</section>
 
 			{/* Footer */}
-			<footer className="py-8 px-6 bg-black">
-				<div className="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-center">
+			<footer className="py-8 px-32 bg-gray-50">
+				<div className="mx-auto flex flex-col md:flex-row justify-between items-center">
 					<div className="text-sm text-gray-500 mb-4 md:mb-0">
-						© 2025 itsverso Inc. Todos los derechos reservados.
+						© 2025 Coco es un servicio de itsverso Inc. Todos los
+						derechos reservados.
 					</div>
 					<div className="flex space-x-6 text-sm text-gray-500">
 						<a
@@ -913,7 +840,7 @@ export default function LandingPage() {
 							href="#"
 							className="hover:text-gray-900 transition-colors"
 						>
-							Soporte
+							Contacto
 						</a>
 					</div>
 				</div>
