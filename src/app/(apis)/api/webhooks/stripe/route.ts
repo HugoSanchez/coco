@@ -56,7 +56,8 @@ export async function POST(request: NextRequest) {
 			// 3. Update payment session status
 			await markPaymentSessionCompleted(
 				session.id,
-				session.payment_intent as string
+				session.payment_intent as string,
+				supabase
 			)
 			// 4. Update booking status to 'scheduled' (payment received) - using service role client
 			await updateBookingStatus(bookingId, 'scheduled', supabase)

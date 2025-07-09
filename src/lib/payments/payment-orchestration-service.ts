@@ -121,12 +121,15 @@ export class PaymentOrchestrationService {
 			// STEP 3: Track payment session in our database
 			// ==============================================
 			// Create a payment session record in our DB to track this payment attempt.
-			await createPaymentSession({
-				booking_id: bookingId,
-				stripe_session_id: sessionId,
-				amount: amount,
-				status: 'pending'
-			})
+			await createPaymentSession(
+				{
+					booking_id: bookingId,
+					stripe_session_id: sessionId,
+					amount: amount,
+					status: 'pending'
+				},
+				supabaseClient
+			)
 
 			// STEP 4: Return success with checkout URL
 			// ========================================

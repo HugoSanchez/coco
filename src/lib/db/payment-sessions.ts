@@ -15,6 +15,7 @@
 
 import { Tables, TablesInsert, TablesUpdate } from '@/types/database.types'
 import { createClient as createSupabaseClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 const supabase = createSupabaseClient()
 
 /**
@@ -96,12 +97,15 @@ export interface PaymentSessionWithBooking extends PaymentSession {
  * Typically called when a Stripe checkout session is created
  *
  * @param payload - Payment session data to insert
+ * @param supabaseClient - Optional SupabaseClient instance for server-side usage
  * @returns Promise<PaymentSession> - The created payment session object with generated ID
  * @throws Error if insertion fails or validation errors occur
  */
 export async function createPaymentSession(
-	payload: CreatePaymentSessionPayload
+	payload: CreatePaymentSessionPayload,
+	supabaseClient?: SupabaseClient
 ): Promise<PaymentSession> {
+	const client = supabaseClient || supabase
 	const paymentSessionData = {
 		booking_id: payload.booking_id,
 		stripe_session_id: payload.stripe_session_id,
@@ -111,7 +115,7 @@ export async function createPaymentSession(
 		completed_at: payload.completed_at || null
 	}
 
-	const { data, error } = await supabase
+	const { data, error } = await client
 		.from('payment_sessions')
 		.insert([paymentSessionData])
 		.select()
@@ -253,14 +257,17 @@ export async function updatePaymentSessionStatus(
  *
  * @param stripeSessionId - The Stripe checkout session ID
  * @param updatePayload - Data to update
+ * @param supabaseClient - Optional SupabaseClient instance for server-side usage
  * @returns Promise<PaymentSession> - The updated payment session object
  * @throws Error if update fails or payment session not found
  */
 export async function updatePaymentSessionByStripeSessionId(
 	stripeSessionId: string,
-	updatePayload: UpdatePaymentSessionStatusPayload
+	updatePayload: UpdatePaymentSessionStatusPayload,
+	supabaseClient?: SupabaseClient
 ): Promise<PaymentSession> {
-	const { data, error } = await supabase
+	const client = supabaseClient || supabase
+	const { data, error } = await client
 		.from('payment_sessions')
 		.update(updatePayload)
 		.eq('stripe_session_id', stripeSessionId)
@@ -277,18 +284,24 @@ export async function updatePaymentSessionByStripeSessionId(
  *
  * @param stripeSessionId - The Stripe checkout session ID
  * @param stripePaymentIntentId - The Stripe payment intent ID
+ * @param supabaseClient - Optional SupabaseClient instance for server-side usage
  * @returns Promise<PaymentSession> - The updated payment session object
  * @throws Error if update fails or payment session not found
  */
 export async function markPaymentSessionCompleted(
 	stripeSessionId: string,
-	stripePaymentIntentId: string
+	stripePaymentIntentId: string,
+	supabaseClient?: SupabaseClient
 ): Promise<PaymentSession> {
-	return updatePaymentSessionByStripeSessionId(stripeSessionId, {
-		status: 'completed',
-		stripe_payment_intent_id: stripePaymentIntentId,
-		completed_at: new Date().toISOString()
-	})
+	return updatePaymentSessionByStripeSessionId(
+		stripeSessionId,
+		{
+			status: 'completed',
+			stripe_payment_intent_id: stripePaymentIntentId,
+			completed_at: new Date().toISOString()
+		},
+		supabaseClient
+	)
 }
 
 /**
