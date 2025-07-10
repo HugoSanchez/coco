@@ -241,12 +241,6 @@ export default function Dashboard() {
 		}
 	}
 
-	useEffect(() => {
-		if (!loading && !user) {
-			router.push('/login')
-		}
-	}, [loading, user, router])
-
 	// Reset pagination and refetch when filters change
 	useEffect(() => {
 		const refetchWithFilters = async () => {
