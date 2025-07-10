@@ -39,19 +39,19 @@ export default function LandingPage() {
 
 	const steps = [
 		{
-			title: 'Crea tu calendario',
+			title: 'Agenda una nueva cita',
 			description:
-				'De forma sencilla, vincula tu calendario de Gmail con Coco, añade disponibilidades, duración y precio de las consultas, y ¡listo!'
+				'Desde la propia aplicación, crea una nueva cita para uno de tus pacientes. Verás que agendar una cita es un proceso rápido e intuitivo en el que tendrás visibilidad sobre tu calendario para que no haya conflictos.'
 		},
 		{
-			title: 'Compártelo',
+			title: 'Tu paciente recibe un email con instrucciones de pago',
 			description:
-				'Comparte tu calendario por el canal que tu prefieras (whatsapp, email, etc), tu eliges. Una vez en él, tu paciente solo necesita dos clicks para reservar y pagar.'
+				'Tu paciente recibirá un email con los detalles para realizar el pago de la consulta por anticipado. En solo dos clicks y tanto desde el móvil como desde el ordenador, podrá abonar la consulta.'
 		},
 		{
-			title: 'No pierdas una cita',
+			title: 'Listo, cita pagada y agendada!',
 			description:
-				'Recibe notificaciones automáticas de nuevas reservas, recordatorios de citas próximas y gestiona todo desde tu panel de control personalizado.'
+				'Una vez realizado el pago, y de forma automática, la cita quedará agendada en vuestros calendarios con todos los detalles para poder acceder a la videoconferencia. No tendrás que hacer nada más.'
 		}
 	]
 
@@ -178,7 +178,7 @@ export default function LandingPage() {
 												</h2>
 												<Button
 													size="sm"
-													className="bg-blue-600 text-white text-xs px-3 py-1 rounded"
+													className="bg-gray-800 text-white text-xs px-3 py-1 rounded"
 												>
 													Nueva cita
 												</Button>
@@ -362,7 +362,7 @@ export default function LandingPage() {
 								integrada.
 								<span className="text-gray-400 font-light">
 									{' '}
-									Así de fácil
+									Así de fácil.
 								</span>
 							</h2>
 						</div>
@@ -387,7 +387,7 @@ export default function LandingPage() {
 						className="text-center mb-20"
 					>
 						<div className="flex justify-center mb-8">
-							<Badge className="text-gray-600 bg-white border border-gray-200 px-4 py-2 rounded-full text-sm font-normal tracking-wide">
+							<Badge className="text-gray-600 bg-white hover:bg-gray-50 border border-gray-200 px-4 py-2 rounded-full text-sm font-normal tracking-wide">
 								Nuestras funcionalidades
 							</Badge>
 						</div>
@@ -447,7 +447,7 @@ export default function LandingPage() {
 									Integrado con Google Calendar
 								</h3>
 								<p className="text-gray-700 font-light leading-relaxed">
-									Coco está integrad con Google Calendar
+									Coco está integrado con Google Calendar
 									haciendo que gestionar tu agenda sea fácil e
 									intuitvo, además, evitarás malentendidos con
 									tus pacientes.
@@ -513,7 +513,7 @@ export default function LandingPage() {
 								</h3>
 								<p className="text-gray-700 font-light leading-relaxed">
 									Olvídate de transferencias bancarias o
-									bizum, con coco tus pacientes pagan en solo
+									bizums, con coco tus pacientes pagan en solo
 									dos clicks.
 								</p>
 							</div>
@@ -531,10 +531,10 @@ export default function LandingPage() {
 							className="bg-white rounded-2xl border border-gray-100 overflow-hidden"
 						>
 							<div className="bg-gray-50 p-6 flex items-center justify-center min-h-[200px]">
-								<div className="rounded-xl p-4 w-full max-w-sm">
+								<div className="rounded-xl p-6 w-full max-w-sm border border-gray-200">
 									{/* Chart Header */}
 									<div className="flex items-center justify-between mb-4">
-										<div className="flex items-center space-x-1 text-teal-600">
+										<div className="flex items-center space-x-1 text-gray-800">
 											<TrendingUp className="w-3 h-3" />
 											<span className="text-xs font-medium">
 												25%
@@ -550,7 +550,7 @@ export default function LandingPage() {
 												className="flex flex-col items-center space-y-1"
 											>
 												<div
-													className="bg-teal-400 rounded-t-sm transition-all duration-500 ease-out"
+													className="bg-gray-700 rounded-t-sm transition-all duration-500 ease-out"
 													style={{
 														height: `${(data.value / maxValue) * 60}px`,
 														width: '12px'
@@ -576,11 +576,11 @@ export default function LandingPage() {
 							</div>
 							<div className="p-6">
 								<h3 className="text-lg font-semibold text-gray-900 mb-2">
-									Reporting integrado
+									Reporting inetgrado
 								</h3>
-								<p className="text-gray-600 text-sm leading-relaxed">
-									Olvídate de pasar horas cuadrando tus
-									cuentas, estamos en 2025
+								<p className="text-gray-700 font-light text-sm leading-relaxed">
+									La información que necesitas cuando la
+									necesitas. Fácil y sin complicaciones.
 								</p>
 							</div>
 						</motion.div>
@@ -644,12 +644,12 @@ export default function LandingPage() {
 							</div>
 							<div className="p-6">
 								<h3 className="text-lg font-semibold text-gray-900 mb-2">
-									Recordatorios inteligentes
+									Dashboard sencillo y funcional
 								</h3>
 								<p className="text-gray-600 text-sm font-light leading-relaxed">
 									En un único dashboard tendrás visibilidad
 									sobre toda tu agenda y estado de facturación
-									de tus consultas
+									de cada una de tus consultas
 								</p>
 							</div>
 						</motion.div>
@@ -697,7 +697,7 @@ export default function LandingPage() {
 								<h3 className="text-lg font-semibold text-gray-900 mb-2">
 									Diseño moderno y responsive
 								</h3>
-								<p className="text-gray-600 text-sm leading-relaxed">
+								<p className="text-gray-700 font-light text-sm leading-relaxed">
 									Coco se adapta tanto a ti como tus
 									pacientes, facilitándote la gestión estés
 									donde estés.
@@ -733,11 +733,11 @@ export default function LandingPage() {
 										delay: index * 0.1
 									}}
 									viewport={{ once: true }}
-									className="border-b border-gray-200 last:border-b-0"
+									className="border-b border-gray-200 last:border-b-0 px-4 hover:bg-gray-50"
 								>
 									<button
 										onClick={() => toggleStep(index)}
-										className="w-full py-8 flex items-center justify-between text-left hover:bg-gray-50 transition-colors duration-200"
+										className="w-full py-8 flex items-center justify-between text-left  transition-colors duration-200"
 									>
 										<h3 className="text-2xl md:text-3xl font-normal text-gray-900">
 											{index + 1}. {step.title}
@@ -770,7 +770,7 @@ export default function LandingPage() {
 												className="overflow-hidden"
 											>
 												<div className="pb-8 pr-10">
-													<p className="text-lg text-gray-600 leading-relaxed">
+													<p className="text-lg text-gray-700 font-light leading-relaxed">
 														{step.description}
 													</p>
 												</div>
