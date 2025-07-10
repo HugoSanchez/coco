@@ -2,23 +2,10 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
-import { useRouter, usePathname } from 'next/navigation'
-import { Search } from 'lucide-react'
-import { Input } from '@/components/ui/input'
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuLabel,
-	DropdownMenuSeparator,
-	DropdownMenuItem,
-	DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
-import { CircleUser } from 'lucide-react'
-import { LogOut } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import DropDownUserMenu from '@/components/DropDownUserMenu'
 import { useUser } from '@/contexts/UserContext'
 import { createClient } from '@/lib/supabase/client'
-import Image from 'next/image'
 
 /**
  * Header Component
@@ -48,15 +35,12 @@ import Image from 'next/image'
 export default function Header() {
 	const pathname = usePathname()
 	const supabase = createClient()
-	const router = useRouter()
 	const { user, profile } = useUser()
 
 	// Track scroll position for shadow effect
 	const [isScrolled, setIsScrolled] = useState(false)
 
-	// Determine current page context for conditional rendering
-	const isBookingPage = /^\/[^\/]+$/.test(pathname) // Matches single-level routes like /username
-	const shouldNotRenderSearchBar = pathname === '/payment/success'
+	const isLandingPage = pathname === '/'
 
 	/**
 	 * Effect to handle scroll-based header styling
@@ -91,114 +75,8 @@ export default function Header() {
 		await supabase.auth.signOut()
 	}
 
-	/**
-	 * Renders the search bar component
-	 *
-	 * Only shows on dashboard page when user is authenticated.
-	 * Provides client search functionality for the dashboard.
-	 *
-	 * @returns JSX.Element | null - Search bar component or null
-	 */
-	const renderSearchBar = () => {
-		// Only show search on dashboard for authenticated users
-		if (shouldNotRenderSearchBar || !user) return null
-
-		return (
-			<form className="ml-auto flex-1 sm:flex-initial mx-4">
-				<div className="relative">
-					{/* Search icon */}
-					<Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-
-					{/* Search input with responsive width */}
-					<Input
-						type="search"
-						placeholder="Search client..."
-						className="pl-8 sm:w-[300px] md:w-[200px] lg:w-[300px]"
-					/>
-				</div>
-			</form>
-		)
-	}
-
-	/**
-	 * Renders the user profile dropdown menu
-	 *
-	 * Shows user avatar/icon and dropdown with navigation options.
-	 * Only visible when user is authenticated.
-	 *
-	 * @returns JSX.Element | null - User menu component or null
-	 */
-	const renderUserMenu = () => {
-		// Don't render menu if user is not authenticated
-		if (!user) return null
-
-		return (
-			<DropdownMenu>
-				{/* User avatar trigger button */}
-				<DropdownMenuTrigger asChild>
-					<Button
-						variant="ghost"
-						size="icon"
-						className="rounded-full h-8 w-8 p-0 hover:bg-transparent"
-					>
-						{/* Show profile picture if available, otherwise show default icon */}
-						{profile?.profile_picture_url ? (
-							<Image
-								src={profile.profile_picture_url}
-								alt={profile.name || 'Profile picture'}
-								width={52}
-								height={52}
-								className="h-8 w-8 rounded-full object-cover"
-							/>
-						) : (
-							<CircleUser className="h-6 w-6" />
-						)}
-						<span className="sr-only">Toggle user menu</span>
-					</Button>
-				</DropdownMenuTrigger>
-
-				{/* Dropdown menu content */}
-				<DropdownMenuContent align="end" className="w-56">
-					{/* User info section */}
-					<DropdownMenuLabel>
-						{profile?.name || 'My Account'}
-						{profile?.email && (
-							<p className="text-xs text-gray-500 font-normal mt-1">
-								{profile.email}
-							</p>
-						)}
-					</DropdownMenuLabel>
-					<DropdownMenuSeparator />
-
-					{/* Navigation menu items */}
-					<DropdownMenuItem
-						className="cursor-pointer"
-						onClick={() => router.push('/dashboard')}
-					>
-						Dashboard
-					</DropdownMenuItem>
-					<DropdownMenuItem
-						className="cursor-pointer"
-						onClick={() => router.push('/settings')}
-					>
-						Settings
-					</DropdownMenuItem>
-					<DropdownMenuItem className="cursor-pointer">
-						Support
-					</DropdownMenuItem>
-					<DropdownMenuSeparator />
-
-					{/* Sign out option */}
-					<DropdownMenuItem
-						className="cursor-pointer"
-						onClick={handleSignOut}
-					>
-						<LogOut className="mr-2 h-4 w-4" />
-						<span>Logout</span>
-					</DropdownMenuItem>
-				</DropdownMenuContent>
-			</DropdownMenu>
-		)
+	if (isLandingPage) {
+		return null
 	}
 
 	return (
@@ -215,12 +93,13 @@ export default function Header() {
 				>
 					coco.
 				</Link>
-
-				{/* Right side content: search bar and user menu */}
-				<>
-					{!shouldNotRenderSearchBar && renderSearchBar()}
-					{user && !shouldNotRenderSearchBar && renderUserMenu()}
-				</>
+				{user && (
+					<DropDownUserMenu
+						user={user}
+						profile={profile}
+						handleSignOut={handleSignOut}
+					/>
+				)}
 			</div>
 		</header>
 	)

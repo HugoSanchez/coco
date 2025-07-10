@@ -4,24 +4,38 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
 	ArrowRight,
 	Calendar,
-	Check,
 	Users,
 	Shield,
 	TrendingUp,
-	Zap,
 	Target,
 	CheckCircle,
-	BarChart3,
 	ChevronDown,
 	ChevronUp
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function LandingPage() {
+	const router = useRouter()
+	const [isMobile, setIsMobile] = useState<boolean | null>(false)
 	const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 	const [expandedStep, setExpandedStep] = useState<number | null>(null)
+
+	useEffect(() => {
+		// Set initial value
+		setIsMobile(window.innerWidth < 768)
+
+		const handleResize = () => {
+			setIsMobile(window.innerWidth < 768)
+		}
+
+		window.addEventListener('resize', handleResize)
+		return () => {
+			window.removeEventListener('resize', handleResize)
+		}
+	}, []) // Empty dependency array
 
 	// Chart data for reporting card
 	const chartData = [
@@ -41,7 +55,7 @@ export default function LandingPage() {
 		{
 			title: 'Agenda una nueva cita',
 			description:
-				'Desde la propia aplicación, crea una nueva cita para uno de tus pacientes. Verás que agendar una cita es un proceso rápido e intuitivo en el que tendrás visibilidad sobre tu calendario para que no haya conflictos.'
+				'Desde la propia aplicación, crea una nueva cita para uno de tus pacientes. Verás que agendar una cita es un proceso rápido e intuitivo en el que tendrás visibilidad sobre todo tu calendario para que nunca haya conflictos.'
 		},
 		{
 			title: 'Tu paciente recibe un email con instrucciones de pago',
@@ -54,6 +68,10 @@ export default function LandingPage() {
 				'Una vez realizado el pago, y de forma automática, la cita quedará agendada en vuestros calendarios con todos los detalles para poder acceder a la videoconferencia. No tendrás que hacer nada más.'
 		}
 	]
+
+	const handleLoginRedirect = () => {
+		router.push('/login')
+	}
 
 	const toggleStep = (index: number) => {
 		setExpandedStep(expandedStep === index ? null : index)
@@ -77,6 +95,7 @@ export default function LandingPage() {
 						</div>
 						<Button
 							size="sm"
+							onClick={handleLoginRedirect}
 							className="bg-gray-100 hover:bg-gray-200/90 text-gray-800 px-6 py-2 rounded-full font-normal"
 						>
 							Log in
@@ -94,18 +113,20 @@ export default function LandingPage() {
 						transition={{ duration: 0.8, delay: 0.1 }}
 					>
 						<p className="text-base text-gray-900 mb-16 font-normal">
-							Sencillo y seguro.
+							Sencillo. Seguro. Efectivo.
 						</p>
 
 						<h1
 							style={{ lineHeight: 1.1 }}
-							className="text-4xl md:text-5xl lg:text-6xl font-normal text-gray-900 mb-16 max-w-5xl"
+							className="text-3xl md:text-5xl lg:text-6xl font-normal text-gray-900 mb-16 max-w-5xl"
 						>
-							Facilita el cobro de tus consultas.{' '}
+							{isMobile
+								? 'Bienvenido a coco,'
+								: 'Facilita el cobro de tus consultas.'}{' '}
 							<span className="text-gray-400 font-light">
-								Coco es la plataforma de gestión de agenda y
-								cobro de honorarios que tu consulta online
-								necesita.
+								{isMobile
+									? 'la plataforma de gestión que tu consulta online necesita.'
+									: 'Coco es la plataforma de gestión de agenda y cobro de honorarios que tu consulta online necesita.'}
 							</span>
 						</h1>
 
@@ -178,7 +199,7 @@ export default function LandingPage() {
 												</h2>
 												<Button
 													size="sm"
-													className="bg-gray-800 text-white text-xs px-3 py-1 rounded"
+													className="bg-gray-200 text-gray-700 text-xs px-3 py-1 rounded"
 												>
 													Nueva cita
 												</Button>
@@ -281,7 +302,7 @@ export default function LandingPage() {
 						>
 							Digitaliza tu consulta
 						</h2>
-						<p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed font-light">
+						<p className="text-base lg:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed font-light">
 							Coco automatiza tanto la gestión de tu agenda como
 							el cobro de tus honorarios, haciendo que puedas
 							dedicar tu tiempo a lo que realmente importa.
@@ -449,8 +470,7 @@ export default function LandingPage() {
 								<p className="text-gray-700 font-light leading-relaxed">
 									Coco está integrado con Google Calendar
 									haciendo que gestionar tu agenda sea fácil e
-									intuitvo, además, evitarás malentendidos con
-									tus pacientes.
+									intuitvo.
 								</p>
 							</div>
 						</motion.div>
@@ -501,7 +521,8 @@ export default function LandingPage() {
 										</div>
 										<div className="w-full h-10 px-4 bg-gray-800 rounded-lg flex items-center justify-center">
 											<span className="text-white font-regular">
-												Confirmar consulta
+												Confirmar{' '}
+												{isMobile ? 'cita' : 'consulta'}
 											</span>
 										</div>
 									</div>
@@ -513,8 +534,8 @@ export default function LandingPage() {
 								</h3>
 								<p className="text-gray-700 font-light leading-relaxed">
 									Olvídate de transferencias bancarias o
-									bizums, con coco tus pacientes pagan en solo
-									dos clicks.
+									bizums, con coco tus pacientes pagan de
+									forma rápida y segura.
 								</p>
 							</div>
 						</motion.div>
@@ -708,82 +729,6 @@ export default function LandingPage() {
 				</div>
 			</section>
 
-			{/* Cómo funciona Section */}
-			<section className="py-10 px-6 bg-white">
-				<div className="max-w-6xl mx-auto">
-					<motion.div
-						initial={{ y: 30, opacity: 0 }}
-						whileInView={{ y: 0, opacity: 1 }}
-						transition={{ duration: 0.6 }}
-						viewport={{ once: true }}
-						className="mb-16"
-					>
-						<h2 className="text-lg font-light text-gray-900 mb-6">
-							Cómo funciona
-						</h2>
-
-						<div className="space-y-0">
-							{steps.map((step, index) => (
-								<motion.div
-									key={index}
-									initial={{ y: 20, opacity: 0 }}
-									whileInView={{ y: 0, opacity: 1 }}
-									transition={{
-										duration: 0.6,
-										delay: index * 0.1
-									}}
-									viewport={{ once: true }}
-									className="border-b border-gray-200 last:border-b-0 px-4 hover:bg-gray-50"
-								>
-									<button
-										onClick={() => toggleStep(index)}
-										className="w-full py-8 flex items-center justify-between text-left  transition-colors duration-200"
-									>
-										<h3 className="text-2xl md:text-3xl font-normal text-gray-900">
-											{index + 1}. {step.title}
-										</h3>
-										<div className="flex-shrink-0 ml-4">
-											{expandedStep === index ? (
-												<ChevronUp className="w-6 h-6 text-gray-400" />
-											) : (
-												<ChevronDown className="w-6 h-6 text-gray-400" />
-											)}
-										</div>
-									</button>
-
-									<AnimatePresence>
-										{expandedStep === index && (
-											<motion.div
-												initial={{
-													height: 0,
-													opacity: 0
-												}}
-												animate={{
-													height: 'auto',
-													opacity: 1
-												}}
-												exit={{ height: 0, opacity: 0 }}
-												transition={{
-													duration: 0.3,
-													ease: 'easeInOut'
-												}}
-												className="overflow-hidden"
-											>
-												<div className="pb-8 pr-10">
-													<p className="text-lg text-gray-700 font-light leading-relaxed">
-														{step.description}
-													</p>
-												</div>
-											</motion.div>
-										)}
-									</AnimatePresence>
-								</motion.div>
-							))}
-						</div>
-					</motion.div>
-				</div>
-			</section>
-
 			{/* CTA Section */}
 			<section className="pt-20 pb-44 px-6 bg-white">
 				<div className="max-w-7xl mx-auto px-6 lg:px-8">
@@ -816,13 +761,122 @@ export default function LandingPage() {
 				</div>
 			</section>
 
+			{/* Cómo funciona Section */}
+			<section className="py-10 px-6 bg-white">
+				<div className="max-w-6xl mx-auto">
+					<motion.div
+						initial={{ y: 30, opacity: 0 }}
+						whileInView={{ y: 0, opacity: 1 }}
+						transition={{ duration: 0.6 }}
+						viewport={{ once: true }}
+						className="mb-16"
+					>
+						<h2 className="text-lg font-light text-gray-900 mb-6">
+							Cómo funciona
+						</h2>
+
+						<div className="space-y-0">
+							{steps.map((step, index) => (
+								<motion.div
+									key={index}
+									initial={{ y: 20, opacity: 0 }}
+									whileInView={{ y: 0, opacity: 1 }}
+									transition={{
+										duration: 0.6,
+										delay: index * 0.1
+									}}
+									viewport={{ once: true }}
+									className="border-b border-gray-200 last:border-b-0 px-4 hover:bg-gray-50"
+								>
+									<button
+										onClick={() => toggleStep(index)}
+										className="w-full py-8 flex items-center justify-between text-left  transition-colors duration-200"
+									>
+										<h3 className="text-xl md:text-3xl font-normal text-gray-900">
+											{index + 1}. {step.title}
+										</h3>
+										<div className="flex-shrink-0 ml-4">
+											{expandedStep === index ? (
+												<ChevronUp className="w-6 h-6 text-gray-400" />
+											) : (
+												<ChevronDown className="w-6 h-6 text-gray-400" />
+											)}
+										</div>
+									</button>
+
+									<AnimatePresence>
+										{expandedStep === index && (
+											<motion.div
+												initial={{
+													height: 0,
+													opacity: 0
+												}}
+												animate={{
+													height: 'auto',
+													opacity: 1
+												}}
+												exit={{ height: 0, opacity: 0 }}
+												transition={{
+													duration: 0.3,
+													ease: 'easeInOut'
+												}}
+												className="overflow-hidden"
+											>
+												<div className="pb-8 pr-10">
+													<p className="text-base lg:text-lg text-gray-700 font-light leading-relaxed">
+														{step.description}
+													</p>
+												</div>
+											</motion.div>
+										)}
+									</AnimatePresence>
+								</motion.div>
+							))}
+						</div>
+					</motion.div>
+				</div>
+			</section>
+
+			{/* CTA Section */}
+			<section className="pt-20 pb-44 px-6 bg-white">
+				<div className="max-w-7xl mx-auto px-6 lg:px-8">
+					<motion.div
+						initial={{ y: 30, opacity: 0 }}
+						whileInView={{ y: 0, opacity: 1 }}
+						transition={{ duration: 0.6 }}
+						viewport={{ once: true }}
+						className="flex flex-col lg:flex-row lg:items-start lg:justify-between"
+					>
+						<div className="mb-8 lg:mb-0 flex-1">
+							<h2
+								className="text-3xl md:text-4xl lg:text-5xl font-normal text-gray-900 max-w-4xl"
+								style={{ lineHeight: '1.2' }}
+							>
+								¿Todavía te quedan dudas?{' '}
+								<span className="text-gray-400 font-light">
+									Escríbenos y te responderemos lo antes
+									posible.
+								</span>
+							</h2>
+						</div>
+						<div className="flex-shrink-0 lg:ml-8 lg:mt-2">
+							<Button
+								onClick={() =>
+									window.open('mailto:hugo@itsverso.com')
+								}
+								className="bg-gray-200 hover:bg-gray-200/90 text-gray-900 px-8 py-3 rounded-full text-base font-normal"
+							>
+								Escríbenos
+								<ArrowRight className="ml-2 w-4 h-4" />
+							</Button>
+						</div>
+					</motion.div>
+				</div>
+			</section>
+
 			{/* Footer */}
 			<footer className="py-8 px-32 bg-gray-50">
 				<div className="mx-auto flex flex-col md:flex-row justify-between items-center">
-					<div className="text-sm text-gray-500 mb-4 md:mb-0">
-						© 2025 Coco es un servicio de itsverso Inc. Todos los
-						derechos reservados.
-					</div>
 					<div className="flex space-x-6 text-sm text-gray-500">
 						<a
 							href="#"
@@ -836,12 +890,14 @@ export default function LandingPage() {
 						>
 							Términos
 						</a>
-						<a
-							href="#"
+						<p
+							onClick={() =>
+								window.open('mailto:hugo@itsverso.com')
+							}
 							className="hover:text-gray-900 transition-colors"
 						>
 							Contacto
-						</a>
+						</p>
 					</div>
 				</div>
 			</footer>
