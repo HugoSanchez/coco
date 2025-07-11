@@ -44,6 +44,7 @@ interface BookingsTableProps {
 	loading?: boolean
 	onStatusChange: (bookingId: string, status: string) => void
 	onCancelBooking: (bookingId: string) => void
+	onConfirmBooking: (bookingId: string) => void
 }
 
 // Status labels in Spanish
@@ -150,7 +151,8 @@ export function BookingsTable({
 	bookings,
 	loading = false,
 	onStatusChange,
-	onCancelBooking
+	onCancelBooking,
+	onConfirmBooking
 }: BookingsTableProps) {
 	if (loading) {
 		return (
@@ -267,14 +269,28 @@ export function BookingsTable({
 													<MoreHorizontal className="h-4 w-4" />
 												</Button>
 											</DropdownMenuTrigger>
-											<DropdownMenuContent align="end">
+											<DropdownMenuContent
+												align="end"
+												className="w-40"
+											>
+												{booking.status ===
+													'pending' && (
+													<DropdownMenuItem
+														onClick={() =>
+															onConfirmBooking(
+																booking.id
+															)
+														}
+													>
+														Confirmar cita
+													</DropdownMenuItem>
+												)}
 												<DropdownMenuItem
 													onClick={() =>
 														onCancelBooking(
 															booking.id
 														)
 													}
-													className=""
 												>
 													Cancelar cita
 												</DropdownMenuItem>

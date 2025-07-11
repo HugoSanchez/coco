@@ -6,6 +6,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/use-toast'
 import { useUser } from '@/contexts/UserContext'
 import { useSearchParams } from 'next/navigation'
+import { Check } from 'lucide-react'
 
 interface PaymentsStepProps {
 	onComplete: () => void
@@ -18,7 +19,7 @@ interface PaymentsStepProps {
 export function PaymentsStep({
 	onComplete,
 	title = '5. Configura tus pagos',
-	subtitle = 'Conecta tu cuenta de Stripe para poder recibir pagos de tus pacientes de forma segura.',
+	subtitle = 'Stripe es la plataforma de pagos más usada en el mundo. Conecta tu cuenta para poder recibir pagos de tus pacientes directamente a tu cuenta bancaria.',
 	buttonText = 'Configurar cuenta de Stripe',
 	loadingText = 'Creando enlace...'
 }: PaymentsStepProps) {
@@ -42,6 +43,7 @@ export function PaymentsStep({
 				const response = await fetch('/api/payments/onboarding-status')
 				if (response.ok) {
 					const data = await response.json()
+					console.log('data', data)
 					setHasStripeAccount(data.onboarding_completed || false)
 				}
 			} catch (error) {
@@ -205,21 +207,6 @@ export function PaymentsStep({
 			<div className="pt-6">
 				{!hasStripeAccount ? (
 					<div className="space-y-4">
-						<div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-							<h3 className="font-medium text-blue-900 mb-2">
-								¿Por qué conectar Stripe?
-							</h3>
-							<ul className="text-sm text-blue-800 space-y-1">
-								<li>• Recibe pagos seguros de tus pacientes</li>
-								<li>• Procesa tarjetas de crédito y débito</li>
-								<li>• Gestión automática de facturas</li>
-								<li>
-									• Transferencias directas a tu cuenta
-									bancaria
-								</li>
-							</ul>
-						</div>
-
 						<Button
 							onClick={handleConnectStripe}
 							disabled={isLoading || isCheckingStatus}
@@ -251,14 +238,11 @@ export function PaymentsStep({
 					</div>
 				) : (
 					<div className="space-y-4">
-						<div className="bg-green-50 border border-green-200 rounded-lg p-4">
-							<h3 className="font-medium text-green-900 mb-2">
-								✓ Cuenta de Stripe configurada
+						<div className="py-4 flex">
+							<Check className="w-6 h-6 mr-2" />
+							<h3 className="font-medium mb-2">
+								Cuenta de Stripe configurada
 							</h3>
-							<p className="text-sm text-green-800">
-								Ya puedes recibir pagos de tus pacientes de
-								forma segura.
-							</p>
 						</div>
 
 						<Button

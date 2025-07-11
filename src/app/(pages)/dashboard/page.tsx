@@ -208,6 +208,65 @@ export default function Dashboard() {
 		}
 	}
 
+	const handleConfirmBooking = async (bookingId: string) => {
+		try {
+			// Update local state immediately for better UX
+			setBookings((prev) =>
+				prev.map((booking) =>
+					booking.id === bookingId
+						? {
+								...booking,
+								status: 'scheduled' as const,
+								payment_status: 'paid' as const
+							}
+						: booking
+				)
+			)
+
+			// Call our confirmation API endpoint
+			const response = await fetch(`/api/bookings/${bookingId}/confirm`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				}
+			})
+
+			if (!response.ok) {
+				const errorData = await response.json()
+				throw new Error(errorData.error || 'Failed to confirm booking')
+			}
+
+			const result = await response.json()
+
+			toast({
+				title: 'Confirmada',
+				description:
+					'Cita confirmada y invitación enviada al paciente.',
+				variant: 'default',
+				color: 'success'
+			})
+		} catch (error) {
+			// Revert local state on error
+			setBookings((prev) =>
+				prev.map((booking) =>
+					booking.id === bookingId
+						? {
+								...booking,
+								status: 'pending' as const,
+								payment_status: 'pending' as const
+							}
+						: booking
+				)
+			)
+
+			toast({
+				title: 'Error',
+				description: 'Failed to confirm booking. Please try again.',
+				variant: 'destructive'
+			})
+		}
+	}
+
 	const loadMoreBookings = async () => {
 		if (!user || loadingMore || !hasMore) return
 
@@ -406,6 +465,7 @@ export default function Dashboard() {
 								loading={loadingBookings}
 								onStatusChange={handleStatusChange}
 								onCancelBooking={handleCancelBooking}
+								onConfirmBooking={handleConfirmBooking}
 							/>
 							{/* Load More Button */}
 							{hasMore && !loadingBookings && (

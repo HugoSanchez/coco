@@ -39,7 +39,7 @@ export async function GET() {
 
 		// Step 2: Retrieve Stripe account information from database
 		// This will be null if user hasn't created a Stripe account yet
-		const stripeAccount = await getStripeAccountByUserId(user.id)
+		const stripeAccount = await getStripeAccountByUserId(user.id, supabase)
 
 		// Step 3: Return comprehensive onboarding status
 		// Frontend uses these flags to determine what UI to show

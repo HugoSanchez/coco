@@ -136,9 +136,12 @@ export async function getStripeAccountById(
  * @throws Error if database operation fails
  */
 export async function getStripeAccountByUserId(
-	userId: string
+	userId: string,
+	supabaseClient?: SupabaseClient
 ): Promise<StripeAccount | null> {
-	const { data, error } = await supabase
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
 		.from('stripe_accounts')
 		.select('*')
 		.eq('user_id', userId)
