@@ -649,6 +649,90 @@ export async function cancelCalendarEvent(
 }
 
 /**
+ * Interface for reschedule calendar event payload
+ */
+export interface RescheduleCalendarEventPayload {
+	googleEventId: string // Existing Google Calendar event ID
+	userId: string // Practitioner's auth user ID
+	newStartTime: string // New start time in ISO string format
+	newEndTime: string // New end time in ISO string format
+}
+
+/**
+ * Reschedules a Google Calendar event (updates start and end times)
+ * Used for moving an existing booking to a different time slot
+ *
+ * This function updates the event's start and end times while preserving
+ * all other event properties like attendees, description, and meeting links.
+ * Notifications are sent to all attendees about the time change.
+ *
+ * @param payload - The reschedule payload containing event ID and new times
+ * @param supabaseClient - Optional SupabaseClient instance to use
+ * @returns Promise<CalendarEventResult> - Success status and any error messages
+ */
+export async function rescheduleCalendarEvent(
+	payload: RescheduleCalendarEventPayload,
+	supabaseClient?: SupabaseClient
+): Promise<CalendarEventResult> {
+	try {
+		// Get authenticated calendar client
+		const calendar = await getAuthenticatedCalendar(
+			payload.userId,
+			supabaseClient
+		)
+
+		// First, get the existing event to preserve its properties
+		const existingEvent = await calendar.events.get({
+			calendarId: 'primary',
+			eventId: payload.googleEventId
+		})
+
+		if (!existingEvent.data) {
+			return {
+				success: false,
+				error: 'Event not found'
+			}
+		}
+
+		// Update the event with new start and end times
+		const updatedEvent = await calendar.events.update({
+			calendarId: 'primary',
+			eventId: payload.googleEventId,
+			requestBody: {
+				...existingEvent.data,
+				start: {
+					dateTime: payload.newStartTime,
+					timeZone: 'UTC'
+				},
+				end: {
+					dateTime: payload.newEndTime,
+					timeZone: 'UTC'
+				}
+			},
+			sendUpdates: 'all' // Send notifications to all attendees about the time change
+		})
+
+		return {
+			success: true,
+			googleEventId: updatedEvent.data.id || payload.googleEventId
+		}
+	} catch (error: any) {
+		console.error('Calendar event reschedule error:', {
+			message: error.message,
+			code: error.code,
+			status: error.status,
+			googleEventId: payload.googleEventId,
+			userId: payload.userId
+		})
+
+		return {
+			success: false,
+			error: `Failed to reschedule calendar event: ${error.message}`
+		}
+	}
+}
+
+/**
  * Fetches Google Calendar events for a specific day
  * Returns external calendar events (meetings, appointments, etc.) to show as "busy" time
  *

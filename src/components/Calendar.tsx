@@ -51,8 +51,8 @@ interface CalendarProps {
  * - Week starts on Monday (European format)
  *
  * VISUAL STATES:
- * - Available slots: Green background (emerald-100)
- * - Selected date: Darker green background (emerald-200)
+ * - Available slots: Green background (teal-100)
+ * - Selected date: Darker green background (teal-200)
  * - Today: Gray background
  * - Past dates: Disabled and grayed out
  * - Other month dates: Lighter text color
@@ -140,7 +140,7 @@ export default function Calendar({
 					className={`p-2 ${
 						isSameMonth(currentMonth, new Date())
 							? ''
-							: 'rounded-full bg-emerald-100'
+							: 'rounded-full bg-teal-100'
 					}`}
 				>
 					<ChevronLeft className="h-5 w-5 text-gray-400" />
@@ -154,7 +154,7 @@ export default function Calendar({
 				{/* Next month button */}
 				<button
 					onClick={nextMonth}
-					className="p-2 rounded-full bg-emerald-100"
+					className="p-2 rounded-full bg-teal-100"
 				>
 					<ChevronRight className="h-5 w-5 text-gray-400" />
 				</button>
@@ -198,16 +198,16 @@ export default function Calendar({
 								}
 								disabled={!isSelectable}
 								className={`p-2 h-10 w-10 md:h-12 md:w-12 text-center text-sm font-medium rounded-full
-                        ${hasAvailableSlots ? 'bg-emerald-100' : ''}
+                        ${hasAvailableSlots ? 'bg-teal-100' : ''}
                         ${
 							isSelectable
-								? 'hover:bg-emerald-200 hover:opacity-80'
+								? 'hover:bg-teal-200 hover:opacity-80'
 								: 'cursor-default'
 						}
                         ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}
                         ${
 							isSameDay(day, selectedDay as Date)
-								? 'bg-emerald-200 text-emerald-500 font-semibold'
+								? 'bg-teal-200 text-teal-500 font-semibold'
 								: ''
 						}
                         ${isSameDay(day, new Date()) ? 'bg-gray-200' : ''}`}

@@ -311,6 +311,82 @@ export async function getBookingById(
 }
 
 /**
+ * Retrieves a single booking by ID with user ownership validation
+ * Used for operations that require confirming the user owns the booking
+ *
+ * @param bookingId - UUID of the booking to retrieve
+ * @param userId - UUID of the user who should own the booking
+ * @param supabaseClient - Optional SupabaseClient instance to use
+ * @returns Promise<Booking | null> - The booking object, or null if not found or not owned by user
+ * @throws Error if database operation fails
+ */
+export async function getBookingByIdAndUser(
+	bookingId: string,
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<Booking | null> {
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
+		.from('bookings')
+		.select('*')
+		.eq('id', bookingId)
+		.eq('user_id', userId)
+		.single()
+
+	if (error) {
+		if (error.code === 'PGRST116') {
+			// No rows returned - either doesn't exist or user doesn't own it
+			return null
+		}
+		throw error
+	}
+
+	return data
+}
+
+/**
+ * Updates a booking's date and time (reschedule operation)
+ * This function specifically handles rescheduling by updating start_time and end_time
+ *
+ * @param bookingId - UUID of the booking to reschedule
+ * @param userId - UUID of the user who owns the booking (for ownership validation)
+ * @param newStartTime - New start time in ISO string format
+ * @param newEndTime - New end time in ISO string format
+ * @param supabaseClient - Optional SupabaseClient instance to use
+ * @returns Promise<Booking> - The updated booking object
+ * @throws Error if update fails, booking not found, or user doesn't own booking
+ */
+export async function rescheduleBooking(
+	bookingId: string,
+	userId: string,
+	newStartTime: string,
+	newEndTime: string,
+	supabaseClient?: SupabaseClient
+): Promise<Booking> {
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
+		.from('bookings')
+		.update({
+			start_time: newStartTime,
+			end_time: newEndTime,
+			updated_at: new Date().toISOString()
+		})
+		.eq('id', bookingId)
+		.eq('user_id', userId)
+		.select()
+		.single()
+
+	if (error) {
+		console.log('Error rescheduling booking', error)
+		throw error
+	}
+
+	return data
+}
+
+/**
  * Retrieves bookings for a user with complete billing information and pagination support
  * Perfect for dashboard tables that need comprehensive booking data with efficient loading
  *

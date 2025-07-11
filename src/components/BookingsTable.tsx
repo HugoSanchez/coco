@@ -54,6 +54,7 @@ interface BookingsTableProps {
 	onConfirmBooking: (bookingId: string) => void
 	onMarkAsPaid: (bookingId: string) => void
 	onRefundBooking: (bookingId: string) => void
+	onRescheduleBooking: (bookingId: string) => void
 }
 
 // Status labels in Spanish
@@ -134,7 +135,8 @@ export function BookingsTable({
 	onCancelBooking,
 	onConfirmBooking,
 	onMarkAsPaid,
-	onRefundBooking
+	onRefundBooking,
+	onRescheduleBooking
 }: BookingsTableProps) {
 	if (loading) {
 		return (
@@ -308,6 +310,20 @@ export function BookingsTable({
 														Pagada
 													</DropdownMenuItem>
 												)}
+												{booking.status !==
+													'canceled' &&
+													booking.status !==
+														'completed' && (
+														<DropdownMenuItem
+															onClick={() =>
+																onRescheduleBooking(
+																	booking.id
+																)
+															}
+														>
+															Reprogramar
+														</DropdownMenuItem>
+													)}
 												{booking.status ===
 													'pending' && (
 													<DropdownMenuItem
