@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { updateBookingStatus, getBookingById } from '@/lib/db/bookings'
-import { getBillForBookingAndMarkAsPaid } from '@/lib/db/bills'
 import {
 	getCalendarEventsForBooking,
 	updateCalendarEventType
@@ -14,13 +13,12 @@ import { getClientById } from '@/lib/db/clients'
  * POST /api/bookings/[id]/confirm
  *
  * Manually confirms a booking by:
- * 1. Updating booking status to 'scheduled' (confirmed/paid)
- * 2. Marking associated bill as 'paid'
- * 3. Converting pending calendar event to confirmed appointment with client invitation
- * 4. Updating calendar event type in database
+ * 1. Updating booking status to 'scheduled' (confirmed)
+ * 2. Converting pending calendar event to confirmed appointment with client invitation
+ * 3. Updating calendar event type in database
  *
- * This endpoint replicates the same flow that happens automatically via Stripe webhooks,
- * but allows manual confirmation for payments received through other channels.
+ * This endpoint confirms the booking and updates the calendar, but does NOT mark
+ * the associated bill as paid. Payment status should be handled separately.
  */
 export async function POST(
 	request: NextRequest,
@@ -75,21 +73,10 @@ export async function POST(
 			)
 		}
 
-		// 2. Update booking status to 'scheduled' (confirmed/paid)
+		// 2. Update booking status to 'scheduled' (confirmed)
 		await updateBookingStatus(bookingId, 'scheduled', supabase)
 
-		// 3. Mark associated bill as paid
-		try {
-			await getBillForBookingAndMarkAsPaid(bookingId, supabase)
-		} catch (billError) {
-			console.error(
-				`Error updating bill for booking ${bookingId}:`,
-				billError
-			)
-			// Continue - bill update failure shouldn't fail the entire confirmation
-		}
-
-		// 4. Convert pending calendar event to confirmed appointment
+		// 3. Convert pending calendar event to confirmed appointment
 		try {
 			// Get practitioner and client details for calendar update
 			const [practitioner, client] = await Promise.all([

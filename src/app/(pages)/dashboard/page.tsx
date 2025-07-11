@@ -216,8 +216,7 @@ export default function Dashboard() {
 					booking.id === bookingId
 						? {
 								...booking,
-								status: 'scheduled' as const,
-								payment_status: 'paid' as const
+								status: 'scheduled' as const
 							}
 						: booking
 				)
@@ -239,9 +238,9 @@ export default function Dashboard() {
 			const result = await response.json()
 
 			toast({
-				title: 'Confirmada',
+				title: 'Cita marcada como confirmada',
 				description:
-					'Cita confirmada y invitación enviada al paciente.',
+					'Hemos enviado la invitación al paciente por correo.',
 				variant: 'default',
 				color: 'success'
 			})
@@ -252,8 +251,7 @@ export default function Dashboard() {
 					booking.id === bookingId
 						? {
 								...booking,
-								status: 'pending' as const,
-								payment_status: 'pending' as const
+								status: 'pending' as const
 							}
 						: booking
 				)
@@ -262,6 +260,65 @@ export default function Dashboard() {
 			toast({
 				title: 'Error',
 				description: 'Failed to confirm booking. Please try again.',
+				variant: 'destructive'
+			})
+		}
+	}
+
+	const handleMarkAsPaid = async (bookingId: string) => {
+		try {
+			// Update local state immediately for better UX
+			setBookings((prev) =>
+				prev.map((booking) =>
+					booking.id === bookingId
+						? {
+								...booking,
+								payment_status: 'paid' as const
+							}
+						: booking
+				)
+			)
+
+			// Call our mark as paid API endpoint
+			const response = await fetch(
+				`/api/bookings/${bookingId}/mark-paid`,
+				{
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					}
+				}
+			)
+
+			if (!response.ok) {
+				const errorData = await response.json()
+				throw new Error(errorData.error || 'Failed to mark as paid')
+			}
+
+			const result = await response.json()
+
+			toast({
+				title: 'Pago registrado',
+				description: 'La factura ha sido marcada como pagada.',
+				variant: 'default',
+				color: 'success'
+			})
+		} catch (error) {
+			// Revert local state on error
+			setBookings((prev) =>
+				prev.map((booking) =>
+					booking.id === bookingId
+						? {
+								...booking,
+								payment_status: 'pending' as const
+							}
+						: booking
+				)
+			)
+
+			toast({
+				title: 'Error',
+				description: 'Failed to mark as paid. Please try again.',
 				variant: 'destructive'
 			})
 		}
@@ -466,6 +523,7 @@ export default function Dashboard() {
 								onStatusChange={handleStatusChange}
 								onCancelBooking={handleCancelBooking}
 								onConfirmBooking={handleConfirmBooking}
+								onMarkAsPaid={handleMarkAsPaid}
 							/>
 							{/* Load More Button */}
 							{hasMore && !loadingBookings && (

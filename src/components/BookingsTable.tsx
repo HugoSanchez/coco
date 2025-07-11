@@ -45,6 +45,7 @@ interface BookingsTableProps {
 	onStatusChange: (bookingId: string, status: string) => void
 	onCancelBooking: (bookingId: string) => void
 	onConfirmBooking: (bookingId: string) => void
+	onMarkAsPaid: (bookingId: string) => void
 }
 
 // Status labels in Spanish
@@ -69,7 +70,7 @@ const getStatusColor = (status: string) => {
 		case 'pending':
 			return 'text-gray-700 border-gray-200 font-normal'
 		case 'scheduled':
-			return 'bg-teal-100 text-teal-800 font-normal'
+			return 'bg-teal-100 border-0 text-teal-800 font-medium'
 		case 'completed':
 			return 'bg-green-100 text-green-700 border-green-200'
 		case 'cancelled':
@@ -103,9 +104,9 @@ const getPaymentStatusColor = (status: string) => {
 		case 'not_applicable':
 			return 'bg-gray-100 text-gray-500 border-gray-200'
 		case 'pending':
-			return 'text-gray-700 border-gray-50 font-normal'
+			return 'text-gray-700 border-white font-normal'
 		case 'paid':
-			return 'border-gray-50 text-gray-700 font-normal'
+			return 'border-white text-gray-700 font-normal'
 		case 'disputed':
 			return 'bg-red-100 text-red-700 border-red-200'
 		case 'canceled':
@@ -120,7 +121,8 @@ export function BookingsTable({
 	loading = false,
 	onStatusChange,
 	onCancelBooking,
-	onConfirmBooking
+	onConfirmBooking,
+	onMarkAsPaid
 }: BookingsTableProps) {
 	if (loading) {
 		return (
@@ -265,8 +267,20 @@ export function BookingsTable({
 											</DropdownMenuTrigger>
 											<DropdownMenuContent
 												align="end"
-												className="w-40"
+												className=""
 											>
+												{booking.payment_status !==
+													'paid' && (
+													<DropdownMenuItem
+														onClick={() =>
+															onMarkAsPaid(
+																booking.id
+															)
+														}
+													>
+														Marcar como pagada
+													</DropdownMenuItem>
+												)}
 												{booking.status ===
 													'pending' && (
 													<DropdownMenuItem
