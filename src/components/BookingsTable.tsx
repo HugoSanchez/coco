@@ -17,7 +17,14 @@ import {
 	DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Spinner } from '@/components/ui/spinner'
-import { MoreHorizontal, Calendar, X, Check, Loader } from 'lucide-react'
+import {
+	MoreHorizontal,
+	Calendar,
+	X,
+	Check,
+	Loader,
+	RefreshCcw
+} from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -75,7 +82,7 @@ const getStatusColor = (status: string) => {
 		case 'completed':
 			return 'bg-green-100 text-green-700 border-green-200'
 		case 'canceled':
-			return 'bg-red-100 text-red-700 border-0 font-medium'
+			return 'bg-red-50 text-red-800 border-0 font-medium'
 		default:
 			return 'bg-gray-100 text-gray-700 border-gray-200'
 	}
@@ -95,7 +102,7 @@ const getPaymentStatusLabel = (status: string) => {
 		case 'canceled':
 			return 'Cancelado'
 		case 'refunded':
-			return 'Reembolsado'
+			return 'Devuelto'
 		default:
 			return status
 	}
@@ -242,6 +249,9 @@ export function BookingsTable({
 											) : booking.payment_status ===
 											  'pending' ? (
 												<Loader className="h-3 w-3 mr-2" />
+											) : booking.payment_status ===
+											  'refunded' ? (
+												<RefreshCcw className="h-3 w-3 mr-2 text-gray-900" />
 											) : (
 												<X className="h-3 w-3 mr-2 text-red-500" />
 											)}
@@ -283,7 +293,7 @@ export function BookingsTable({
 															)
 														}
 													>
-														Reembolsar pago
+														Reembolsar
 													</DropdownMenuItem>
 												)}
 												{booking.payment_status !==
@@ -295,7 +305,7 @@ export function BookingsTable({
 															)
 														}
 													>
-														Marcar como pagada
+														Pagada
 													</DropdownMenuItem>
 												)}
 												{booking.status ===
@@ -307,18 +317,21 @@ export function BookingsTable({
 															)
 														}
 													>
-														Confirmar cita
+														Confirmada
 													</DropdownMenuItem>
 												)}
-												<DropdownMenuItem
-													onClick={() =>
-														onCancelBooking(
-															booking.id
-														)
-													}
-												>
-													Cancelar cita
-												</DropdownMenuItem>
+												{booking.status !==
+													'canceled' && (
+													<DropdownMenuItem
+														onClick={() =>
+															onCancelBooking(
+																booking.id
+															)
+														}
+													>
+														Cancelar
+													</DropdownMenuItem>
+												)}
 											</DropdownMenuContent>
 										</DropdownMenu>
 									</TableCell>

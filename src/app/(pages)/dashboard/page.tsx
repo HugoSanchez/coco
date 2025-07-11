@@ -38,6 +38,7 @@ import {
 import { BookingForm } from '@/components/BookingForm'
 import { Spinner } from '@/components/ui/spinner'
 import { RefundConfirmationModal } from '@/components/RefundConfirmationModal'
+import { MarkAsPaidConfirmationModal } from '@/components/MarkAsPaidConfirmationModal'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -86,6 +87,9 @@ export default function Dashboard() {
 	const [refundingBookingId, setRefundingBookingId] = useState<string | null>(
 		null
 	)
+	const [markingAsPaidBookingId, setMarkingAsPaidBookingId] = useState<
+		string | null
+	>(null)
 	const [filters, setFilters] = useState<BookingFiltersState>({
 		customerSearch: '',
 		statusFilter: 'all',
@@ -309,6 +313,9 @@ export default function Dashboard() {
 				)
 			)
 
+			// Close the modal
+			setMarkingAsPaidBookingId(null)
+
 			toast({
 				title: 'Pago registrado',
 				description: 'La factura ha sido marcada como pagada.',
@@ -316,6 +323,9 @@ export default function Dashboard() {
 				color: 'success'
 			})
 		} catch (error) {
+			// Close the modal even on error
+			setMarkingAsPaidBookingId(null)
+
 			toast({
 				title: 'Error',
 				description: 'Failed to mark as paid. Please try again.',
@@ -326,6 +336,10 @@ export default function Dashboard() {
 
 	const handleRefundBooking = (bookingId: string) => {
 		setRefundingBookingId(bookingId)
+	}
+
+	const handleShowMarkAsPaidDialog = (bookingId: string) => {
+		setMarkingAsPaidBookingId(bookingId)
 	}
 
 	const handleRefundConfirm = async (bookingId: string, reason?: string) => {
@@ -371,8 +385,7 @@ export default function Dashboard() {
 
 			toast({
 				title: 'Reembolso procesado',
-				description:
-					'El reembolso se ha procesado correctamente. El dinero aparecerá en la cuenta del cliente en 5-10 días hábiles.',
+				description: 'El reembolso se ha procesado correctamente.',
 				variant: 'default',
 				color: 'success'
 			})
@@ -488,11 +501,11 @@ export default function Dashboard() {
 				<div className="flex gap-2">
 					<Button
 						variant="default"
-						className="text-md"
+						className="text-md px-4"
 						onClick={() => setIsNewBookingOpen(true)}
 					>
 						<Plus className="h-5 w-5 mr-2" />
-						Nueva Cita
+						Crear cita
 					</Button>
 				</div>
 			</header>
@@ -583,17 +596,17 @@ export default function Dashboard() {
 								loading={loadingBookings}
 								onCancelBooking={handleCancelBooking}
 								onConfirmBooking={handleConfirmBooking}
-								onMarkAsPaid={handleMarkAsPaid}
+								onMarkAsPaid={handleShowMarkAsPaidDialog}
 								onRefundBooking={handleRefundBooking}
 							/>
 							{/* Load More Button */}
 							{hasMore && !loadingBookings && (
 								<div className="flex justify-center pt-4">
 									<Button
-										variant="outline"
+										variant="ghost"
 										onClick={loadMoreBookings}
 										disabled={loadingMore}
-										className="w-40"
+										className="w-40 hover:bg-gray-50 rounded-full"
 									>
 										{loadingMore ? (
 											<>
@@ -694,6 +707,49 @@ export default function Dashboard() {
 							onConfirm={(reason) =>
 								handleRefundConfirm(refundingBookingId, reason)
 							}
+							bookingDetails={{
+								id: booking.id,
+								customerName: booking.customerName,
+								customerEmail: booking.customerEmail,
+								amount: booking.amount,
+								currency: booking.currency || 'EUR',
+								date: format(
+									booking.bookingDate,
+									'dd MMM yyyy',
+									{ locale: es }
+								)
+							}}
+						/>
+					)
+				})()}
+
+			{/* Mark As Paid Confirmation Modal */}
+			{markingAsPaidBookingId &&
+				(() => {
+					const booking = bookings.find(
+						(b) => b.id === markingAsPaidBookingId
+					) || {
+						id: markingAsPaidBookingId,
+						customerName: 'Cliente',
+						customerEmail: '',
+						bookingDate: new Date(),
+						status: 'scheduled' as const,
+						billing_status: 'sent' as const,
+						payment_status: 'paid' as const,
+						amount: 0,
+						currency: 'EUR'
+					}
+
+					return (
+						<MarkAsPaidConfirmationModal
+							key={markingAsPaidBookingId}
+							isOpen={!!markingAsPaidBookingId}
+							onOpenChange={(open) =>
+								!open && setMarkingAsPaidBookingId(null)
+							}
+							onConfirm={() => {
+								handleMarkAsPaid(markingAsPaidBookingId)
+							}}
 							bookingDetails={{
 								id: booking.id,
 								customerName: booking.customerName,
