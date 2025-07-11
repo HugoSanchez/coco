@@ -27,6 +27,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
+import { Spinner } from '@/components/ui/spinner'
 
 interface BookingFormProps {
 	onSuccess?: () => void // Called when booking is successfully created
@@ -67,6 +68,7 @@ export function BookingForm({
 			bookingId?: string
 		}>
 	>([])
+	const [loadingBookings, setLoadingBookings] = useState(false) // Loading state for fetching day bookings
 
 	// Context and utilities
 	const { user, profile } = useUser() // Current user and profile data
@@ -86,6 +88,9 @@ export function BookingForm({
 	// Fetch existing bookings when date changes
 	const fetchExistingBookings = async (date: Date) => {
 		if (!user?.id) return
+
+		// Clear existing bookings when starting new fetch
+		setExistingBookings([])
 
 		try {
 			// Get start and end of the selected day
@@ -126,8 +131,16 @@ export function BookingForm({
 	 */
 	const handleDateSelect = async (date: Date) => {
 		setSelectedDate(date)
-		await fetchExistingBookings(date) // Fetch existing bookings for the selected date
-		setCurrentStep(2) // Auto-advance to time selection step
+		setSelectedSlot(null) // Clear any previously selected time slot
+		setCurrentStep(2) // Immediate transition to step 2
+
+		// Fetch existing bookings asynchronously (non-blocking)
+		setLoadingBookings(true)
+		try {
+			await fetchExistingBookings(date)
+		} finally {
+			setLoadingBookings(false)
+		}
 	}
 
 	/**
@@ -292,29 +305,39 @@ export function BookingForm({
 			{/* ===== STEP 2: TIME SELECTION ===== */}
 			{currentStep === 2 && selectedDate && (
 				<div className="space-y-4">
-					<div className="">
-						{/* Day view showing available time slots for selected date */}
-						<DayViewTimeSelector
-							date={selectedDate}
-							onTimeSelect={handleSlotSelect}
-							onClearSelection={handleClearTimeSelection}
-							existingBookings={existingBookings}
-							initialSelectedSlot={selectedSlot}
-						/>
-					</div>
-
-					{/* Continue button - only show when time is selected */}
-					{/* User must manually continue to review their selection */}
-					{selectedSlot && (
-						<div className="pt-4">
-							<Button
-								variant="default"
-								onClick={handleContinueToClient}
-								className="w-full bg-accent"
-							>
-								Continuar
-							</Button>
+					{loadingBookings ? (
+						/* Loading state - show spinner while fetching bookings */
+						<div className="flex items-center justify-center py-12">
+							<Spinner size="sm" color={'dark'} />
 						</div>
+					) : (
+						/* Loaded state - show time selector */
+						<>
+							<div className="">
+								{/* Day view showing available time slots for selected date */}
+								<DayViewTimeSelector
+									date={selectedDate}
+									onTimeSelect={handleSlotSelect}
+									onClearSelection={handleClearTimeSelection}
+									existingBookings={existingBookings}
+									initialSelectedSlot={selectedSlot}
+								/>
+							</div>
+
+							{/* Continue button - only show when time is selected */}
+							{/* User must manually continue to review their selection */}
+							{selectedSlot && !loadingBookings && (
+								<div className="pt-4">
+									<Button
+										variant="default"
+										onClick={handleContinueToClient}
+										className="w-full bg-accent"
+									>
+										Continuar
+									</Button>
+								</div>
+							)}
+						</>
 					)}
 				</div>
 			)}
