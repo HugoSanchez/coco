@@ -17,7 +17,7 @@ import {
 	DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Spinner } from '@/components/ui/spinner'
-import { MoreHorizontal, Calendar, X } from 'lucide-react'
+import { MoreHorizontal, Calendar, X, Check, Loader } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -67,44 +67,12 @@ const getStatusLabel = (status: string) => {
 const getStatusColor = (status: string) => {
 	switch (status) {
 		case 'pending':
-			return 'bg-gray-100 text-gray-700 border-gray-200 font-normal'
+			return 'text-gray-700 border-gray-200 font-normal'
 		case 'scheduled':
-			return 'bg-teal-100 text-teal-700 border-teal-200'
+			return 'bg-teal-100 text-teal-800 border-teal-300 font-normal'
 		case 'completed':
 			return 'bg-green-100 text-green-700 border-green-200'
 		case 'cancelled':
-			return 'bg-gray-100 text-gray-700 border-gray-200'
-		default:
-			return 'bg-gray-100 text-gray-700 border-gray-200'
-	}
-}
-
-// Billing status labels in Spanish
-const getBillingStatusLabel = (status: string) => {
-	switch (status) {
-		case 'not_generated':
-			return 'No generada'
-		case 'pending':
-			return 'Pendiente'
-		case 'sent':
-			return 'Enviada'
-		case 'canceled':
-			return 'Cancelada'
-		default:
-			return status
-	}
-}
-
-// Billing status colors
-const getBillingStatusColor = (status: string) => {
-	switch (status) {
-		case 'not_generated':
-			return 'bg-gray-100 text-gray-600 border-gray-200'
-		case 'pending':
-			return 'bg-yellow-100 text-yellow-700 border-yellow-200'
-		case 'sent':
-			return 'bg-blue-100 text-blue-700 border-blue-200'
-		case 'canceled':
 			return 'bg-gray-100 text-gray-700 border-gray-200'
 		default:
 			return 'bg-gray-100 text-gray-700 border-gray-200'
@@ -119,7 +87,7 @@ const getPaymentStatusLabel = (status: string) => {
 		case 'pending':
 			return 'Pendiente'
 		case 'paid':
-			return 'Pagado'
+			return 'Pagada'
 		case 'disputed':
 			return 'Disputado'
 		case 'canceled':
@@ -135,9 +103,9 @@ const getPaymentStatusColor = (status: string) => {
 		case 'not_applicable':
 			return 'bg-gray-100 text-gray-500 border-gray-200'
 		case 'pending':
-			return 'bg-yellow-100 text-yellow-700 border-yellow-200'
+			return 'text-gray-700 border-gray-200 font-normal'
 		case 'paid':
-			return 'bg-green-100 text-green-700 border-green-200'
+			return 'border-gray-200 border-teal-500 text-teal-800 font-normal'
 		case 'disputed':
 			return 'bg-red-100 text-red-700 border-red-200'
 		case 'canceled':
@@ -175,11 +143,14 @@ export function BookingsTable({
 							<TableHead className="hidden md:table-cell font-semibold w-[140px] text-center">
 								Fecha
 							</TableHead>
-							<TableHead className="hidden sm:table-cell font-semibold w-[100px] text-center">
+							<TableHead className="hidden font-semibold w-[100px] text-center">
 								Hora
 							</TableHead>
 							<TableHead className="hidden sm:table-cell font-semibold w-[160px] text-center">
 								Estado
+							</TableHead>
+							<TableHead className="hidden lg:table-cell font-semibold w-[120px] text-center">
+								Pago
 							</TableHead>
 							<TableHead className="text-right font-semibold w-[120px]">
 								Honorarios
@@ -191,7 +162,7 @@ export function BookingsTable({
 						{bookings.length === 0 ? (
 							<TableRow>
 								<TableCell
-									colSpan={6}
+									colSpan={7}
 									className="text-center py-12"
 								>
 									<div className="text-gray-400">
@@ -227,7 +198,7 @@ export function BookingsTable({
 									</TableCell>
 
 									{/* Time */}
-									<TableCell className="hidden sm:table-cell text-center py-2">
+									<TableCell className="hidden text-center py-2">
 										<span className="font-light">
 											{format(
 												booking.startTime ||
@@ -247,6 +218,29 @@ export function BookingsTable({
 											)}
 										>
 											{getStatusLabel(booking.status)}
+										</Badge>
+									</TableCell>
+
+									{/* Payment Status */}
+									<TableCell className="hidden lg:table-cell text-center py-2">
+										<Badge
+											variant="outline"
+											className={getPaymentStatusColor(
+												booking.payment_status
+											)}
+										>
+											{booking.payment_status ===
+											'paid' ? (
+												<Check className="h-4 w-4 mr-2 text-teal-500" />
+											) : booking.payment_status ===
+											  'pending' ? (
+												<Loader className="h-3 w-3 mr-2" />
+											) : (
+												<X className="h-0 w-0" />
+											)}
+											{getPaymentStatusLabel(
+												booking.payment_status
+											)}
 										</Badge>
 									</TableCell>
 
