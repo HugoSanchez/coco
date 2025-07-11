@@ -37,6 +37,9 @@ import {
 } from '@/lib/db/bookings'
 import { BookingForm } from '@/components/BookingForm'
 import { Spinner } from '@/components/ui/spinner'
+import { RefundConfirmationModal } from '@/components/RefundConfirmationModal'
+import { format } from 'date-fns'
+import { es } from 'date-fns/locale'
 
 // Transform database booking with bills to component booking format
 const transformBooking = (dbBooking: BookingWithBills): Booking => {
@@ -80,6 +83,9 @@ export default function Dashboard() {
 	const [offset, setOffset] = useState(0)
 	const [isFilterOpen, setIsFilterOpen] = useState(false)
 	const [isNewBookingOpen, setIsNewBookingOpen] = useState(false)
+	const [refundingBookingId, setRefundingBookingId] = useState<string | null>(
+		null
+	)
 	const [filters, setFilters] = useState<BookingFiltersState>({
 		customerSearch: '',
 		statusFilter: 'all',
@@ -318,6 +324,67 @@ export default function Dashboard() {
 		}
 	}
 
+	const handleRefundBooking = (bookingId: string) => {
+		setRefundingBookingId(bookingId)
+	}
+
+	const handleRefundConfirm = async (bookingId: string, reason?: string) => {
+		try {
+			// Show immediate feedback with spinner
+			toast({
+				title: 'Procesando reembolso...',
+				description: 'Enviando solicitud de reembolso a Stripe.',
+				variant: 'default',
+				color: 'loading'
+			})
+
+			// Call our refund API endpoint
+			const response = await fetch(`/api/bookings/${bookingId}/refund`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ reason })
+			})
+
+			if (!response.ok) {
+				const errorData = await response.json()
+				throw new Error(errorData.error || 'Failed to process refund')
+			}
+
+			const result = await response.json()
+
+			// Update local state - mark payment as refunded
+			setBookings((prev) =>
+				prev.map((booking) =>
+					booking.id === bookingId
+						? {
+								...booking,
+								payment_status: 'refunded' as const
+							}
+						: booking
+				)
+			)
+
+			// Close the modal
+			setRefundingBookingId(null)
+
+			toast({
+				title: 'Reembolso procesado',
+				description:
+					'El reembolso se ha procesado correctamente. El dinero aparecerá en la cuenta del cliente en 5-10 días hábiles.',
+				variant: 'default',
+				color: 'success'
+			})
+		} catch (error) {
+			toast({
+				title: 'Error',
+				description: 'Failed to process refund. Please try again.',
+				variant: 'destructive'
+			})
+		}
+	}
+
 	const loadMoreBookings = async () => {
 		if (!user || loadingMore || !hasMore) return
 
@@ -517,6 +584,7 @@ export default function Dashboard() {
 								onCancelBooking={handleCancelBooking}
 								onConfirmBooking={handleConfirmBooking}
 								onMarkAsPaid={handleMarkAsPaid}
+								onRefundBooking={handleRefundBooking}
 							/>
 							{/* Load More Button */}
 							{hasMore && !loadingBookings && (
@@ -599,6 +667,48 @@ export default function Dashboard() {
 					onCancel={() => setIsNewBookingOpen(false)}
 				/>
 			</SideSheet>
+
+			{/* Refund Confirmation Modal */}
+			{refundingBookingId &&
+				(() => {
+					const booking = bookings.find(
+						(b) => b.id === refundingBookingId
+					) || {
+						id: refundingBookingId,
+						customerName: 'Cliente',
+						customerEmail: '',
+						bookingDate: new Date(),
+						status: 'scheduled' as const,
+						billing_status: 'sent' as const,
+						payment_status: 'paid' as const,
+						amount: 0,
+						currency: 'EUR'
+					}
+
+					return (
+						<RefundConfirmationModal
+							isOpen={!!refundingBookingId}
+							onOpenChange={(open) =>
+								!open && setRefundingBookingId(null)
+							}
+							onConfirm={(reason) =>
+								handleRefundConfirm(refundingBookingId, reason)
+							}
+							bookingDetails={{
+								id: booking.id,
+								customerName: booking.customerName,
+								customerEmail: booking.customerEmail,
+								amount: booking.amount,
+								currency: booking.currency || 'EUR',
+								date: format(
+									booking.bookingDate,
+									'dd MMM yyyy',
+									{ locale: es }
+								)
+							}}
+						/>
+					)
+				})()}
 		</div>
 	)
 }

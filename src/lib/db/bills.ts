@@ -124,11 +124,17 @@ export async function createBill(
  * Retrieves a bill by its ID
  *
  * @param billId - The UUID of the bill to retrieve
+ * @param supabaseClient - Optional SupabaseClient instance
  * @returns Promise<Bill | null> - The bill object or null if not found
  * @throws Error if database operation fails
  */
-export async function getBillById(billId: string): Promise<Bill | null> {
-	const { data, error } = await supabase
+export async function getBillById(
+	billId: string,
+	supabaseClient?: SupabaseClient
+): Promise<Bill | null> {
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
 		.from('bills')
 		.select('*')
 		.eq('id', billId)
@@ -176,7 +182,7 @@ export async function getBillsForBooking(
  */
 export async function getBillsForUser(
 	userId: string,
-	status?: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled'
+	status?: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled' | 'refunded'
 ): Promise<Bill[]> {
 	let query = supabase
 		.from('bills')
@@ -205,7 +211,7 @@ export async function getBillsForUser(
  */
 export async function getBillsForClient(
 	clientId: string,
-	status?: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled'
+	status?: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled' | 'refunded'
 ): Promise<Bill[]> {
 	let query = supabase
 		.from('bills')
@@ -234,7 +240,7 @@ export async function getBillsForClient(
  */
 export async function getBillsWithBookings(
 	userId: string,
-	status?: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled'
+	status?: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled' | 'refunded'
 ): Promise<BillWithBooking[]> {
 	let query = supabase
 		.from('bills')
@@ -299,7 +305,7 @@ export async function getOverdueBills(userId?: string): Promise<Bill[]> {
  * @throws Error if database operation fails
  */
 export async function getBillsByStatus(
-	status: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled',
+	status: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled' | 'refunded',
 	userId?: string
 ): Promise<Bill[]> {
 	let query = supabase
@@ -329,7 +335,7 @@ export async function getBillsByStatus(
  */
 export async function updateBillStatus(
 	billId: string,
-	status: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled',
+	status: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled' | 'refunded',
 	supabaseClient?: SupabaseClient
 ): Promise<Bill> {
 	const updateData: any = { status }
@@ -397,6 +403,48 @@ export async function markBillAsPaid(
 		.update({
 			status: 'paid',
 			paid_at: new Date().toISOString()
+		})
+		.eq('id', billId)
+		.select()
+		.single()
+
+	if (error) throw error
+	return data
+}
+
+/**
+ * Marks a bill as refunded
+ * Sets refund tracking fields and updates status to 'refunded'
+ *
+ * @param billId - The UUID of the bill to mark as refunded
+ * @param stripeRefundId - The Stripe refund ID for tracking
+ * @param reason - Optional reason for the refund
+ * @param supabaseClient - Optional SupabaseClient instance
+ * @returns Promise<Bill> - The updated bill object
+ * @throws Error if update fails or bill not found
+ */
+export async function markBillAsRefunded(
+	billId: string,
+	stripeRefundId: string,
+	reason?: string,
+	supabaseClient?: SupabaseClient
+): Promise<Bill> {
+	const client = supabaseClient || supabase
+
+	// First, get the bill to set refunded_amount equal to the bill amount
+	const bill = await getBillById(billId, supabaseClient)
+	if (!bill) {
+		throw new Error(`Bill with ID ${billId} not found`)
+	}
+
+	const { data, error } = await client
+		.from('bills')
+		.update({
+			status: 'refunded',
+			refunded_amount: bill.amount, // Full refund
+			stripe_refund_id: stripeRefundId,
+			refunded_at: new Date().toISOString(),
+			refund_reason: reason || null
 		})
 		.eq('id', billId)
 		.select()

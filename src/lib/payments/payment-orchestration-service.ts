@@ -18,7 +18,11 @@ import {
 	updatePaymentSessionStatus
 } from '@/lib/db/payment-sessions'
 import { getStripeAccountForPayments } from '@/lib/db/stripe-accounts'
-import { getBillsForBooking, updateBillStatus } from '@/lib/db/bills'
+import {
+	getBillsForBooking,
+	updateBillStatus,
+	markBillAsRefunded
+} from '@/lib/db/bills'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export class PaymentOrchestrationService {
@@ -256,6 +260,101 @@ export class PaymentOrchestrationService {
 				`Payment cancellation error for booking ${bookingId}:`,
 				error
 			)
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'Unknown error'
+			}
+		}
+	}
+
+	/**
+	 * Processes a full refund for a booking payment
+	 *
+	 * This function handles the complete refund flow:
+	 * 1. Finds the paid bill for the booking
+	 * 2. Gets the payment intent from the payment session (if exists)
+	 * 3. Processes the refund with Stripe (if payment was through Stripe)
+	 * 4. Updates the bill status to 'refunded'
+	 *
+	 * Only bills with status 'paid' can be refunded. The function performs
+	 * a full refund (entire bill amount) back to the original payment method.
+	 * For manually marked payments (no Stripe session), it performs a manual refund.
+	 *
+	 * @param bookingId - UUID of the booking to refund
+	 * @param reason - Optional reason for the refund
+	 * @param supabaseClient - Optional Supabase client for database operations
+	 * @returns Promise resolving to refund result with success flag and optional error
+	 */
+	async refundBookingPayment(
+		bookingId: string,
+		reason?: string,
+		supabaseClient?: SupabaseClient
+	): Promise<{
+		success: boolean
+		refundId?: string
+		error?: string
+	}> {
+		try {
+			// STEP 1: Find the paid bill for this booking
+			// ===========================================
+			const bills = await getBillsForBooking(bookingId, supabaseClient)
+			const paidBill = bills.find((bill) => bill.status === 'paid')
+
+			if (!paidBill) {
+				return {
+					success: false,
+					error: 'No paid bill found for this booking'
+				}
+			}
+
+			// STEP 2: Check if this was a Stripe payment or manual payment
+			// ===========================================================
+			const paymentSessions =
+				await getPaymentSessionsForBooking(bookingId)
+			const completedSession = paymentSessions.find(
+				(session) => session.status === 'completed'
+			)
+
+			// STEP 3: Process refund based on payment method
+			// ==============================================
+			let stripeRefundId: string
+
+			if (completedSession && completedSession.stripe_payment_intent_id) {
+				// This was a Stripe payment - process refund through Stripe
+				const refundResult = await stripeService.processRefund(
+					completedSession.stripe_payment_intent_id,
+					reason,
+					bookingId
+				)
+
+				if (!refundResult.success) {
+					return {
+						success: false,
+						error: `Stripe refund failed: ${refundResult.error}`
+					}
+				}
+
+				stripeRefundId = refundResult.refundId!
+			} else {
+				// This was a manual payment - create a manual refund record
+				stripeRefundId = `manual_refund_${Date.now()}_${bookingId.slice(0, 8)}`
+			}
+
+			// STEP 4: Update bill status to refunded
+			// ======================================
+			await markBillAsRefunded(
+				paidBill.id,
+				stripeRefundId,
+				reason,
+				supabaseClient
+			)
+
+			return {
+				success: true,
+				refundId: stripeRefundId
+			}
+		} catch (error) {
+			console.error(`Refund error for booking ${bookingId}:`, error)
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error'

@@ -35,6 +35,7 @@ export interface Booking {
 		| 'paid'
 		| 'disputed'
 		| 'canceled'
+		| 'refunded'
 	amount: number
 	currency?: string
 }
@@ -45,6 +46,7 @@ interface BookingsTableProps {
 	onCancelBooking: (bookingId: string) => void
 	onConfirmBooking: (bookingId: string) => void
 	onMarkAsPaid: (bookingId: string) => void
+	onRefundBooking: (bookingId: string) => void
 }
 
 // Status labels in Spanish
@@ -92,6 +94,8 @@ const getPaymentStatusLabel = (status: string) => {
 			return 'Disputado'
 		case 'canceled':
 			return 'Cancelado'
+		case 'refunded':
+			return 'Reembolsado'
 		default:
 			return status
 	}
@@ -110,6 +114,8 @@ const getPaymentStatusColor = (status: string) => {
 			return 'bg-red-100 text-red-700 border-red-200'
 		case 'canceled':
 			return 'text-gray-700 border-0 font-medium'
+		case 'refunded':
+			return 'text-gray-700 border-0 font-medium'
 		default:
 			return 'bg-gray-100 text-gray-700 border-gray-200'
 	}
@@ -120,7 +126,8 @@ export function BookingsTable({
 	loading = false,
 	onCancelBooking,
 	onConfirmBooking,
-	onMarkAsPaid
+	onMarkAsPaid,
+	onRefundBooking
 }: BookingsTableProps) {
 	if (loading) {
 		return (
@@ -267,6 +274,18 @@ export function BookingsTable({
 												align="end"
 												className=""
 											>
+												{booking.payment_status ===
+													'paid' && (
+													<DropdownMenuItem
+														onClick={() =>
+															onRefundBooking(
+																booking.id
+															)
+														}
+													>
+														Reembolsar pago
+													</DropdownMenuItem>
+												)}
 												{booking.payment_status !==
 													'paid' && (
 													<DropdownMenuItem

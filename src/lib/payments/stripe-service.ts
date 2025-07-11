@@ -179,6 +179,51 @@ export class StripeService {
 			}
 		}
 	}
+
+	/**
+	 * Process a full refund for a consultation payment
+	 *
+	 * This method creates a full refund for a payment intent.
+	 * For consultation bookings, we only support full refunds to keep things simple.
+	 * The refund will be processed back to the original payment method.
+	 *
+	 * @param paymentIntentId - The Stripe payment intent ID to refund
+	 * @param reason - Optional reason for the refund (for Stripe records)
+	 * @param bookingId - The booking ID for metadata tracking
+	 * @returns Promise with refund result containing Stripe refund ID
+	 */
+	async processRefund(
+		paymentIntentId: string,
+		reason?: string,
+		bookingId?: string
+	): Promise<{
+		success: boolean
+		refundId?: string
+		error?: string
+	}> {
+		try {
+			// Create full refund in Stripe
+			const refund = await stripe.refunds.create({
+				payment_intent: paymentIntentId,
+				reason: (reason as any) || 'requested_by_customer',
+				metadata: {
+					booking_id: bookingId || '',
+					refund_reason: reason || 'Full refund requested'
+				}
+			})
+
+			return {
+				success: true,
+				refundId: refund.id
+			}
+		} catch (error) {
+			console.error('Error processing refund:', error)
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'Unknown error'
+			}
+		}
+	}
 }
 
 // Export a singleton instance

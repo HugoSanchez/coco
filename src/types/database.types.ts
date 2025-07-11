@@ -89,8 +89,12 @@ export type Database = {
           id: string
           notes: string | null
           paid_at: string | null
+          refund_reason: string | null
+          refunded_amount: number
+          refunded_at: string | null
           sent_at: string | null
           status: string
+          stripe_refund_id: string | null
           updated_at: string
           user_id: string
         }
@@ -107,8 +111,12 @@ export type Database = {
           id?: string
           notes?: string | null
           paid_at?: string | null
+          refund_reason?: string | null
+          refunded_amount?: number
+          refunded_at?: string | null
           sent_at?: string | null
           status?: string
+          stripe_refund_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -125,8 +133,12 @@ export type Database = {
           id?: string
           notes?: string | null
           paid_at?: string | null
+          refund_reason?: string | null
+          refunded_amount?: number
+          refunded_at?: string | null
           sent_at?: string | null
           status?: string
+          stripe_refund_id?: string | null
           updated_at?: string
           user_id?: string
         }

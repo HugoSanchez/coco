@@ -76,7 +76,13 @@ export interface BookingWithBills extends Booking {
 		id: string
 		amount: number
 		currency: string
-		status: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled'
+		status:
+			| 'pending'
+			| 'sent'
+			| 'paid'
+			| 'disputed'
+			| 'canceled'
+			| 'refunded'
 		created_at: string
 		due_date: string | null
 		sent_at: string | null
@@ -90,6 +96,7 @@ export interface BookingWithBills extends Booking {
 		| 'paid'
 		| 'disputed'
 		| 'canceled'
+		| 'refunded'
 }
 
 /**
@@ -412,6 +419,10 @@ export async function getBookingsWithBills(
 				case 'canceled':
 					billing_status = 'canceled'
 					payment_status = 'canceled'
+					break
+				case 'refunded':
+					billing_status = 'sent'
+					payment_status = 'refunded'
 					break
 				default:
 					billing_status = 'not_generated'
