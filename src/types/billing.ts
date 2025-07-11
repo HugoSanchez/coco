@@ -2,7 +2,7 @@
 export type BillingType = 'recurring' | 'consultation_based' | 'project_based'
 export type BillingFrequency = 'weekly' | 'monthly' | 'quarterly' | 'yearly'
 export type BillingTrigger = 'after_consultation' | 'before_consultation'
-export type BillingStatus = 'pending' | 'sent' | 'paid' | 'cancelled'
+export type BillingStatus = 'pending' | 'sent' | 'paid' | 'canceled'
 
 // Unified billing configuration (replaces scattered billing config)
 export interface BillingConfiguration {

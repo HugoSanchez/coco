@@ -30,7 +30,6 @@ import {
 import { getClientsForUser, Client } from '@/lib/db/clients'
 import {
 	getBookingsWithBills,
-	updateBookingStatus,
 	BookingWithBills,
 	PaginatedBookingsResult,
 	PaginationOptions,
@@ -38,7 +37,6 @@ import {
 } from '@/lib/db/bookings'
 import { BookingForm } from '@/components/BookingForm'
 import { Spinner } from '@/components/ui/spinner'
-import { TestApiButton } from '@/components/TestApiButton'
 
 // Transform database booking with bills to component booking format
 const transformBooking = (dbBooking: BookingWithBills): Booking => {
@@ -47,14 +45,14 @@ const transformBooking = (dbBooking: BookingWithBills): Booking => {
 		'pending',
 		'scheduled',
 		'completed',
-		'cancelled'
+		'canceled'
 	] as const
 	const status = validStatuses.includes(dbBooking.status as any)
 		? (dbBooking.status as
 				| 'pending'
 				| 'scheduled'
 				| 'completed'
-				| 'cancelled')
+				| 'canceled')
 		: 'pending'
 
 	return {
@@ -88,6 +86,7 @@ export default function Dashboard() {
 		startDate: '',
 		endDate: ''
 	})
+
 	const { toast } = useToast()
 	const router = useRouter()
 
@@ -147,57 +146,60 @@ export default function Dashboard() {
 		}
 	}, [user])
 
-	const handleStatusChange = async (bookingId: string, status: string) => {
-		try {
-			// Update local state immediately for better UX
-			setBookings((prev) =>
-				prev.map((booking) =>
-					booking.id === bookingId
-						? { ...booking, status: status as any }
-						: booking
-				)
-			)
-
-			// Update status in database
-			await updateBookingStatus(bookingId, status)
-
-			toast({
-				title: 'Status updated',
-				description: `Booking status updated to ${status}`,
-				variant: 'default'
-			})
-		} catch (error) {
-			// Revert local state on error
-			setBookings((prev) =>
-				prev.map((booking) =>
-					booking.id === bookingId
-						? { ...booking, status: booking.status }
-						: booking
-				)
-			)
-
-			toast({
-				title: 'Error',
-				description: 'Failed to update status. Please try again.',
-				variant: 'destructive'
-			})
-		}
-	}
-
 	const handleCancelBooking = async (bookingId: string) => {
 		try {
-			// Update booking status to cancelled
-			await updateBookingStatus(bookingId, 'cancelled')
+			// Show immediate feedback with spinner
+			toast({
+				title: 'Cancelando cita...',
+				description: 'Procesando la cancelación de la cita.',
+				variant: 'default',
+				color: 'loading'
+			})
 
-			// Remove from local state (or update status to show as cancelled)
+			// Call our comprehensive cancellation API endpoint
+			const response = await fetch(`/api/bookings/${bookingId}/cancel`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				}
+			})
+
+			if (!response.ok) {
+				const errorData = await response.json()
+				throw new Error(errorData.error || 'Failed to cancel booking')
+			}
+
+			const result = await response.json()
+
+			// Update local state after successful API response
+			// Update booking status to canceled and payment status if not already paid
 			setBookings((prev) =>
-				prev.filter((booking) => booking.id !== bookingId)
+				prev.map((booking) => {
+					if (booking.id === bookingId) {
+						const updatedBooking = {
+							...booking,
+							status: 'canceled' as const
+						}
+
+						// If payment is still pending, mark it as canceled too
+						if (
+							booking.payment_status === 'pending' ||
+							booking.payment_status === 'not_applicable'
+						) {
+							updatedBooking.payment_status = 'canceled' as const
+						}
+
+						return updatedBooking
+					}
+					return booking
+				})
 			)
 
 			toast({
-				title: 'Booking cancelled',
-				description: 'The appointment has been cancelled successfully.',
-				variant: 'default'
+				title: 'Cita cancelada',
+				description: 'La cita ha sido cancelada correctamente.',
+				variant: 'default',
+				color: 'success'
 			})
 		} catch (error) {
 			toast({
@@ -210,17 +212,13 @@ export default function Dashboard() {
 
 	const handleConfirmBooking = async (bookingId: string) => {
 		try {
-			// Update local state immediately for better UX
-			setBookings((prev) =>
-				prev.map((booking) =>
-					booking.id === bookingId
-						? {
-								...booking,
-								status: 'scheduled' as const
-							}
-						: booking
-				)
-			)
+			// Show immediate feedback with spinner
+			toast({
+				title: 'Confirmando cita...',
+				description: 'Procesando la confirmación de la cita.',
+				variant: 'default',
+				color: 'loading'
+			})
 
 			// Call our confirmation API endpoint
 			const response = await fetch(`/api/bookings/${bookingId}/confirm`, {
@@ -237,6 +235,18 @@ export default function Dashboard() {
 
 			const result = await response.json()
 
+			// Update local state after successful API response
+			setBookings((prev) =>
+				prev.map((booking) =>
+					booking.id === bookingId
+						? {
+								...booking,
+								status: 'scheduled' as const
+							}
+						: booking
+				)
+			)
+
 			toast({
 				title: 'Cita marcada como confirmada',
 				description:
@@ -245,18 +255,6 @@ export default function Dashboard() {
 				color: 'success'
 			})
 		} catch (error) {
-			// Revert local state on error
-			setBookings((prev) =>
-				prev.map((booking) =>
-					booking.id === bookingId
-						? {
-								...booking,
-								status: 'pending' as const
-							}
-						: booking
-				)
-			)
-
 			toast({
 				title: 'Error',
 				description: 'Failed to confirm booking. Please try again.',
@@ -267,17 +265,13 @@ export default function Dashboard() {
 
 	const handleMarkAsPaid = async (bookingId: string) => {
 		try {
-			// Update local state immediately for better UX
-			setBookings((prev) =>
-				prev.map((booking) =>
-					booking.id === bookingId
-						? {
-								...booking,
-								payment_status: 'paid' as const
-							}
-						: booking
-				)
-			)
+			// Show immediate feedback with spinner
+			toast({
+				title: 'Marcando como pagada...',
+				description: 'Procesando el registro de pago.',
+				variant: 'default',
+				color: 'loading'
+			})
 
 			// Call our mark as paid API endpoint
 			const response = await fetch(
@@ -297,6 +291,18 @@ export default function Dashboard() {
 
 			const result = await response.json()
 
+			// Update local state after successful API response
+			setBookings((prev) =>
+				prev.map((booking) =>
+					booking.id === bookingId
+						? {
+								...booking,
+								payment_status: 'paid' as const
+							}
+						: booking
+				)
+			)
+
 			toast({
 				title: 'Pago registrado',
 				description: 'La factura ha sido marcada como pagada.',
@@ -304,18 +310,6 @@ export default function Dashboard() {
 				color: 'success'
 			})
 		} catch (error) {
-			// Revert local state on error
-			setBookings((prev) =>
-				prev.map((booking) =>
-					booking.id === bookingId
-						? {
-								...booking,
-								payment_status: 'pending' as const
-							}
-						: booking
-				)
-			)
-
 			toast({
 				title: 'Error',
 				description: 'Failed to mark as paid. Please try again.',
@@ -520,7 +514,6 @@ export default function Dashboard() {
 							<BookingsTable
 								bookings={bookings}
 								loading={loadingBookings}
-								onStatusChange={handleStatusChange}
 								onCancelBooking={handleCancelBooking}
 								onConfirmBooking={handleConfirmBooking}
 								onMarkAsPaid={handleMarkAsPaid}

@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/toast'
 import { useToast } from '@/components/ui/use-toast'
 import { cn } from '@/lib/utils'
-import { Check, X } from 'lucide-react'
+import { Check, X, Loader } from 'lucide-react'
 
 export function Toaster() {
 	const { toasts } = useToast()
@@ -33,6 +33,7 @@ export function Toaster() {
 									'h-6 w-6 rounded-full flex items-center justify-center flex-shrink-0',
 									color === 'success' && 'bg-accent',
 									color === 'error' && 'bg-red-100',
+									color === 'loading' && 'bg-gray-100',
 									color === 'default' && 'bg-gray-200'
 								)}
 							>
@@ -41,6 +42,9 @@ export function Toaster() {
 								)) ||
 									(color === 'error' && (
 										<X className="h-4 w-4" color="red" />
+									)) ||
+									(color === 'loading' && (
+										<Loader className="h-4 w-4 text-gray-600 animate-spin" />
 									)) ||
 									(color === 'default' && props.icon)}
 							</div>

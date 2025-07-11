@@ -23,7 +23,7 @@ import { Search, RotateCcw, CalendarIcon } from 'lucide-react'
 
 export interface BookingFiltersState {
 	customerSearch: string
-	statusFilter: 'all' | 'pending' | 'scheduled' | 'completed' | 'cancelled'
+	statusFilter: 'all' | 'pending' | 'scheduled' | 'completed' | 'canceled'
 	startDate: string
 	endDate: string
 }
@@ -186,7 +186,7 @@ export function BookingFilters({
 								| 'pending'
 								| 'scheduled'
 								| 'completed'
-								| 'cancelled'
+								| 'canceled'
 						)
 					}
 				>
@@ -200,7 +200,7 @@ export function BookingFilters({
 						</SelectItem>
 						<SelectItem value="scheduled">Confirmada</SelectItem>
 						<SelectItem value="completed">Completada</SelectItem>
-						<SelectItem value="cancelled">Cancelada</SelectItem>
+						<SelectItem value="canceled">Cancelada</SelectItem>
 					</SelectContent>
 				</Select>
 			</div>

@@ -153,6 +153,32 @@ export class StripeService {
 			)
 		}
 	}
+
+	/**
+	 * Expires a Stripe checkout session to prevent payment completion
+	 *
+	 * Note: Stripe checkout sessions automatically expire after 24 hours,
+	 * but we can manually expire them to immediately invalidate payment links.
+	 * This is useful when a booking is cancelled before payment is completed.
+	 */
+	async expireCheckoutSession(sessionId: string): Promise<{
+		success: boolean
+		error?: string
+	}> {
+		try {
+			await stripe.checkout.sessions.expire(sessionId)
+
+			return {
+				success: true
+			}
+		} catch (error) {
+			console.error('Error expiring checkout session:', error)
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'Unknown error'
+			}
+		}
+	}
 }
 
 // Export a singleton instance

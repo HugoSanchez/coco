@@ -117,7 +117,7 @@ export interface PaginationOptions {
  */
 export interface BookingFilterOptions {
 	customerSearch?: string
-	statusFilter?: 'all' | 'pending' | 'scheduled' | 'completed' | 'cancelled'
+	statusFilter?: 'all' | 'pending' | 'scheduled' | 'completed' | 'canceled'
 	startDate?: string
 	endDate?: string
 }
@@ -217,7 +217,7 @@ export async function createBooking(
 
 /**
  * Updates a booking's status
- * Common statuses: 'scheduled', 'completed', 'cancelled', 'no-show'
+ * Common statuses: 'scheduled', 'completed', 'canceled', 'no-show'
  *
  * @param bookingId - UUID of the booking to update
  * @param status - New status for the booking
@@ -250,7 +250,7 @@ export async function updateBookingStatus(
 
 /**
  * Deletes a booking from the database
- * Note: Consider using status updates ('cancelled') instead of hard deletion for audit trails
+ * Note: Consider using status updates ('canceled') instead of hard deletion for audit trails
  *
  * @param bookingId - UUID of the booking to delete
  * @returns Promise<void>

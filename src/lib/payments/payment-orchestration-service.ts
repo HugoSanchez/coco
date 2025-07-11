@@ -12,8 +12,13 @@
  */
 
 import { stripeService } from './stripe-service'
-import { createPaymentSession } from '@/lib/db/payment-sessions'
+import {
+	createPaymentSession,
+	getPaymentSessionsForBooking,
+	updatePaymentSessionStatus
+} from '@/lib/db/payment-sessions'
 import { getStripeAccountForPayments } from '@/lib/db/stripe-accounts'
+import { getBillsForBooking, updateBillStatus } from '@/lib/db/bills'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export class PaymentOrchestrationService {
@@ -141,6 +146,116 @@ export class PaymentOrchestrationService {
 		} catch (error) {
 			// STEP 5: Error handling
 			// ======================
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'Unknown error'
+			}
+		}
+	}
+
+	/**
+	 * Cancels payment for a booking by invalidating payment sessions and bills
+	 *
+	 * This function handles the complete cancellation flow for pending payments:
+	 * 1. Finds active payment sessions for the booking
+	 * 2. Expires Stripe checkout sessions to prevent payment completion
+	 * 3. Marks payment sessions as 'cancelled' in our database
+	 * 4. Marks associated bills as 'canceled'
+	 *
+	 * This is used when a pending booking is cancelled to ensure the client
+	 * cannot accidentally complete payment for a cancelled appointment.
+	 *
+	 * @param bookingId - UUID of the booking to cancel payments for
+	 * @param supabaseClient - Optional Supabase client for database operations
+	 * @returns Promise resolving to operation result with success flag and optional error
+	 */
+	async cancelPaymentForBooking(
+		bookingId: string,
+		supabaseClient?: SupabaseClient
+	): Promise<{
+		success: boolean
+		error?: string
+	}> {
+		try {
+			// STEP 1: Get active payment sessions for this booking
+			// ===================================================
+			// Find all payment sessions that are still 'pending' for this booking
+			const paymentSessions =
+				await getPaymentSessionsForBooking(bookingId)
+			const activeSessions = paymentSessions.filter(
+				(session) => session.status === 'pending'
+			)
+
+			// STEP 2: Expire Stripe checkout sessions
+			// ========================================
+			// For each active payment session, expire the Stripe checkout session
+			// to immediately prevent the client from completing payment
+			for (const session of activeSessions) {
+				if (session.stripe_session_id) {
+					const stripeResult =
+						await stripeService.expireCheckoutSession(
+							session.stripe_session_id
+						)
+
+					// Log but don't fail if Stripe expiration fails
+					// (session might already be expired or completed)
+					if (!stripeResult.success) {
+						console.warn(
+							`Failed to expire Stripe session ${session.stripe_session_id}: ${stripeResult.error}`
+						)
+					}
+				}
+
+				// STEP 3: Mark payment session as cancelled in our database
+				// =========================================================
+				try {
+					await updatePaymentSessionStatus(session.id, {
+						status: 'cancelled'
+					})
+				} catch (sessionError) {
+					console.error(
+						`Failed to cancel payment session ${session.id}:`,
+						sessionError
+					)
+					// Continue with other sessions even if one fails
+				}
+			}
+
+			// STEP 4: Cancel associated bills
+			// ===============================
+			// Find and cancel all bills associated with this booking
+			try {
+				const bills = await getBillsForBooking(
+					bookingId,
+					supabaseClient
+				)
+
+				for (const bill of bills) {
+					// Only cancel bills that aren't already paid or canceled
+					if (bill.status !== 'paid' && bill.status !== 'canceled') {
+						await updateBillStatus(
+							bill.id,
+							'canceled',
+							supabaseClient
+						)
+					}
+				}
+			} catch (billError) {
+				console.error(
+					`Failed to cancel bills for booking ${bookingId}:`,
+					billError
+				)
+				// Don't fail the entire operation if bill cancellation fails
+			}
+
+			return {
+				success: true
+			}
+		} catch (error) {
+			console.error(
+				`Payment cancellation error for booking ${bookingId}:`,
+				error
+			)
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error'

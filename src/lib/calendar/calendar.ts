@@ -532,6 +532,123 @@ export async function updatePendingToConfirmed(
 }
 
 /**
+ * Deletes a Google Calendar event completely
+ * Used for pending bookings where the event is just a placeholder
+ *
+ * This function completely removes the event from Google Calendar,
+ * as if it never existed. Best used for pending bookings that were
+ * never confirmed or paid for.
+ *
+ * @param googleEventId - Google Calendar event ID to delete
+ * @param userId - Practitioner's user ID for authentication
+ * @param supabaseClient - Optional SupabaseClient for backend operations
+ * @returns Promise<CalendarEventResult> - Result with success status or error
+ */
+export async function deleteCalendarEvent(
+	googleEventId: string,
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<CalendarEventResult> {
+	try {
+		// Get authenticated calendar client
+		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+
+		// Delete the event from Google Calendar
+		await calendar.events.delete({
+			calendarId: 'primary',
+			eventId: googleEventId
+		})
+
+		return {
+			success: true,
+			googleEventId
+		}
+	} catch (error: any) {
+		console.error('Calendar event deletion error:', {
+			message: error.message,
+			code: error.code,
+			status: error.status,
+			googleEventId,
+			userId
+		})
+
+		return {
+			success: false,
+			error: `Failed to delete calendar event: ${error.message}`
+		}
+	}
+}
+
+/**
+ * Cancels a Google Calendar event with proper notifications
+ * Used for confirmed bookings that need to be cancelled
+ *
+ * This function updates the event to show cancelled status and sends
+ * cancellation notifications to attendees. The event remains in calendar
+ * history for audit purposes.
+ *
+ * @param googleEventId - Google Calendar event ID to cancel
+ * @param userId - Practitioner's user ID for authentication
+ * @param supabaseClient - Optional SupabaseClient for backend operations
+ * @returns Promise<CalendarEventResult> - Result with success status or error
+ */
+export async function cancelCalendarEvent(
+	googleEventId: string,
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<CalendarEventResult> {
+	try {
+		// Get authenticated calendar client
+		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+
+		// First, get the current event to preserve important details
+		const currentEvent = await calendar.events.get({
+			calendarId: 'primary',
+			eventId: googleEventId
+		})
+
+		if (!currentEvent.data) {
+			throw new Error('Event not found')
+		}
+
+		// Update the event to show cancelled status
+		const cancelledEventData = {
+			...currentEvent.data,
+			summary: `CANCELLED - ${currentEvent.data.summary}`,
+			description: `This appointment has been cancelled.\n\nOriginal description: ${currentEvent.data.description || 'No description'}`,
+			status: 'cancelled', // Google Calendar cancelled status
+			colorId: '8' // Gray color for cancelled events
+		}
+
+		// Update the event in Google Calendar
+		const response = await calendar.events.update({
+			calendarId: 'primary',
+			eventId: googleEventId,
+			requestBody: cancelledEventData,
+			sendUpdates: 'all' // Send cancellation notifications to all attendees
+		})
+
+		return {
+			success: true,
+			googleEventId: response.data.id!
+		}
+	} catch (error: any) {
+		console.error('Calendar event cancellation error:', {
+			message: error.message,
+			code: error.code,
+			status: error.status,
+			googleEventId,
+			userId
+		})
+
+		return {
+			success: false,
+			error: `Failed to cancel calendar event: ${error.message}`
+		}
+	}
+}
+
+/**
  * Fetches Google Calendar events for a specific day
  * Returns external calendar events (meetings, appointments, etc.) to show as "busy" time
  *

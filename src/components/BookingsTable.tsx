@@ -27,7 +27,7 @@ export interface Booking {
 	customerEmail: string
 	bookingDate: Date
 	startTime?: Date // Optional for backward compatibility
-	status: 'pending' | 'scheduled' | 'completed' | 'cancelled'
+	status: 'pending' | 'scheduled' | 'completed' | 'canceled'
 	billing_status: 'not_generated' | 'pending' | 'sent' | 'canceled'
 	payment_status:
 		| 'not_applicable'
@@ -42,7 +42,6 @@ export interface Booking {
 interface BookingsTableProps {
 	bookings: Booking[]
 	loading?: boolean
-	onStatusChange: (bookingId: string, status: string) => void
 	onCancelBooking: (bookingId: string) => void
 	onConfirmBooking: (bookingId: string) => void
 	onMarkAsPaid: (bookingId: string) => void
@@ -57,7 +56,7 @@ const getStatusLabel = (status: string) => {
 			return 'Confirmada'
 		case 'completed':
 			return 'Completada'
-		case 'cancelled':
+		case 'canceled':
 			return 'Cancelada'
 		default:
 			return status
@@ -73,8 +72,8 @@ const getStatusColor = (status: string) => {
 			return 'bg-teal-100 border-0 text-teal-800 font-medium'
 		case 'completed':
 			return 'bg-green-100 text-green-700 border-green-200'
-		case 'cancelled':
-			return 'bg-gray-100 text-gray-700 border-gray-200'
+		case 'canceled':
+			return 'bg-red-100 text-red-700 border-0 font-medium'
 		default:
 			return 'bg-gray-100 text-gray-700 border-gray-200'
 	}
@@ -110,7 +109,7 @@ const getPaymentStatusColor = (status: string) => {
 		case 'disputed':
 			return 'bg-red-100 text-red-700 border-red-200'
 		case 'canceled':
-			return 'bg-gray-100 text-gray-700 border-gray-200'
+			return 'text-gray-700 border-0 font-medium'
 		default:
 			return 'bg-gray-100 text-gray-700 border-gray-200'
 	}
@@ -119,7 +118,6 @@ const getPaymentStatusColor = (status: string) => {
 export function BookingsTable({
 	bookings,
 	loading = false,
-	onStatusChange,
 	onCancelBooking,
 	onConfirmBooking,
 	onMarkAsPaid
@@ -238,7 +236,7 @@ export function BookingsTable({
 											  'pending' ? (
 												<Loader className="h-3 w-3 mr-2" />
 											) : (
-												<X className="h-0 w-0" />
+												<X className="h-3 w-3 mr-2 text-red-500" />
 											)}
 											{getPaymentStatusLabel(
 												booking.payment_status
