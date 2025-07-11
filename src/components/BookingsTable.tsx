@@ -69,7 +69,7 @@ const getStatusColor = (status: string) => {
 		case 'pending':
 			return 'text-gray-700 border-gray-200 font-normal'
 		case 'scheduled':
-			return 'bg-teal-100 text-teal-800 border-teal-300 font-normal'
+			return 'bg-teal-100 text-teal-800 font-normal'
 		case 'completed':
 			return 'bg-green-100 text-green-700 border-green-200'
 		case 'cancelled':
@@ -103,9 +103,9 @@ const getPaymentStatusColor = (status: string) => {
 		case 'not_applicable':
 			return 'bg-gray-100 text-gray-500 border-gray-200'
 		case 'pending':
-			return 'text-gray-700 border-gray-200 font-normal'
+			return 'text-gray-700 border-gray-50 font-normal'
 		case 'paid':
-			return 'border-gray-200 border-teal-500 text-teal-800 font-normal'
+			return 'border-gray-50 text-gray-700 font-normal'
 		case 'disputed':
 			return 'bg-red-100 text-red-700 border-red-200'
 		case 'canceled':
