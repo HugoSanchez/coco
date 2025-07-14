@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Calendar } from '@/components/ui/calendar'
@@ -37,6 +38,9 @@ export function BookingFilters({
 	filters,
 	onFiltersChange
 }: BookingFiltersProps) {
+	const [startDateOpen, setStartDateOpen] = useState(false)
+	const [endDateOpen, setEndDateOpen] = useState(false)
+
 	const updateFilter = (key: keyof BookingFiltersState, value: any) => {
 		onFiltersChange({ ...filters, [key]: value })
 	}
@@ -63,22 +67,20 @@ export function BookingFilters({
 	const endDate = filters.endDate ? new Date(filters.endDate) : undefined
 
 	const handleStartDateSelect = (date: Date | undefined) => {
-		console.log('Start date selected:', date)
 		if (date) {
-			const dateString = date.toISOString().split('T')[0]
-			console.log('Start date string:', dateString)
+			const dateString = format(date, 'yyyy-MM-dd')
 			updateFilter('startDate', dateString)
+			setStartDateOpen(false) // Close popover after selection
 		} else {
 			updateFilter('startDate', '')
 		}
 	}
 
 	const handleEndDateSelect = (date: Date | undefined) => {
-		console.log('End date selected:', date)
 		if (date) {
-			const dateString = date.toISOString().split('T')[0]
-			console.log('End date string:', dateString)
+			const dateString = format(date, 'yyyy-MM-dd')
 			updateFilter('endDate', dateString)
+			setEndDateOpen(false) // Close popover after selection
 		} else {
 			updateFilter('endDate', '')
 		}
@@ -109,12 +111,15 @@ export function BookingFilters({
 						<label className="text-sm text-gray-600 block mb-2">
 							Desde
 						</label>
-						<Popover>
+						<Popover
+							open={startDateOpen}
+							onOpenChange={setStartDateOpen}
+						>
 							<PopoverTrigger asChild>
 								<Button
 									variant={'outline'}
 									className={cn(
-										'w-full justify-start text-left font-normal',
+										'w-full justify-start text-left font-normal bg-white',
 										!startDate && 'text-muted-foreground'
 									)}
 								>
@@ -129,15 +134,6 @@ export function BookingFilters({
 							<PopoverContent
 								className="w-auto p-0"
 								align="start"
-								onInteractOutside={(e) => {
-									// Prevent closing when clicking inside calendar
-									if (
-										e.target instanceof Element &&
-										e.target.closest('[role="dialog"]')
-									) {
-										e.preventDefault()
-									}
-								}}
 							>
 								<Calendar
 									mode="single"
@@ -153,12 +149,15 @@ export function BookingFilters({
 						<label className="text-sm text-gray-600 block mb-2">
 							Hasta
 						</label>
-						<Popover>
+						<Popover
+							open={endDateOpen}
+							onOpenChange={setEndDateOpen}
+						>
 							<PopoverTrigger asChild>
 								<Button
 									variant={'outline'}
 									className={cn(
-										'w-full justify-start text-left font-normal',
+										'w-full justify-start text-left font-normal bg-white',
 										!endDate && 'text-muted-foreground'
 									)}
 								>
@@ -171,15 +170,6 @@ export function BookingFilters({
 							<PopoverContent
 								className="w-auto p-0"
 								align="start"
-								onInteractOutside={(e) => {
-									// Prevent closing when clicking inside calendar
-									if (
-										e.target instanceof Element &&
-										e.target.closest('[role="dialog"]')
-									) {
-										e.preventDefault()
-									}
-								}}
 							>
 								<Calendar
 									mode="single"
@@ -233,11 +223,10 @@ export function BookingFilters({
 			{hasActiveFilters && (
 				<div className="pt-4 border-t">
 					<Button
-						variant="outline"
+						variant="ghost"
 						onClick={clearAllFilters}
-						className="w-full bg-red-300 hover:bg-red-300/90"
+						className="w-full hover:bg-transparent"
 					>
-						<RotateCcw className="h-4 w-4 mr-2" />
 						Eliminar filtros
 					</Button>
 				</div>
