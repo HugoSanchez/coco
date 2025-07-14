@@ -348,8 +348,13 @@ export default function Dashboard() {
 	}
 
 	const handleRescheduleBooking = (bookingId: string) => {
-		setReschedulingBookingId(bookingId)
-		setIsRescheduleOpen(true)
+		console.log('Opening reschedule slidesheet for booking:', bookingId)
+
+		// Add a small delay to ensure dropdown closes first
+		setTimeout(() => {
+			setReschedulingBookingId(bookingId)
+			setIsRescheduleOpen(true)
+		}, 100)
 	}
 
 	const handleRefundConfirm = async (bookingId: string, reason?: string) => {
@@ -692,6 +697,38 @@ export default function Dashboard() {
 				/>
 			</SideSheet>
 
+			{/* Reschedule Sidebar */}
+			<SideSheet
+				isOpen={isRescheduleOpen}
+				onClose={() => {
+					console.log('Closing reschedule slidesheet')
+					setIsRescheduleOpen(false)
+					setReschedulingBookingId(null)
+				}}
+				title="Reprogramar Cita"
+				description="Selecciona una nueva fecha y hora para la cita"
+			>
+				{reschedulingBookingId && (
+					<RescheduleForm
+						bookingId={reschedulingBookingId}
+						customerName={
+							bookings.find((b) => b.id === reschedulingBookingId)
+								?.customerName || 'Cliente'
+						}
+						onSuccess={() => {
+							console.log('Reschedule successful')
+							setIsRescheduleOpen(false)
+							setReschedulingBookingId(null)
+						}}
+						onCancel={() => {
+							console.log('Reschedule cancelled')
+							setIsRescheduleOpen(false)
+							setReschedulingBookingId(null)
+						}}
+					/>
+				)}
+			</SideSheet>
+
 			{/* Refund Confirmation Modal */}
 			{refundingBookingId &&
 				(() => {
@@ -776,62 +813,6 @@ export default function Dashboard() {
 						/>
 					)
 				})()}
-
-			{/* Reschedule Sidebar */}
-			<SideSheet
-				isOpen={isRescheduleOpen}
-				onClose={() => {
-					setIsRescheduleOpen(false)
-					setReschedulingBookingId(null)
-				}}
-				title="Reprogramar Cita"
-				description={
-					reschedulingBookingId
-						? `Reprogramar la cita de ${
-								bookings.find(
-									(b) => b.id === reschedulingBookingId
-								)?.customerName || 'Cliente'
-							}`
-						: 'Reprogramar la cita'
-				}
-			>
-				{reschedulingBookingId && (
-					<RescheduleForm
-						bookingId={reschedulingBookingId}
-						customerName={
-							bookings.find((b) => b.id === reschedulingBookingId)
-								?.customerName || 'Cliente'
-						}
-						onSuccess={async () => {
-							setIsRescheduleOpen(false)
-							setReschedulingBookingId(null)
-							// Refresh bookings list
-							if (user) {
-								try {
-									const result = await getBookingsWithBills(
-										user.id,
-										{ limit: 10, offset: 0 }
-									)
-									const transformedBookings =
-										result.bookings.map(transformBooking)
-									setBookings(transformedBookings)
-									setHasMore(result.hasMore)
-									setOffset(10)
-								} catch (error) {
-									console.error(
-										'Error refreshing bookings:',
-										error
-									)
-								}
-							}
-						}}
-						onCancel={() => {
-							setIsRescheduleOpen(false)
-							setReschedulingBookingId(null)
-						}}
-					/>
-				)}
-			</SideSheet>
 		</div>
 	)
 }
