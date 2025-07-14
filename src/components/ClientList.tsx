@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Plus, Users, ArrowUpRight } from 'lucide-react'
+import { Plus, Users, ArrowUpRight, MoreHorizontal, Edit } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
 	Table,
@@ -12,6 +12,12 @@ import {
 	TableHeader,
 	TableRow
 } from '@/components/ui/table'
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import {
 	Card,
 	CardContent,
@@ -37,48 +43,31 @@ export type Client = Tables<'clients'>
  * @property clients - Array of client objects to display
  * @property loading - Boolean indicating if clients are being fetched
  * @property onClientCreated - Callback function called when a client is successfully created
+ * @property onEditClient - Optional callback function called when a client needs to be edited
  */
 interface ClientListProps {
 	clients: Client[]
 	loading: boolean
 	onClientCreated?: () => void
+	onEditClient?: (client: Client) => void
 }
 
 /**
  * ClientList Component
  *
  * Displays a list of clients/patients in a table format with the ability to
- * add new clients. Provides a clean interface for managing client relationships.
- *
- * FEATURES:
- * - Displays clients in a responsive table
- * - Add new client functionality via modal
- * - Loading state handling
- * - Scrollable table for many clients
- * - Client name and email display
- *
- * COMPONENT STRUCTURE:
- * - Card container with header and content
- * - Table with client information
- * - Add client button in header
- * - ClientForm modal for adding new clients
- *
- * @component
- * @example
- * ```tsx
- * <ClientList
- *   clients={clients}
- *   loading={isLoading}
- * />
- * ```
+ * add new clients and edit existing ones through action dropdowns.
  */
 export function ClientList({
 	clients,
 	loading,
-	onClientCreated
+	onClientCreated,
+	onEditClient
 }: ClientListProps) {
 	// State to control the client form modal visibility
 	const [isFormOpen, setIsFormOpen] = useState(false)
+	// State to track which client is being edited
+	const [editingClient, setEditingClient] = useState<Client | null>(null)
 
 	/**
 	 * Handles successful client creation
@@ -88,8 +77,29 @@ export function ClientList({
 	 */
 	const handleClientCreated = () => {
 		setIsFormOpen(false)
+		setEditingClient(null) // Clear editing state
 		// Call parent callback to refresh the client list
 		onClientCreated?.()
+	}
+
+	/**
+	 * Handles the edit client action
+	 * Opens the form modal in edit mode with the selected client data
+	 */
+	const handleEditClient = (client: Client) => {
+		setEditingClient(client)
+		setIsFormOpen(true)
+		// Optionally notify parent component
+		onEditClient?.(client)
+	}
+
+	/**
+	 * Handles closing the form modal
+	 * Resets both form and editing state
+	 */
+	const handleCloseForm = () => {
+		setIsFormOpen(false)
+		setEditingClient(null)
 	}
 
 	// Show loading state while clients are being fetched
@@ -130,6 +140,9 @@ export function ClientList({
 							<TableHeader>
 								<TableRow>
 									<TableHead>Paciente</TableHead>
+									<TableHead className="text-right">
+										Acciones
+									</TableHead>
 								</TableRow>
 							</TableHeader>
 
@@ -147,6 +160,31 @@ export function ClientList({
 												{client.email}
 											</div>
 										</TableCell>
+										{/* Actions dropdown */}
+										<TableCell className="text-right py-2">
+											<DropdownMenu>
+												<DropdownMenuTrigger asChild>
+													<Button
+														variant="ghost"
+														className="h-8 w-8 p-0 hover:bg-gray-100"
+													>
+														<MoreHorizontal className="h-4 w-4" />
+													</Button>
+												</DropdownMenuTrigger>
+												<DropdownMenuContent align="end">
+													<DropdownMenuItem
+														onClick={() =>
+															handleEditClient(
+																client
+															)
+														}
+													>
+														<Edit className="h-4 w-4 mr-2" />
+														Editar
+													</DropdownMenuItem>
+												</DropdownMenuContent>
+											</DropdownMenu>
+										</TableCell>
 									</TableRow>
 								))}
 							</TableBody>
@@ -155,11 +193,13 @@ export function ClientList({
 				</CardContent>
 			</Card>
 
-			{/* Client form modal for adding new clients */}
+			{/* Client form modal for adding new clients or editing existing ones */}
 			<ClientForm
 				isOpen={isFormOpen}
-				onClose={() => setIsFormOpen(false)}
+				onClose={handleCloseForm}
 				onClientCreated={handleClientCreated}
+				editMode={!!editingClient}
+				initialData={editingClient || undefined}
 			/>
 		</div>
 	)

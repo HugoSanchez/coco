@@ -8,10 +8,15 @@ import { useUser } from '@/contexts/UserContext'
 import { useToast } from '@/components/ui/use-toast'
 import {
 	createClientWithBilling,
+	upsertClientWithBilling,
 	type CreateClientPayload,
-	type ClientBillingSettingsPayload
+	type ClientBillingSettingsPayload,
+	type UpsertClientPayload,
+	type UpsertBillingPayload,
+	type Client
 } from '@/lib/db/clients'
-import { UserPlus } from 'lucide-react'
+import { getClientBillingSettings } from '@/lib/db/billing-settings'
+import { UserPlus, Save } from 'lucide-react'
 
 interface ClientFormFieldsProps {
 	onSuccess: () => void
@@ -20,6 +25,9 @@ interface ClientFormFieldsProps {
 	onFormSubmit?: (e: React.FormEvent) => void
 	onSubmitFunction?: (submitFn: () => Promise<void>) => void
 	onLoadingChange?: (loading: boolean) => void
+	// New props for edit mode
+	editMode?: boolean
+	initialData?: Client
 }
 
 export function ClientFormFields({
@@ -28,19 +36,53 @@ export function ClientFormFields({
 	hideSubmitButton = false,
 	onFormSubmit,
 	onSubmitFunction,
-	onLoadingChange
+	onLoadingChange,
+	editMode = false,
+	initialData
 }: ClientFormFieldsProps) {
 	const [loading, setLoading] = useState(false)
 	const { user } = useUser()
 	const { toast } = useToast()
+
+	// Initialize form data with either initial data (edit mode) or empty values (create mode)
 	const [formData, setFormData] = useState({
-		name: '',
-		lastName: '',
-		email: '',
-		description: '',
-		shouldBill: false,
-		billingAmount: ''
+		name: initialData?.name || '',
+		lastName: initialData?.last_name || '',
+		email: initialData?.email || '',
+		description: initialData?.description || '',
+		shouldBill: false, // We'll load this from billing settings separately
+		billingAmount: '' // We'll load this from billing settings separately
 	})
+
+	// Load existing billing settings when in edit mode
+	useEffect(() => {
+		const loadBillingSettings = async () => {
+			if (editMode && initialData && user) {
+				try {
+					const billingSettings = await getClientBillingSettings(
+						user.id,
+						initialData.id
+					)
+
+					if (billingSettings) {
+						const amountString =
+							billingSettings.billing_amount?.toString() || ''
+
+						setFormData((prev) => ({
+							...prev,
+							shouldBill: true,
+							billingAmount: amountString
+						}))
+					}
+				} catch (error) {
+					console.error('Error loading billing settings:', error)
+					// Don't show error toast, just continue without billing data
+				}
+			}
+		}
+
+		loadBillingSettings()
+	}, [editMode, initialData, user])
 
 	const submitForm = useCallback(async () => {
 		setLoading(true)
@@ -48,8 +90,9 @@ export function ClientFormFields({
 		try {
 			if (!user) throw new Error('Not authenticated')
 
-			// Prepare client data
-			const clientPayload: CreateClientPayload = {
+			// Prepare client data for upsert (include ID for edit mode)
+			const clientPayload: UpsertClientPayload = {
+				...(editMode && initialData?.id ? { id: initialData.id } : {}), // Include ID only in edit mode
 				user_id: user.id,
 				name: formData.name,
 				last_name: formData.lastName || null,
@@ -58,9 +101,7 @@ export function ClientFormFields({
 			}
 
 			// Prepare billing data if billing is enabled
-			let billingPayload:
-				| Omit<ClientBillingSettingsPayload, 'user_id' | 'client_id'>
-				| undefined
+			let billingPayload: UpsertBillingPayload | undefined
 
 			if (formData.shouldBill) {
 				billingPayload = {
@@ -72,39 +113,61 @@ export function ClientFormFields({
 				}
 			}
 
-			// Create client with optional billing settings
-			await createClientWithBilling(clientPayload, billingPayload)
+			// Upsert client with optional billing settings (works for both create and update)
+			await upsertClientWithBilling(clientPayload, billingPayload)
 
-			// Reset form
-			setFormData({
-				name: '',
-				lastName: '',
-				email: '',
-				description: '',
-				shouldBill: false,
-				billingAmount: ''
-			})
+			// Reset form only in create mode (in edit mode, keep the form populated)
+			if (!editMode) {
+				setFormData({
+					name: '',
+					lastName: '',
+					email: '',
+					description: '',
+					shouldBill: false,
+					billingAmount: ''
+				})
+			}
 
 			onSuccess()
+
+			// Context-aware success message
 			toast({
-				title: 'Paciente creado correctamente',
-				description: 'El paciente ha sido añadido a tu lista.',
+				title: editMode
+					? 'Paciente actualizado correctamente'
+					: 'Paciente creado correctamente',
+				description: editMode
+					? 'Los datos del paciente han sido actualizados.'
+					: 'El paciente ha sido añadido a tu lista.',
 				variant: 'default',
 				color: 'success'
 			})
 		} catch (error) {
-			console.error('Error creating client:', error)
+			console.error(
+				`Error ${editMode ? 'updating' : 'creating'} client:`,
+				error
+			)
 			toast({
-				title: 'Error al crear paciente',
-				description:
-					'No se pudo crear el paciente. Inténtalo de nuevo.',
+				title: editMode
+					? 'Error al actualizar paciente'
+					: 'Error al crear paciente',
+				description: editMode
+					? 'No se pudieron actualizar los datos del paciente. Inténtalo de nuevo.'
+					: 'No se pudo crear el paciente. Inténtalo de nuevo.',
 				variant: 'destructive'
 			})
 		} finally {
 			setLoading(false)
 			if (onLoadingChange) onLoadingChange(false)
 		}
-	}, [user, formData, onSuccess, onLoadingChange, toast])
+	}, [
+		user,
+		formData,
+		onSuccess,
+		onLoadingChange,
+		toast,
+		editMode,
+		initialData
+	])
 
 	// Expose the submit function to parent
 	useEffect(() => {
@@ -255,8 +318,13 @@ export function ClientFormFields({
 						disabled={loading}
 						className="w-full text-md font-medium"
 					>
-						<UserPlus className="h-4 w-4 mr-2" />
-						{loading ? 'Guardando...' : 'Añadir'}
+						{loading
+							? editMode
+								? 'Guardando...'
+								: 'Creando...'
+							: editMode
+								? 'Guardar cambios'
+								: 'Añadir paciente'}
 					</Button>
 					{onCancel && (
 						<Button

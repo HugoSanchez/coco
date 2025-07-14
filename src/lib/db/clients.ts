@@ -14,6 +14,10 @@
 
 import { Tables } from '@/types/database.types'
 import { createClient as createSupabaseClient } from '@/lib/supabase/client'
+import {
+	type BillingType,
+	getClientBillingSettings
+} from '@/lib/db/billing-settings'
 import type { SupabaseClient } from '@supabase/supabase-js'
 const supabase = createSupabaseClient()
 
@@ -124,6 +128,42 @@ export interface ClientBillingSettingsPayload {
 }
 
 /**
+ * Interface for client upsert payload (create or update)
+ * Contains client information with an optional ID for updates
+ *
+ * @interface UpsertClientPayload
+ * @property id - Optional UUID for updates (omit for creates)
+ * @property user_id - UUID of the user who owns this client
+ * @property name - First name of the client
+ * @property last_name - Last name of the client (optional)
+ * @property email - Contact email for the client
+ * @property description - Optional notes about the client
+ */
+export interface UpsertClientPayload {
+	id?: string
+	user_id: string
+	name: string
+	last_name?: string | null
+	email: string
+	description?: string | null
+}
+
+/**
+ * Interface for billing settings payload used in upsert operations
+ * Simplified version that only includes the billing data
+ *
+ * @interface UpsertBillingPayload
+ * @property billing_amount - Amount to charge per consultation
+ * @property billing_type - Type of billing (defaults to 'in-advance')
+ * @property currency - Currency code (defaults to 'EUR')
+ */
+export interface UpsertBillingPayload {
+	billing_amount?: number | null
+	billing_type?: BillingType
+	currency?: string
+}
+
+/**
  * Creates a new client in the database
  * Only handles basic client information - no billing data
  *
@@ -217,4 +257,108 @@ export async function createClientWithBilling(
 
 	// Return the client - billing settings are created separately but linked
 	return client
+}
+
+/**
+ * Upserts (creates or updates) a client with optional billing settings
+ * This is the unified function that can handle both creation and updates
+ *
+ * HOW IT WORKS:
+ * - If payload.id is provided → Updates existing client using upsert
+ * - If payload.id is omitted → Creates new client using insert
+ * - Billing settings are always upserted separately using existing function
+ *
+ * ADVANTAGES:
+ * - Single function for both create and edit operations
+ * - Consistent behavior for billing settings
+ * - Simpler UI logic (no need to know if creating or updating)
+ * - Avoids PostgreSQL conflict constraint issues
+ *
+ * @param clientPayload - Client information with optional ID
+ * @param billingPayload - Optional billing settings
+ * @returns Promise<Client> - The created or updated client object
+ * @throws Error if upsert fails or validation errors occur
+ */
+export async function upsertClientWithBilling(
+	clientPayload: UpsertClientPayload,
+	billingPayload?: UpsertBillingPayload
+): Promise<Client> {
+	let clientData: Client
+
+	// Check if this is an update (has ID) or create (no ID)
+	if (clientPayload.id) {
+		// UPDATE: Use upsert for existing client
+		const { data, error } = await supabase
+			.from('clients')
+			.upsert(clientPayload, {
+				onConflict: 'id',
+				ignoreDuplicates: false
+			})
+			.select()
+			.single()
+
+		if (error) throw error
+		clientData = data
+	} else {
+		// CREATE: Use insert for new client
+		const { data, error } = await supabase
+			.from('clients')
+			.insert([clientPayload])
+			.select()
+			.single()
+
+		if (error) throw error
+		clientData = data
+	}
+
+	// If billing settings are provided, handle them appropriately
+	if (billingPayload) {
+		if (clientPayload.id) {
+			// UPDATE: Manually handle existing client billing settings
+			// First check if billing settings exist for this client
+			const existingBillingSettings = await getClientBillingSettings(
+				clientPayload.user_id,
+				clientData.id
+			)
+
+			const billingData = {
+				user_id: clientPayload.user_id,
+				client_id: clientData.id,
+				booking_id: null,
+				is_default: false,
+				billing_amount: billingPayload.billing_amount || null,
+				billing_type: billingPayload.billing_type || 'in-advance',
+				currency: billingPayload.currency || 'EUR'
+			}
+
+			if (existingBillingSettings) {
+				// Update existing billing settings
+				const { error } = await supabase
+					.from('billing_settings')
+					.update(billingData)
+					.eq('id', existingBillingSettings.id)
+
+				if (error) throw error
+			} else {
+				// Create new billing settings
+				const { error } = await supabase
+					.from('billing_settings')
+					.insert([billingData])
+
+				if (error) throw error
+			}
+		} else {
+			// CREATE: Use the original create function for new client billing settings
+			await createClientBillingSettings({
+				user_id: clientPayload.user_id,
+				client_id: clientData.id,
+				billing_amount: billingPayload.billing_amount || null,
+				billing_type: billingPayload.billing_type || 'in-advance',
+				currency: billingPayload.currency || 'EUR'
+			})
+		}
+	}
+
+	// Return the client
+	return clientData
 }
