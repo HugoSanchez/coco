@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Input } from '@/components/ui/input'
 import { User } from 'lucide-react'
+import { getClientFullName } from '@/lib/db/clients'
 
 interface Client {
 	id: string
 	name: string
+	last_name?: string | null
 	email: string
 }
 
@@ -39,7 +41,7 @@ export function ClientSearchSelect({
 			const client = clients.find((c) => c.id === value)
 			setSelectedClient(client || null)
 			if (client) {
-				setSearchTerm(client.name)
+				setSearchTerm(getClientFullName(client))
 			}
 		} else {
 			setSelectedClient(null)
@@ -54,7 +56,7 @@ export function ClientSearchSelect({
 		const search = searchTerm.toLowerCase()
 		return clients.filter(
 			(client) =>
-				client.name.toLowerCase().includes(search) ||
+				getClientFullName(client).toLowerCase().includes(search) ||
 				client.email.toLowerCase().includes(search)
 		)
 	}, [clients, searchTerm])
@@ -81,7 +83,7 @@ export function ClientSearchSelect({
 		setIsOpen(true)
 
 		// Clear selection if input doesn't match selected client
-		if (selectedClient && newValue !== selectedClient.name) {
+		if (selectedClient && newValue !== getClientFullName(selectedClient)) {
 			setSelectedClient(null)
 			onValueChange('')
 		}
@@ -89,7 +91,7 @@ export function ClientSearchSelect({
 
 	const handleClientSelect = (client: Client) => {
 		setSelectedClient(client)
-		setSearchTerm(client.name)
+		setSearchTerm(getClientFullName(client))
 		setIsOpen(false)
 		onValueChange(client.id)
 	}
@@ -137,7 +139,7 @@ export function ClientSearchSelect({
 							onClick={() => handleClientSelect(client)}
 						>
 							<div className="font-medium text-gray-900">
-								{client.name}
+								{getClientFullName(client)}
 							</div>
 							<div className="text-sm text-gray-500">
 								{client.email}

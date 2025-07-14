@@ -27,7 +27,7 @@ import {
 	CardHeader,
 	CardTitle
 } from '@/components/ui/card'
-import { getClientsForUser, Client } from '@/lib/db/clients'
+import { getClientsForUser, Client, getClientFullName } from '@/lib/db/clients'
 import {
 	getBookingsWithBills,
 	BookingWithBills,
@@ -62,7 +62,7 @@ const transformBooking = (dbBooking: BookingWithBills): Booking => {
 
 	return {
 		id: dbBooking.id,
-		customerName: dbBooking.client.name,
+		customerName: getClientFullName(dbBooking.client),
 		customerEmail: dbBooking.client.email,
 		bookingDate: new Date(dbBooking.start_time),
 		startTime: new Date(dbBooking.start_time),
@@ -160,6 +160,20 @@ export default function Dashboard() {
 			fetchClients()
 		}
 	}, [user])
+
+	const handleClientCreated = async () => {
+		// Refresh the client list when a new client is created
+		if (!user) return
+		setLoadingClients(true)
+		try {
+			const data = await getClientsForUser(user.id)
+			setClients(data as Client[])
+		} catch (e) {
+			console.error('Error refreshing clients:', e)
+		} finally {
+			setLoadingClients(false)
+		}
+	}
 
 	const handleCancelBooking = async (bookingId: string) => {
 		try {
@@ -644,6 +658,7 @@ export default function Dashboard() {
 						<ClientList
 							clients={clients as Client[]}
 							loading={loadingClients}
+							onClientCreated={handleClientCreated}
 						/>
 					</div>
 				</div>

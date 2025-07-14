@@ -37,7 +37,8 @@ interface BookingFormProps {
 
 interface Client {
 	id: string // Unique client identifier
-	name: string // Client's display name
+	name: string // Client's first name
+	last_name?: string | null // Client's last name (optional)
 	email: string // Client's email address
 }
 

@@ -24,6 +24,23 @@ const supabase = createSupabaseClient()
 export type Client = Tables<'clients'>
 
 /**
+ * Utility function to get the full name of a client
+ * Combines first name and last name with proper spacing
+ *
+ * @param client - The client object with name and last_name properties
+ * @returns string - The full name (e.g., "John Doe" or just "John" if no last name)
+ */
+export function getClientFullName(client: {
+	name: string
+	last_name?: string | null
+}): string {
+	if (!client.last_name) {
+		return client.name
+	}
+	return `${client.name} ${client.last_name}`.trim()
+}
+
+/**
  * Retrieves all clients for a specific user, ordered by creation date (newest first)
  *
  * @param userId - The UUID of the user whose clients to fetch
@@ -74,13 +91,15 @@ export async function getClientById(
  *
  * @interface CreateClientPayload
  * @property user_id - UUID of the user who owns this client
- * @property name - Full name of the client
+ * @property name - First name of the client
+ * @property last_name - Last name of the client (optional)
  * @property email - Contact email for the client
  * @property description - Optional notes about the client
  */
 export interface CreateClientPayload {
 	user_id: string
 	name: string
+	last_name?: string | null
 	email: string
 	description?: string | null
 }
@@ -92,22 +111,16 @@ export interface CreateClientPayload {
  * @interface ClientBillingSettingsPayload
  * @property user_id - UUID of the user (for data isolation)
  * @property client_id - UUID of the client these settings apply to
- * @property should_bill - Whether billing is enabled for this client
- * @property billing_amount - Amount to charge per consultation/period
- * @property billing_type - Type of billing: 'recurring' or 'consultation_based'
- * @property billing_frequency - For recurring: 'weekly' or 'monthly'
- * @property billing_trigger - For consultation_based: 'before_consultation' or 'after_consultation'
- * @property billing_advance_days - Days before consultation to send invoice (if before_consultation)
+ * @property billing_amount - Amount to charge per consultation
+ * @property billing_type - Type of billing: 'in-advance', 'right-after', or 'monthly'
+ * @property currency - Currency code (defaults to 'EUR')
  */
 export interface ClientBillingSettingsPayload {
 	user_id: string
 	client_id: string
-	should_bill: boolean
 	billing_amount?: number | null
-	billing_type?: string | null
-	billing_frequency?: string | null
-	billing_trigger?: string | null
-	billing_advance_days?: number | null
+	billing_type: string
+	currency?: string
 }
 
 /**
@@ -138,7 +151,6 @@ export async function createClient(
  * The function sets:
  * - booking_id: null (client-specific, not booking-specific)
  * - is_default: false (not default settings, client-specific override)
- * - billing_advance_days: defaults to 0 if not provided
  *
  * @param payload - Billing settings data for the client
  * @returns Promise<any> - The created billing settings object
@@ -153,12 +165,9 @@ export async function createClientBillingSettings(
 		client_id: payload.client_id,
 		booking_id: null, // Client-specific settings (not booking-specific)
 		is_default: false, // Not default settings (client-specific override)
-		should_bill: payload.should_bill,
 		billing_amount: payload.billing_amount,
 		billing_type: payload.billing_type,
-		billing_frequency: payload.billing_frequency,
-		billing_trigger: payload.billing_trigger,
-		billing_advance_days: payload.billing_advance_days || 0 // Default to 0 if not specified
+		currency: payload.currency || 'EUR' // Default to EUR if not specified
 	}
 
 	const { data, error } = await supabase
@@ -177,7 +186,7 @@ export async function createClientBillingSettings(
  *
  * The process:
  * 1. Create the client first (always succeeds)
- * 2. If billing settings are provided and billing is enabled, create those separately
+ * 2. If billing settings are provided, create those separately
  * 3. Return the created client
  *
  * This approach ensures that:
@@ -197,9 +206,8 @@ export async function createClientWithBilling(
 	// Create the client first - this establishes the client record
 	const client = await createClient(clientPayload)
 
-	// If billing settings are provided and billing is enabled, create them
-	// We check should_bill to ensure we don't create billing records for disabled billing
-	if (billingPayload && billingPayload.should_bill) {
+	// If billing settings are provided, create them
+	if (billingPayload) {
 		await createClientBillingSettings({
 			user_id: clientPayload.user_id,
 			client_id: client.id, // Use the newly created client's ID

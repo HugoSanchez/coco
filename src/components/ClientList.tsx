@@ -22,6 +22,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { ClientForm } from './ClientForm'
 import { Tables } from '@/types/database.types'
+import { getClientFullName } from '@/lib/db/clients'
 
 /**
  * Type alias for Client data from the database
@@ -35,10 +36,12 @@ export type Client = Tables<'clients'>
  * @interface ClientListProps
  * @property clients - Array of client objects to display
  * @property loading - Boolean indicating if clients are being fetched
+ * @property onClientCreated - Callback function called when a client is successfully created
  */
 interface ClientListProps {
 	clients: Client[]
 	loading: boolean
+	onClientCreated?: () => void
 }
 
 /**
@@ -69,20 +72,24 @@ interface ClientListProps {
  * />
  * ```
  */
-export function ClientList({ clients, loading }: ClientListProps) {
+export function ClientList({
+	clients,
+	loading,
+	onClientCreated
+}: ClientListProps) {
 	// State to control the client form modal visibility
 	const [isFormOpen, setIsFormOpen] = useState(false)
 
 	/**
 	 * Handles successful client creation
 	 *
-	 * Closes the form modal and signals to the parent component
-	 * that clients should be re-fetched to show the new client.
+	 * Closes the form modal and refreshes the client list
+	 * by calling the parent component's refresh callback.
 	 */
 	const handleClientCreated = () => {
 		setIsFormOpen(false)
-		// The parent (dashboard) should re-fetch clients after creation
-		// This could be enhanced with a callback prop for better communication
+		// Call parent callback to refresh the client list
+		onClientCreated?.()
 	}
 
 	// Show loading state while clients are being fetched
@@ -133,7 +140,7 @@ export function ClientList({ clients, loading }: ClientListProps) {
 										<TableCell>
 											{/* Client name (always visible) */}
 											<div className="font-medium">
-												{client.name}
+												{getClientFullName(client)}
 											</div>
 											{/* Client email (hidden on mobile for space) */}
 											<div className="hidden text-sm text-muted-foreground md:inline">
