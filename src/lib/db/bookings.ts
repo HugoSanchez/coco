@@ -58,8 +58,10 @@ export interface BookingWithClient extends Booking {
 	client: {
 		id: string
 		name: string
+		last_name: string | null
 		email: string
-	}
+		full_name_search: string
+	} | null
 }
 
 /**
@@ -70,8 +72,10 @@ export interface BookingWithBills extends Booking {
 	client: {
 		id: string
 		name: string
+		last_name: string | null
 		email: string
-	}
+		full_name_search: string
+	} | null
 	bill?: {
 		id: string
 		amount: number
@@ -145,7 +149,7 @@ export async function getBookingsForUser(
 		.select(
 			`
 			*,
-			client:clients(id, name, email)
+			client:clients(id, name, last_name, email)
 		`
 		)
 		.eq('user_id', userId)
@@ -178,7 +182,7 @@ export async function getBookingsForDateRange(
 		.select(
 			`
 			*,
-			client:clients(id, name, email)
+			client:clients(id, name, last_name, email)
 		`
 		)
 		.eq('user_id', userId)
@@ -293,7 +297,7 @@ export async function getBookingById(
 		.select(
 			`
 			*,
-			client:clients(id, name, email)
+			client:clients(id, name, last_name, email)
 		`
 		)
 		.eq('id', bookingId)
@@ -412,7 +416,7 @@ export async function getBookingsWithBills(
 		.select(
 			`
 			*,
-			client:clients(id, name, email),
+			client:clients(id, name, last_name, email, full_name_search),
 			bill:bills(
 				id,
 				amount,
@@ -429,9 +433,11 @@ export async function getBookingsWithBills(
 
 	// Apply filters
 	if (customerSearch) {
-		query = query.or(
-			`client.name.ilike.%${customerSearch}%,client.email.ilike.%${customerSearch}%`
-		)
+		// Use computed full_name_search column for clean, reliable filtering
+		// Supports "Hugo", "Sanchez", or "Hugo Sanchez" searches
+		query = query
+			.filter('client.full_name_search', 'ilike', `%${customerSearch}%`)
+			.not('client', 'is', null)
 	}
 
 	if (statusFilter && statusFilter !== 'all') {

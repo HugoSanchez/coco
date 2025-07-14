@@ -63,16 +63,22 @@ export function BookingFilters({
 	const endDate = filters.endDate ? new Date(filters.endDate) : undefined
 
 	const handleStartDateSelect = (date: Date | undefined) => {
+		console.log('Start date selected:', date)
 		if (date) {
-			updateFilter('startDate', date.toISOString().split('T')[0])
+			const dateString = date.toISOString().split('T')[0]
+			console.log('Start date string:', dateString)
+			updateFilter('startDate', dateString)
 		} else {
 			updateFilter('startDate', '')
 		}
 	}
 
 	const handleEndDateSelect = (date: Date | undefined) => {
+		console.log('End date selected:', date)
 		if (date) {
-			updateFilter('endDate', date.toISOString().split('T')[0])
+			const dateString = date.toISOString().split('T')[0]
+			console.log('End date string:', dateString)
+			updateFilter('endDate', dateString)
 		} else {
 			updateFilter('endDate', '')
 		}
@@ -123,6 +129,15 @@ export function BookingFilters({
 							<PopoverContent
 								className="w-auto p-0"
 								align="start"
+								onInteractOutside={(e) => {
+									// Prevent closing when clicking inside calendar
+									if (
+										e.target instanceof Element &&
+										e.target.closest('[role="dialog"]')
+									) {
+										e.preventDefault()
+									}
+								}}
 							>
 								<Calendar
 									mode="single"
@@ -156,6 +171,15 @@ export function BookingFilters({
 							<PopoverContent
 								className="w-auto p-0"
 								align="start"
+								onInteractOutside={(e) => {
+									// Prevent closing when clicking inside calendar
+									if (
+										e.target instanceof Element &&
+										e.target.closest('[role="dialog"]')
+									) {
+										e.preventDefault()
+									}
+								}}
 							>
 								<Calendar
 									mode="single"

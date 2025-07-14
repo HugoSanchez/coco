@@ -63,7 +63,7 @@ const transformBooking = (dbBooking: BookingWithBills): Booking => {
 	return {
 		id: dbBooking.id,
 		customerName: getClientFullName(dbBooking.client),
-		customerEmail: dbBooking.client.email,
+		customerEmail: dbBooking.client?.email || 'Email no disponible',
 		bookingDate: new Date(dbBooking.start_time),
 		startTime: new Date(dbBooking.start_time),
 		status,

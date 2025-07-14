@@ -34,10 +34,15 @@ export type Client = Tables<'clients'>
  * @param client - The client object with name and last_name properties
  * @returns string - The full name (e.g., "John Doe" or just "John" if no last name)
  */
-export function getClientFullName(client: {
-	name: string
-	last_name?: string | null
-}): string {
+export function getClientFullName(
+	client: {
+		name: string
+		last_name?: string | null
+	} | null
+): string {
+	if (!client) {
+		return 'Cliente no encontrado'
+	}
 	if (!client.last_name) {
 		return client.name
 	}
