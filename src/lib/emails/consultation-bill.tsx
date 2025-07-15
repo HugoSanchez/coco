@@ -74,74 +74,33 @@ export default function ConsultationBillEmail({
 	dueDate,
 	paymentUrl
 }: ConsultationBillEmailProps) {
-	const isBefore = billingTrigger === 'before_consultation'
-	const billingContext = isBefore
-		? 'Tu consulta está programada y requiere pago anticipado'
-		: 'Tu consulta ha sido completada'
-
 	return (
 		<Html>
 			<Head />
-			<Preview>
-				{isBefore
-					? 'Factura de Consulta - Pago Requerido'
-					: 'Factura de Consulta Completada'}
-			</Preview>
+			<Preview>{'Confirmar Consulta - Pago Requerido'}</Preview>
 			<Body style={main}>
 				<Container style={container}>
-					{/* Header */}
-					<Section style={header}>
-						<div style={headerContainer}>
-							<Heading style={h1}>Factura de Consulta</Heading>
-						</div>
-					</Section>
+					{/* Logo */}
+					<Section style={logoSection}></Section>
 
 					{/* Greeting */}
-					<Section style={{ ...section, paddingTop: '32px' }}>
-						<Text style={text}>Hola {clientName},</Text>
-						<Text style={text}>
-							Aquí tienes la factura y detalles de pago de tu{' '}
-							{isBefore ? '' : 'próxima'}
-							consulta con {' ' + practitionerName}
-						</Text>
-					</Section>
-
-					{/* Bill Details */}
 					<Section style={section}>
-						<div style={billSection}>
-							<Row>
-								<Column style={labelColumn}>
-									<Text style={label}>Profesional:</Text>
-								</Column>
-								<Column style={valueColumn}>
-									<Text style={value}>
-										{practitionerName}
-									</Text>
-								</Column>
-							</Row>
+						<Text style={greeting}>
+							{`Hola ${clientName.trim()},`}
+						</Text>
+						<Text style={text}>
+							Este email es para comunicarte que tu próxima
+							consulta con {practitionerName} está pre-programada
+							para el {formatDateToSpanish(consultationDate)}.
+						</Text>
 
-							<Row>
-								<Column style={labelColumn}>
-									<Text style={label}>
-										Fecha de la Consulta:
-									</Text>
-								</Column>
-								<Column style={valueColumn}>
-									<Text style={value}>
-										{formatDateToSpanish(consultationDate)}
-									</Text>
-								</Column>
-							</Row>
+						<Text style={text}>
+							<strong>{`Para confirmar tu cita, por favor sigue las instrucciones de pago que encontrarás a continuación.`}</strong>
+						</Text>
 
-							<Row>
-								<Column style={labelColumn}>
-									<Text style={label}>Honorarios:</Text>
-								</Column>
-								<Column style={valueColumn}>
-									<Text style={value}>{amount}€</Text>
-								</Column>
-							</Row>
-						</div>
+						<Text style={text}>
+							{`Una vez realizado el pago, recibirás un email con los detalles de la cita así como la factura correspondiente. Si tienes cualquier duda, puedes ponerte en contacto con ${practitionerName}.`}
+						</Text>
 					</Section>
 
 					{/* Payment Button */}
@@ -150,35 +109,35 @@ export default function ConsultationBillEmail({
 							{paymentUrl ? (
 								<a href={paymentUrl} style={payButton}>
 									<Text style={buttonText}>
-										Pagar Consulta
+										Confirmar consulta
 									</Text>
 								</a>
 							) : (
 								<div style={payButton}>
 									<Text style={buttonText}>
-										Pagar Consulta
+										Confirmar consulta
 									</Text>
 								</div>
 							)}
 						</div>
 					</Section>
 
-					{/* Instructions */}
+					{/* Greetings Section */}
 					<Section style={section}>
-						<Text style={text}>
-							Si tienes alguna pregunta sobre esta factura, no
-							dudes en contactar con tu profesional:{' '}
-							{practitionerEmail}.
+						<Text style={signatureLine}>Atentamente,</Text>
+						<Text style={signatureLine}>
+							{practitionerName} y el equipo de Coco.
 						</Text>
 					</Section>
 
 					{/* Footer */}
 					<Section style={footer}>
-						<div style={footerPractitionerInfo}>
-							<Text style={footerText}>
-								Gracias por confiar en nosotros.
-							</Text>
-						</div>
+						<Text style={footerText}>
+							Coco es una plataforma de reservas para
+							profesionales de la salud. Si no eres{' '}
+							{clientName.trim()}, o no has concertado una cita
+							con {practitionerName} por favor ignora este email.
+						</Text>
 					</Section>
 				</Container>
 			</Body>
@@ -198,171 +157,91 @@ const container = {
 	margin: '0 auto',
 	padding: '0',
 	maxWidth: '600px',
-	border: '1px solid #e5e7eb',
-	borderRadius: '12px',
+	border: 'none',
+	borderRadius: '0',
 	overflow: 'hidden'
 }
 
-const header = {
-	padding: '40px 32px',
-	background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)',
-	textAlign: 'center' as const
-}
-
-const headerContainer = {
-	display: 'flex',
-	flexDirection: 'column' as const,
-	justifyContent: 'center',
-	alignItems: 'center',
-	width: '100%'
-}
-
-const h1 = {
-	color: '#ffffff',
-	fontSize: '28px',
-	fontWeight: 'bold',
-	margin: '0 0 16px',
-	textAlign: 'center' as const,
-	width: '100%'
-}
-
-const subtitle = {
-	color: '#ffffff',
-	fontSize: '16px',
-	fontWeight: '400',
-	margin: '0',
-	textAlign: 'left' as const,
-	lineHeight: '24px'
-}
-
-const practitionerImage = {
-	width: '24px',
-	height: '24px',
-	borderRadius: '50%',
-	objectFit: 'cover' as const
-}
-
-const practitionerContainer = {
-	textAlign: 'center' as const,
-	width: '100%'
-}
-
-const practitionerTable = {
-	margin: '0 auto',
-	borderCollapse: 'collapse' as const,
-	borderSpacing: '0'
-}
-
-const practitionerImageCell = {
-	paddingRight: '12px',
-	verticalAlign: 'middle' as const,
-	lineHeight: '24px',
-	height: '24px'
-}
-
-const practitionerNameCell = {
-	verticalAlign: 'middle' as const,
-	lineHeight: '24px',
-	height: '24px'
-}
-
-const section = {
-	padding: '0 32px',
-	marginBottom: '32px'
-}
-
-const text = {
-	color: '#374151',
-	fontSize: '16px',
-	lineHeight: '26px',
-	margin: '0 0 20px'
-}
-
-const billSection = {
-	padding: '',
+const logoSection = {
+	padding: '48px 40px 32px',
 	backgroundColor: '#ffffff',
-	border: '',
-	borderRadius: '12px',
-	margin: '0 0 32px 0',
-	boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-}
-
-const labelColumn = {
-	width: '40%',
-	verticalAlign: 'top' as const,
-	paddingRight: '12px'
-}
-
-const valueColumn = {
-	width: '60%',
-	verticalAlign: 'top' as const
-}
-
-const label = {
-	color: '#6b7280',
-	fontSize: '14px',
-	fontWeight: '600',
-	margin: '0 0 12px',
-	textTransform: 'uppercase' as const,
-	letterSpacing: '0.5px'
-}
-
-const value = {
-	color: '#111827',
-	fontSize: '16px',
-	fontWeight: '500',
-	margin: '0 0 12px'
-}
-
-const totalValue = {
-	color: '#111827',
-	fontSize: '16px',
-	fontWeight: '300',
-	margin: '0 0 12px'
-}
-
-const footer = {
-	padding: '32px',
-	textAlign: 'center' as const,
-	borderTop: '1px solid #f3f4f6',
-	backgroundColor: '#f9fafb'
-}
-
-const footerPractitionerInfo = {
-	display: 'flex',
-	alignItems: 'center',
-	justifyContent: 'center',
-	gap: '16px',
 	textAlign: 'left' as const
 }
 
+const logo = {
+	color: '#000000',
+	fontSize: '18px',
+	fontWeight: '900',
+	margin: '0',
+	textAlign: 'left' as const,
+	lineHeight: '22px'
+}
+
+const section = {
+	padding: '0 40px',
+	marginBottom: '40px'
+}
+
+const greeting = {
+	color: '#333333',
+	fontSize: '16px',
+	lineHeight: '24px',
+	margin: '0 0 24px',
+	fontWeight: '400'
+}
+
+const text = {
+	color: '#333333',
+	fontSize: '16px',
+	lineHeight: '24px',
+	margin: '0 0 24px',
+	fontWeight: '400'
+}
+
+const signatureLine = {
+	color: '#333333',
+	fontSize: '16px',
+	lineHeight: '24px',
+	margin: '0 0 8px',
+	fontWeight: '400'
+}
+
+const footer = {
+	padding: '40px',
+	textAlign: 'left' as const,
+	borderTop: '1px solid #e9ecef',
+	backgroundColor: '#ffffff'
+}
+
 const footerText = {
-	color: '#6b7280',
+	color: '#666666',
 	fontSize: '14px',
-	margin: '0 0 8px'
+	margin: '0 0 8px',
+	lineHeight: '20px'
 }
 
 const buttonContainer = {
-	textAlign: 'center' as const,
-	margin: '0 0 24px'
+	textAlign: 'left' as const,
+	margin: '0 0 32px'
 }
 
 const payButton = {
-	display: 'block',
-	width: '100%',
-	background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)',
-	borderRadius: '8px',
-	padding: '16px 32px',
+	display: 'inline-block',
+	backgroundColor: '#179898',
+	borderRadius: '6px',
+	padding: '16px 44px',
 	textAlign: 'center' as const,
 	textDecoration: 'none',
 	cursor: 'pointer',
-	boxSizing: 'border-box' as const
+	boxSizing: 'border-box' as const,
+	border: 'none'
 }
 
 const buttonText = {
 	color: '#ffffff',
 	fontSize: '16px',
-	fontWeight: '600',
+	fontWeight: '500',
 	margin: '0',
-	textDecoration: 'none'
+	textDecoration: 'none',
+	lineHeight: '20px'
 }
