@@ -28,8 +28,13 @@
 
 import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Spinner } from '@/components/ui/spinner'
-import { AlertCircle, TrendingUp, TrendingDown } from 'lucide-react'
+import { AlertCircle, TrendingUp, TrendingDown, Info } from 'lucide-react'
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger
+} from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 /**
@@ -45,6 +50,7 @@ import { cn } from '@/lib/utils'
  * @property loading - Shows loading skeleton when true
  * @property error - Error message to display (if any)
  * @property onRetry - Optional retry function for error states
+ * @property tooltipContent - Optional tooltip text for additional information
  * @property className - Additional CSS classes
  */
 export interface StatCardProps {
@@ -56,6 +62,7 @@ export interface StatCardProps {
 	loading?: boolean
 	error?: string | null
 	onRetry?: () => void
+	tooltipContent?: string
 	className?: string
 }
 
@@ -79,6 +86,7 @@ export function StatCard({
 	loading = false,
 	error = null,
 	onRetry,
+	tooltipContent,
 	className
 }: StatCardProps): JSX.Element {
 	/**
@@ -160,49 +168,67 @@ export function StatCard({
 				: null
 
 		return (
-			<Card className={cn('', className)}>
-				<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-					<CardTitle className="text-sm font-medium">
-						{title}
-					</CardTitle>
-					{icon && (
-						<div className="h-4 w-4 text-muted-foreground">
-							{icon}
-						</div>
-					)}
-				</CardHeader>
-				<CardContent>
-					<div className="space-y-1">
-						{/* Main value display */}
-						<div
-							className="text-2xl font-bold"
-							aria-label={`${title}: ${value}`}
-						>
-							{value || '—'}
-						</div>
-
-						{/* Change percentage and period */}
-						{hasValidChange ? (
+			<TooltipProvider>
+				<Card className={cn('', className)}>
+					<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+						<CardTitle className="text-sm font-medium">
+							{tooltipContent ? (
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<div className="flex items-center gap-1 cursor-pointer">
+											{title}
+											<Info className="h-3 w-3 text-muted-foreground" />
+										</div>
+									</TooltipTrigger>
+									<TooltipContent>
+										<p className="max-w-xs">
+											{tooltipContent}
+										</p>
+									</TooltipContent>
+								</Tooltip>
+							) : (
+								title
+							)}
+						</CardTitle>
+						{icon && (
+							<div className="h-4 w-4 text-muted-foreground">
+								{icon}
+							</div>
+						)}
+					</CardHeader>
+					<CardContent>
+						<div className="space-y-1">
+							{/* Main value display */}
 							<div
-								className={cn(
-									'flex items-center text-xs',
-									changeTextColor
-								)}
-								aria-label={`${change! > 0 ? 'Increased' : change! < 0 ? 'Decreased' : 'No change'} by ${Math.abs(change!)}% ${changeLabel}`}
+								className="text-2xl font-bold"
+								aria-label={`${title}: ${value}`}
 							>
-								<span className="text-xs text-gray-500">
-									{isPositive && '+'}
-									{change}% {changeLabel}
-								</span>
+								{value || '—'}
 							</div>
-						) : change === null ? (
-							<div className="text-xs text-gray-500">
-								Primera vez este período
-							</div>
-						) : null}
-					</div>
-				</CardContent>
-			</Card>
+
+							{/* Change percentage and period */}
+							{hasValidChange ? (
+								<div
+									className={cn(
+										'flex items-center text-xs',
+										changeTextColor
+									)}
+									aria-label={`${change! > 0 ? 'Increased' : change! < 0 ? 'Decreased' : 'No change'} by ${Math.abs(change!)}% ${changeLabel}`}
+								>
+									<span className="text-xs text-gray-500">
+										{isPositive && '+'}
+										{change}% {changeLabel}
+									</span>
+								</div>
+							) : change === null ? (
+								<div className="text-xs text-gray-500">
+									Primera vez este período
+								</div>
+							) : null}
+						</div>
+					</CardContent>
+				</Card>
+			</TooltipProvider>
 		)
 	}
 

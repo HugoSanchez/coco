@@ -42,7 +42,7 @@ interface DashboardStatsResponse {
 		revenue: {
 			current: number
 			previous: number
-			percentageChange: number
+			percentageChange: number | null
 			currency: string
 			formattedCurrent: string
 			formattedPrevious: string

@@ -28,6 +28,8 @@ import { createClient } from '@/lib/supabase/server'
 import {
 	getRevenueStats,
 	getBookingStats,
+	getPendingBookingStats,
+	getActiveClientsStats,
 	formatCurrency
 } from '@/lib/db/dashboard-stats'
 
@@ -52,6 +54,16 @@ interface DashboardStatsResponse {
 			formattedPrevious: string
 		}
 		bookings: {
+			current: number
+			previous: number
+			percentageChange: number | null
+		}
+		pendingBookings: {
+			current: number
+			previous: number
+			percentageChange: number | null
+		}
+		activeClients: {
 			current: number
 			previous: number
 			percentageChange: number | null
@@ -133,9 +145,16 @@ export async function GET(
 
 		// Fetch both revenue and booking statistics in parallel for better performance
 		// Pass the server-side Supabase client for proper RLS enforcement
-		const [revenueStats, bookingStats] = await Promise.all([
+		const [
+			revenueStats,
+			bookingStats,
+			pendingBookingStats,
+			activeClientsStats
+		] = await Promise.all([
 			getRevenueStats(userId, supabase),
-			getBookingStats(userId, supabase)
+			getBookingStats(userId, supabase),
+			getPendingBookingStats(userId, supabase),
+			getActiveClientsStats(userId, supabase)
 		])
 
 		// Format currency values for consistent display
@@ -157,7 +176,9 @@ export async function GET(
 				success: true,
 				data: {
 					revenue: formattedRevenueStats,
-					bookings: bookingStats
+					bookings: bookingStats,
+					pendingBookings: pendingBookingStats,
+					activeClients: activeClientsStats
 				}
 			},
 			{ status: 200 }

@@ -18,7 +18,8 @@ import {
 	DollarSign,
 	Users,
 	Plus,
-	CalendarCheck
+	CalendarCheck,
+	TriangleAlert
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -60,6 +61,16 @@ interface DashboardStats {
 		formattedPrevious: string
 	}
 	bookings: {
+		current: number
+		previous: number
+		percentageChange: number | null
+	}
+	pendingBookings: {
+		current: number
+		previous: number
+		percentageChange: number | null
+	}
+	activeClients: {
 		current: number
 		previous: number
 		percentageChange: number | null
@@ -649,58 +660,68 @@ export default function Dashboard() {
 				<div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
 					{/* Revenue Card - Real Data */}
 					<StatCard
-						title={`Facturación ${getCurrentMonthNameCapitalized()}`}
+						title={`Facturación Mensual`}
 						value={dashboardStats.data?.revenue.formattedCurrent}
 						change={dashboardStats.data?.revenue.percentageChange}
 						changeLabel="respecto al mes anterior"
 						icon={
 							<DollarSign className="h-4 w-4 text-muted-foreground" />
 						}
+						tooltipContent={`Facturación total confirmada para el mes de ${getCurrentMonthNameCapitalized()}`}
 						loading={dashboardStats.loading}
 						error={dashboardStats.error}
 						onRetry={retryDashboardStats}
 					/>
 					{/* Bookings Card - Real Data */}
 					<StatCard
-						title={`Citas confirmadas ${getCurrentMonthNameCapitalized()}`}
-						value={dashboardStats.data?.bookings.current}
+						title={`Total Confirmadas`}
+						value={'+' + dashboardStats.data?.bookings.current}
 						change={dashboardStats.data?.bookings.percentageChange}
 						changeLabel="respecto al mes anterior"
 						icon={
 							<CalendarCheck className="h-4 w-4 text-muted-foreground" />
 						}
+						tooltipContent={`Total de citas confirmadas para el mes de ${getCurrentMonthNameCapitalized()}`}
 						loading={dashboardStats.loading}
 						error={dashboardStats.error}
 						onRetry={retryDashboardStats}
 					/>
-					<Card x-chunk="dashboard-01-chunk-2">
-						<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-							<CardTitle className="text-sm font-medium">
-								Available slots
-							</CardTitle>
-							<CreditCard className="h-4 w-4 text-muted-foreground" />
-						</CardHeader>
-						<CardContent>
-							<div className="text-2xl font-bold">+12</div>
-							<p className="text-xs text-muted-foreground">
-								+19% from last month
-							</p>
-						</CardContent>
-					</Card>
-					<Card x-chunk="dashboard-01-chunk-3">
-						<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-							<CardTitle className="text-sm font-medium">
-								Active Clients
-							</CardTitle>
-							<Activity className="h-4 w-4 text-muted-foreground" />
-						</CardHeader>
-						<CardContent>
-							<div className="text-2xl font-bold">+57</div>
-							<p className="text-xs text-muted-foreground">
-								+201 since last hour
-							</p>
-						</CardContent>
-					</Card>
+					{/* Pending Bookings Card - Real Data */}
+					<StatCard
+						title={`Pendientes de confirmación`}
+						value={
+							'+' + dashboardStats.data?.pendingBookings.current
+						}
+						change={
+							dashboardStats.data?.pendingBookings
+								.percentageChange
+						}
+						changeLabel="respecto al mes anterior"
+						icon={
+							<TriangleAlert className="h-4 w-4 text-muted-foreground" />
+						}
+						tooltipContent={`Número de citas pendientes de confirmación para ${getCurrentMonthNameCapitalized()}`}
+						loading={dashboardStats.loading}
+						error={dashboardStats.error}
+						onRetry={retryDashboardStats}
+					/>
+
+					{/* Active Clients Card - Real Data */}
+					<StatCard
+						title="Clientes Activos"
+						value={'+' + dashboardStats.data?.activeClients.current}
+						change={
+							dashboardStats.data?.activeClients.percentageChange
+						}
+						changeLabel="respecto a los 30 días anteriores"
+						icon={
+							<Users className="h-4 w-4 text-muted-foreground" />
+						}
+						tooltipContent="Clientes únicos que han tenido al menos una cita en los últimos 30 días."
+						loading={dashboardStats.loading}
+						error={dashboardStats.error}
+						onRetry={retryDashboardStats}
+					/>
 				</div>
 				<div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
 					<Card
