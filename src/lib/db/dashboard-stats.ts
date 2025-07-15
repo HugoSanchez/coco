@@ -26,13 +26,13 @@ const supabase = createSupabaseClient()
  * @interface RevenueStats
  * @property current - Revenue for current calendar month in EUR
  * @property previous - Revenue for previous calendar month in EUR
- * @property percentageChange - Percentage change from previous to current month
+ * @property percentageChange - Percentage change from previous to current month (null if no previous data)
  * @property currency - Currency code (always 'EUR' for now)
  */
 export interface RevenueStats {
 	current: number
 	previous: number
-	percentageChange: number
+	percentageChange: number | null
 	currency: string
 }
 
@@ -43,12 +43,12 @@ export interface RevenueStats {
  * @interface BookingStats
  * @property current - Booking count for current calendar month
  * @property previous - Booking count for previous calendar month
- * @property percentageChange - Percentage change from previous to current month
+ * @property percentageChange - Percentage change from previous to current month (null if no previous data)
  */
 export interface BookingStats {
 	current: number
 	previous: number
-	percentageChange: number
+	percentageChange: number | null
 }
 
 /**
@@ -58,38 +58,41 @@ export interface BookingStats {
  * @interface ActiveClientsStats
  * @property current - Active clients in last 30 days
  * @property previous - Active clients in previous 30-day period (days 31-60 ago)
- * @property percentageChange - Percentage change from previous to current period
+ * @property percentageChange - Percentage change from previous to current period (null if no previous data)
  */
 export interface ActiveClientsStats {
 	current: number
 	previous: number
-	percentageChange: number
+	percentageChange: number | null
 }
 
 /**
  * Calculates the percentage change between two values
  * Handles edge cases like zero or null previous values gracefully
+ * Returns exact percentage with 1 decimal place precision
  *
  * @param current - Current period value
  * @param previous - Previous period value
  * @returns Percentage change (positive for increase, negative for decrease)
  *
  * @example
- * calculatePercentageChange(120, 100) // Returns 20 (20% increase)
- * calculatePercentageChange(80, 100)  // Returns -20 (20% decrease)
- * calculatePercentageChange(50, 0)    // Returns 100 (treat as 100% increase from zero)
+ * calculatePercentageChange(120, 100) // Returns 20.0 (20% increase)
+ * calculatePercentageChange(80, 100)  // Returns -20.0 (20% decrease)
+ * calculatePercentageChange(125.50, 100) // Returns 25.5 (25.5% increase)
+ * calculatePercentageChange(50, 0)    // Returns null (handled as "new" in UI)
  */
 export function calculatePercentageChange(
 	current: number,
 	previous: number
-): number {
-	// Handle edge case: no previous data
+): number | null {
+	// Handle edge case: no previous data (return null to be handled in UI)
 	if (previous === 0 || previous === null || previous === undefined) {
-		return current > 0 ? 100 : 0
+		return null
 	}
 
-	// Calculate standard percentage change
-	return Math.round(((current - previous) / previous) * 100)
+	// Calculate exact percentage change with 1 decimal place precision
+	const percentageChange = ((current - previous) / previous) * 100
+	return Math.round(percentageChange * 10) / 10
 }
 
 /**
@@ -315,6 +318,213 @@ export async function getRevenueStats(
 	} catch (error) {
 		console.error('Error fetching revenue statistics:', error)
 		throw new Error(`Failed to fetch revenue statistics: ${error}`)
+	}
+}
+
+/**
+ * Retrieves total confirmed bookings for the current calendar month
+ * Counts all bookings with status 'scheduled' or 'completed' in current month
+ *
+ * This function:
+ * 1. Filters bookings by user_id for security
+ * 2. Only includes bookings with status 'scheduled' or 'completed'
+ * 3. Filters by start_time timestamp for current calendar month
+ * 4. Handles timezone-aware date filtering
+ * 5. Returns 0 if no bookings found (graceful handling)
+ *
+ * @param userId - UUID of the user whose bookings to count
+ * @param supabaseClient - Optional Supabase client (defaults to standard client)
+ * @returns Promise<number> - Total confirmed bookings for current month
+ * @throws Error if database query fails
+ *
+ * @example
+ * const bookings = await getCurrentMonthBookings('user-uuid-123')
+ * console.log(`Current month bookings: ${bookings}`) // "Current month bookings: 15"
+ */
+export async function getCurrentMonthBookings(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<number> {
+	const client = supabaseClient || supabase
+
+	try {
+		// Get current date for month calculation
+		const now = new Date()
+		const currentYear = now.getFullYear()
+		const currentMonth = now.getMonth() + 1 // JavaScript months are 0-indexed
+
+		// Calculate upper bound for date range (first day of next month)
+		let upperBoundYear = currentYear
+		let upperBoundMonth = currentMonth + 1
+
+		if (upperBoundMonth > 12) {
+			// December -> January of next year
+			upperBoundMonth = 1
+			upperBoundYear = upperBoundYear + 1
+		}
+
+		// Query bookings for current calendar month
+		// Count confirmed bookings (scheduled + completed)
+		const { count, error } = await client
+			.from('bookings')
+			.select('*', { count: 'exact', head: true })
+			.eq('user_id', userId)
+			.in('status', ['scheduled', 'completed'])
+			.gte(
+				'start_time',
+				`${currentYear}-${currentMonth.toString().padStart(2, '0')}-01`
+			)
+			.lt(
+				'start_time',
+				`${upperBoundYear}-${upperBoundMonth.toString().padStart(2, '0')}-01`
+			)
+
+		if (error) {
+			console.error('Error fetching current month bookings:', error)
+			throw new Error(
+				`Failed to fetch current month bookings: ${error.message}`
+			)
+		}
+
+		// Return count, handle null gracefully
+		return count || 0
+	} catch (error) {
+		console.error('Unexpected error in getCurrentMonthBookings:', error)
+		throw error
+	}
+}
+
+/**
+ * Retrieves total confirmed bookings for the previous calendar month
+ * Counts all bookings with status 'scheduled' or 'completed' in previous month
+ *
+ * This function:
+ * 1. Calculates previous month dates accounting for year boundaries
+ * 2. Filters bookings by user_id for security
+ * 3. Only includes bookings with status 'scheduled' or 'completed'
+ * 4. Filters by start_time timestamp for previous calendar month
+ * 5. Handles timezone-aware date filtering
+ * 6. Returns 0 if no bookings found (graceful handling)
+ *
+ * @param userId - UUID of the user whose bookings to count
+ * @param supabaseClient - Optional Supabase client (defaults to standard client)
+ * @returns Promise<number> - Total confirmed bookings for previous month
+ * @throws Error if database query fails
+ *
+ * @example
+ * const bookings = await getLastMonthBookings('user-uuid-123')
+ * console.log(`Last month bookings: ${bookings}`) // "Last month bookings: 12"
+ */
+export async function getLastMonthBookings(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<number> {
+	const client = supabaseClient || supabase
+
+	try {
+		// Calculate previous month, handling year boundary
+		const now = new Date()
+		let previousMonth = now.getMonth() // 0-indexed (0 = January)
+		let previousYear = now.getFullYear()
+
+		if (previousMonth === 0) {
+			// January -> December of previous year
+			previousMonth = 11 // December is month 11 in 0-indexed
+			previousYear = previousYear - 1
+		} else {
+			// All other months, just subtract 1
+			previousMonth = previousMonth - 1
+		}
+
+		// Convert to 1-indexed for date formatting
+		const monthForQuery = previousMonth + 1
+
+		// Calculate upper bound for date range (first day of following month)
+		let upperBoundYear = previousYear
+		let upperBoundMonth = monthForQuery + 1
+
+		if (upperBoundMonth > 12) {
+			// December -> January of next year
+			upperBoundMonth = 1
+			upperBoundYear = upperBoundYear + 1
+		}
+
+		// Query bookings for previous calendar month
+		const { count, error } = await client
+			.from('bookings')
+			.select('*', { count: 'exact', head: true })
+			.eq('user_id', userId)
+			.in('status', ['scheduled', 'completed'])
+			.gte(
+				'start_time',
+				`${previousYear}-${monthForQuery.toString().padStart(2, '0')}-01`
+			)
+			.lt(
+				'start_time',
+				`${upperBoundYear}-${upperBoundMonth.toString().padStart(2, '0')}-01`
+			)
+
+		if (error) {
+			console.error('Error fetching last month bookings:', error)
+			throw new Error(
+				`Failed to fetch last month bookings: ${error.message}`
+			)
+		}
+
+		// Return count, handle null gracefully
+		return count || 0
+	} catch (error) {
+		console.error('Unexpected error in getLastMonthBookings:', error)
+		throw error
+	}
+}
+
+/**
+ * Retrieves complete booking statistics for dashboard display
+ * Combines current month, previous month, and percentage change calculations
+ *
+ * This function:
+ * 1. Fetches current month confirmed bookings
+ * 2. Fetches previous month confirmed bookings
+ * 3. Calculates percentage change
+ * 4. Returns formatted statistics object
+ * 5. Handles all edge cases gracefully
+ *
+ * @param userId - UUID of the user whose booking statistics to calculate
+ * @param supabaseClient - Optional Supabase client (defaults to standard client)
+ * @returns Promise<BookingStats> - Complete booking statistics object
+ * @throws Error if database queries fail
+ *
+ * @example
+ * const stats = await getBookingStats('user-uuid-123')
+ * console.log(`Bookings: ${stats.current} (${stats.percentageChange > 0 ? '+' : ''}${stats.percentageChange}%)`)
+ * // "Bookings: 15 (+25%)"
+ */
+export async function getBookingStats(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<BookingStats> {
+	try {
+		// Fetch both current and previous month bookings in parallel for better performance
+		const [currentBookings, previousBookings] = await Promise.all([
+			getCurrentMonthBookings(userId, supabaseClient),
+			getLastMonthBookings(userId, supabaseClient)
+		])
+
+		// Calculate percentage change
+		const percentageChange = calculatePercentageChange(
+			currentBookings,
+			previousBookings
+		)
+
+		return {
+			current: currentBookings,
+			previous: previousBookings,
+			percentageChange
+		}
+	} catch (error) {
+		console.error('Error fetching booking statistics:', error)
+		throw new Error(`Failed to fetch booking statistics: ${error}`)
 	}
 }
 

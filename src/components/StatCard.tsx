@@ -50,7 +50,7 @@ import { cn } from '@/lib/utils'
 export interface StatCardProps {
 	title: string
 	value?: string | number
-	change?: number
+	change?: number | null
 	changeLabel?: string
 	icon?: React.ReactNode
 	loading?: boolean
@@ -141,9 +141,10 @@ export function StatCard({
 	 */
 	const renderSuccessState = () => {
 		// Determine if the change is positive, negative, or neutral
-		const isPositive = change !== undefined && change > 0
-		const isNegative = change !== undefined && change < 0
-		const isNeutral = change === 0
+		const hasValidChange = change !== undefined && change !== null
+		const isPositive = hasValidChange && change > 0
+		const isNegative = hasValidChange && change < 0
+		const isNeutral = hasValidChange && change === 0
 
 		// Choose appropriate styling and icons based on change direction
 		const changeTextColor = isPositive
@@ -181,20 +182,24 @@ export function StatCard({
 						</div>
 
 						{/* Change percentage and period */}
-						{change !== undefined && (
+						{hasValidChange ? (
 							<div
 								className={cn(
 									'flex items-center text-xs',
 									changeTextColor
 								)}
-								aria-label={`${change > 0 ? 'Increased' : change < 0 ? 'Decreased' : 'No change'} by ${Math.abs(change)}% ${changeLabel}`}
+								aria-label={`${change! > 0 ? 'Increased' : change! < 0 ? 'Decreased' : 'No change'} by ${Math.abs(change!)}% ${changeLabel}`}
 							>
 								<span className="text-xs text-gray-500">
 									{isPositive && '+'}
 									{change}% {changeLabel}
 								</span>
 							</div>
-						)}
+						) : change === null ? (
+							<div className="text-xs text-gray-500">
+								Primera vez este período
+							</div>
+						) : null}
 					</div>
 				</CardContent>
 			</Card>
