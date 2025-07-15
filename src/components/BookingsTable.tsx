@@ -17,14 +17,7 @@ import {
 	DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Spinner } from '@/components/ui/spinner'
-import {
-	MoreHorizontal,
-	Calendar,
-	X,
-	Check,
-	Loader,
-	RefreshCcw
-} from 'lucide-react'
+import { MoreHorizontal, X, Check, Loader, RefreshCcw } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -177,15 +170,14 @@ export function BookingsTable({
 					<TableBody>
 						{bookings.length === 0 ? (
 							<TableRow>
-								<TableCell
-									colSpan={7}
-									className="text-center py-12"
-								>
-									<div className="text-gray-400">
-										<Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
-										<p className="text-sm">
-											No bookings found
-										</p>
+								<TableCell colSpan={7} className="h-20">
+									<div className="flex items-center justify-center h-full">
+										<div className="text-center">
+											<p className="text-sm text-gray-400">
+												Todavía no hay citas
+												programadas.
+											</p>
+										</div>
 									</div>
 								</TableCell>
 							</TableRow>

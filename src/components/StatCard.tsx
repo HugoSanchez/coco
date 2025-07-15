@@ -113,37 +113,6 @@ export function StatCard({
 	)
 
 	/**
-	 * Renders the error state
-	 * Shows error message with optional retry functionality
-	 */
-	const renderErrorState = () => (
-		<Card className={cn('border-red-200 bg-red-50', className)}>
-			<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-				<CardTitle className="text-sm font-medium text-red-800">
-					{title}
-				</CardTitle>
-				<AlertCircle className="h-4 w-4 text-red-600" />
-			</CardHeader>
-			<CardContent>
-				<div className="space-y-2">
-					<div className="text-sm text-red-700">
-						{error || 'Failed to load data'}
-					</div>
-					{onRetry && (
-						<button
-							onClick={onRetry}
-							className="text-xs text-red-600 hover:text-red-800 underline focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded"
-							aria-label={`Retry loading ${title}`}
-						>
-							Try again
-						</button>
-					)}
-				</div>
-			</CardContent>
-		</Card>
-	)
-
-	/**
 	 * Renders the success state with formatted data
 	 * Shows the main value and percentage change with appropriate styling
 	 */
@@ -235,10 +204,6 @@ export function StatCard({
 	// Render appropriate state based on loading/error conditions
 	if (loading) {
 		return renderLoadingState()
-	}
-
-	if (error) {
-		return renderErrorState()
 	}
 
 	return renderSuccessState()

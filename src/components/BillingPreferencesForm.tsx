@@ -12,6 +12,9 @@ export interface BillingPreferences {
 	billingAmount: string
 }
 
+// Define which billing types are currently available
+const AVAILABLE_BILLING_TYPES = ['in-advance'] as const
+
 interface BillingPreferencesFormProps {
 	values: BillingPreferences
 	onChange: (values: BillingPreferences) => void
@@ -23,6 +26,10 @@ export function BillingPreferencesForm({
 	onChange,
 	disabled
 }: BillingPreferencesFormProps) {
+	// Helper function to check if a billing type is currently available
+	const isBillingTypeAvailable = (billingType: string) => {
+		return AVAILABLE_BILLING_TYPES.includes(billingType as any)
+	}
 	const handleInputChange = (
 		field: keyof BillingPreferences,
 		value: string
@@ -79,9 +86,12 @@ export function BillingPreferencesForm({
 					</div>
 					<Select
 						value={values.billingType}
-						onValueChange={(value) =>
-							handleInputChange('billingType', value as any)
-						}
+						onValueChange={(value) => {
+							// Only allow selection of available billing types
+							if (isBillingTypeAvailable(value)) {
+								handleInputChange('billingType', value as any)
+							}
+						}}
 						disabled={disabled}
 					>
 						<SelectTrigger className="h-12">
@@ -90,7 +100,11 @@ export function BillingPreferencesForm({
 						<SelectContent>
 							<SelectItem
 								value="in-advance"
-								className="hover:bg-gray-100"
+								className={`${
+									isBillingTypeAvailable('in-advance')
+										? 'hover:bg-gray-100 cursor-pointer'
+										: 'opacity-50 cursor-not-allowed'
+								}`}
 							>
 								Por Adelantado{' '}
 								<span className="text-xs text-gray-500">
@@ -99,22 +113,40 @@ export function BillingPreferencesForm({
 							</SelectItem>
 							<SelectItem
 								value="right-after"
-								className="hover:bg-gray-100"
+								className={`${
+									isBillingTypeAvailable('right-after')
+										? 'hover:bg-gray-100 cursor-pointer'
+										: 'opacity-50 cursor-not-allowed'
+								}`}
 							>
 								Después de la Consulta{' '}
 								<span className="text-xs text-gray-500">
 									- Enviar factura automáticamente tras la
 									consulta
 								</span>
+								{!isBillingTypeAvailable('right-after') && (
+									<span className="text-xs text-black font-medium ml-1">
+										(Próximamente)
+									</span>
+								)}
 							</SelectItem>
 							<SelectItem
 								value="monthly"
-								className="hover:bg-gray-100"
+								className={`${
+									isBillingTypeAvailable('monthly')
+										? 'hover:bg-gray-100 cursor-pointer'
+										: 'opacity-50 cursor-not-allowed'
+								}`}
 							>
 								Mensual{' '}
 								<span className="text-xs text-gray-500">
 									- Enviar una factura a final de mes
 								</span>
+								{!isBillingTypeAvailable('monthly') && (
+									<span className="text-xs text-black font-medium ml-1">
+										(Próximamente)
+									</span>
+								)}
 							</SelectItem>
 						</SelectContent>
 					</Select>
