@@ -27,6 +27,7 @@ import {
 	CardHeader,
 	CardTitle
 } from '@/components/ui/card'
+import { StatCard } from '@/components/StatCard'
 import { getClientsForUser, Client, getClientFullName } from '@/lib/db/clients'
 import {
 	getBookingsWithBills,
@@ -42,6 +43,32 @@ import { MarkAsPaidConfirmationModal } from '@/components/MarkAsPaidConfirmation
 import { RescheduleForm } from '@/components/RescheduleForm'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { getCurrentMonthNameCapitalized } from '@/lib/utils'
+
+/**
+ * Interface for dashboard statistics API response
+ * Matches the response structure from /api/dashboard/stats
+ */
+interface DashboardStats {
+	revenue: {
+		current: number
+		previous: number
+		percentageChange: number
+		currency: string
+		formattedCurrent: string
+		formattedPrevious: string
+	}
+}
+
+/**
+ * Interface for dashboard statistics state management
+ * Handles loading, error, and data states for statistics
+ */
+interface DashboardStatsState {
+	data: DashboardStats | null
+	loading: boolean
+	error: string | null
+}
 
 // Transform database booking with bills to component booking format
 const transformBooking = (dbBooking: BookingWithBills): Booking => {
@@ -101,9 +128,83 @@ export default function Dashboard() {
 		startDate: '',
 		endDate: ''
 	})
+	const [dashboardStats, setDashboardStats] = useState<DashboardStatsState>({
+		data: null,
+		loading: false,
+		error: null
+	})
 
 	const { toast } = useToast()
 	const router = useRouter()
+
+	/**
+	 * Fetches dashboard statistics from the API
+	 * Handles loading states and error management
+	 */
+	const fetchDashboardStats = async () => {
+		if (!user) return
+
+		try {
+			setDashboardStats((prev) => ({
+				...prev,
+				loading: true,
+				error: null
+			}))
+
+			const response = await fetch('/api/dashboard/stats', {
+				method: 'GET',
+				headers: {
+					'Content-Type': 'application/json'
+				}
+			})
+
+			if (!response.ok) {
+				const errorData = await response.json()
+				throw new Error(
+					errorData.error || 'Failed to fetch dashboard statistics'
+				)
+			}
+
+			const result = await response.json()
+
+			if (!result.success) {
+				throw new Error(
+					result.error || 'Failed to fetch dashboard statistics'
+				)
+			}
+
+			setDashboardStats({
+				data: result.data,
+				loading: false,
+				error: null
+			})
+		} catch (error) {
+			console.error('Error fetching dashboard statistics:', error)
+			setDashboardStats({
+				data: null,
+				loading: false,
+				error:
+					error instanceof Error
+						? error.message
+						: 'Failed to load statistics'
+			})
+		}
+	}
+
+	/**
+	 * Retry function for dashboard statistics
+	 * Provides user-friendly retry mechanism
+	 */
+	const retryDashboardStats = () => {
+		fetchDashboardStats()
+	}
+
+	// Fetch dashboard statistics when user is available
+	useEffect(() => {
+		if (user) {
+			fetchDashboardStats()
+		}
+	}, [user])
 
 	useEffect(() => {
 		const fetchBookings = async () => {
@@ -540,20 +641,19 @@ export default function Dashboard() {
 			</header>
 			<main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:px-16">
 				<div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
-					<Card x-chunk="dashboard-01-chunk-0">
-						<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-							<CardTitle className="text-sm font-medium">
-								Total Revenue
-							</CardTitle>
+					{/* Revenue Card - Real Data */}
+					<StatCard
+						title={`Facturación ${getCurrentMonthNameCapitalized()}`}
+						value={dashboardStats.data?.revenue.formattedCurrent}
+						change={dashboardStats.data?.revenue.percentageChange}
+						changeLabel="respecto al mes anterior"
+						icon={
 							<DollarSign className="h-4 w-4 text-muted-foreground" />
-						</CardHeader>
-						<CardContent>
-							<div className="text-2xl font-bold">$5,231.89</div>
-							<p className="text-xs text-muted-foreground">
-								+20.1% from last month
-							</p>
-						</CardContent>
-					</Card>
+						}
+						loading={dashboardStats.loading}
+						error={dashboardStats.error}
+						onRetry={retryDashboardStats}
+					/>
 					<Card x-chunk="dashboard-01-chunk-1">
 						<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
 							<CardTitle className="text-sm font-medium">
