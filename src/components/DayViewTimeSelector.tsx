@@ -69,10 +69,9 @@ export function DayViewTimeSelector({
 		}
 	}, [initialSelectedSlot])
 
-	// Time range: 8 AM to 8 PM (12 hours = 720 minutes)
-	const startHour = 8
-	const endHour = 20
-	const totalMinutes = (endHour - startHour) * 60
+	// Time range: Full 24 hours (0-23)
+	const displayStartHour = 8 // Start displaying from 8 AM
+	const totalMinutes = 24 * 60 // 24 hours = 1440 minutes
 	const pixelsPerMinute = 1 // 1 pixel per minute, so 60px per hour
 
 	// Convert pixel position to time in minutes from start of day
@@ -81,13 +80,12 @@ export function DayViewTimeSelector({
 		const rect = containerRef.current.getBoundingClientRect()
 		const relativeY = Math.max(0, Math.min(pixelY - rect.top, rect.height))
 		const minutes = Math.round(relativeY / pixelsPerMinute)
-		return startHour * 60 + minutes
+		return minutes // Now represents minutes from 00:00 (midnight)
 	}, [])
 
 	// Convert time in minutes from start of day to pixel position
 	const timeToPixel = useCallback((timeInMinutes: number): number => {
-		const minutesFromStart = timeInMinutes - startHour * 60
-		return minutesFromStart * pixelsPerMinute
+		return timeInMinutes * pixelsPerMinute
 	}, [])
 
 	// Format time from minutes to HH:MM
@@ -160,9 +158,9 @@ export function DayViewTimeSelector({
 		onTimeSelect(startDate.toISOString(), endDate.toISOString())
 	}, [dragState, date, onTimeSelect])
 
-	// Generate hour labels
+	// Generate hour labels for all 24 hours
 	const hours: number[] = []
-	for (let hour = startHour; hour < endHour; hour++) {
+	for (let hour = 0; hour < 24; hour++) {
 		hours.push(hour)
 	}
 
@@ -239,7 +237,15 @@ export function DayViewTimeSelector({
 			</div>
 
 			{/* Day View Container */}
-			<div className="relative border-2 border-gray-200 rounded-lg overflow-hidden max-h-96 overflow-y-auto">
+			<div
+				className="relative border-2 border-gray-200 rounded-lg overflow-hidden max-h-96 overflow-y-auto"
+				ref={(el) => {
+					if (el) {
+						// Scroll to 8 AM (8 * 60 * pixelsPerMinute = 480px) on mount
+						el.scrollTop = displayStartHour * 60 * pixelsPerMinute
+					}
+				}}
+			>
 				<div className="flex">
 					{/* Time Labels */}
 					<div
@@ -278,11 +284,7 @@ export function DayViewTimeSelector({
 								key={hour}
 								className="absolute border-b border-gray-200"
 								style={{
-									top: `${
-										(hour - startHour) *
-										60 *
-										pixelsPerMinute
-									}px`,
+									top: `${hour * 60 * pixelsPerMinute}px`,
 									left: '-64px', // Extend into the time labels column
 									right: '0px',
 									width: 'calc(100% + 64px)'
