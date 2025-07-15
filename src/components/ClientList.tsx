@@ -1,8 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
-import { Plus, Users, ArrowUpRight, MoreHorizontal, Edit } from 'lucide-react'
+import { Plus, MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
 	Table,
@@ -25,7 +24,6 @@ import {
 	CardHeader,
 	CardTitle
 } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { ClientForm } from './ClientForm'
 import { Tables } from '@/types/database.types'
 import { getClientFullName } from '@/lib/db/clients'
@@ -179,7 +177,6 @@ export function ClientList({
 															)
 														}
 													>
-														<Edit className="h-4 w-4 mr-2" />
 														Editar
 													</DropdownMenuItem>
 												</DropdownMenuContent>
