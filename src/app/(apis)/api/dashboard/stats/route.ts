@@ -25,7 +25,13 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getRevenueStats, formatCurrency } from '@/lib/db/dashboard-stats'
+import {
+	getRevenueStats,
+	getBookingStats,
+	getPendingBookingStats,
+	getActiveClientsStats,
+	formatCurrency
+} from '@/lib/db/dashboard-stats'
 
 /**
  * Interface for the complete dashboard statistics response
@@ -47,8 +53,22 @@ interface DashboardStatsResponse {
 			formattedCurrent: string
 			formattedPrevious: string
 		}
+		bookings: {
+			current: number
+			previous: number
+			percentageChange: number | null
+		}
+		pendingBookings: {
+			current: number
+			previous: number
+			percentageChange: number | null
+		}
+		activeClients: {
+			current: number
+			previous: number
+			percentageChange: number | null
+		}
 		// Future additions:
-		// bookings: BookingStats
 		// clients: ActiveClientsStats
 	}
 	error?: string
@@ -92,9 +112,9 @@ export async function GET(
 
 		// Get the current user session
 		const {
-			data: { session },
+			data: { user },
 			error: sessionError
-		} = await supabase.auth.getSession()
+		} = await supabase.auth.getUser()
 
 		// Handle authentication errors
 		if (sessionError) {
@@ -109,7 +129,7 @@ export async function GET(
 		}
 
 		// Ensure user is authenticated
-		if (!session?.user) {
+		if (!user) {
 			console.warn('Unauthorized access attempt to dashboard stats API')
 			return NextResponse.json(
 				{
@@ -121,11 +141,21 @@ export async function GET(
 		}
 
 		// Extract user ID for database queries
-		const userId = session.user.id
+		const userId = user.id
 
-		// Fetch revenue statistics using our comprehensive database functions
+		// Fetch both revenue and booking statistics in parallel for better performance
 		// Pass the server-side Supabase client for proper RLS enforcement
-		const revenueStats = await getRevenueStats(userId, supabase)
+		const [
+			revenueStats,
+			bookingStats,
+			pendingBookingStats,
+			activeClientsStats
+		] = await Promise.all([
+			getRevenueStats(userId, supabase),
+			getBookingStats(userId, supabase),
+			getPendingBookingStats(userId, supabase),
+			getActiveClientsStats(userId, supabase)
+		])
 
 		// Format currency values for consistent display
 		const formattedRevenueStats = {
@@ -145,7 +175,10 @@ export async function GET(
 			{
 				success: true,
 				data: {
-					revenue: formattedRevenueStats
+					revenue: formattedRevenueStats,
+					bookings: bookingStats,
+					pendingBookings: pendingBookingStats,
+					activeClients: activeClientsStats
 				}
 			},
 			{ status: 200 }

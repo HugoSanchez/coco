@@ -124,9 +124,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 		 * (e.g., refreshing the page, returning to the app)
 		 */
 		supabase.auth
-			.getSession()
-			.then(({ data: { session }, error }) => {
-				setUser(session?.user ?? null)
+			.getUser()
+			.then(({ data: { user }, error }) => {
+				setUser(user ?? null)
 			})
 			.catch((err) => {
 				console.error('Error getting initial session:', err)

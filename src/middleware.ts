@@ -21,17 +21,17 @@ export async function middleware(request: NextRequest) {
 		console.log('Inside isProtectedPage')
 		try {
 			const {
-				data: { session }
-			} = await supabase.auth.getSession()
+				data: { user }
+			} = await supabase.auth.getUser()
 			// If the user is not authenticated, redirect to the login page
-			if (!session) {
+			if (!user) {
 				// Save the original URL for post-login redirect
 				const redirectUrl = new URL('/login', request.url)
 				redirectUrl.searchParams.set('redirectTo', pathname)
 				return NextResponse.redirect(redirectUrl)
 			}
 
-			console.log('Are we here? session', !!session)
+			console.log('Are we here? session', !!user)
 		} catch (error) {
 			console.log('Error in middleware getSession:', error)
 		}

@@ -310,10 +310,10 @@ export function DayViewTimeSelector({
 									'bg-gray-100 border border-gray-300 text-gray-600'
 							} else if (block.status === 'pending') {
 								className +=
-									'bg-yellow-50 border border-yellow-200 text-yellow-700'
+									'bg-teal-100 border border-teal-50 text-teal-800 font-medium'
 							} else {
 								className +=
-									'bg-red-50 border border-red-200 text-gray-700'
+									'bg-teal-400 border border-teal-50 text-teal-900 font-medium'
 							}
 
 							return (
