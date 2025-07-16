@@ -25,6 +25,7 @@ import Stripe from 'stripe'
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
 export async function POST(request: NextRequest) {
+	console.log('Stripe webhook received!')
 	try {
 		///////////////////////////////////////////////////////////
 		///// 1. Create service role client for bypassing RLS
