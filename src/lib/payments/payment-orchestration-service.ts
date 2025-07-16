@@ -23,6 +23,8 @@ import {
 	updateBillStatus,
 	markBillAsRefunded
 } from '@/lib/db/bills'
+import { getProfileById } from '@/lib/db/profiles'
+import { getBookingById } from '@/lib/db/bookings'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export class PaymentOrchestrationService {
@@ -58,9 +60,6 @@ export class PaymentOrchestrationService {
 		consultationDate,
 		amount,
 		practitionerName,
-		practitionerEmail,
-		startTime,
-		endTime,
 		supabaseClient
 	}: {
 		userId: string
@@ -70,9 +69,6 @@ export class PaymentOrchestrationService {
 		consultationDate: string
 		amount: number
 		practitionerName: string
-		practitionerEmail: string
-		startTime: string
-		endTime: string
 		supabaseClient?: SupabaseClient
 	}): Promise<{
 		success: boolean
@@ -106,6 +102,28 @@ export class PaymentOrchestrationService {
 				}
 			}
 
+			// STEP 1.5: Fetch additional required data from database
+			// ======================================================
+			// Get practitioner email and booking details for Stripe metadata
+			const [practitioner, booking] = await Promise.all([
+				getProfileById(userId, supabaseClient),
+				getBookingById(bookingId, supabaseClient)
+			])
+
+			if (!practitioner) {
+				return {
+					success: false,
+					error: 'Practitioner profile not found'
+				}
+			}
+
+			if (!booking) {
+				return {
+					success: false,
+					error: 'Booking not found'
+				}
+			}
+
 			// STEP 2: Create Stripe checkout session
 			// =======================================
 			// Use the Stripe service to create a checkout session. This handles
@@ -121,10 +139,10 @@ export class PaymentOrchestrationService {
 					amount,
 					bookingId,
 					practitionerName,
-					practitionerEmail,
+					practitionerEmail: practitioner.email,
 					practitionerUserId: userId,
-					startTime,
-					endTime
+					startTime: booking.start_time,
+					endTime: booking.end_time
 				})
 
 			// STEP 3: Track payment session in our database

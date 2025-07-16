@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { paymentOrchestrationService } from '@/lib/payments/payment-orchestration-service'
 import { sendConsultationBillEmail } from '@/lib/emails/email-service'
-import { getClientById } from '@/lib/db/clients'
 import { getProfileById } from '@/lib/db/profiles'
 import { updateBillStatus } from '@/lib/db/bills'
 
@@ -34,11 +33,6 @@ export async function POST(request: NextRequest) {
 			error: authError
 		} = await supabase.auth.getUser()
 
-		console.log('🔍 [DEBUG] Auth result:', {
-			user: user ? { id: user.id, email: user.email } : null,
-			authError: authError?.message
-		})
-
 		if (authError || !user) {
 			return NextResponse.json(
 				{ error: 'Authentication required' },
@@ -57,16 +51,6 @@ export async function POST(request: NextRequest) {
 			practitionerName
 		} = await request.json()
 
-		console.log('🔍 [DEBUG] Request payload:', {
-			bookingId,
-			clientEmail,
-			clientName,
-			consultationDate,
-			amount,
-			practitionerName,
-			userId: user.id
-		})
-
 		if (
 			!bookingId ||
 			!clientEmail ||
@@ -81,34 +65,6 @@ export async function POST(request: NextRequest) {
 			)
 		}
 
-		// Step 3: Create checkout session with payment orchestration
-		// This handles Stripe account validation, checkout creation, and DB tracking
-		console.log(
-			'🔍 [DEBUG] Calling payment orchestration with userId:',
-			user.id
-		)
-
-		// TEMPORARY DEBUG: Let's see all stripe accounts
-		const { data: allAccounts } = await supabase
-			.from('stripe_accounts')
-			.select(
-				'user_id, stripe_account_id, onboarding_completed, payments_enabled'
-			)
-
-		console.log('🔍 [DEBUG] All stripe accounts in DB:', allAccounts)
-		console.log('🔍 [DEBUG] Looking for user_id:', user.id)
-
-		// DIRECT TEST: Try querying stripe_accounts directly from API context
-		const { data: directTest, error: directError } = await supabase
-			.from('stripe_accounts')
-			.select('*')
-			.eq('user_id', user.id)
-
-		console.log('🔍 [DEBUG] Direct query from API route:', {
-			directTest,
-			directError
-		})
-
 		const result =
 			await paymentOrchestrationService.orechestrateConsultationCheckout({
 				userId: user.id,
@@ -121,18 +77,12 @@ export async function POST(request: NextRequest) {
 				supabaseClient: supabase
 			})
 
-		console.log('🔍 [DEBUG] Payment orchestration result:', result)
-
-		// Step 5: Handle result from orchestration service
+		// Step 3: Handle result from orchestration service
 		if (!result.success) {
-			console.log(
-				'🔍 [DEBUG] Payment orchestration failed:',
-				result.error
-			)
 			return NextResponse.json({ error: result.error }, { status: 400 })
 		}
 
-		// Step 6: Send consultation bill email with payment link
+		// Step 4: Send consultation bill email with payment link
 		if (result.checkoutUrl) {
 			try {
 				// Get practitioner info for email
@@ -163,19 +113,16 @@ export async function POST(request: NextRequest) {
 
 						if (bill) {
 							await updateBillStatus(bill.id, 'sent')
-							console.log(
-								'✅ [EMAIL] Bill email sent and status updated to sent'
-							)
 						}
 					} else {
 						console.error(
-							'❌ [EMAIL] Failed to send bill email:',
+							'[EMAIL] Failed to send bill email:',
 							emailResult.error
 						)
 					}
 				}
 			} catch (emailError) {
-				console.error('❌ [EMAIL] Error in email flow:', emailError)
+				console.error('[EMAIL] Error in email flow:', emailError)
 				// Don't fail the entire request if email fails
 			}
 		}
