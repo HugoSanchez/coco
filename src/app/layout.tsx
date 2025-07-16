@@ -8,7 +8,7 @@ import { UserProvider } from '@/contexts/UserContext'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-	title: 'Coco App - Facilita el cobro de tus consultas',
+	title: 'Coco App',
 	description:
 		'Coco es la plataforma de gestión de agenda y cobro de honorarios que tu consulta online necesita',
 	icons: {
@@ -20,7 +20,6 @@ export const metadata: Metadata = {
 			'Coco es la plataforma de gestión de agenda y cobro de honorarios que tu consulta online necesita',
 		url: 'https://itscoco.app',
 		siteName: 'Coco App',
-		images: ['/coco-logo-small.png'],
 		locale: 'es_ES',
 		type: 'website'
 	}
