@@ -17,10 +17,9 @@ export const metadata: Metadata = {
 	openGraph: {
 		title: 'Coco App',
 		description:
-			'Coco es la plataforma de gestión de agenda y cobro de honorarios que tu consulta online necesita',
+			'Coco es la plataforma de gestión de agenda que tu consulta online necesita',
 		url: 'https://itscoco.app',
 		siteName: 'Coco App',
-		images: ['/coco-logo-small.png'],
 		locale: 'es_ES',
 		type: 'website'
 	}
