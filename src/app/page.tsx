@@ -147,7 +147,7 @@ export default function LandingPage() {
 						transition={{ duration: 0.8, delay: 0.3 }}
 						className="relative"
 					>
-						<div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 md:p-12">
+						<div className="bg-gradient-to-br from-teal-50 to-teal-50 rounded-2xl p-8 md:p-12">
 							<div className="bg-white rounded-xl shadow-2xl overflow-hidden">
 								<div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
 									<div className="flex items-center space-x-2">
@@ -156,124 +156,12 @@ export default function LandingPage() {
 										<div className="w-3 h-3 bg-green-400 rounded-full"></div>
 									</div>
 								</div>
-								<div className="p-8">
-									<div className="grid md:grid-cols-3 gap-8">
-										{/* Left sidebar */}
-										<div className="space-y-4">
-											<h3 className="font-medium text-gray-900 mb-4">
-												Dashboard
-											</h3>
-											<div className="space-y-2">
-												<div className="flex items-center space-x-3 p-2 bg-blue-50 rounded-lg">
-													<Calendar className="w-4 h-4 text-blue-600" />
-													<span className="text-sm text-gray-700">
-														Agenda
-													</span>
-												</div>
-												<div className="flex items-center space-x-3 p-2 rounded-lg">
-													<div className="w-4 h-4 bg-gray-300 rounded"></div>
-													<span className="text-sm text-gray-500">
-														Pacientes
-													</span>
-												</div>
-												<div className="flex items-center space-x-3 p-2 rounded-lg">
-													<div className="w-4 h-4 bg-gray-300 rounded"></div>
-													<span className="text-sm text-gray-500">
-														Pagos
-													</span>
-												</div>
-												<div className="flex items-center space-x-3 p-2 rounded-lg">
-													<div className="w-4 h-4 bg-gray-300 rounded"></div>
-													<span className="text-sm text-gray-500">
-														Reportes
-													</span>
-												</div>
-											</div>
-										</div>
-
-										{/* Main content */}
-										<div className="md:col-span-2">
-											<div className="flex justify-between items-center mb-6">
-												<h2 className="text-lg font-medium text-gray-900">
-													Agenda de hoy
-												</h2>
-												<Button
-													size="sm"
-													className="bg-gray-200 text-gray-700 text-xs px-3 py-1 rounded"
-												>
-													Nueva cita
-												</Button>
-											</div>
-											<div className="space-y-3">
-												{[
-													{
-														time: '09:00',
-														patient:
-															'María González',
-														type: 'Consulta',
-														status: 'Confirmada'
-													},
-													{
-														time: '10:30',
-														patient: 'Carlos Ruiz',
-														type: 'Seguimiento',
-														status: 'Pendiente'
-													},
-													{
-														time: '12:00',
-														patient: 'Ana López',
-														type: 'Primera consulta',
-														status: 'Confirmada'
-													},
-													{
-														time: '14:30',
-														patient: 'Pedro Martín',
-														type: 'Control',
-														status: 'Confirmada'
-													}
-												].map((appointment, index) => (
-													<div
-														key={index}
-														className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-													>
-														<div className="flex items-center space-x-3">
-															<div className="text-sm font-medium text-gray-900 w-12">
-																{
-																	appointment.time
-																}
-															</div>
-															<div>
-																<p className="text-sm font-medium text-gray-900">
-																	{
-																		appointment.patient
-																	}
-																</p>
-																<p className="text-xs text-gray-500">
-																	{
-																		appointment.type
-																	}
-																</p>
-															</div>
-														</div>
-														<div className="text-right">
-															<span
-																className={`text-xs px-2 py-1 rounded-full ${
-																	appointment.status ===
-																	'Confirmada'
-																		? 'bg-green-100 text-green-700'
-																		: 'bg-yellow-100 text-yellow-700'
-																}`}
-															>
-																{
-																	appointment.status
-																}
-															</span>
-														</div>
-													</div>
-												))}
-											</div>
-										</div>
-									</div>
+								<div className="relative">
+									<img
+										src="/dashboard.png"
+										alt="Dashboard de Coco - Gestión de citas y pagos"
+										className="w-full h-auto"
+									/>
 								</div>
 							</div>
 						</div>
