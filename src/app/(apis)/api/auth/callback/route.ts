@@ -1,6 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+// Force dynamic rendering since this route uses cookies for authentication
+export const dynamic = 'force-dynamic'
+
 // GET /api/auth/callback
 // This route is being called by Supabase AUTH during the authentication flow.
 // It exchanges the authorization code for a session token and redirects to the dashboard.

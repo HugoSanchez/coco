@@ -5,6 +5,9 @@ import { sendConsultationBillEmail } from '@/lib/emails/email-service'
 import { getProfileById } from '@/lib/db/profiles'
 import { updateBillStatus } from '@/lib/db/bills'
 
+// Force dynamic rendering since this route uses cookies for authentication
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/payments/create-checkout
  *

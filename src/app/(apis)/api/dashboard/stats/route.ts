@@ -33,6 +33,9 @@ import {
 	formatCurrency
 } from '@/lib/db/dashboard-stats'
 
+// Force dynamic rendering since this route uses cookies for authentication
+export const dynamic = 'force-dynamic'
+
 /**
  * Interface for the complete dashboard statistics response
  * Provides type safety for the API response structure

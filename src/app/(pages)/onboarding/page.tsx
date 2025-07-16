@@ -12,6 +12,9 @@ import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
 
+// Force dynamic rendering since this page uses useSearchParams
+export const dynamic = 'force-dynamic'
+
 const steps = [
 	{
 		name: '1. Crea tu perfil',

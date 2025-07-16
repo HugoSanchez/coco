@@ -4,6 +4,9 @@ import { getGoogleCalendarEventsForDay } from '@/lib/calendar/calendar'
 import { getBookingsForDateRange } from '@/lib/db/bookings'
 import { getSystemGoogleEventIds } from '@/lib/db/calendar-events'
 
+// Force dynamic rendering since this route uses cookies for authentication
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/calendar/events
  *

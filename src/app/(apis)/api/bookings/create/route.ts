@@ -5,6 +5,9 @@ import {
 	CreateBookingRequest
 } from '@/lib/bookings/booking-orchestration-service'
 
+// Force dynamic rendering since this route uses cookies for authentication
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/bookings/create
  *

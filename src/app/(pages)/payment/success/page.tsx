@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import confetti from 'canvas-confetti'
 import {
@@ -13,7 +13,10 @@ import {
 import { Check } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
 
-export default function BookingConfirmationPage() {
+// Force dynamic rendering since this page uses useSearchParams
+export const dynamic = 'force-dynamic'
+
+function BookingConfirmationContent() {
 	const searchParams = useSearchParams()
 	const bookingId = searchParams.get('booking_id')
 	const [loading, setLoading] = useState(true)
@@ -92,5 +95,21 @@ export default function BookingConfirmationPage() {
 				</p>
 			</div>
 		</div>
+	)
+}
+
+export default function BookingConfirmationPage() {
+	return (
+		<Suspense
+			fallback={
+				<div className="min-h-screen flex items-center justify-center">
+					<div className="text-center flex items-center gap-4">
+						<Spinner color="dark" size="sm" />
+					</div>
+				</div>
+			}
+		>
+			<BookingConfirmationContent />
+		</Suspense>
 	)
 }

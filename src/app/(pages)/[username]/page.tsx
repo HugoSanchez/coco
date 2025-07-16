@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Calendar from '@/components/Calendar'
@@ -16,6 +16,9 @@ import {
 	UserProfileWithSchedule
 } from '@/lib/db/profiles'
 
+// Force dynamic rendering since this page uses useSearchParams and useParams
+export const dynamic = 'force-dynamic'
+
 interface PageState {
 	isLoading: boolean
 	error: string | null
@@ -28,7 +31,7 @@ interface PageState {
 	userTimeZone: string
 }
 
-export default function BookingPage() {
+function BookingPageContent() {
 	// Params & Navigation
 	const router = useRouter()
 	const { username } = useParams()
@@ -282,27 +285,16 @@ export default function BookingPage() {
 	)
 }
 
-/**
- *
- *
- * <div className="md:w-1/2 mb-6 md:mb-0k">
-                <div className="md:w-1/2 p-6">
-                    <TimeSlots
-                    date={selectedDate}
-                    availableSlots={availableSlots}
-                    onSelectSlot={(slot) => {
-                        // Handle slot selection
-                    }}
-                    />
-                </div>
-                </div>
- *
- *  <div className="mt-6">
-              <label className="block text-sm font-medium text-gray-700">Time zone</label>
-              <select className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-                <option>Central European Time (15:12)</option>
-
-                </select>
-                </div>
- *
- */
+export default function BookingPage() {
+	return (
+		<Suspense
+			fallback={
+				<div className="container flex justify-center items-center min-h-screen">
+					Loading...
+				</div>
+			}
+		>
+			<BookingPageContent />
+		</Suspense>
+	)
+}
