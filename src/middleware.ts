@@ -3,10 +3,11 @@ import type { NextRequest } from 'next/server'
 import { createMiddlewareClient } from '@/lib/supabase/server'
 
 export async function middleware(request: NextRequest) {
-	console.log('MIDDLEWARE')
+	// Get the pathname of the request
 	const { pathname } = request.nextUrl
 	// Create response object early so we can pass it to the Supabase client
 	const response = NextResponse.next()
+	// Create a Supabase client
 	const supabase = createMiddlewareClient(request, response)
 	// Define protected routes
 	const protectedPages = ['/dashboard', '/settings', '/onboarding']
@@ -14,11 +15,10 @@ export async function middleware(request: NextRequest) {
 	const isProtectedPage = protectedPages.some((route) =>
 		pathname.startsWith(route)
 	)
-	console.log('isProtectedPage', isProtectedPage)
+
 	// If the current path is a protected page,
 	// check if the user is authenticated
 	if (isProtectedPage) {
-		console.log('Inside isProtectedPage')
 		try {
 			const {
 				data: { user }
@@ -30,13 +30,11 @@ export async function middleware(request: NextRequest) {
 				redirectUrl.searchParams.set('redirectTo', pathname)
 				return NextResponse.redirect(redirectUrl)
 			}
-
-			console.log('Are we here? session', !!user)
 		} catch (error) {
 			console.log('Error in middleware getSession:', error)
+			throw error
 		}
 	}
-
 	// Return the response object (which may have updated cookies)
 	return response
 }
