@@ -15,11 +15,12 @@ export const metadata: Metadata = {
 		icon: '/favicon.ico'
 	},
 	openGraph: {
-		title: 'Coco App - Facilita el cobro de tus consultas',
+		title: 'Coco App',
 		description:
 			'Coco es la plataforma de gestión de agenda y cobro de honorarios que tu consulta online necesita',
 		url: 'https://itscoco.app',
 		siteName: 'Coco App',
+		images: ['/coco-logo-small.png'],
 		locale: 'es_ES',
 		type: 'website'
 	}
