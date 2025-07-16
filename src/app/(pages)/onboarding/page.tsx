@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { ProfileSetup } from '@/components/ProfileSetup'
 import { WeeklyAvailability } from '@/components/WeeklyAvailability'
 import { CalendarStep } from '@/components/CalendarStep'
@@ -45,7 +45,7 @@ const steps = [
 	}
 ]
 
-export default function Onboarding() {
+function OnboardingContent() {
 	const searchParams = useSearchParams()
 	const step = searchParams.get('step')
 
@@ -132,5 +132,23 @@ export default function Onboarding() {
 				)}
 			</div>
 		</div>
+	)
+}
+
+export default function Onboarding() {
+	return (
+		<Suspense
+			fallback={
+				<div className="xl:px-96 md:px-44 px-6 mt-16 py-2 bg-gray-50">
+					<div className="animate-pulse">
+						<div className="h-8 bg-gray-200 rounded w-3/4 mb-4"></div>
+						<div className="h-6 bg-gray-200 rounded w-1/2 mb-8"></div>
+						<div className="h-96 bg-gray-200 rounded"></div>
+					</div>
+				</div>
+			}
+		>
+			<OnboardingContent />
+		</Suspense>
 	)
 }

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getStripeAccountByUserId } from '@/lib/db/stripe-accounts'
 
+// Force dynamic rendering since this page uses useSearchParams
+export const dynamic = 'force-dynamic'
 /**
  * GET /api/payments/onboarding-status
  *

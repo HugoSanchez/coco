@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { stripeService } from '@/lib/payments/stripe-service'
 import { getStripeAccountByUserId } from '@/lib/db/stripe-accounts'
 
+// Force dynamic rendering since this page uses useSearchParams
+export const dynamic = 'force-dynamic'
 /**
  * POST /api/payments/onboarding-link
  *

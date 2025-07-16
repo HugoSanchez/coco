@@ -4,6 +4,9 @@ import { stripeService } from '@/lib/payments/stripe-service'
 import { hasStripeAccount, createStripeAccount } from '@/lib/db/stripe-accounts'
 import { getUserEmail } from '@/lib/db/profiles'
 
+// Force dynamic rendering since this page uses useSearchParams
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/payments/create-account
  *
