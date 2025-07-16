@@ -59,7 +59,10 @@ export async function POST(request: NextRequest) {
 
 		// Step 4: Generate return and refresh URLs for onboarding flow
 		// These URLs determine where Stripe redirects the user after onboarding
-		const origin = request.headers.get('origin') || 'http://localhost:3000'
+		const origin =
+			request.headers.get('origin') ||
+			process.env.NEXT_PUBLIC_BASE_URL ||
+			'http://localhost:3000'
 		const returnUrl = `${origin}/onboarding?step=4&stripe_onboarding=success`
 		const refreshUrl = `${origin}/onboarding?step=4&stripe_onboarding=refresh`
 

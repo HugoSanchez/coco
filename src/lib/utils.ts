@@ -59,3 +59,33 @@ export function getMonthNameCapitalized(date: Date): string {
 	const monthName = getMonthName(date)
 	return monthName.charAt(0).toUpperCase() + monthName.slice(1)
 }
+
+/**
+ * URL utility functions
+ * Provides consistent URL construction across the application
+ */
+
+/**
+ * Gets the base URL for the application
+ * Uses NEXT_PUBLIC_BASE_URL environment variable or falls back to localhost
+ * @returns {string} The base URL (e.g., "https://yourdomain.com" or "http://localhost:3000")
+ *
+ * @example
+ * getBaseUrl() // "https://yourdomain.com" in production, "http://localhost:3000" in development
+ */
+export function getBaseUrl(): string {
+	return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+}
+
+/**
+ * Constructs a full URL for a given path
+ * @param {string} path - The path to append to the base URL (should start with '/')
+ * @returns {string} The full URL
+ *
+ * @example
+ * getUrl('/api/auth/callback') // "https://yourdomain.com/api/auth/callback"
+ */
+export function getUrl(path: string): string {
+	const baseUrl = getBaseUrl()
+	return `${baseUrl}${path}`
+}

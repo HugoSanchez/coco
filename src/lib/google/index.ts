@@ -22,10 +22,14 @@ import {
 
 const clientId = process.env.GOOGLE_CLIENT_ID_CALENDAR
 const clientSecret = process.env.GOOGLE_CLIENT_SECRET_CALENDAR
-const redirectUri = process.env.GOOGLE_REDIRECT_URI
+const redirectUri = `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/callback/calendar`
 
-if (!clientId || !clientSecret || !redirectUri) {
-	console.error('Missing Google Calendar environment variables', redirectUri)
+if (!clientId || !clientSecret || !process.env.NEXT_PUBLIC_BASE_URL) {
+	console.error('Missing Google Calendar environment variables', {
+		clientId: !!clientId,
+		clientSecret: !!clientSecret,
+		baseUrl: process.env.NEXT_PUBLIC_BASE_URL
+	})
 	throw new Error('Missing Google Calendar environment variables')
 }
 
