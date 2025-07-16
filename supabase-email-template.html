@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Acceso a Coco</title>
+		<style>
+			body {
+				margin: 0;
+				padding: 0;
+				font-family:
+					-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+					'Helvetica Neue', Ubuntu, sans-serif;
+				background-color: #ffffff;
+				color: #333333;
+			}
+			.container {
+				max-width: 600px;
+				margin: 0 auto;
+				background-color: #ffffff;
+				padding: 0;
+				border: none;
+				border-radius: 0;
+				overflow: hidden;
+			}
+			.logo-section {
+				padding: 48px 40px 32px;
+				background-color: #ffffff;
+				text-align: left;
+			}
+			.logo {
+				color: #000000;
+				font-size: 18px;
+				font-weight: 900;
+				margin: 0;
+				text-align: left;
+				line-height: 22px;
+			}
+			.section {
+				padding: 0 40px;
+				margin-bottom: 40px;
+			}
+			.greeting {
+				color: #333333;
+				font-size: 16px;
+				line-height: 24px;
+				margin: 0 0 24px;
+				font-weight: 400;
+			}
+			.text {
+				color: #333333;
+				font-size: 16px;
+				line-height: 24px;
+				margin: 0 0 24px;
+				font-weight: 400;
+			}
+			.button-container {
+				text-align: left;
+				margin: 0 0 32px;
+			}
+			.button {
+				display: inline-block;
+				background-color: #179898;
+				border-radius: 6px;
+				padding: 16px 44px;
+				text-align: center;
+				text-decoration: none;
+				cursor: pointer;
+				box-sizing: border-box;
+				border: none;
+				color: #ffffff !important;
+				font-size: 16px;
+				font-weight: 500;
+				margin: 0;
+				line-height: 20px;
+			}
+			.button:hover {
+				color: #ffffff !important;
+			}
+			.footer {
+				padding: 40px;
+				text-align: left;
+				border-top: 1px solid #e9ecef;
+				background-color: #ffffff;
+			}
+			.footer-text {
+				color: #666666;
+				font-size: 14px;
+				margin: 0 0 8px;
+				line-height: 20px;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<div class="logo-section">
+				<h1 class="logo">coco.</h1>
+			</div>
+
+			<div class="section">
+				<p class="greeting">Hola,</p>
+				<p class="text">
+					Has solicitado acceder a tu cuenta de Coco. Haz clic en el
+					botón de abajo para confirmar tu acceso.
+				</p>
+			</div>
+
+			<div class="section">
+				<div class="button-container">
+					<a href="{{ .ConfirmationURL }}" class="button">
+						Confirmar acceso
+					</a>
+				</div>
+			</div>
+
+			<div class="section">
+				<p class="text">
+					Si el botón no funciona, puedes copiar y pegar este enlace
+					en tu navegador:<br />
+					<a href="{{ .ConfirmationURL }}" style="color: #179898"
+						>{{ .ConfirmationURL }}</a
+					>
+				</p>
+			</div>
+
+			<div class="footer">
+				<p class="footer-text">
+					Coco es una plataforma de reservas para profesionales de la
+					salud. Si no has solicitado este acceso, puedes ignorar este
+					email.
+				</p>
+			</div>
+		</div>
+	</body>
+</html>
