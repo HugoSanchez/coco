@@ -367,3 +367,45 @@ export async function isAccountReadyForPayments(
 
 	return !!(account.onboarding_completed && account.payments_enabled)
 }
+
+/**
+ * Syncs Stripe account status with database by checking actual Stripe account capabilities
+ * This function queries the Stripe API to get real-time account status and updates
+ * both onboarding_completed and payments_enabled flags in the database accordingly
+ *
+ * @param userId - The UUID of the user whose Stripe account to sync
+ * @param supabaseClient - Optional Supabase client instance
+ * @returns Promise<StripeAccount> - The updated Stripe account object with synced status
+ * @throws Error if Stripe account not found, Stripe API call fails, or database update fails
+ */
+export async function syncStripeAccountStatus(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<StripeAccount> {
+	const client = supabaseClient || supabase
+
+	// Step 1: Get the user's Stripe account from database
+	const stripeAccount = await getStripeAccountByUserId(userId, client)
+	if (!stripeAccount) {
+		throw new Error('No Stripe account found for user')
+	}
+
+	// Step 2: Import and use StripeService to check actual account status
+	const { StripeService } = await import('@/lib/payments/stripe-service')
+	const stripeService = new StripeService()
+
+	// Step 3: Get real-time status from Stripe API
+	const accountStatus = await stripeService.getAccountStatus(
+		stripeAccount.stripe_account_id
+	)
+
+	// Step 4: Update database with actual Stripe account capabilities
+	return updateStripeAccountStatus(
+		userId,
+		{
+			onboarding_completed: true, // If we can check status, onboarding flow was completed
+			payments_enabled: accountStatus.paymentsEnabled
+		},
+		client
+	)
+}

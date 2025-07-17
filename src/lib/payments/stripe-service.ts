@@ -72,6 +72,75 @@ export class StripeService {
 	}
 
 	/**
+	 * Get the real-time status of a Stripe Connect account
+	 *
+	 * This function calls Stripe's Account API to get the actual account status,
+	 * checking if the account is ready to accept payments and receive payouts.
+	 *
+	 * Key capabilities checked:
+	 * - charges_enabled: Can accept payments from customers
+	 * - payouts_enabled: Can receive payouts to bank account
+	 * - details_submitted: Required account information has been provided
+	 * - requirements.currently_due: Any pending verification requirements
+	 *
+	 * @param accountId - The Stripe Connect account ID to check
+	 * @returns Promise with account status and payment readiness
+	 */
+	async getAccountStatus(accountId: string): Promise<{
+		success: boolean
+		paymentsEnabled: boolean
+		error?: string
+		details?: {
+			charges_enabled: boolean
+			payouts_enabled: boolean
+			details_submitted: boolean
+			requirements_due: string[]
+			account_type: string
+		}
+	}> {
+		try {
+			// Fetch account details from Stripe API
+			const account = await stripe.accounts.retrieve(accountId)
+
+			// Extract key status fields
+			const charges_enabled = account.charges_enabled || false
+			const payouts_enabled = account.payouts_enabled || false
+			const details_submitted = account.details_submitted || false
+			const requirements_due = account.requirements?.currently_due || []
+
+			// Account is ready for payments if:
+			// 1. Can accept charges (payments from customers)
+			// 2. Can receive payouts (money to bank account)
+			// 3. Has submitted required details
+			// 4. Has no outstanding requirements
+			const paymentsEnabled =
+				charges_enabled &&
+				payouts_enabled &&
+				details_submitted &&
+				requirements_due.length === 0
+
+			return {
+				success: true,
+				paymentsEnabled,
+				details: {
+					charges_enabled,
+					payouts_enabled,
+					details_submitted,
+					requirements_due,
+					account_type: account.type || 'unknown'
+				}
+			}
+		} catch (error) {
+			console.error('Error fetching Stripe account status:', error)
+			return {
+				success: false,
+				paymentsEnabled: false,
+				error: error instanceof Error ? error.message : 'Unknown error'
+			}
+		}
+	}
+
+	/**
 	 * Create checkout session for consultation payment
 	 */
 	async createConsultationCheckout({

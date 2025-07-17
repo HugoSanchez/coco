@@ -72,7 +72,7 @@ export function SideSheet({
 			{/* Sheet content with custom styling */}
 			<SheetContent
 				side="right"
-				className={`${width} overflow-y-auto p-8 bg-gray-50 [&>button]:hidden`}
+				className={`${width} w-screen md:w-1/3 overflow-y-auto p-8 bg-gray-50 [&>button]:hidden`}
 			>
 				{/* Sheet header with title and description */}
 				<SheetHeader>

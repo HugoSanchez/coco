@@ -1,24 +1,24 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { markOnboardingCompleted } from '@/lib/db/stripe-accounts'
+import { syncStripeAccountStatus } from '@/lib/db/stripe-accounts'
 
 // Force dynamic rendering since this page uses useSearchParams
 export const dynamic = 'force-dynamic'
 /**
  * POST /api/payments/update-onboarding
  *
- * Marks a practitioner's Stripe onboarding as completed in our database.
+ * Syncs a practitioner's Stripe account status with the actual Stripe account capabilities.
  * This endpoint is called after the user returns from Stripe's onboarding flow
- * to update their account status and enable payment processing capabilities.
+ * to update their account status based on real-time Stripe API data.
  *
  * Flow:
  * 1. Authenticates the practitioner
- * 2. Marks their Stripe account onboarding as completed in database
- * 3. Returns success confirmation
+ * 2. Calls Stripe API to check actual account status and capabilities
+ * 3. Updates database with onboarding_completed and payments_enabled flags
+ * 4. Returns success confirmation with account status
  *
- * This is typically called by the frontend when users return from Stripe
- * onboarding with a success status, allowing them to start accepting payments.
- * After this call, the onboarding-status endpoint will show onboarding_completed: true.
+ * This ensures the database accurately reflects the actual Stripe account capabilities,
+ * preventing issues where onboarding appears complete but payments are not yet enabled.
  */
 export async function POST() {
 	try {
@@ -34,18 +34,22 @@ export async function POST() {
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 		}
 
-		// Step 2: Mark Stripe onboarding as completed in database
-		// This enables the user to start accepting payments
-		await markOnboardingCompleted(user.id, supabase)
+		// Step 2: Sync Stripe account status with actual Stripe capabilities
+		// This calls the Stripe API to check real account status and updates both database flags
+		const updatedAccount = await syncStripeAccountStatus(user.id, supabase)
 
-		// Step 3: Return success confirmation
+		// Step 3: Return success confirmation with account status
 		return NextResponse.json({
 			success: true,
-			message: 'Onboarding status updated successfully'
+			message: 'Onboarding status synced successfully',
+			account: {
+				onboarding_completed: updatedAccount.onboarding_completed,
+				payments_enabled: updatedAccount.payments_enabled
+			}
 		})
 	} catch (error) {
-		// Catch any errors from authentication or database operations
-		console.error('Error updating onboarding status:', error)
+		// Catch any errors from authentication, Stripe API, or database operations
+		console.error('Error syncing onboarding status:', error)
 		return NextResponse.json(
 			{
 				error: 'Internal server error',
