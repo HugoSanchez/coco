@@ -23,6 +23,11 @@ export async function middleware(request: NextRequest) {
 			const {
 				data: { user }
 			} = await supabase.auth.getUser()
+			console.log('CALLBACK SESSION CHECK:', {
+				hasUser: !!user,
+				userId: user?.id,
+				timestamp: new Date().toISOString()
+			})
 			// If the user is not authenticated, redirect to the login page
 			if (!user) {
 				// Save the original URL for post-login redirect
