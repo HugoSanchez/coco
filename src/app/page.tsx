@@ -118,19 +118,22 @@ export default function LandingPage() {
 
 						<h1
 							style={{ lineHeight: 1.1 }}
-							className="text-3xl md:text-5xl lg:text-6xl font-normal text-gray-900 mb-16 max-w-5xl"
+							className="text-3xl md:text-5xl lg:text-6xl font-normal text-gray-900 mb-8 md:mb-16 max-w-5xl"
 						>
 							{isMobile
 								? 'Bienvenido a coco,'
 								: 'Facilita el cobro de tus consultas.'}{' '}
 							<span className="text-gray-400 font-light">
 								{isMobile
-									? 'la plataforma de gestión que tu consulta online necesita.'
+									? 'la plataforma de reservas y cobro de honorarios que tu consulta online necesita.'
 									: 'Coco es la plataforma de gestión de agenda y cobro de honorarios que tu consulta online necesita.'}
 							</span>
 						</h1>
 
-						<Button className="bg-teal-400 hover:bg-teal-400/90 text-white px-8 py-3 rounded-full text-base font-normal">
+						<Button
+							onClick={handleLoginRedirect}
+							className="bg-teal-400 hover:bg-teal-400/90 text-white px-8 py-3 rounded-full text-base font-normal"
+						>
 							Pruébalo
 							<ArrowRight className="ml-2 w-4 h-4" />
 						</Button>
@@ -139,7 +142,7 @@ export default function LandingPage() {
 			</section>
 
 			{/* Dashboard Preview */}
-			<section className="pb-20 px-6">
+			<section className="md:pb-20 px-4">
 				<div className="max-w-5xl mx-auto">
 					<motion.div
 						initial={{ y: 50, opacity: 0 }}
@@ -147,13 +150,13 @@ export default function LandingPage() {
 						transition={{ duration: 0.8, delay: 0.3 }}
 						className="relative"
 					>
-						<div className="bg-gradient-to-br from-teal-50 to-teal-50 rounded-2xl p-8 md:p-12">
-							<div className="bg-white rounded-xl shadow-2xl overflow-hidden">
-								<div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-									<div className="flex items-center space-x-2">
-										<div className="w-3 h-3 bg-red-400 rounded-full"></div>
-										<div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-										<div className="w-3 h-3 bg-green-400 rounded-full"></div>
+						<div className="bg-gradient-to-br from-teal-50 to-teal-50 rounded-2xl p-2 md:p-12">
+							<div className="bg-white rounded-md md:rounded-xl shadow-2xl overflow-hidden">
+								<div className="bg-gray-50 px-3 md:px-6 py-1 md:py-4 border-b border-gray-100">
+									<div className="flex items-center space-x-1 md:space-x-2">
+										<div className="w-1 h-1 md:w-3 md:h-3 bg-red-400 rounded-full"></div>
+										<div className="w-1 h-1 md:w-3 md:h-3 bg-yellow-400 rounded-full"></div>
+										<div className="w-1 h-1 md:w-3 md:h-3 bg-green-400 rounded-full"></div>
 									</div>
 								</div>
 								<div className="relative">
@@ -170,7 +173,7 @@ export default function LandingPage() {
 			</section>
 
 			{/* Benefits Section */}
-			<section className="py-32 px-6 bg-white">
+			<section className="pt-24 pb-0 md:py-32 px-6 bg-white">
 				<div className="max-w-6xl mx-auto">
 					<motion.div
 						initial={{ y: 30, opacity: 0 }}
@@ -197,7 +200,7 @@ export default function LandingPage() {
 						</p>
 					</motion.div>
 
-					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mt-20 rounded-lg overflow-hidden">
+					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 md:mt-20 rounded-lg overflow-hidden">
 						{[
 							{
 								icon: Target,
@@ -250,7 +253,7 @@ export default function LandingPage() {
 			</section>
 
 			{/* CTA Section */}
-			<section className="py-20 px-6 bg-white">
+			<section className="pt-20 md:py-20 px-2 md:px-6 bg-white">
 				<div className="max-w-7xl mx-auto px-6 lg:px-8">
 					<motion.div
 						initial={{ y: 30, opacity: 0 }}
@@ -276,7 +279,10 @@ export default function LandingPage() {
 							</h2>
 						</div>
 						<div className="flex-shrink-0 lg:ml-8 lg:mt-2">
-							<Button className="bg-teal-400 hover:bg-teal-400/90 text-white px-8 py-3 rounded-full text-base font-normal">
+							<Button
+								onClick={handleLoginRedirect}
+								className="bg-teal-400 hover:bg-teal-400/90 text-white px-8 py-3 rounded-full text-base font-normal"
+							>
 								Pruébalo
 								<ArrowRight className="ml-2 w-4 h-4" />
 							</Button>
@@ -618,7 +624,7 @@ export default function LandingPage() {
 			</section>
 
 			{/* CTA Section */}
-			<section className="pt-20 pb-44 px-6 bg-white">
+			<section className="md:pt-20 pb-44 px-1 md:px-6 bg-white">
 				<div className="max-w-7xl mx-auto px-6 lg:px-8">
 					<motion.div
 						initial={{ y: 30, opacity: 0 }}
@@ -640,7 +646,10 @@ export default function LandingPage() {
 							</h2>
 						</div>
 						<div className="flex-shrink-0 lg:ml-8 lg:mt-2">
-							<Button className="bg-teal-400 hover:bg-teal-400/90 text-white px-8 py-3 rounded-full text-base font-normal">
+							<Button
+								onClick={handleLoginRedirect}
+								className="bg-teal-400 hover:bg-teal-400/90 text-white px-8 py-3 rounded-full text-base font-normal"
+							>
 								Pruébalo
 								<ArrowRight className="ml-2 w-4 h-4" />
 							</Button>
@@ -650,7 +659,7 @@ export default function LandingPage() {
 			</section>
 
 			{/* Cómo funciona Section */}
-			<section className="py-10 px-6 bg-white">
+			<section className="md:py-10 px-6 bg-white">
 				<div className="max-w-6xl mx-auto">
 					<motion.div
 						initial={{ y: 30, opacity: 0 }}
@@ -726,7 +735,7 @@ export default function LandingPage() {
 			</section>
 
 			{/* CTA Section */}
-			<section className="pt-20 pb-44 px-6 bg-white">
+			<section className="pt-20 pb-44 px-2 md:px-6 bg-white">
 				<div className="max-w-7xl mx-auto px-6 lg:px-8">
 					<motion.div
 						initial={{ y: 30, opacity: 0 }}
@@ -750,7 +759,7 @@ export default function LandingPage() {
 						<div className="flex-shrink-0 lg:ml-8 lg:mt-2">
 							<Button
 								onClick={() =>
-									window.open('mailto:hugo@itsverso.com')
+									window.open('mailto:info@itscoco.app')
 								}
 								className="bg-gray-200 hover:bg-gray-200/90 text-gray-900 px-8 py-3 rounded-full text-base font-normal"
 							>
