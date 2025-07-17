@@ -638,7 +638,7 @@ export default function Dashboard() {
 
 	return (
 		<div className="flex min-h-screen w-full flex-col py-24">
-			<header className="flex flex-col md:flex-row items-left md:items-center justify-between px-4 md:px-16 pb-6 gap-4 md:gap-0">
+			<header className="flex flex-col md:flex-row items-left md:items-center justify-between px-6 md:px-16 pb-6 gap-4 md:gap-0">
 				<div className="flex flex-col">
 					<h1 className="text-xl md:text-3xl font-bold">
 						Hola {profile?.name},

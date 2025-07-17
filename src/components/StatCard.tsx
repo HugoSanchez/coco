@@ -28,7 +28,7 @@
 
 import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertCircle, TrendingUp, TrendingDown, Info } from 'lucide-react'
+import { TrendingUp, TrendingDown, Info } from 'lucide-react'
 import {
 	Tooltip,
 	TooltipContent,

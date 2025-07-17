@@ -76,7 +76,7 @@ export function SideSheet({
 			>
 				{/* Sheet header with title and description */}
 				<SheetHeader>
-					<SheetTitle className="flex items-center gap-2 text-2xl font-bold">
+					<SheetTitle className="text-xl md:text-2xl font-bold">
 						{title}
 					</SheetTitle>
 					{/* Optional description text */}
