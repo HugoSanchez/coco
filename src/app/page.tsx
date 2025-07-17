@@ -13,6 +13,7 @@ import {
 	ChevronUp
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useState, useEffect } from 'react'
@@ -775,12 +776,12 @@ export default function LandingPage() {
 			<footer className="py-8 px-32 bg-gray-50">
 				<div className="mx-auto flex flex-col md:flex-row justify-between items-center">
 					<div className="flex space-x-6 text-sm text-gray-500">
-						<a
-							href="#"
+						<Link
+							href="/privacy-policy"
 							className="hover:text-gray-900 transition-colors"
 						>
 							Privacidad
-						</a>
+						</Link>
 						<a
 							href="#"
 							className="hover:text-gray-900 transition-colors"

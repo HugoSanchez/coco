@@ -306,7 +306,7 @@ export function ProfileSetup({
 						</p>
 					)}
 					<p className="text-xs text-gray-500 my-2">
-						itsmomo.com/book/{username}
+						itscoco.app/book/{username}
 					</p>
 				</div>
 
