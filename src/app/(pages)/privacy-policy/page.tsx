@@ -11,23 +11,25 @@ export default function PrivacyPolicyPage() {
 
 					<div className="prose prose-gray max-w-none">
 						<p className="text-gray-600 mb-6">
-							Itsverso Inc. (the "Company") behind Coco App is
-							committed to maintaining robust privacy protections
-							for its users. Our Privacy Policy ("Privacy Policy")
-							is designed to help you understand how we collect,
-							use and safeguard the information you provide to us
-							and to assist you in making informed decisions when
-							using our Service.
+							Itsverso Inc. (the &ldquo;Company&rdquo;) behind
+							Coco App is committed to maintaining robust privacy
+							protections for its users. Our Privacy Policy
+							(&ldquo;Privacy Policy&rdquo;) is designed to help
+							you understand how we collect, use and safeguard the
+							information you provide to us and to assist you in
+							making informed decisions when using our Service.
 						</p>
 
 						<p className="text-gray-600 mb-6">
-							For purposes of this Agreement, "Site" refers to the
-							Company's website, which can be accessed at
-							www.itscoco.app. "Service" refers to the Company's
-							services accessed via the Site, in which users can
-							manage their bookings for their online consultation
-							practices. The terms "we," "us," and "our" refer to
-							the Company. "You" refers to you, as a user of our
+							For purposes of this Agreement, &ldquo;Site&rdquo;
+							refers to the Company&rsquo;s website, which can be
+							accessed at www.itscoco.app. &ldquo;Service&rdquo;
+							refers to the Company&rsquo;s services accessed via
+							the Site, in which users can manage their bookings
+							for their online consultation practices. The terms
+							&ldquo;we,&rdquo; &ldquo;us,&rdquo; and
+							&ldquo;our&rdquo; refer to the Company.
+							&ldquo;You&rdquo; refers to you, as a user of our
 							Site or our Service.
 						</p>
 
@@ -44,8 +46,9 @@ export default function PrivacyPolicyPage() {
 								I. INFORMATION WE COLLECT
 							</h2>
 							<p className="text-gray-600 mb-4">
-								We collect "Non-Personal Information" and
-								"Personal Information." Non-Personal Information
+								We collect &ldquo;Non-Personal
+								Information&rdquo; and &ldquo;Personal
+								Information.&rdquo; Non-Personal Information
 								includes information that cannot be used to
 								personally identify you, such as anonymous usage
 								data, general demographic information we may
@@ -81,7 +84,7 @@ export default function PrivacyPolicyPage() {
 							</p>
 
 							<h3 className="text-xl font-medium text-gray-900 mb-3">
-								3. Children's Privacy
+								3. Children&rsquo;s Privacy
 							</h3>
 							<p className="text-gray-600 mb-4">
 								The Site and the Service are not directed to
@@ -115,11 +118,11 @@ export default function PrivacyPolicyPage() {
 								consent. We do share Personal Information with
 								vendors who are performing services for the
 								Company, such as the servers for our email
-								communications who are provided access to user's
-								email address for purposes of sending emails
-								from us. Those vendors use your Personal
-								Information only at our direction and in
-								accordance with our Privacy Policy.
+								communications who are provided access to
+								user&rsquo;s email address for purposes of
+								sending emails from us. Those vendors use your
+								Personal Information only at our direction and
+								in accordance with our Privacy Policy.
 							</p>
 							<p className="text-gray-600 mb-4">
 								In general, the Personal Information you provide
