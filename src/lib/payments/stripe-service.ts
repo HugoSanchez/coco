@@ -1,4 +1,5 @@
 import Stripe from 'stripe'
+import { SupabaseClient } from '@supabase/supabase-js'
 
 // Initialize Stripe with environment variable
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)

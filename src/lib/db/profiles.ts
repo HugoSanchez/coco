@@ -237,11 +237,18 @@ export async function getProfileById(
  * Convenience function for cases where only email is needed
  *
  * @param userId - UUID of the user whose email to fetch
+ * @param supabaseClient - Optional Supabase client instance (uses default if not provided)
  * @returns Promise<string | null> - User email or null if not found
  * @throws Error if database operation fails
  */
-export async function getUserEmail(userId: string): Promise<string | null> {
-	const { data: profile, error } = await supabase
+export async function getUserEmail(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<string | null> {
+	// Use provided client or fall back to default
+	const client = supabaseClient || supabase
+
+	const { data: profile, error } = await client
 		.from('profiles')
 		.select('email')
 		.eq('id', userId)

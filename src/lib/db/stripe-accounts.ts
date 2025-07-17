@@ -85,8 +85,11 @@ export interface StripeAccountForPayments {
  * @throws Error if insertion fails or validation errors occur
  */
 export async function createStripeAccount(
-	payload: CreateStripeAccountPayload
+	payload: CreateStripeAccountPayload,
+	supabaseClient?: SupabaseClient
 ): Promise<StripeAccount> {
+	const client = supabaseClient || supabase
+
 	const stripeAccountData = {
 		user_id: payload.user_id,
 		stripe_account_id: payload.stripe_account_id,
@@ -94,7 +97,7 @@ export async function createStripeAccount(
 		payments_enabled: payload.payments_enabled || false
 	}
 
-	const { data, error } = await supabase
+	const { data, error } = await client
 		.from('stripe_accounts')
 		.insert([stripeAccountData])
 		.select()
@@ -218,9 +221,11 @@ export async function getStripeAccountByStripeId(
  */
 export async function updateStripeAccountStatus(
 	userId: string,
-	updatePayload: UpdateStripeAccountStatusPayload
+	updatePayload: UpdateStripeAccountStatusPayload,
+	supabaseClient?: SupabaseClient
 ): Promise<StripeAccount> {
-	const { data, error } = await supabase
+	const client = supabaseClient || supabase
+	const { data, error } = await client
 		.from('stripe_accounts')
 		.update(updatePayload)
 		.eq('user_id', userId)
@@ -264,11 +269,16 @@ export async function updateStripeAccountByStripeId(
  * @throws Error if update fails or Stripe account not found
  */
 export async function markOnboardingCompleted(
-	userId: string
+	userId: string,
+	supabaseClient?: SupabaseClient
 ): Promise<StripeAccount> {
-	return updateStripeAccountStatus(userId, {
-		onboarding_completed: true
-	})
+	return updateStripeAccountStatus(
+		userId,
+		{
+			onboarding_completed: true
+		},
+		supabaseClient
+	)
 }
 
 /**
@@ -325,8 +335,12 @@ export async function deleteStripeAccount(userId: string): Promise<void> {
  * @returns Promise<boolean> - True if the user has a Stripe account, false otherwise
  * @throws Error if database operation fails
  */
-export async function hasStripeAccount(userId: string): Promise<boolean> {
-	const { data, error } = await supabase
+export async function hasStripeAccount(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<boolean> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
 		.from('stripe_accounts')
 		.select('id')
 		.eq('user_id', userId)

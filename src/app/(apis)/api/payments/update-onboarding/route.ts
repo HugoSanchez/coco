@@ -36,7 +36,7 @@ export async function POST() {
 
 		// Step 2: Mark Stripe onboarding as completed in database
 		// This enables the user to start accepting payments
-		await markOnboardingCompleted(user.id)
+		await markOnboardingCompleted(user.id, supabase)
 
 		// Step 3: Return success confirmation
 		return NextResponse.json({

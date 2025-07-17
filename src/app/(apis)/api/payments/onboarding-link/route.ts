@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
 		// Step 2: Retrieve practitioner's Stripe account from database
 		// User must have created a Stripe account first
-		const stripeAccount = await getStripeAccountByUserId(user.id)
+		const stripeAccount = await getStripeAccountByUserId(user.id, supabase)
 
 		if (!stripeAccount) {
 			return NextResponse.json(

@@ -36,7 +36,7 @@ export async function POST() {
 		}
 
 		// Step 2: Get user's email from their profile
-		const userEmail = await getUserEmail(user.id)
+		const userEmail = await getUserEmail(user.id, supabase)
 
 		if (!userEmail) {
 			return NextResponse.json(
@@ -47,7 +47,7 @@ export async function POST() {
 
 		// Step 3: Check if user already has a Stripe account (prevent duplicates)
 		// This is a security measure to prevent users from creating multiple accounts
-		const userHasAccount = await hasStripeAccount(user.id)
+		const userHasAccount = await hasStripeAccount(user.id, supabase)
 
 		if (userHasAccount) {
 			return NextResponse.json(
@@ -74,12 +74,15 @@ export async function POST() {
 
 		// Step 5: Save Stripe account info to our database
 		// Account starts in pending state - user must complete onboarding
-		const stripeAccount = await createStripeAccount({
-			user_id: user.id,
-			stripe_account_id: result.accountId!,
-			onboarding_completed: false, // Will be updated after onboarding
-			payments_enabled: false // Will be enabled after verification
-		})
+		const stripeAccount = await createStripeAccount(
+			{
+				user_id: user.id,
+				stripe_account_id: result.accountId!,
+				onboarding_completed: false, // Will be updated after onboarding
+				payments_enabled: false // Will be enabled after verification,
+			},
+			supabase
+		)
 
 		// Return success with account details
 		// Frontend can now call /api/payments/onboarding-link to start onboarding
