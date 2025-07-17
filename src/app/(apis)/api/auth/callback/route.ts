@@ -20,13 +20,6 @@ export async function GET(request: Request) {
 		const supabase = createClient()
 		const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
-		console.log('CALLBACK SESSION CHECK:', {
-			hasUser: !!data?.user,
-			hasSession: !!data?.session,
-			userId: data?.user?.id,
-			timestamp: new Date().toISOString()
-		})
-
 		if (data?.user) {
 			// If there's a specific redirect from middleware, use it
 			if (redirectTo) {
