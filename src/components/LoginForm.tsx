@@ -107,11 +107,11 @@ export default function LoginForm() {
 		<div>
 			{isSubmitted ? (
 				// Success confirmation screen
-				<div className="text-center max-w-lg w-full">
+				<div className="text-center md:max-w-lg w-full px-6">
 					<h1 className="text-3xl font-black mb-3 text-center">
 						¡Revisa tu correo!
 					</h1>
-					<p className="mt-3 text-lg text-gray-600 font-light">
+					<p className="mt-3 text-base md:text-lg text-gray-600 font-light">
 						Te hemos enviado un enlace de confirmación a{' '}
 						<span className="font-semibold text-primary">
 							{email}

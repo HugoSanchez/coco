@@ -19,7 +19,6 @@ export async function GET(request: Request) {
 	if (code) {
 		const supabase = createClient()
 		const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-		if (error) console.log(error)
 
 		if (data?.user) {
 			// If there's a specific redirect from middleware, use it

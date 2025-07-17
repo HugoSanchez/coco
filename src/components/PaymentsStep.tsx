@@ -226,15 +226,6 @@ export function PaymentsStep({
 								buttonText
 							)}
 						</Button>
-
-						<Button
-							onClick={handleSkip}
-							variant="ghost"
-							className="w-full"
-							disabled={isLoading || isCheckingStatus}
-						>
-							Saltar por ahora
-						</Button>
 					</div>
 				) : (
 					<div className="space-y-4">
