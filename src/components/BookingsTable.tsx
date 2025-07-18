@@ -265,46 +265,33 @@ export function BookingsTable({
 
 									{/* Actions */}
 									<TableCell className="text-right py-2">
-										<DropdownMenu>
-											<DropdownMenuTrigger asChild>
-												<Button
-													variant="ghost"
-													className="h-8 w-8 p-0 hover:bg-gray-100"
+										{booking.status !== 'canceled' && (
+											<DropdownMenu>
+												<DropdownMenuTrigger asChild>
+													<Button
+														variant="ghost"
+														className="h-8 w-8 p-0 hover:bg-gray-100"
+													>
+														<MoreHorizontal className="h-4 w-4" />
+													</Button>
+												</DropdownMenuTrigger>
+												<DropdownMenuContent
+													align="end"
+													className=""
 												>
-													<MoreHorizontal className="h-4 w-4" />
-												</Button>
-											</DropdownMenuTrigger>
-											<DropdownMenuContent
-												align="end"
-												className=""
-											>
-												{booking.payment_status ===
-													'paid' && (
-													<DropdownMenuItem
-														onClick={() =>
-															onRefundBooking(
-																booking.id
-															)
-														}
-													>
-														Reembolsar
-													</DropdownMenuItem>
-												)}
-												{booking.payment_status !==
-													'paid' && (
-													<DropdownMenuItem
-														onClick={() =>
-															onMarkAsPaid(
-																booking.id
-															)
-														}
-													>
-														Pagada
-													</DropdownMenuItem>
-												)}
-												{booking.status !==
-													'canceled' &&
-													booking.status !==
+													{booking.payment_status ===
+														'paid' && (
+														<DropdownMenuItem
+															onClick={() =>
+																onRefundBooking(
+																	booking.id
+																)
+															}
+														>
+															Reembolsar pago
+														</DropdownMenuItem>
+													)}
+													{booking.status !==
 														'completed' && (
 														<DropdownMenuItem
 															onClick={() =>
@@ -313,35 +300,49 @@ export function BookingsTable({
 																)
 															}
 														>
-															Reprogramar
+															Reprogramar cita
 														</DropdownMenuItem>
 													)}
-												{booking.status ===
-													'pending' && (
-													<DropdownMenuItem
-														onClick={() =>
-															onConfirmBooking(
-																booking.id
-															)
-														}
-													>
-														Confirmada
-													</DropdownMenuItem>
-												)}
-												{booking.status !==
-													'canceled' && (
-													<DropdownMenuItem
-														onClick={() =>
-															onCancelBooking(
-																booking.id
-															)
-														}
-													>
-														Cancelar
-													</DropdownMenuItem>
-												)}
-											</DropdownMenuContent>
-										</DropdownMenu>
+													{booking.payment_status !==
+														'paid' && (
+														<DropdownMenuItem
+															onClick={() =>
+																onMarkAsPaid(
+																	booking.id
+																)
+															}
+														>
+															Marcar cita como
+															pagada
+														</DropdownMenuItem>
+													)}
+													{booking.status ===
+														'pending' && (
+														<DropdownMenuItem
+															onClick={() =>
+																onConfirmBooking(
+																	booking.id
+																)
+															}
+														>
+															Marcar cita como
+															confirmada
+														</DropdownMenuItem>
+													)}
+													{
+														<DropdownMenuItem
+															onClick={() =>
+																onCancelBooking(
+																	booking.id
+																)
+															}
+														>
+															Cancelar cita
+														</DropdownMenuItem>
+													}
+												</DropdownMenuContent>
+											</DropdownMenu>
+										)}
 									</TableCell>
 								</TableRow>
 							))

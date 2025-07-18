@@ -69,118 +69,241 @@ export function DayViewTimeSelector({
 		}
 	}, [initialSelectedSlot])
 
-	// Time range: Full 24 hours (0-23)
-	const displayStartHour = 8 // Start displaying from 8 AM
-	const totalMinutes = 24 * 60 // 24 hours = 1440 minutes
-	const pixelsPerMinute = 1 // 1 pixel per minute, so 60px per hour
+	// Configuration constants for time display and calculations
+	const displayStartHour = 8 // Start displaying from 8 AM (auto-scroll position)
+	const totalMinutes = 24 * 60 // Total minutes in a day (1440 minutes)
+	const pixelsPerMinute = 1 // UI scale: 1 pixel per minute (60px per hour)
 
-	// Convert pixel position to time in minutes from start of day
+	/**
+	 * Converts pixel Y position to time in minutes from midnight (00:00)
+	 * @param pixelY - Y coordinate relative to the page
+	 * @returns Minutes from midnight (0-1439)
+	 */
 	const pixelToTime = useCallback((pixelY: number): number => {
+		// Safety check: ensure container exists before calculations
 		if (!containerRef.current) return 0
+
+		// Get container's position and dimensions on the page
 		const rect = containerRef.current.getBoundingClientRect()
+
+		// Calculate Y position relative to container top
+		// Clamp between 0 and container height to prevent invalid values
 		const relativeY = Math.max(0, Math.min(pixelY - rect.top, rect.height))
+
+		// Convert pixels to minutes using our scale (1 pixel = 1 minute)
 		const minutes = Math.round(relativeY / pixelsPerMinute)
-		return minutes // Now represents minutes from 00:00 (midnight)
+
+		return minutes // Minutes from 00:00 (midnight)
 	}, [])
 
-	// Convert time in minutes from start of day to pixel position
+	/**
+	 * Converts time in minutes from midnight to pixel Y position
+	 * @param timeInMinutes - Minutes from midnight (0-1439)
+	 * @returns Pixel position from top of container
+	 */
 	const timeToPixel = useCallback((timeInMinutes: number): number => {
 		return timeInMinutes * pixelsPerMinute
 	}, [])
 
-	// Format time from minutes to HH:MM
+	/**
+	 * Formats time from minutes to human-readable HH:MM format
+	 * @param timeInMinutes - Minutes from midnight
+	 * @returns Formatted time string (e.g., "14:30")
+	 */
 	const formatTime = useCallback((timeInMinutes: number): string => {
+		// Extract hours by dividing by 60 and rounding down
 		const hours = Math.floor(timeInMinutes / 60)
+
+		// Extract remaining minutes using modulo operator
 		const minutes = timeInMinutes % 60
+
+		// Format both to 2 digits with leading zeros (e.g., "09:05")
 		return `${hours.toString().padStart(2, '0')}:${minutes
 			.toString()
 			.padStart(2, '0')}`
 	}, [])
 
-	// Snap time to 15-minute intervals
+	/**
+	 * Snaps time to nearest 15-minute interval for user-friendly selection
+	 * @param timeInMinutes - Raw time in minutes
+	 * @returns Snapped time to nearest 15-minute mark
+	 */
 	const snapToInterval = useCallback((timeInMinutes: number): number => {
 		return Math.round(timeInMinutes / 15) * 15
 	}, [])
 
-	const handleMouseDown = useCallback(
-		(e: React.MouseEvent) => {
-			e.preventDefault()
-			const startTime = snapToInterval(pixelToTime(e.clientY))
+	/**
+	 * Unified drag start handler for both mouse and touch events
+	 * Extracts Y coordinate from event and initializes drag state
+	 */
+	const handleDragStart = useCallback(
+		(clientY: number) => {
+			// Convert Y coordinate to time and snap to 15-minute intervals
+			const startTime = snapToInterval(pixelToTime(clientY))
 
+			// Initialize drag state with starting position and time
 			setDragState({
-				isDragging: true,
-				startY: e.clientY,
-				startTime,
-				currentTime: startTime
+				isDragging: true, // Flag to track drag in progress
+				startY: clientY, // Store original Y position
+				startTime, // Time where drag started
+				currentTime: startTime // Current time (starts same as start)
 			})
+
+			// Clear any previously selected slot when starting new drag
 			setSelectedSlot(null)
 		},
 		[pixelToTime, snapToInterval]
 	)
 
-	const handleMouseMove = useCallback(
-		(e: React.MouseEvent) => {
+	/**
+	 * Unified drag move handler for both mouse and touch events
+	 * Updates current time during drag operation
+	 */
+	const handleDragMove = useCallback(
+		(clientY: number) => {
+			// Only process movement if we're actively dragging
 			if (!dragState.isDragging) return
 
-			const currentTime = snapToInterval(pixelToTime(e.clientY))
+			// Convert current Y position to time and snap to intervals
+			const currentTime = snapToInterval(pixelToTime(clientY))
+
+			// Update only the currentTime, keeping other drag state intact
 			setDragState((prev) => ({
-				...prev,
-				currentTime
+				...prev, // Preserve isDragging, startY, startTime
+				currentTime // Update only the current position
 			}))
 		},
 		[dragState.isDragging, pixelToTime, snapToInterval]
 	)
 
-	const handleMouseUp = useCallback(() => {
+	/**
+	 * Unified drag end handler for both mouse and touch events
+	 * Finalizes the selection and calls the callback with ISO date strings
+	 */
+	const handleDragEnd = useCallback(() => {
+		// Only process if we're actively dragging
 		if (!dragState.isDragging) return
 
+		// Calculate final time range ensuring start <= end
+		// (handles both upward and downward drag directions)
 		const startTime = Math.min(dragState.startTime, dragState.currentTime)
 		const endTime = Math.max(dragState.startTime, dragState.currentTime)
 
-		// Minimum 15 minutes
+		// Enforce minimum 15-minute duration for usability
+		// If user made a very small selection, expand to 15 minutes
 		const finalEndTime = endTime <= startTime ? startTime + 15 : endTime
 
+		// Update component state with finalized selection
 		setSelectedSlot({ start: startTime, end: finalEndTime })
+
+		// Reset drag state to idle
 		setDragState({
-			isDragging: false,
-			startY: 0,
-			startTime: 0,
-			currentTime: 0
+			isDragging: false, // No longer dragging
+			startY: 0, // Clear Y position
+			startTime: 0, // Clear start time
+			currentTime: 0 // Clear current time
 		})
 
-		// Convert to ISO strings and call callback
+		// Convert time values to proper Date objects for the selected date
 		const startDate = new Date(date)
-		startDate.setHours(Math.floor(startTime / 60), startTime % 60, 0, 0)
+		startDate.setHours(
+			Math.floor(startTime / 60), // Extract hours
+			startTime % 60, // Extract minutes
+			0, // Set seconds to 0
+			0 // Set milliseconds to 0
+		)
 
 		const endDate = new Date(date)
-		endDate.setHours(Math.floor(finalEndTime / 60), finalEndTime % 60, 0, 0)
+		endDate.setHours(
+			Math.floor(finalEndTime / 60), // Extract hours
+			finalEndTime % 60, // Extract minutes
+			0, // Set seconds to 0
+			0 // Set milliseconds to 0
+		)
 
+		// Call parent callback with ISO date strings for API compatibility
 		onTimeSelect(startDate.toISOString(), endDate.toISOString())
 	}, [dragState, date, onTimeSelect])
 
-	// Generate hour labels for all 24 hours
+	// Mouse event handlers - extract clientY and delegate to unified handlers
+	const handleMouseDown = useCallback(
+		(e: React.MouseEvent) => {
+			e.preventDefault()
+			handleDragStart(e.clientY)
+		},
+		[handleDragStart]
+	)
+
+	const handleMouseMove = useCallback(
+		(e: React.MouseEvent) => {
+			handleDragMove(e.clientY)
+		},
+		[handleDragMove]
+	)
+
+	const handleMouseUp = useCallback(() => {
+		handleDragEnd()
+	}, [handleDragEnd])
+
+	// Touch event handlers - extract clientY from first touch and delegate to unified handlers
+	const handleTouchStart = useCallback(
+		(e: React.TouchEvent) => {
+			e.preventDefault()
+			const touch = e.touches[0]
+			handleDragStart(touch.clientY)
+		},
+		[handleDragStart]
+	)
+
+	const handleTouchMove = useCallback(
+		(e: React.TouchEvent) => {
+			const touch = e.touches[0]
+			handleDragMove(touch.clientY)
+		},
+		[handleDragMove]
+	)
+
+	const handleTouchEnd = useCallback(() => {
+		handleDragEnd()
+	}, [handleDragEnd])
+
+	// Generate array of hour numbers for rendering (0-23)
 	const hours: number[] = []
 	for (let hour = 0; hour < 24; hour++) {
 		hours.push(hour)
 	}
 
-	// Calculate existing booking positions
+	/**
+	 * Calculate visual positioning for existing bookings
+	 * Converts booking times to pixel positions for rendering
+	 */
 	const bookingBlocks = existingBookings.map((booking) => {
+		// Parse ISO date strings to Date objects
 		const start = new Date(booking.start)
 		const end = new Date(booking.end)
+
+		// Convert times to minutes from midnight for calculations
 		const startMinutes = start.getHours() * 60 + start.getMinutes()
 		const endMinutes = end.getHours() * 60 + end.getMinutes()
 
 		return {
+			// Calculate pixel position from top of calendar
 			top: timeToPixel(startMinutes),
+			// Calculate height based on duration
 			height: timeToPixel(endMinutes) - timeToPixel(startMinutes),
+			// Use provided title or default fallback
 			title: booking.title || 'Ocupado',
+			// Determine booking type (system vs external calendar)
 			type: booking.type || 'system',
+			// Booking status for styling (pending vs confirmed)
 			status: booking.status
 		}
 	})
 
-	// Calculate drag preview
+	/**
+	 * Calculate drag preview positioning while user is actively dragging
+	 * Shows a preview of the time slot being created
+	 */
 	const dragPreview = dragState.isDragging
 		? {
 				top: timeToPixel(
@@ -192,11 +315,14 @@ export function DayViewTimeSelector({
 					) -
 						timeToPixel(
 							Math.min(dragState.startTime, dragState.currentTime)
-						) || 15 * pixelsPerMinute
+						) || 15 * pixelsPerMinute // Minimum height for visibility
 			}
 		: null
 
-	// Calculate selected slot display (reuse drag preview positioning)
+	/**
+	 * Calculate selected slot display positioning after selection is complete
+	 * Shows the finalized time slot selection
+	 */
 	const selectedSlotDisplay = selectedSlot
 		? {
 				top: timeToPixel(selectedSlot.start),
@@ -277,6 +403,9 @@ export function DayViewTimeSelector({
 						onMouseMove={handleMouseMove}
 						onMouseUp={handleMouseUp}
 						onMouseLeave={handleMouseUp}
+						onTouchStart={handleTouchStart}
+						onTouchMove={handleTouchMove}
+						onTouchEnd={handleTouchEnd}
 					>
 						{/* Hour Lines - extend across both columns */}
 						{hours.map((hour) => (
