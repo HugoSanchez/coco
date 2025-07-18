@@ -110,7 +110,7 @@ export function SideSheet({
 			{/* Sheet content with custom styling */}
 			<SheetContent
 				side="right"
-				className={`w-6/6 md:w-1/3 max-w-full overflow-y-auto bg-gray-50 [&>button]:hidden p-0 right-[6.5%] md:right-0`}
+				className={`w-full md:w-1/3 max-w-full md:px-2 overflow-y-auto bg-gray-50 [&>button]:hidden p-0`}
 				onPointerDownOutside={(e) => {
 					// Allow closing by clicking outside on mobile
 					onClose()
