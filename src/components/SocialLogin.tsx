@@ -70,7 +70,7 @@ export function SocialLogin() {
 			<Button
 				onClick={() => handleSocialLogin('google')}
 				disabled={isLoading}
-				className="w-full h-12 flex items-center justify-center"
+				className="w-full h-12 flex items-center justify-center bg-white"
 				variant="outline"
 			>
 				<FcGoogle className="mr-2 h-4 w-4" />
