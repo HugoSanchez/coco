@@ -799,12 +799,10 @@ export default function Dashboard() {
 				title="Filtros"
 				description="Filtra tus consultas por paciente, estado de facturación y estado de pago."
 			>
-				<div className="w-full">
-					<BookingFilters
-						filters={filters}
-						onFiltersChange={setFilters}
-					/>
-				</div>
+				<BookingFilters
+					filters={filters}
+					onFiltersChange={setFilters}
+				/>
 			</SideSheet>
 
 			{/* New Booking Sidebar */}
