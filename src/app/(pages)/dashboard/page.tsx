@@ -627,7 +627,7 @@ export default function Dashboard() {
 	if (loading) {
 		return (
 			<div className="flex h-screen w-full items-center justify-center">
-				<Spinner size="lg" />
+				<Spinner size="sm" color="dark" />
 			</div>
 		)
 	}
@@ -799,13 +799,12 @@ export default function Dashboard() {
 				title="Filtros"
 				description="Filtra tus consultas por paciente, estado de facturación y estado de pago."
 			>
-				<div></div>
-				{/**
-					 * <BookingFilters
-					filters={filters}
-					onFiltersChange={setFilters}
-				/>
-					 */}
+				<div className="w-full">
+					<BookingFilters
+						filters={filters}
+						onFiltersChange={setFilters}
+					/>
+				</div>
 			</SideSheet>
 
 			{/* New Booking Sidebar */}

@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react'
 import {
 	Sheet,
 	SheetContent,
@@ -67,26 +68,80 @@ export function SideSheet({
 	children,
 	width = 'w-1/3'
 }: SideSheetProps) {
+	// State for tracking swipe gesture
+	const [startX, setStartX] = useState<number | null>(null)
+	const [currentX, setCurrentX] = useState<number | null>(null)
+	const containerRef = useRef<HTMLDivElement>(null)
+
+	// Handle touch start
+	const handleTouchStart = (e: React.TouchEvent) => {
+		const touch = e.touches[0]
+		setStartX(touch.clientX)
+	}
+
+	// Handle touch move
+	const handleTouchMove = (e: React.TouchEvent) => {
+		if (!startX) return
+		const touch = e.touches[0]
+		setCurrentX(touch.clientX)
+	}
+
+	// Handle touch end
+	const handleTouchEnd = () => {
+		if (!startX || !currentX) {
+			setStartX(null)
+			setCurrentX(null)
+			return
+		}
+
+		const diff = currentX - startX
+		const threshold = 100 // Minimum swipe distance in pixels
+
+		// If swiped right more than threshold, close the sheet
+		if (diff > threshold) {
+			onClose()
+		}
+
+		setStartX(null)
+		setCurrentX(null)
+	}
 	return (
 		<Sheet open={isOpen} onOpenChange={onClose}>
 			{/* Sheet content with custom styling */}
 			<SheetContent
 				side="right"
-				className={`${width} w-screen md:w-1/3 overflow-y-auto p-8 bg-gray-50 [&>button]:hidden`}
+				className={`w-6/6 md:w-1/3 max-w-full overflow-y-auto bg-gray-50 [&>button]:hidden p-0 right-[6.5%] md:right-0`}
+				onPointerDownOutside={(e) => {
+					// Allow closing by clicking outside on mobile
+					onClose()
+				}}
+				onEscapeKeyDown={(e) => {
+					// Allow closing with escape key
+					onClose()
+				}}
 			>
-				{/* Sheet header with title and description */}
-				<SheetHeader>
-					<SheetTitle className="text-xl md:text-2xl font-bold">
-						{title}
-					</SheetTitle>
-					{/* Optional description text */}
-					{description && (
-						<SheetDescription>{description}</SheetDescription>
-					)}
-				</SheetHeader>
+				{/* Container with proper padding and swipe handling */}
+				<div
+					ref={containerRef}
+					className="p-6 h-full"
+					onTouchStart={handleTouchStart}
+					onTouchMove={handleTouchMove}
+					onTouchEnd={handleTouchEnd}
+				>
+					{/* Sheet header with title and description */}
+					<SheetHeader>
+						<SheetTitle className="text-xl md:text-2xl font-bold">
+							{title}
+						</SheetTitle>
+						{/* Optional description text */}
+						{description && (
+							<SheetDescription>{description}</SheetDescription>
+						)}
+					</SheetHeader>
 
-				{/* Main content area */}
-				{children}
+					{/* Main content area */}
+					{children}
+				</div>
 			</SheetContent>
 		</Sheet>
 	)

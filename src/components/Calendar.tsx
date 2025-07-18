@@ -13,7 +13,8 @@ import {
 	isBefore,
 	startOfWeek,
 	endOfWeek,
-	isSunday
+	isSunday,
+	startOfDay
 } from 'date-fns'
 
 import { TimeSlot } from '@/lib/calendar/calendar'
@@ -179,12 +180,13 @@ export default function Calendar({
 					// Determine various states for the day
 					const isCurrentMonth = isSameMonth(day, currentMonth)
 					const isSelectable =
-						isCurrentMonth && !isBefore(day, new Date())
+						isCurrentMonth &&
+						startOfDay(day) >= startOfDay(new Date())
 					const dateKey = format(day, 'yyyy-MM-dd')
 					const hasAvailableSlots =
 						availableSlots[dateKey] &&
 						availableSlots[dateKey].length > 0 &&
-						day >= new Date()
+						startOfDay(day) >= startOfDay(new Date())
 
 					return (
 						<div
