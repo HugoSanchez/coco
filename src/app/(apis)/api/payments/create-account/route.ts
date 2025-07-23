@@ -24,6 +24,8 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST() {
 	try {
+		console.log('=== CREATE ACCOUNT API CALLED ===')
+
 		// Step 1: Authenticate the user
 		const supabase = createClient()
 
@@ -31,14 +33,21 @@ export async function POST() {
 			data: { user },
 			error: authError
 		} = await supabase.auth.getUser()
+
+		console.log('Auth check:', { hasUser: !!user, authError })
+
 		if (authError || !user) {
+			console.log('Auth failed:', authError)
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 		}
 
 		// Step 2: Get user's email from their profile
+		console.log('Getting user email for user:', user.id)
 		const userEmail = await getUserEmail(user.id, supabase)
+		console.log('User email:', userEmail)
 
 		if (!userEmail) {
+			console.log('No email found for user')
 			return NextResponse.json(
 				{ error: 'Profile not found' },
 				{ status: 404 }
@@ -47,15 +56,22 @@ export async function POST() {
 
 		// Step 3: Check if user already has a Stripe account (prevent duplicates)
 		// This is a security measure to prevent users from creating multiple accounts
+		console.log('Checking if user has existing Stripe account')
 		const userHasAccount = await hasStripeAccount(user.id, supabase)
+		console.log('User has existing account:', userHasAccount)
 
 		if (userHasAccount) {
-			return NextResponse.json(
-				{
-					error: 'Stripe account already exists'
-				},
-				{ status: 400 }
+			console.log(
+				'User already has Stripe account, returning success to continue onboarding'
 			)
+			// User already has an account - that's fine, they can continue to onboarding
+			// This handles cases where account was created but onboarding wasn't completed
+			return NextResponse.json({
+				success: true,
+				message:
+					'Stripe account already exists - continuing to onboarding',
+				accountExists: true
+			})
 		}
 
 		// Step 4: Create Stripe Connect account with Stripe
@@ -79,7 +95,7 @@ export async function POST() {
 				user_id: user.id,
 				stripe_account_id: result.accountId!,
 				onboarding_completed: false, // Will be updated after onboarding
-				payments_enabled: false // Will be enabled after verification,
+				payments_enabled: false // Will be enabled after verification
 			},
 			supabase
 		)

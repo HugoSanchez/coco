@@ -277,28 +277,49 @@ export function DayViewTimeSelector({
 	 * Calculate visual positioning for existing bookings
 	 * Converts booking times to pixel positions for rendering
 	 */
-	const bookingBlocks = existingBookings.map((booking) => {
-		// Parse ISO date strings to Date objects
-		const start = new Date(booking.start)
-		const end = new Date(booking.end)
+	const bookingBlocks = existingBookings
+		.map((booking) => {
+			// Parse ISO date strings to Date objects
+			const start = new Date(booking.start)
+			const end = new Date(booking.end)
 
-		// Convert times to minutes from midnight for calculations
-		const startMinutes = start.getHours() * 60 + start.getMinutes()
-		const endMinutes = end.getHours() * 60 + end.getMinutes()
+			// Check if this event is actually for the current day being displayed
+			// Filter out events that have shifted to different days due to timezone conversion
+			const selectedDateDay = date.getDate()
+			const selectedDateMonth = date.getMonth()
+			const selectedDateYear = date.getFullYear()
 
-		return {
-			// Calculate pixel position from top of calendar
-			top: timeToPixel(startMinutes),
-			// Calculate height based on duration
-			height: timeToPixel(endMinutes) - timeToPixel(startMinutes),
-			// Use provided title or default fallback
-			title: booking.title || 'Ocupado',
-			// Determine booking type (system vs external calendar)
-			type: booking.type || 'system',
-			// Booking status for styling (pending vs confirmed)
-			status: booking.status
-		}
-	})
+			const eventDay = start.getDate()
+			const eventMonth = start.getMonth()
+			const eventYear = start.getFullYear()
+
+			// Skip events that don't match the selected date after timezone conversion
+			if (
+				eventDay !== selectedDateDay ||
+				eventMonth !== selectedDateMonth ||
+				eventYear !== selectedDateYear
+			) {
+				return null
+			}
+
+			// Convert times to minutes from midnight for calculations
+			const startMinutes = start.getHours() * 60 + start.getMinutes()
+			const endMinutes = end.getHours() * 60 + end.getMinutes()
+
+			return {
+				// Calculate pixel position from top of calendar
+				top: timeToPixel(startMinutes),
+				// Calculate height based on duration
+				height: timeToPixel(endMinutes) - timeToPixel(startMinutes),
+				// Use provided title or default fallback
+				title: booking.title || 'Ocupado',
+				// Determine booking type (system vs external calendar)
+				type: booking.type || 'system',
+				// Booking status for styling (pending vs confirmed)
+				status: booking.status
+			}
+		})
+		.filter((block): block is NonNullable<typeof block> => block !== null)
 
 	/**
 	 * Calculate drag preview positioning while user is actively dragging

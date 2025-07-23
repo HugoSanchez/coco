@@ -59,55 +59,75 @@ export function PaymentsStep({
 
 	// Check if user returned from Stripe onboarding
 	useEffect(() => {
-		const stripeOnboarding = searchParams.get('stripe_onboarding')
+		const stripeReady = searchParams.get('stripe_ready')
+		const stripeIncomplete = searchParams.get('stripe_incomplete')
+		const stripeError = searchParams.get('stripe_error')
+		const reason = searchParams.get('reason')
 
 		// Prevent processing the same return multiple times
-		if (hasProcessedReturn || !stripeOnboarding) {
+		if (
+			hasProcessedReturn ||
+			(!stripeReady && !stripeIncomplete && !stripeError)
+		) {
 			return
 		}
 
-		if (stripeOnboarding === 'success') {
-			setHasProcessedReturn(true)
+		setHasProcessedReturn(true)
 
-			// Update the database to mark onboarding as completed
-			const updateOnboardingStatus = async () => {
-				try {
-					await fetch('/api/payments/update-onboarding', {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json'
-						}
-					})
-				} catch (error) {
-					console.error('Error updating onboarding status:', error)
-					// Don't block the flow if this fails
-				}
-			}
+		if (stripeReady === 'true') {
+			// Account is ready for payments - proceed to next step
+			setHasStripeAccount(true)
 
-			updateOnboardingStatus()
+			toast({
+				title: 'Cuenta configurada correctamente',
+				description:
+					'Tu cuenta de Stripe está lista para recibir pagos.'
+			})
 
-			// Clean up the URL
+			// Clean up URL and proceed
 			const url = new URL(window.location.href)
-			url.searchParams.delete('stripe_onboarding')
+			url.searchParams.delete('stripe_ready')
 			window.history.replaceState({}, '', url.toString())
 
-			// Use setTimeout to avoid the infinite loop
 			setTimeout(() => {
 				onComplete()
 			}, 0)
-		} else if (stripeOnboarding === 'refresh') {
-			setHasProcessedReturn(true)
+		} else if (stripeIncomplete === 'true') {
+			// Account needs more setup - show appropriate message
+			let message =
+				'Necesitas completar la configuración de tu cuenta de Stripe.'
+
+			if (reason === 'form_incomplete') {
+				message = 'Completa tu información en Stripe para continuar.'
+			} else if (reason === 'verification_needed') {
+				message = 'Verificación en proceso. Puede tomar hasta 7 días.'
+			} else if (reason === 'payouts_disabled') {
+				message = 'Verificación bancaria pendiente.'
+			}
 
 			toast({
-				title: 'Configuración interrumpida',
-				description:
-					'Puedes continuar configurando tu cuenta cuando quieras.',
+				title: 'Configuración pendiente',
+				description: message,
 				variant: 'destructive'
 			})
 
-			// Clean up the URL
+			// Clean up URL
 			const url = new URL(window.location.href)
-			url.searchParams.delete('stripe_onboarding')
+			url.searchParams.delete('stripe_incomplete')
+			url.searchParams.delete('reason')
+			window.history.replaceState({}, '', url.toString())
+		} else if (stripeError) {
+			// Error occurred - show error message
+			toast({
+				title: 'Error en la configuración',
+				description:
+					'Hubo un problema verificando tu cuenta. Intenta de nuevo.',
+				variant: 'destructive'
+			})
+
+			// Clean up URL
+			const url = new URL(window.location.href)
+			url.searchParams.delete('stripe_error')
 			window.history.replaceState({}, '', url.toString())
 		}
 	}, [searchParams, toast, onComplete, hasProcessedReturn])
@@ -135,13 +155,13 @@ export function PaymentsStep({
 			const createData = await createResponse.json()
 
 			if (!createResponse.ok) {
-				// If account already exists, that's fine, continue to onboarding
-				if (!createData.error?.includes('already exists')) {
-					throw new Error(
-						createData.error || 'Error al crear cuenta de Stripe'
-					)
-				}
+				throw new Error(
+					createData.error || 'Error al crear cuenta de Stripe'
+				)
 			}
+
+			// Account created successfully or already exists - both are fine
+			console.log('Create account result:', createData)
 
 			// Now create the onboarding link
 			const onboardingResponse = await fetch(
