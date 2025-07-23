@@ -60,7 +60,7 @@ export default function SettingsPage() {
 					<div className="">
 						<CalendarStep
 							title="Configuración de calendario"
-							subtitle="Mantén a momo sincronizado con Google Calendar para gestionar tus citas automáticamente."
+							subtitle="Mantén a coco sincronizado con Google Calendar para gestionar tus citas automáticamente."
 							buttonText="Guardar"
 							loadingText="Guardando..."
 							onComplete={() => {

@@ -111,13 +111,13 @@ export function ConnectCalendar() {
 			disabled={isConnecting || isConnected}
 			className="w-full flex items-center justify-center h-14 gap-2 bg-white shadow-sm text-black border border-gray-200 hover:bg-white"
 		>
-			<FcGoogle />
+			<FcGoogle className="w-5 h-5" />
 			{/* Dynamic button text based on connection state */}
 			{isConnecting
 				? 'Connectando...'
 				: isConnected
-				? 'El calendario ya está conectado'
-				: 'Conecta Google Calendar'}
+					? 'El calendario ya está conectado'
+					: 'Conecta Google Calendar'}
 		</Button>
 	)
 }

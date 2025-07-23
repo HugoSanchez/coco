@@ -24,7 +24,7 @@ const steps = [
 	{
 		name: '2. Calendario',
 		description:
-			'This way momo will always be in sync with your google calendar.',
+			'This way coco will always be in sync with your google calendar.',
 		component: CalendarStep
 	},
 	{
