@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { User, Calendar, CreditCard, Settings } from 'lucide-react'
@@ -32,7 +32,7 @@ const settingsMenuItems = [
 	}
 ]
 
-export default function SettingsPage() {
+function SettingsContent() {
 	const { user, loading } = useUser()
 	const searchParams = useSearchParams()
 	const router = useRouter()
@@ -201,5 +201,21 @@ export default function SettingsPage() {
 				</div>
 			</div>
 		</div>
+	)
+}
+
+export default function SettingsPage() {
+	return (
+		<Suspense
+			fallback={
+				<div className="min-h-screen bg-gray-50 pt-16">
+					<div className="flex items-center justify-center h-64">
+						<Spinner size="sm" color="dark" />
+					</div>
+				</div>
+			}
+		>
+			<SettingsContent />
+		</Suspense>
 	)
 }
