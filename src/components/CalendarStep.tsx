@@ -14,6 +14,8 @@ import { ConnectCalendar } from '@/components/ConnectCalendar'
  * @property subtitle - Optional custom subtitle/description
  * @property buttonText - Optional custom text for the continue button
  * @property loadingText - Optional custom text shown during loading
+ * @property showContinueButton - Optional flag to show/hide the continue button (defaults to true)
+ * @property source - Source page context for proper redirect after OAuth (e.g., 'onboarding', 'settings')
  */
 interface CalendarStepProps {
 	onComplete: () => void
@@ -21,6 +23,8 @@ interface CalendarStepProps {
 	subtitle?: string
 	buttonText?: string
 	loadingText?: string
+	showContinueButton?: boolean
+	source?: 'onboarding' | 'settings'
 }
 
 /**
@@ -57,7 +61,9 @@ export function CalendarStep({
 	title = '2. Connecta tu calendario',
 	subtitle = 'Coco estará siempre sincronizado con tu calendario de Google de manera que te resulte fácil y automático agendar nuevas consultas.',
 	buttonText = 'Continuar',
-	loadingText = 'Guardando...'
+	loadingText = 'Guardando...',
+	showContinueButton = true,
+	source = 'onboarding'
 }: CalendarStepProps) {
 	// State for loading indicator during form submission
 	const [isLoading, setIsLoading] = useState(false)
@@ -91,22 +97,24 @@ export function CalendarStep({
 			<div className="mb-8">
 				<div className="pt-2">
 					{/* Google Calendar connection component */}
-					<ConnectCalendar />
+					<ConnectCalendar source={source} />
 				</div>
 			</div>
 
-			{/* Continue button form */}
-			<form onSubmit={handleSubmit} className="space-y-8">
-				<Button
-					type="submit"
-					variant="default"
-					disabled={isLoading}
-					className="h-12 w-full shadow-sm text-md"
-				>
-					{/* Show loading text or button text based on state */}
-					{isLoading ? loadingText : buttonText}
-				</Button>
-			</form>
+			{/* Continue button form - only show if showContinueButton is true */}
+			{showContinueButton && (
+				<form onSubmit={handleSubmit} className="space-y-8">
+					<Button
+						type="submit"
+						variant="default"
+						disabled={isLoading}
+						className="h-12 w-full shadow-sm text-md"
+					>
+						{/* Show loading text or button text based on state */}
+						{isLoading ? loadingText : buttonText}
+					</Button>
+				</form>
+			)}
 		</div>
 	)
 }

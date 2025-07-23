@@ -83,12 +83,13 @@ export async function getUserCalendarTokens(
 	access_token: string
 	refresh_token: string
 	expiry_date: number | null
+	granted_scopes: string[] | null
 } | null> {
 	const client = supabaseClient || supabase
 
 	const { data, error } = await client
 		.from('calendar_tokens')
-		.select('access_token, refresh_token, expiry_date')
+		.select('access_token, refresh_token, expiry_date, granted_scopes')
 		.eq('user_id', userId)
 		.single()
 
@@ -103,9 +104,122 @@ export async function getUserCalendarTokens(
 	return data
 }
 
+/**
+ * Deletes all calendar tokens for a specific user
+ *
+ * This function is called when:
+ * - A user disconnects their Google Calendar
+ * - Calendar permissions are revoked
+ * - User account cleanup is needed
+ *
+ * IMPORTANT: This permanently removes the user's ability to sync with Google Calendar
+ * until they reconnect their account.
+ *
+ * @param userId - UUID of the user whose tokens to delete
+ * @param supabaseClient - Optional SupabaseClient instance
+ * @returns Promise<boolean> - true if deletion successful
+ * @throws Error if database deletion fails
+ */
+export async function deleteUserCalendarTokens(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<boolean> {
+	const client = supabaseClient || supabase
+
+	// Delete all calendar tokens for the specified user
+	const { error } = await client
+		.from('calendar_tokens')
+		.delete()
+		.eq('user_id', userId)
+
+	// Handle any database errors that occur during deletion
+	if (error) {
+		console.error('Error deleting calendar tokens from database:', error)
+		throw new Error('Failed to delete calendar tokens from database')
+	}
+
+	// Return success indicator
+	return true
+}
+
+/**
+ * Checks if a user has the required calendar permissions
+ *
+ * This function analyzes the granted scopes to determine if the user
+ * has provided the necessary permissions for calendar operations.
+ *
+ * @param userId - UUID of the user to check permissions for
+ * @param supabaseClient - Optional SupabaseClient instance
+ * @returns Promise<CalendarPermissionStatus> - Detailed permission status
+ */
+export async function checkCalendarPermissions(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<CalendarPermissionStatus> {
+	const tokens = await getUserCalendarTokens(userId, supabaseClient)
+
+	if (!tokens) {
+		return {
+			hasTokens: false,
+			hasCalendarAccess: false,
+			hasRequiredPermissions: false,
+			grantedScopes: [],
+			missingScopes: REQUIRED_SCOPES,
+			canEdit: false,
+			canRead: false
+		}
+	}
+
+	const grantedScopes = tokens.granted_scopes || []
+	const hasCalendarAccess = grantedScopes.includes(
+		'https://www.googleapis.com/auth/calendar.events'
+	)
+	const hasRequiredPermissions = REQUIRED_SCOPES.every((scope) =>
+		grantedScopes.includes(scope)
+	)
+	const missingScopes = REQUIRED_SCOPES.filter(
+		(scope) => !grantedScopes.includes(scope)
+	)
+
+	return {
+		hasTokens: true,
+		hasCalendarAccess,
+		hasRequiredPermissions,
+		grantedScopes,
+		missingScopes,
+		canEdit: hasCalendarAccess,
+		canRead:
+			grantedScopes.includes(
+				'https://www.googleapis.com/auth/calendar.readonly'
+			) || hasCalendarAccess
+	}
+}
+
+/**
+ * Required OAuth scopes for full calendar functionality
+ * These are the permissions we need for the app to work properly
+ */
+export const REQUIRED_SCOPES = [
+	'https://www.googleapis.com/auth/calendar.events',
+	'https://www.googleapis.com/auth/userinfo.email',
+	'https://www.googleapis.com/auth/userinfo.profile'
+]
+
+/**
+ * Interface defining the calendar permission status
+ * Provides detailed information about what permissions the user has granted
+ */
+export interface CalendarPermissionStatus {
+	hasTokens: boolean
+	hasCalendarAccess: boolean
+	hasRequiredPermissions: boolean
+	grantedScopes: string[]
+	missingScopes: string[]
+	canEdit: boolean
+	canRead: boolean
+}
+
 // TODO: Add additional calendar token management functions as needed:
 // - createUserCalendarTokens() - For initial token storage
-// - deleteUserCalendarTokens() - For revoking calendar access
-// - getUserCalendarTokens() - For retrieving tokens for API calls
 // - refreshExpiredTokens() - For automatic token refresh
 // - validateTokenExpiry() - For checking if tokens need refresh

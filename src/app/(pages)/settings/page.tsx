@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useUser } from '@/contexts/UserContext'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { User, Calendar, CreditCard, Settings } from 'lucide-react'
 import { ProfileSetup } from '@/components/ProfileSetup'
 import { CalendarStep } from '@/components/CalendarStep'
 import { BillingPreferencesStep } from '@/components/BillingPreferencesStep'
+import { Spinner } from '@/components/ui/spinner'
 
 type SettingsSection = 'profile' | 'calendar' | 'billing'
 
@@ -32,10 +34,61 @@ const settingsMenuItems = [
 
 export default function SettingsPage() {
 	const { user, loading } = useUser()
-	const [activeSection, setActiveSection] =
-		useState<SettingsSection>('profile')
+	const searchParams = useSearchParams()
+	const router = useRouter()
+	const [activeSection, setActiveSection] = useState<SettingsSection | null>(
+		null
+	) // Start with null to show loading
+	const [isInitialized, setIsInitialized] = useState(false)
+
+	// Set active section from URL parameter and handle calendar connection feedback
+	useEffect(() => {
+		// Check for tab parameter in URL and set active section
+		const tabParam = searchParams.get('tab')
+		if (tabParam && ['profile', 'calendar', 'billing'].includes(tabParam)) {
+			setActiveSection(tabParam as SettingsSection)
+			setIsInitialized(true)
+		} else if (!tabParam) {
+			// If no tab parameter, default to profile and update URL
+			setActiveSection('profile')
+			setIsInitialized(true)
+			router.replace('/settings?tab=profile', { scroll: false })
+		}
+
+		// Handle calendar connection feedback from OAuth redirect
+		const calendarConnected = searchParams.get('calendar_connected')
+		if (calendarConnected === 'true') {
+			console.log('Calendar successfully connected from settings')
+			// Optional: Show success toast here
+			// Clean up URL by removing the calendar_connected parameter
+			setTimeout(() => {
+				const currentTab = searchParams.get('tab') || 'calendar'
+				router.replace(`/settings?tab=${currentTab}`, { scroll: false })
+			}, 100)
+		} else if (calendarConnected === 'false') {
+			console.log('Calendar connection failed from settings')
+			// Optional: Show error toast here
+			// Clean up URL by removing the calendar_connected parameter
+			setTimeout(() => {
+				const currentTab = searchParams.get('tab') || 'calendar'
+				router.replace(`/settings?tab=${currentTab}`, { scroll: false })
+			}, 100)
+		}
+	}, [searchParams, router])
+
+	/**
+	 * Handles tab navigation - updates both state and URL
+	 * This ensures the URL always reflects the current tab
+	 */
+	const handleTabChange = (newSection: SettingsSection) => {
+		setActiveSection(newSection)
+		// Update URL to reflect current tab
+		router.push(`/settings?tab=${newSection}`, { scroll: false })
+	}
 
 	const renderSectionContent = () => {
+		if (!activeSection) return null // Don't render content while loading
+
 		switch (activeSection) {
 			case 'profile':
 				return (
@@ -63,6 +116,8 @@ export default function SettingsPage() {
 							subtitle="Mantén a coco sincronizado con Google Calendar para gestionar tus citas automáticamente."
 							buttonText="Guardar"
 							loadingText="Guardando..."
+							showContinueButton={false}
+							source="settings"
 							onComplete={() => {
 								console.log('Calendar settings updated')
 							}}
@@ -93,6 +148,17 @@ export default function SettingsPage() {
 		}
 	}
 
+	// Show loading state until we know which tab to display
+	if (!isInitialized) {
+		return (
+			<div className="min-h-screen bg-gray-50 pt-16">
+				<div className="flex items-center justify-center h-64">
+					<Spinner size="sm" color="dark" />
+				</div>
+			</div>
+		)
+	}
+
 	return (
 		<div className="min-h-screen bg-gray-50 pt-16">
 			<div className="flex">
@@ -117,9 +183,7 @@ export default function SettingsPage() {
 												? 'bg-gray-200 font-medium text-gray-900'
 												: 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
 										}`}
-										onClick={() =>
-											setActiveSection(item.id)
-										}
+										onClick={() => handleTabChange(item.id)}
 									>
 										{item.label}
 									</button>
