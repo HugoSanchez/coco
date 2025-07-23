@@ -207,6 +207,8 @@ export function BookingForm({
 			return // Form validation should prevent this, but extra safety check
 		}
 
+		// Note: Stripe onboarding check is now handled in Dashboard before opening this form
+
 		setLoading(true)
 
 		try {

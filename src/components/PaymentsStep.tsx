@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/use-toast'
 import { useUser } from '@/contexts/UserContext'
-import { useSearchParams } from 'next/navigation'
-import { Check } from 'lucide-react'
+import { Check, AlertTriangle } from 'lucide-react'
 
 interface PaymentsStepProps {
 	onComplete: () => void
@@ -14,6 +13,7 @@ interface PaymentsStepProps {
 	subtitle?: string
 	buttonText?: string
 	loadingText?: string
+	source?: 'onboarding' | 'settings'
 }
 
 export function PaymentsStep({
@@ -21,15 +21,16 @@ export function PaymentsStep({
 	title = '5. Configura tus pagos',
 	subtitle = 'Stripe es la plataforma de pagos más usada en el mundo. Conecta tu cuenta para poder recibir pagos de tus pacientes directamente a tu cuenta bancaria.',
 	buttonText = 'Configurar cuenta de Stripe',
-	loadingText = 'Creando enlace...'
+	loadingText = 'Creando enlace...',
+	source = 'onboarding'
 }: PaymentsStepProps) {
 	const [isLoading, setIsLoading] = useState(false)
-	const [hasStripeAccount, setHasStripeAccount] = useState(false)
+	const [hasStripeAccount, setHasStripeAccount] = useState<boolean | null>(
+		null
+	)
 	const [isCheckingStatus, setIsCheckingStatus] = useState(true)
-	const [hasProcessedReturn, setHasProcessedReturn] = useState(false)
-	const { toast } = useToast()
 	const { user } = useUser()
-	const searchParams = useSearchParams()
+	const { toast } = useToast()
 
 	// Check onboarding status when component loads
 	useEffect(() => {
@@ -43,11 +44,10 @@ export function PaymentsStep({
 				const response = await fetch('/api/payments/onboarding-status')
 				if (response.ok) {
 					const data = await response.json()
-					console.log('data', data)
 					setHasStripeAccount(data.onboarding_completed || false)
 				}
 			} catch (error) {
-				console.error('Error checking onboarding status:', error)
+				console.error('Error checking Stripe status:', error)
 				// If there's an error, default to not completed
 			} finally {
 				setIsCheckingStatus(false)
@@ -57,80 +57,37 @@ export function PaymentsStep({
 		checkOnboardingStatus()
 	}, [user?.id])
 
-	// Check if user returned from Stripe onboarding
+	// Check if user returned from Stripe onboarding - refresh status
 	useEffect(() => {
-		const stripeReady = searchParams.get('stripe_ready')
-		const stripeIncomplete = searchParams.get('stripe_incomplete')
-		const stripeError = searchParams.get('stripe_error')
-		const reason = searchParams.get('reason')
+		if (user?.id) {
+			// Small delay to allow webhook to process first
+			const timer = setTimeout(async () => {
+				try {
+					const response = await fetch(
+						'/api/payments/onboarding-status'
+					)
+					if (response.ok) {
+						const data = await response.json()
+						const wasIncomplete = hasStripeAccount !== true
+						const isNowComplete = data.onboarding_completed
 
-		// Prevent processing the same return multiple times
-		if (
-			hasProcessedReturn ||
-			(!stripeReady && !stripeIncomplete && !stripeError)
-		) {
-			return
+						setHasStripeAccount(isNowComplete)
+
+						// Auto-proceed if account became ready
+						if (wasIncomplete && isNowComplete) {
+							setTimeout(() => {
+								onComplete()
+							}, 500)
+						}
+					}
+				} catch (error) {
+					console.error('Error rechecking Stripe status:', error)
+				}
+			}, 1000)
+
+			return () => clearTimeout(timer)
 		}
-
-		setHasProcessedReturn(true)
-
-		if (stripeReady === 'true') {
-			// Account is ready for payments - proceed to next step
-			setHasStripeAccount(true)
-
-			toast({
-				title: 'Cuenta configurada correctamente',
-				description:
-					'Tu cuenta de Stripe está lista para recibir pagos.'
-			})
-
-			// Clean up URL and proceed
-			const url = new URL(window.location.href)
-			url.searchParams.delete('stripe_ready')
-			window.history.replaceState({}, '', url.toString())
-
-			setTimeout(() => {
-				onComplete()
-			}, 0)
-		} else if (stripeIncomplete === 'true') {
-			// Account needs more setup - show appropriate message
-			let message =
-				'Necesitas completar la configuración de tu cuenta de Stripe.'
-
-			if (reason === 'form_incomplete') {
-				message = 'Completa tu información en Stripe para continuar.'
-			} else if (reason === 'verification_needed') {
-				message = 'Verificación en proceso. Puede tomar hasta 7 días.'
-			} else if (reason === 'payouts_disabled') {
-				message = 'Verificación bancaria pendiente.'
-			}
-
-			toast({
-				title: 'Configuración pendiente',
-				description: message,
-				variant: 'destructive'
-			})
-
-			// Clean up URL
-			const url = new URL(window.location.href)
-			url.searchParams.delete('stripe_incomplete')
-			url.searchParams.delete('reason')
-			window.history.replaceState({}, '', url.toString())
-		} else if (stripeError) {
-			// Error occurred - show error message
-			toast({
-				title: 'Error en la configuración',
-				description:
-					'Hubo un problema verificando tu cuenta. Intenta de nuevo.',
-				variant: 'destructive'
-			})
-
-			// Clean up URL
-			const url = new URL(window.location.href)
-			url.searchParams.delete('stripe_error')
-			window.history.replaceState({}, '', url.toString())
-		}
-	}, [searchParams, toast, onComplete, hasProcessedReturn])
+	}, [user?.id, onComplete, hasStripeAccount])
 
 	const handleConnectStripe = async () => {
 		if (!user?.id) {
@@ -163,9 +120,9 @@ export function PaymentsStep({
 			// Account created successfully or already exists - both are fine
 			console.log('Create account result:', createData)
 
-			// Now create the onboarding link
+			// Now create the onboarding link with source context
 			const onboardingResponse = await fetch(
-				'/api/payments/onboarding-link',
+				`/api/payments/onboarding-link?source=${source}`,
 				{
 					method: 'POST',
 					headers: {
@@ -224,8 +181,25 @@ export function PaymentsStep({
 				<p className="text-md text-gray-500 my-2">{subtitle}</p>
 			</div>
 
+			{/* Notice for incomplete onboarding - only show after status check is complete */}
+			{!isCheckingStatus && hasStripeAccount === false && (
+				<div className="my-4 rounded-md bg-gray-200 px-5 py-3 flex items-center gap-5">
+					<AlertTriangle className="w-5 h-5 text-gray-600 flex-shrink-0" />
+					<div>
+						<p className="text-sm text-gray-600">
+							Tu configuración de pagos está incompleta. Algunos
+							detalles están pendientes en Stripe.{' '}
+							<strong>
+								Completa la configuración para poder recibir
+								pagos de tus pacientes.
+							</strong>
+						</p>
+					</div>
+				</div>
+			)}
+
 			<div className="pt-6">
-				{!hasStripeAccount ? (
+				{hasStripeAccount !== true ? (
 					<div className="space-y-4">
 						<Button
 							onClick={handleConnectStripe}
@@ -256,12 +230,30 @@ export function PaymentsStep({
 							</h3>
 						</div>
 
-						<Button
-							onClick={handleContinue}
-							className="w-full h-12 text-md"
-						>
-							Continuar
-						</Button>
+						{source === 'settings' ? (
+							<Button
+								onClick={handleConnectStripe}
+								disabled={isLoading}
+								className="w-full h-12 text-md bg-gray-200"
+								variant="outline"
+							>
+								{isLoading ? (
+									<>
+										<Spinner size="sm" className="mr-2" />
+										Actualizando...
+									</>
+								) : (
+									'Actualizar configuración'
+								)}
+							</Button>
+						) : (
+							<Button
+								onClick={handleContinue}
+								className="w-full h-12 text-md"
+							>
+								Continuar
+							</Button>
+						)}
 					</div>
 				)}
 			</div>

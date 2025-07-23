@@ -7,9 +7,10 @@ import { User, Calendar, CreditCard, Settings } from 'lucide-react'
 import { ProfileSetup } from '@/components/ProfileSetup'
 import { CalendarStep } from '@/components/CalendarStep'
 import { BillingPreferencesStep } from '@/components/BillingPreferencesStep'
+import { PaymentsStep } from '@/components/PaymentsStep'
 import { Spinner } from '@/components/ui/spinner'
 
-type SettingsSection = 'profile' | 'calendar' | 'billing'
+type SettingsSection = 'profile' | 'calendar' | 'billing' | 'payments'
 
 const settingsMenuItems = [
 	{
@@ -26,9 +27,15 @@ const settingsMenuItems = [
 	},
 	{
 		id: 'billing' as SettingsSection,
-		label: 'Opciones de Facturación',
+		label: 'Facturación',
 		icon: CreditCard,
 		description: 'Set up your default billing preferences'
+	},
+	{
+		id: 'payments' as SettingsSection,
+		label: 'Pasarela de Pago',
+		icon: Settings,
+		description: 'Configure your Stripe payment gateway'
 	}
 ]
 
@@ -45,7 +52,10 @@ function SettingsContent() {
 	useEffect(() => {
 		// Check for tab parameter in URL and set active section
 		const tabParam = searchParams.get('tab')
-		if (tabParam && ['profile', 'calendar', 'billing'].includes(tabParam)) {
+		if (
+			tabParam &&
+			['profile', 'calendar', 'billing', 'payments'].includes(tabParam)
+		) {
 			setActiveSection(tabParam as SettingsSection)
 			setIsInitialized(true)
 		} else if (!tabParam) {
@@ -138,6 +148,22 @@ function SettingsContent() {
 							onComplete={() => {
 								// This won't be called due to skipOnComplete=true
 								console.log('Billing preferences updated')
+							}}
+						/>
+					</div>
+				)
+
+			case 'payments':
+				return (
+					<div className="">
+						<PaymentsStep
+							title="Pasarela de Pago"
+							subtitle="Conecta tu cuenta de Stripe para recibir pagos de tus pacientes directamente a tu cuenta bancaria."
+							buttonText="Configurar Stripe"
+							loadingText="Configurando..."
+							source="settings"
+							onComplete={() => {
+								console.log('Stripe payment gateway configured')
 							}}
 						/>
 					</div>

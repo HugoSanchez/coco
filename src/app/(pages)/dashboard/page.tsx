@@ -43,6 +43,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { RefundConfirmationModal } from '@/components/RefundConfirmationModal'
 import { MarkAsPaidConfirmationModal } from '@/components/MarkAsPaidConfirmationModal'
 import { RescheduleForm } from '@/components/RescheduleForm'
+import { StripeConfigurationModal } from '@/components/StripeConfigurationModal'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { getCurrentMonthNameCapitalized } from '@/lib/utils'
@@ -119,7 +120,7 @@ const transformBooking = (dbBooking: BookingWithBills): Booking => {
 }
 
 export default function Dashboard() {
-	const { user, profile, loading } = useUser()
+	const { user, profile, loading, stripeOnboardingCompleted } = useUser()
 	const [clients, setClients] = useState<Client[]>([])
 	const [loadingClients, setLoadingClients] = useState(true)
 	const [bookings, setBookings] = useState<Booking[]>([])
@@ -129,6 +130,7 @@ export default function Dashboard() {
 	const [offset, setOffset] = useState(0)
 	const [isFilterOpen, setIsFilterOpen] = useState(false)
 	const [isNewBookingOpen, setIsNewBookingOpen] = useState(false)
+	const [showStripeConfigModal, setShowStripeConfigModal] = useState(false)
 	const [refundingBookingId, setRefundingBookingId] = useState<string | null>(
 		null
 	)
@@ -651,7 +653,14 @@ export default function Dashboard() {
 					<Button
 						variant="default"
 						className="text-md px-4"
-						onClick={() => setIsNewBookingOpen(true)}
+						onClick={() => {
+							// Check Stripe onboarding status before opening booking form
+							if (stripeOnboardingCompleted === false) {
+								setShowStripeConfigModal(true)
+							} else {
+								setIsNewBookingOpen(true)
+							}
+						}}
 					>
 						<Plus className="h-5 w-5 mr-2" />
 						Crear cita
@@ -956,6 +965,16 @@ export default function Dashboard() {
 						/>
 					)
 				})()}
+
+			{/* Stripe Configuration Modal */}
+			<StripeConfigurationModal
+				isOpen={showStripeConfigModal}
+				onOpenChange={setShowStripeConfigModal}
+				onConfirm={() => {
+					router.push('/settings?tab=payments')
+					setShowStripeConfigModal(false)
+				}}
+			/>
 		</div>
 	)
 }

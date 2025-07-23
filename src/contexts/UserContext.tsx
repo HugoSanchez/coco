@@ -62,6 +62,8 @@ interface UserContextType {
 	profile: UserProfile | null
 	loading: boolean
 	refreshProfile: () => Promise<void>
+	checkStripeOnboarding: () => Promise<boolean>
+	stripeOnboardingCompleted: boolean | null
 }
 
 // Create the React Context with undefined as default
@@ -98,6 +100,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
 	// Supabase client
 	const supabase = createClient()
+
+	// State for stripe status
+	const [stripeOnboardingCompleted, setStripeOnboardingCompleted] = useState<
+		boolean | null
+	>(null)
 
 	// Effect: Set up authentication state listener
 	useEffect(() => {
@@ -187,10 +194,55 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 		}
 	}
 
+	// Function to check Stripe onboarding status
+	const checkStripeOnboarding = async (): Promise<boolean> => {
+		if (!user) return false
+
+		try {
+			const { data, error } = await supabase
+				.from('stripe_accounts')
+				.select('charges_enabled, payouts_enabled, details_submitted')
+				.eq('user_id', user.id)
+				.single()
+
+			if (error || !data) {
+				setStripeOnboardingCompleted(false)
+				return false
+			}
+
+			const isCompleted =
+				data.charges_enabled &&
+				data.payouts_enabled &&
+				data.details_submitted
+			setStripeOnboardingCompleted(isCompleted)
+			return isCompleted
+		} catch (error) {
+			console.error('Error checking Stripe status:', error)
+			setStripeOnboardingCompleted(false)
+			return false
+		}
+	}
+
+	// Effect: Call checkStripeOnboarding when user changes or profile is refreshed
+	useEffect(() => {
+		if (user) {
+			checkStripeOnboarding()
+		} else {
+			setStripeOnboardingCompleted(null)
+		}
+	}, [user])
+
 	// Provide the context value to all child components
 	return (
 		<UserContext.Provider
-			value={{ user, profile, loading, refreshProfile }}
+			value={{
+				user,
+				profile,
+				loading,
+				refreshProfile,
+				checkStripeOnboarding,
+				stripeOnboardingCompleted
+			}}
 		>
 			{children}
 		</UserContext.Provider>

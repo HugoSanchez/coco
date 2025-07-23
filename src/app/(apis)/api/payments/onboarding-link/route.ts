@@ -24,6 +24,8 @@ export const dynamic = 'force-dynamic'
  * the update-onboarding endpoint to mark their account as ready.
  */
 export async function POST(request: NextRequest) {
+	const { searchParams } = new URL(request.url)
+	const source = searchParams.get('source') || 'onboarding'
 	try {
 		const supabase = createClient()
 
@@ -49,23 +51,28 @@ export async function POST(request: NextRequest) {
 		}
 
 		// Step 3: Validate onboarding hasn't already been completed
-		// Prevent users from going through onboarding multiple times
-		if (stripeAccount.onboarding_completed) {
+		// Allow updates from settings, but prevent duplicate onboarding from onboarding flow
+		if (stripeAccount.onboarding_completed && source !== 'settings') {
 			return NextResponse.json(
 				{ error: 'Onboarding already completed' },
 				{ status: 400 }
 			)
 		}
 
-		// Step 4: Generate return and refresh URLs for onboarding flow
-		// These URLs determine where Stripe redirects the user after onboarding
-		// Include user_id parameter to identify the user when they return from Stripe
+		// Step 4: Generate return and refresh URLs based on source
+		// Webhook will handle status updates
 		const origin =
 			request.headers.get('origin') ||
 			process.env.NEXT_PUBLIC_BASE_URL ||
 			'http://localhost:3000'
-		const returnUrl = `${origin}/api/payments/onboarding-callback?user_id=${user.id}`
-		const refreshUrl = `${origin}/api/payments/onboarding-callback?user_id=${user.id}`
+
+		const redirectUrl =
+			source === 'settings'
+				? `${origin}/settings?tab=payments`
+				: `${origin}/onboarding?step=4`
+
+		const returnUrl = redirectUrl
+		const refreshUrl = redirectUrl
 
 		// Step 5: Create Stripe onboarding link
 		// This generates a secure URL for the user to complete verification
