@@ -219,7 +219,7 @@ function BookingCard({
 	onRescheduleBooking: (bookingId: string) => void
 }) {
 	return (
-		<div className="bg-white border border-gray-200 rounded-lg p-4 mb-3 hover:bg-gray-50/50 transition-colors">
+		<div className="bg-white border rounded-lg p-4 mb-3 hover:bg-gray-50/50 transition-colors">
 			<div className="flex justify-between items-center">
 				<div className="flex-1 min-w-0">
 					{/* Name, Date, and Amount on same line */}

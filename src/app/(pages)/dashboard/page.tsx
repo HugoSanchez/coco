@@ -773,7 +773,7 @@ export default function Dashboard() {
 										variant="ghost"
 										onClick={loadMoreBookings}
 										disabled={loadingMore}
-										className="w-40 hover:bg-gray-50 rounded-full"
+										className="w-40 hover:bg-gray-50 rounded-full text-xs"
 									>
 										{loadingMore ? (
 											<>
