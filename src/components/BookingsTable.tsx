@@ -176,7 +176,6 @@ function BookingActions({
 			setIsResending(false)
 		}
 	}
-	if (booking.status === 'canceled') return null
 
 	return (
 		<DropdownMenu>
@@ -203,13 +202,14 @@ function BookingActions({
 						Reembolsar pago
 					</DropdownMenuItem>
 				)}
-				{booking.status !== 'completed' && (
-					<DropdownMenuItem
-						onClick={() => onRescheduleBooking(booking.id)}
-					>
-						Reprogramar cita
-					</DropdownMenuItem>
-				)}
+				{booking.status !== 'completed' &&
+					booking.status !== 'canceled' && (
+						<DropdownMenuItem
+							onClick={() => onRescheduleBooking(booking.id)}
+						>
+							Reprogramar cita
+						</DropdownMenuItem>
+					)}
 				{booking.payment_status === 'pending' && (
 					<DropdownMenuItem
 						onClick={handleResendEmail}
@@ -233,13 +233,13 @@ function BookingActions({
 					</DropdownMenuItem>
 				)}
 
-				{
+				{booking.status !== 'canceled' && (
 					<DropdownMenuItem
 						onClick={() => onCancelBooking(booking.id)}
 					>
 						Cancelar cita
 					</DropdownMenuItem>
-				}
+				)}
 			</DropdownMenuContent>
 		</DropdownMenu>
 	)
