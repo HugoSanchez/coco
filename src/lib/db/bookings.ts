@@ -188,6 +188,7 @@ export async function getBookingsForDateRange(
 		.eq('user_id', userId)
 		.gte('start_time', startDate)
 		.lte('start_time', endDate)
+		.neq('status', 'canceled') // Exclude canceled bookings from time selection
 		.order('start_time', { ascending: true })
 
 	if (error) throw error
