@@ -40,6 +40,7 @@ export function DayViewTimeSelector({
 	initialSelectedSlot = null
 }: DayViewTimeSelectorProps) {
 	const containerRef = useRef<HTMLDivElement>(null)
+	const scrollContainerRef = useRef<HTMLDivElement>(null)
 	const [dragState, setDragState] = useState<DragState>({
 		isDragging: false,
 		startY: 0,
@@ -68,6 +69,14 @@ export function DayViewTimeSelector({
 			setSelectedSlot(null)
 		}
 	}, [initialSelectedSlot])
+
+	// Scroll to 8 AM only once on mount
+	useEffect(() => {
+		if (scrollContainerRef.current) {
+			scrollContainerRef.current.scrollTop =
+				displayStartHour * 60 * pixelsPerMinute
+		}
+	}, []) // Empty dependency array = only runs once on mount
 
 	// Configuration constants for time display and calculations
 	const displayStartHour = 8 // Start displaying from 8 AM (auto-scroll position)
@@ -386,12 +395,7 @@ export function DayViewTimeSelector({
 			{/* Day View Container */}
 			<div
 				className="relative border-2 border-gray-200 rounded-lg overflow-hidden max-h-96 overflow-y-auto"
-				ref={(el) => {
-					if (el) {
-						// Scroll to 8 AM (8 * 60 * pixelsPerMinute = 480px) on mount
-						el.scrollTop = displayStartHour * 60 * pixelsPerMinute
-					}
-				}}
+				ref={scrollContainerRef}
 			>
 				<div className="flex">
 					{/* Time Labels */}
