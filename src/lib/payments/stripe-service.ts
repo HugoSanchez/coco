@@ -171,6 +171,23 @@ export class StripeService {
 		sessionId: string
 		checkoutUrl: string
 	}> {
+		// Log all input parameters for debugging
+		console.log('[STRIPE] Creating checkout session with parameters:', {
+			practitionerStripeAccountId,
+			clientEmail,
+			clientName,
+			consultationDate,
+			amount,
+			amountInCents: Math.round(amount * 100),
+			bookingId,
+			practitionerName,
+			practitionerEmail,
+			practitionerUserId,
+			startTime,
+			endTime,
+			baseUrl: process.env.NEXT_PUBLIC_BASE_URL
+		})
+
 		try {
 			const session = await stripe.checkout.sessions.create({
 				payment_method_types: ['card'],
@@ -210,12 +227,36 @@ export class StripeService {
 				}
 			})
 
+			console.log('[STRIPE] Successfully created checkout session:', {
+				sessionId: session.id,
+				checkoutUrl: session.url,
+				sessionStatus: session.status,
+				paymentStatus: session.payment_status
+			})
+
 			return {
 				sessionId: session.id,
 				checkoutUrl: session.url || ''
 			}
 		} catch (error) {
-			console.error('Error creating checkout session:', error)
+			// Log detailed error information
+			console.error('[STRIPE] Error creating checkout session:', {
+				error: error,
+				errorMessage:
+					error instanceof Error ? error.message : 'Unknown error',
+				errorType: error?.constructor?.name,
+				stripeError:
+					error instanceof Error && 'type' in error
+						? {
+								type: (error as any).type,
+								code: (error as any).code,
+								decline_code: (error as any).decline_code,
+								param: (error as any).param,
+								detail: (error as any).detail
+							}
+						: undefined
+			})
+
 			throw new Error(
 				`Failed to create checkout session: ${
 					error instanceof Error ? error.message : 'Unknown error'

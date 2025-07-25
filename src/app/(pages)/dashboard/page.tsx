@@ -491,6 +491,54 @@ export default function Dashboard() {
 		}, 100)
 	}
 
+	const handleResendEmail = async (bookingId: string) => {
+		try {
+			// Show immediate feedback with spinner
+			toast({
+				title: 'Reenviando email...',
+				description:
+					'Enviando email de confirmación con nuevo enlace de pago.',
+				variant: 'default',
+				color: 'loading'
+			})
+
+			// Call our resend email API endpoint
+			const response = await fetch(
+				`/api/bookings/${bookingId}/resend-email`,
+				{
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					}
+				}
+			)
+
+			if (!response.ok) {
+				const errorData = await response.json()
+				throw new Error(errorData.error || 'Failed to resend email')
+			}
+
+			const result = await response.json()
+
+			toast({
+				title: 'Email reenviado',
+				description: 'El email de pago ha sido enviado correctamente.',
+				variant: 'default',
+				color: 'success'
+			})
+		} catch (error) {
+			console.error('Error resending email:', error)
+			toast({
+				title: 'Error al reenviar email',
+				description:
+					error instanceof Error
+						? error.message
+						: 'No se pudo reenviar el email. Inténtalo de nuevo.',
+				variant: 'destructive'
+			})
+		}
+	}
+
 	const handleRefundConfirm = async (bookingId: string, reason?: string) => {
 		try {
 			// Show immediate feedback with spinner
@@ -765,6 +813,7 @@ export default function Dashboard() {
 								onMarkAsPaid={handleShowMarkAsPaidDialog}
 								onRefundBooking={handleRefundBooking}
 								onRescheduleBooking={handleRescheduleBooking}
+								onResendEmail={handleResendEmail}
 							/>
 							{/* Load More Button */}
 							{hasMore && !loadingBookings && (

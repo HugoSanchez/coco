@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,13 +18,15 @@ import {
 	DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Spinner } from '@/components/ui/spinner'
+import { useToast } from '@/components/ui/use-toast'
 import {
 	MoreHorizontal,
 	MoreVertical,
 	X,
 	Check,
 	Loader,
-	RefreshCcw
+	RefreshCcw,
+	Mail
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -55,6 +58,7 @@ interface BookingsTableProps {
 	onMarkAsPaid: (bookingId: string) => void
 	onRefundBooking: (bookingId: string) => void
 	onRescheduleBooking: (bookingId: string) => void
+	onResendEmail: (bookingId: string) => void
 }
 
 // Status labels in Spanish
@@ -137,7 +141,8 @@ function BookingActions({
 	onConfirmBooking,
 	onMarkAsPaid,
 	onRefundBooking,
-	onRescheduleBooking
+	onRescheduleBooking,
+	onResendEmail
 }: {
 	isMobile: boolean
 	booking: Booking
@@ -146,7 +151,31 @@ function BookingActions({
 	onMarkAsPaid: (bookingId: string) => void
 	onRefundBooking: (bookingId: string) => void
 	onRescheduleBooking: (bookingId: string) => void
+	onResendEmail: (bookingId: string) => void
 }) {
+	const { toast } = useToast()
+	const [isResending, setIsResending] = useState(false)
+
+	const handleResendEmail = async () => {
+		setIsResending(true)
+		try {
+			await onResendEmail(booking.id)
+			toast({
+				title: 'Email reenviado',
+				description:
+					'El email de confirmación ha sido enviado exitosamente.'
+			})
+		} catch (error) {
+			toast({
+				title: 'Error al reenviar email',
+				description:
+					'No se pudo reenviar el email. Inténtalo de nuevo.',
+				variant: 'destructive'
+			})
+		} finally {
+			setIsResending(false)
+		}
+	}
 	if (booking.status === 'canceled') return null
 
 	return (
@@ -163,7 +192,10 @@ function BookingActions({
 					)}
 				</Button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end" className="">
+			<DropdownMenuContent
+				align="end"
+				className="space-y-1 p-2 border border-gray-300 rounded-lg"
+			>
 				{booking.payment_status === 'paid' && (
 					<DropdownMenuItem
 						onClick={() => onRefundBooking(booking.id)}
@@ -178,6 +210,16 @@ function BookingActions({
 						Reprogramar cita
 					</DropdownMenuItem>
 				)}
+				{booking.payment_status === 'pending' && (
+					<DropdownMenuItem
+						onClick={handleResendEmail}
+						disabled={isResending}
+					>
+						{isResending
+							? 'Reenviando...'
+							: 'Reenviar email de pago'}
+					</DropdownMenuItem>
+				)}
 				{booking.payment_status !== 'paid' && (
 					<DropdownMenuItem onClick={() => onMarkAsPaid(booking.id)}>
 						Marcar cita como pagada
@@ -190,6 +232,7 @@ function BookingActions({
 						Marcar cita como confirmada
 					</DropdownMenuItem>
 				)}
+
 				{
 					<DropdownMenuItem
 						onClick={() => onCancelBooking(booking.id)}
@@ -209,7 +252,8 @@ function BookingCard({
 	onConfirmBooking,
 	onMarkAsPaid,
 	onRefundBooking,
-	onRescheduleBooking
+	onRescheduleBooking,
+	onResendEmail
 }: {
 	booking: Booking
 	onCancelBooking: (bookingId: string) => void
@@ -217,6 +261,7 @@ function BookingCard({
 	onMarkAsPaid: (bookingId: string) => void
 	onRefundBooking: (bookingId: string) => void
 	onRescheduleBooking: (bookingId: string) => void
+	onResendEmail: (bookingId: string) => void
 }) {
 	return (
 		<div className="bg-white border rounded-lg p-4 mb-3 hover:bg-gray-50/50 transition-colors">
@@ -272,6 +317,7 @@ function BookingCard({
 						onMarkAsPaid={onMarkAsPaid}
 						onRefundBooking={onRefundBooking}
 						onRescheduleBooking={onRescheduleBooking}
+						onResendEmail={onResendEmail}
 					/>
 				</div>
 			</div>
@@ -286,7 +332,8 @@ export function BookingsTable({
 	onConfirmBooking,
 	onMarkAsPaid,
 	onRefundBooking,
-	onRescheduleBooking
+	onRescheduleBooking,
+	onResendEmail
 }: BookingsTableProps) {
 	const isMobile = window.innerWidth > 768
 	if (loading) {
@@ -318,6 +365,7 @@ export function BookingsTable({
 						onMarkAsPaid={onMarkAsPaid}
 						onRefundBooking={onRefundBooking}
 						onRescheduleBooking={onRescheduleBooking}
+						onResendEmail={onResendEmail}
 					/>
 				))}
 			</div>
@@ -463,6 +511,7 @@ export function BookingsTable({
 												onRescheduleBooking={
 													onRescheduleBooking
 												}
+												onResendEmail={onResendEmail}
 											/>
 										</TableCell>
 									</TableRow>

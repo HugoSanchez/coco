@@ -201,20 +201,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 		try {
 			const { data, error } = await supabase
 				.from('stripe_accounts')
-				.select('charges_enabled, payouts_enabled, details_submitted')
+				.select('onboarding_completed, payments_enabled')
 				.eq('user_id', user.id)
 				.single()
 
 			if (error || !data) {
+				// No error if no Stripe account exists yet
 				setStripeOnboardingCompleted(false)
 				return false
 			}
 
 			const isCompleted =
-				data.charges_enabled &&
-				data.payouts_enabled &&
-				data.details_submitted
+				data.onboarding_completed && data.payments_enabled
 			setStripeOnboardingCompleted(isCompleted)
+			console.log('Stripe onboarding completed:', isCompleted)
 			return isCompleted
 		} catch (error) {
 			console.error('Error checking Stripe status:', error)
