@@ -34,10 +34,6 @@ export async function POST(
 		const supabase = createClient()
 		const bookingId = params.id
 
-		console.log(
-			`[RESEND] Starting resend email process for booking: ${bookingId}`
-		)
-
 		// Step 1: Authenticate practitioner
 		// Only authenticated practitioners can resend emails for their bookings
 		const {
@@ -55,10 +51,6 @@ export async function POST(
 				{ status: 401 }
 			)
 		}
-
-		console.log(
-			`[RESEND] Authenticated user: ${user.id} for booking: ${bookingId}`
-		)
 
 		// Step 2: Fetch booking details and validate ownership
 		// Get booking first to check if it belongs to the authenticated user
@@ -90,9 +82,7 @@ export async function POST(
 
 		// Step 3: Fetch client, practitioner details, and billing information
 		// We need this data for the email template and amount validation
-		console.log(
-			`[RESEND] Fetching client, practitioner, and billing data for booking: ${bookingId}`
-		)
+
 		const [client, practitioner, bills] = await Promise.all([
 			getClientById(booking.client_id, supabase),
 			getProfileById(user.id, supabase),
@@ -192,25 +182,25 @@ export async function POST(
 			)
 		}
 
-		// Step 6: Cancel/expire previous checkout sessions
+		// Step 6: Expire previous checkout sessions (without canceling bills)
 		// This prevents patients from using old payment links and paying twice
 		console.log(
-			`[RESEND] Cancelling previous payment sessions for booking ${bookingId}`
+			`[RESEND] Expiring previous payment sessions for booking ${bookingId}`
 		)
-		const cancelResult =
-			await paymentOrchestrationService.cancelPaymentForBooking(
+		const expireResult =
+			await paymentOrchestrationService.expirePaymentSessionsForBooking(
 				bookingId,
 				supabase
 			)
 
-		if (!cancelResult.success) {
+		if (!expireResult.success) {
 			console.warn(
-				`[RESEND] Failed to cancel previous sessions: ${cancelResult.error}`
+				`[RESEND] Failed to expire previous sessions: ${expireResult.error}`
 			)
 			// Continue anyway - we'll still create a new session
 		} else {
 			console.log(
-				`[RESEND] Successfully canceled previous payment sessions`
+				`[RESEND] Successfully expired previous payment sessions`
 			)
 		}
 

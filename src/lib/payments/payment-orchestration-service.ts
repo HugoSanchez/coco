@@ -15,7 +15,8 @@ import { stripeService } from './stripe-service'
 import {
 	createPaymentSession,
 	getPaymentSessionsForBooking,
-	updatePaymentSessionStatus
+	updatePaymentSessionStatus,
+	updatePaymentSession
 } from '@/lib/db/payment-sessions'
 import { getStripeAccountForPayments } from '@/lib/db/stripe-accounts'
 import {
@@ -147,16 +148,37 @@ export class PaymentOrchestrationService {
 
 			// STEP 3: Track payment session in our database
 			// ==============================================
-			// Create a payment session record in our DB to track this payment attempt.
-			await createPaymentSession(
-				{
-					booking_id: bookingId,
-					stripe_session_id: sessionId,
-					amount: amount,
-					status: 'pending'
-				},
+			// Check if a payment session already exists for this booking (e.g., from resend)
+			const existingSessions = await getPaymentSessionsForBooking(
+				bookingId,
 				supabaseClient
 			)
+
+			if (existingSessions.length > 0) {
+				// Update existing payment session with new Stripe session ID
+				await updatePaymentSession(
+					existingSessions[0].id,
+					{
+						stripe_session_id: sessionId,
+						amount: amount,
+						status: 'pending',
+						stripe_payment_intent_id: null,
+						completed_at: null
+					},
+					supabaseClient
+				)
+			} else {
+				// Create new payment session record
+				await createPaymentSession(
+					{
+						booking_id: bookingId,
+						stripe_session_id: sessionId,
+						amount: amount,
+						status: 'pending'
+					},
+					supabaseClient
+				)
+			}
 
 			// STEP 4: Return success with checkout URL
 			// ========================================
@@ -168,6 +190,76 @@ export class PaymentOrchestrationService {
 		} catch (error) {
 			// STEP 5: Error handling
 			// ======================
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'Unknown error'
+			}
+		}
+	}
+
+	/**
+	 * Expires payment sessions for a booking without canceling bills
+	 *
+	 * This function is used specifically for payment link refreshes (e.g., resend emails):
+	 * 1. Finds active payment sessions for the booking
+	 * 2. Expires Stripe checkout sessions to prevent payment completion
+	 * 3. Marks payment sessions as 'cancelled' in our database
+	 * 4. Does NOT touch bills (they remain valid for new payment attempts)
+	 *
+	 * Use this when you want to invalidate old payment links while keeping
+	 * the billing information intact for new payment sessions.
+	 *
+	 * @param bookingId - UUID of the booking to expire payment sessions for
+	 * @param supabaseClient - Optional Supabase client for database operations
+	 * @returns Promise resolving to operation result with success flag and optional error
+	 */
+	async expirePaymentSessionsForBooking(
+		bookingId: string,
+		supabaseClient?: SupabaseClient
+	): Promise<{
+		success: boolean
+		error?: string
+	}> {
+		try {
+			// STEP 1: Get active payment sessions for this booking
+			const paymentSessions = await getPaymentSessionsForBooking(
+				bookingId,
+				supabaseClient
+			)
+			const activeSessions = paymentSessions.filter(
+				(session) => session.status === 'pending'
+			)
+
+			// STEP 2: Expire Stripe checkout sessions and mark as cancelled in DB
+			for (const session of activeSessions) {
+				if (session.stripe_session_id) {
+					const stripeResult =
+						await stripeService.expireCheckoutSession(
+							session.stripe_session_id
+						)
+
+					if (!stripeResult.success) {
+						console.warn(
+							`Failed to expire Stripe session ${session.stripe_session_id}: ${stripeResult.error}`
+						)
+					}
+				}
+
+				// Mark payment session as cancelled in our database
+				try {
+					await updatePaymentSessionStatus(session.id, {
+						status: 'cancelled'
+					})
+				} catch (sessionError) {
+					console.error(
+						`Failed to cancel payment session ${session.id}:`,
+						sessionError
+					)
+				}
+			}
+
+			return { success: true }
+		} catch (error) {
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error'

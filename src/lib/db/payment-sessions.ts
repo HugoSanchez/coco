@@ -177,13 +177,16 @@ export async function getPaymentSessionByStripeSessionId(
  * A booking may have multiple payment sessions (retries, refunds, etc.)
  *
  * @param bookingId - The UUID of the booking
+ * @param supabaseClient - Optional SupabaseClient instance for server-side usage
  * @returns Promise<PaymentSession[]> - Array of payment sessions for the booking
  * @throws Error if database operation fails
  */
 export async function getPaymentSessionsForBooking(
-	bookingId: string
+	bookingId: string,
+	supabaseClient?: SupabaseClient
 ): Promise<PaymentSession[]> {
-	const { data, error } = await supabase
+	const client = supabaseClient || supabase
+	const { data, error } = await client
 		.from('payment_sessions')
 		.select('*')
 		.eq('booking_id', bookingId)
@@ -225,6 +228,33 @@ export async function getPaymentSessionsForUser(
 
 	if (error) throw error
 	return data || []
+}
+
+/**
+ * Updates a payment session with any allowed fields
+ * General purpose function for updating payment session records
+ *
+ * @param paymentSessionId - The UUID of the payment session to update
+ * @param updatePayload - Data to update (uses PaymentSessionUpdate type for full flexibility)
+ * @param supabaseClient - Optional SupabaseClient instance for server-side usage
+ * @returns Promise<PaymentSession> - The updated payment session object
+ * @throws Error if update fails or payment session not found
+ */
+export async function updatePaymentSession(
+	paymentSessionId: string,
+	updatePayload: PaymentSessionUpdate,
+	supabaseClient?: SupabaseClient
+): Promise<PaymentSession> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('payment_sessions')
+		.update(updatePayload)
+		.eq('id', paymentSessionId)
+		.select()
+		.single()
+
+	if (error) throw error
+	return data
 }
 
 /**
