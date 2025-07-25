@@ -54,7 +54,6 @@ export async function POST(
 
 		// Step 2: Fetch booking details and validate ownership
 		// Get booking first to check if it belongs to the authenticated user
-		console.log(`[RESEND] Fetching booking details for: ${bookingId}`)
 		const booking = await getBookingById(bookingId, supabase)
 
 		if (!booking) {
@@ -65,15 +64,8 @@ export async function POST(
 			)
 		}
 
-		console.log(
-			`[RESEND] Found booking: ${bookingId}, owner: ${booking.user_id}, status: ${booking.status}`
-		)
-
 		// Verify the booking belongs to the authenticated practitioner
 		if (booking.user_id !== user.id) {
-			console.log(
-				`[RESEND] Unauthorized access: booking owner ${booking.user_id} != authenticated user ${user.id}`
-			)
 			return NextResponse.json(
 				{ error: 'Unauthorized: Booking does not belong to you' },
 				{ status: 403 }
@@ -89,14 +81,7 @@ export async function POST(
 			getBillsForBooking(bookingId, supabase)
 		])
 
-		console.log(
-			`[RESEND] Data fetched - Client: ${client?.name}, Practitioner: ${practitioner?.name}, Bills count: ${bills.length}`
-		)
-
 		if (!client || !practitioner) {
-			console.log(
-				`[RESEND] Missing data - Client: ${!!client}, Practitioner: ${!!practitioner}`
-			)
 			return NextResponse.json(
 				{ error: 'Missing client or practitioner information' },
 				{ status: 400 }
@@ -105,11 +90,7 @@ export async function POST(
 
 		// Step 4: Validate booking is eligible for resend
 		// Cannot resend email for canceled bookings
-		console.log(
-			`[RESEND] Validating booking eligibility - Status: ${booking.status}`
-		)
 		if (booking.status === 'canceled') {
-			console.log(`[RESEND] Booking is canceled, cannot resend`)
 			return NextResponse.json(
 				{
 					error: 'Cannot resend email for canceled bookings'
@@ -118,19 +99,11 @@ export async function POST(
 			)
 		}
 
-		// Find the bill that can be resent (pending or sent, but not paid/canceled/refunded)
-		console.log(
-			`[RESEND] Looking for resendable bill. Available bills:`,
-			bills.map((b) => ({ id: b.id, status: b.status, amount: b.amount }))
-		)
 		const resendableBill = bills.find(
 			(bill) => bill.status === 'pending' || bill.status === 'sent'
 		)
 
 		if (!resendableBill) {
-			console.log(
-				`[RESEND] No resendable bill found for booking ${bookingId}. Need bill with status 'pending' or 'sent'`
-			)
 			return NextResponse.json(
 				{
 					error: 'Cannot resend email: no resendable bill found (bill must be pending or sent, not paid/canceled/refunded)'
@@ -139,14 +112,7 @@ export async function POST(
 			)
 		}
 
-		console.log(
-			`[RESEND] Found resendable bill: ${resendableBill.id}, status: ${resendableBill.status}, amount: ${resendableBill.amount}`
-		)
-
 		if (resendableBill.amount <= 0) {
-			console.log(
-				`[RESEND] Bill amount is ${resendableBill.amount}, cannot resend`
-			)
 			return NextResponse.json(
 				{
 					error: 'Cannot resend email for bookings that do not require payment'
@@ -156,13 +122,9 @@ export async function POST(
 		}
 
 		// Step 5: Validate all required parameters before proceeding
-		console.log(
-			`[RESEND] Validating parameters before creating checkout session`
-		)
 
 		// Validate amount
 		if (!resendableBill.amount || resendableBill.amount <= 0) {
-			console.error(`[RESEND] Invalid amount: ${resendableBill.amount}`)
 			return NextResponse.json(
 				{ error: 'Invalid bill amount for resend' },
 				{ status: 400 }
@@ -171,11 +133,6 @@ export async function POST(
 
 		// Validate required fields
 		if (!client.email || !client.name || !booking.start_time) {
-			console.error(`[RESEND] Missing required fields:`, {
-				hasEmail: !!client.email,
-				hasName: !!client.name,
-				hasStartTime: !!booking.start_time
-			})
 			return NextResponse.json(
 				{ error: 'Missing required client or booking information' },
 				{ status: 400 }
@@ -184,9 +141,6 @@ export async function POST(
 
 		// Step 6: Expire previous checkout sessions (without canceling bills)
 		// This prevents patients from using old payment links and paying twice
-		console.log(
-			`[RESEND] Expiring previous payment sessions for booking ${bookingId}`
-		)
 		const expireResult =
 			await paymentOrchestrationService.expirePaymentSessionsForBooking(
 				bookingId,
@@ -195,29 +149,12 @@ export async function POST(
 
 		if (!expireResult.success) {
 			console.warn(
-				`[RESEND] Failed to expire previous sessions: ${expireResult.error}`
+				`Failed to expire previous payment sessions: ${expireResult.error}`
 			)
 			// Continue anyway - we'll still create a new session
-		} else {
-			console.log(
-				`[RESEND] Successfully expired previous payment sessions`
-			)
 		}
 
 		// Step 7: Create new checkout session with fresh payment link
-		console.log(
-			`[RESEND] Creating new checkout session for booking ${bookingId}`
-		)
-		console.log(`[RESEND] Payment session params:`, {
-			userId: user.id,
-			bookingId,
-			clientEmail: client.email,
-			clientName: client.name,
-			consultationDate: booking.start_time,
-			amount: resendableBill.amount,
-			practitionerName: practitioner.name || 'Your Practitioner'
-		})
-
 		const paymentResult =
 			await paymentOrchestrationService.orechestrateConsultationCheckout({
 				userId: user.id,
@@ -230,37 +167,45 @@ export async function POST(
 				supabaseClient: supabase
 			})
 
-		console.log(`[RESEND] Payment session result:`, {
-			success: paymentResult.success,
-			hasCheckoutUrl: !!paymentResult.checkoutUrl,
-			error: paymentResult.error
-		})
-
-		if (!paymentResult.success || !paymentResult.checkoutUrl) {
-			console.log(
-				`[RESEND] Failed to create payment session: ${paymentResult.error}`
-			)
+		// Validation Step 1: Verify Stripe checkout creation
+		if (!paymentResult.success) {
 			return NextResponse.json(
 				{
-					error: `Failed to create new payment session: ${paymentResult.error}`
+					error: `Failed to create payment session: ${paymentResult.error}`
+				},
+				{ status: 500 }
+			)
+		}
+
+		// Validation Step 2: Verify checkout URL exists and is valid
+		if (
+			!paymentResult.checkoutUrl ||
+			typeof paymentResult.checkoutUrl !== 'string' ||
+			paymentResult.checkoutUrl.trim() === ''
+		) {
+			return NextResponse.json(
+				{
+					error: 'Payment session created but checkout URL is invalid'
+				},
+				{ status: 500 }
+			)
+		}
+
+		// Validation Step 3: Verify checkout URL format (basic Stripe URL validation)
+		if (
+			!paymentResult.checkoutUrl.startsWith(
+				'https://checkout.stripe.com/'
+			)
+		) {
+			return NextResponse.json(
+				{
+					error: 'Payment session created but checkout URL format is invalid'
 				},
 				{ status: 500 }
 			)
 		}
 
 		// Step 8: Send email with new payment link
-		console.log(`[RESEND] Sending email for booking ${bookingId}`)
-		console.log(`[RESEND] Email params:`, {
-			to: client.email,
-			clientName: client.name,
-			consultationDate: booking.start_time,
-			amount: resendableBill.amount,
-			billingTrigger: 'before_consultation',
-			practitionerName: practitioner.name || 'Your Practitioner',
-			practitionerEmail: practitioner.email,
-			hasPaymentUrl: !!paymentResult.checkoutUrl
-		})
-
 		const emailResult = await sendConsultationBillEmail({
 			to: client.email,
 			clientName: client.name,
@@ -273,17 +218,18 @@ export async function POST(
 			paymentUrl: paymentResult.checkoutUrl
 		})
 
-		console.log(`[RESEND] Email sending result:`, {
-			success: emailResult.success,
-			emailId: emailResult.emailId,
-			error: emailResult.error
-		})
+		// Validation Step 4: Verify email was sent successfully
+		if (!emailResult.success) {
+			return NextResponse.json(
+				{
+					error: `Failed to send confirmation email: ${emailResult.error}`
+				},
+				{ status: 500 }
+			)
+		}
 
 		// Step 9: Track resend action in email_communications
 		// This helps practitioners see resend history and prevents abuse
-		console.log(
-			`[RESEND] Tracking email communication for booking ${bookingId}`
-		)
 		try {
 			await createEmailCommunication(
 				{
@@ -293,46 +239,36 @@ export async function POST(
 					email_type: 'consultation_bill_resend',
 					recipient_email: client.email,
 					recipient_name: client.name,
-					status: emailResult.success ? 'sent' : 'failed',
-					error_message: emailResult.success
-						? null
-						: emailResult.error || 'Unknown email error'
+					status: 'sent', // We've already validated email was sent successfully
+					error_message: null
 				},
 				supabase
 			)
-			console.log(`[RESEND] Successfully tracked email communication`)
 		} catch (trackingError) {
-			console.error(
-				'[RESEND] Failed to track email communication:',
-				trackingError
-			)
-			// Don't fail the entire request if tracking fails
-		}
-
-		// Step 10: Return appropriate response
-		if (emailResult.success) {
-			console.log(
-				`[RESEND] ✅ Successfully completed resend process for booking ${bookingId}`
-			)
-			return NextResponse.json({
-				success: true,
-				message: 'Confirmation email resent successfully'
-			})
-		} else {
-			console.error(
-				`[RESEND] ❌ Email sending failed for booking ${bookingId}: ${emailResult.error}`
-			)
+			// Validation Step 6: Email communication tracking failure
+			// This is critical for audit trail and preventing abuse
+			console.error('Failed to track email communication:', trackingError)
 			return NextResponse.json(
 				{
-					error: 'Failed to send email',
-					details: emailResult.error
+					error: 'Email sent successfully but failed to record communication history'
 				},
 				{ status: 500 }
 			)
 		}
+
+		// Step 10: All validations passed - return success
+		// If we reach this point, all critical steps have been validated:
+		// ✅ Stripe checkout created with valid URL
+		// ✅ Email sent successfully with valid email ID
+		// ✅ Email communication tracked for audit trail
+		return NextResponse.json({
+			success: true,
+			message: 'Confirmation email resent successfully',
+			emailId: emailResult.emailId // Include email ID for verification
+		})
 	} catch (error) {
 		console.error(
-			`[RESEND] ❌ Unexpected error for booking ${params.id}:`,
+			`Unexpected error during email resend for booking ${params.id}:`,
 			error
 		)
 		return NextResponse.json(

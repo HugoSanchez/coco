@@ -263,14 +263,17 @@ export async function updatePaymentSession(
  *
  * @param paymentSessionId - The UUID of the payment session to update
  * @param updatePayload - Data to update
+ * @param supabaseClient - Optional SupabaseClient instance for server-side usage
  * @returns Promise<PaymentSession> - The updated payment session object
  * @throws Error if update fails or payment session not found
  */
 export async function updatePaymentSessionStatus(
 	paymentSessionId: string,
-	updatePayload: UpdatePaymentSessionStatusPayload
+	updatePayload: UpdatePaymentSessionStatusPayload,
+	supabaseClient?: SupabaseClient
 ): Promise<PaymentSession> {
-	const { data, error } = await supabase
+	const client = supabaseClient || supabase
+	const { data, error } = await client
 		.from('payment_sessions')
 		.update(updatePayload)
 		.eq('id', paymentSessionId)

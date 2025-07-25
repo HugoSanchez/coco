@@ -247,9 +247,13 @@ export class PaymentOrchestrationService {
 
 				// Mark payment session as cancelled in our database
 				try {
-					await updatePaymentSessionStatus(session.id, {
-						status: 'cancelled'
-					})
+					await updatePaymentSessionStatus(
+						session.id,
+						{
+							status: 'cancelled'
+						},
+						supabaseClient
+					)
 				} catch (sessionError) {
 					console.error(
 						`Failed to cancel payment session ${session.id}:`,
