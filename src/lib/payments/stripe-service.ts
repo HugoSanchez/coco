@@ -1,5 +1,7 @@
 import Stripe from 'stripe'
 import { SupabaseClient } from '@supabase/supabase-js'
+import { format } from 'date-fns'
+import { es } from 'date-fns/locale'
 
 // Initialize Stripe with environment variable
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
@@ -181,7 +183,7 @@ export class StripeService {
 							currency: 'eur',
 							product_data: {
 								name: `Consulta con ${practitionerName}`,
-								description: `Consulta programada para ${consultationDate}`
+								description: `Consulta programada para ${format(new Date(consultationDate), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })}h`
 							},
 							unit_amount: Math.round(amount * 100) // Convert to cents
 						},

@@ -790,7 +790,7 @@ export default function LandingPage() {
 						</a>
 						<p
 							onClick={() =>
-								window.open('mailto:hugo@itsverso.com')
+								window.open('mailto:info@itscoco.app')
 							}
 							className="hover:text-gray-900 transition-colors"
 						>
