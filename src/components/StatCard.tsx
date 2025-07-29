@@ -189,11 +189,7 @@ export function StatCard({
 										{change}% {changeLabel}
 									</span>
 								</div>
-							) : change === null ? (
-								<div className="text-xs text-gray-500">
-									Primera vez este período
-								</div>
-							) : null}
+							) : change === null ? null : null}
 						</div>
 					</CardContent>
 				</Card>
