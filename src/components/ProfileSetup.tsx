@@ -91,8 +91,8 @@ export function ProfileSetup({
 			}
 
 			await updateProfile(user.id, {
-				name,
-				username: username.toLowerCase().replace(/\s+/g, '-'),
+				name: name.trim(),
+				username: username.toLowerCase().trim().replace(/\s+/g, '-'),
 				description,
 				email: user.email,
 				profile_picture_url

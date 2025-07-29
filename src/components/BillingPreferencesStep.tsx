@@ -120,7 +120,6 @@ export function BillingPreferencesStep({
 					<BillingPreferencesForm
 						values={billingPrefs}
 						onChange={setBillingPrefs}
-						disabled={isLoading}
 					/>
 				</div>
 				<Button
