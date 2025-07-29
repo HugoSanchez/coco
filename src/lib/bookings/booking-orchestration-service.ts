@@ -35,7 +35,7 @@ import {
 } from '@/lib/db/bills'
 import { sendConsultationBillEmail } from '@/lib/emails/email-service'
 import { getProfileById } from '@/lib/db/profiles'
-import { paymentOrchestrationService } from '@/lib/payments/payment-orchestration-service'
+
 import { createEmailCommunication } from '@/lib/db/email-communications'
 import { createPendingCalendarEvent } from '@/lib/calendar/calendar'
 import { createCalendarEvent } from '@/lib/db/calendar-events'
@@ -248,107 +248,90 @@ async function createInAdvanceBooking(
 				)
 			}
 
-			// Create Stripe checkout session directly using payment orchestration service
-			const paymentResult =
-				await paymentOrchestrationService.orechestrateConsultationCheckout(
-					{
-						userId: request.userId,
-						bookingId: booking.id,
-						clientEmail: client.email,
-						clientName: client.name,
-						consultationDate: request.startTime,
-						amount: billing.amount,
-						practitionerName:
-							practitioner.name || 'Your Practitioner',
+			// Generate payment gateway URL (no need to create checkout session upfront)
+			const baseUrl =
+				process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+			const paymentGatewayUrl = `${baseUrl}/api/payments/${booking.id}`
+
+			// Send consultation bill email with payment gateway link
+			const emailResult = await sendConsultationBillEmail({
+				to: client.email,
+				clientName: client.name,
+				consultationDate: request.startTime,
+				amount: billing.amount,
+				billingTrigger: 'before_consultation',
+				practitionerName: practitioner.name || 'Your Practitioner',
+				practitionerEmail: practitioner.email,
+				practitionerImageUrl:
+					practitioner.profile_picture_url || undefined,
+				paymentUrl: paymentGatewayUrl
+			})
+
+			if (emailResult.success) {
+				// Update bill status to 'sent' since email was delivered
+				await updateBillStatus(bill.id, 'sent', supabaseClient)
+
+				// Track successful email communication
+				try {
+					await createEmailCommunication(
+						{
+							user_id: booking.user_id,
+							client_id: booking.client_id,
+							bill_id: bill.id,
+							booking_id: booking.id,
+							email_type: 'consultation_bill',
+							recipient_email: client.email,
+							recipient_name: client.name,
+							status: 'sent'
+						},
 						supabaseClient
-					}
-				)
-
-			if (paymentResult.success && paymentResult.checkoutUrl) {
-				// Send consultation bill email with payment link
-				const emailResult = await sendConsultationBillEmail({
-					to: client.email,
-					clientName: client.name,
-					consultationDate: request.startTime,
-					amount: billing.amount,
-					billingTrigger: 'before_consultation',
-					practitionerName: practitioner.name || 'Your Practitioner',
-					practitionerEmail: practitioner.email,
-					practitionerImageUrl:
-						practitioner.profile_picture_url || undefined,
-					paymentUrl: paymentResult.checkoutUrl
-				})
-
-				if (emailResult.success) {
-					// Update bill status to 'sent' since email was delivered
-					await updateBillStatus(bill.id, 'sent', supabaseClient)
-
-					// Track successful email communication
-					try {
-						await createEmailCommunication(
-							{
-								user_id: booking.user_id,
-								client_id: booking.client_id,
-								bill_id: bill.id,
-								booking_id: booking.id,
-								email_type: 'consultation_bill',
-								recipient_email: client.email,
-								recipient_name: client.name,
-								status: 'sent'
-							},
-							supabaseClient
-						)
-					} catch (trackingError) {
-						// Log tracking failure but don't break the flow
-						console.error(
-							'Failed to track successful email:',
-							trackingError
-						)
-					}
-				} else {
-					// Track failed email communication
-					try {
-						await createEmailCommunication(
-							{
-								user_id: booking.user_id,
-								client_id: booking.client_id,
-								bill_id: bill.id,
-								booking_id: booking.id,
-								email_type: 'consultation_bill',
-								recipient_email: client.email,
-								recipient_name: client.name,
-								status: 'failed',
-								error_message:
-									emailResult.error || 'Email sending failed'
-							},
-							supabaseClient
-						)
-					} catch (trackingError) {
-						// Log tracking failure but don't break the flow
-						console.error(
-							'Failed to track failed email:',
-							trackingError
-						)
-					}
-
-					// Email failed - throw error to trigger cleanup
-					const emailError = new Error(
-						`EMAIL_SEND_FAILED: Unable to send payment email to ${client.email}`
 					)
-					emailError.name = 'EmailSendError'
-					throw emailError
+				} catch (trackingError) {
+					// Log tracking failure but don't break the flow
+					console.error(
+						'Failed to track successful email:',
+						trackingError
+					)
 				}
 
 				return {
 					booking,
 					bill,
 					requiresPayment: true,
-					paymentUrl: paymentResult.checkoutUrl
+					paymentUrl: paymentGatewayUrl
 				}
 			} else {
-				throw new Error(
-					`Payment session creation failed: ${paymentResult.error}`
+				// Track failed email communication
+				try {
+					await createEmailCommunication(
+						{
+							user_id: booking.user_id,
+							client_id: booking.client_id,
+							bill_id: bill.id,
+							booking_id: booking.id,
+							email_type: 'consultation_bill',
+							recipient_email: client.email,
+							recipient_name: client.name,
+							status: 'failed',
+							error_message:
+								emailResult.error || 'Email sending failed'
+						},
+						supabaseClient
+					)
+				} catch (trackingError) {
+					// Log tracking failure but don't break the flow
+					console.error(
+						'Failed to track failed email:',
+						trackingError
+					)
+				}
+
+				// Email failed - throw error to trigger cleanup
+				const emailError = new Error(
+					`EMAIL_SEND_FAILED: Unable to send payment email to ${client.email}`
 				)
+				emailError.name = 'EmailSendError'
+				throw emailError
 			}
 		} catch (error) {
 			console.error(

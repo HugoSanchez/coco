@@ -4,7 +4,7 @@ import { getBookingById } from '@/lib/db/bookings'
 import { getClientById } from '@/lib/db/clients'
 import { getProfileById } from '@/lib/db/profiles'
 import { getBillsForBooking } from '@/lib/db/bills'
-import { paymentOrchestrationService } from '@/lib/payments/payment-orchestration-service'
+
 import { sendConsultationBillEmail } from '@/lib/emails/email-service'
 import { createEmailCommunication } from '@/lib/db/email-communications'
 
@@ -139,73 +139,12 @@ export async function POST(
 			)
 		}
 
-		// Step 6: Expire previous checkout sessions (without canceling bills)
-		// This prevents patients from using old payment links and paying twice
-		const expireResult =
-			await paymentOrchestrationService.expirePaymentSessionsForBooking(
-				bookingId,
-				supabase
-			)
+		// Step 6: Generate payment gateway URL (no need to create checkout session)
+		// The payment gateway will create a fresh checkout session when the user clicks the link
+		const baseUrl =
+			process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+		const paymentGatewayUrl = `${baseUrl}/api/payments/${booking.id}`
 
-		if (!expireResult.success) {
-			console.warn(
-				`Failed to expire previous payment sessions: ${expireResult.error}`
-			)
-			// Continue anyway - we'll still create a new session
-		}
-
-		// Step 7: Create new checkout session with fresh payment link
-		const paymentResult =
-			await paymentOrchestrationService.orechestrateConsultationCheckout({
-				userId: user.id,
-				bookingId,
-				clientEmail: client.email,
-				clientName: client.name,
-				consultationDate: booking.start_time,
-				amount: resendableBill.amount,
-				practitionerName: practitioner.name || 'Your Practitioner',
-				supabaseClient: supabase
-			})
-
-		// Validation Step 1: Verify Stripe checkout creation
-		if (!paymentResult.success) {
-			return NextResponse.json(
-				{
-					error: `Failed to create payment session: ${paymentResult.error}`
-				},
-				{ status: 500 }
-			)
-		}
-
-		// Validation Step 2: Verify checkout URL exists and is valid
-		if (
-			!paymentResult.checkoutUrl ||
-			typeof paymentResult.checkoutUrl !== 'string' ||
-			paymentResult.checkoutUrl.trim() === ''
-		) {
-			return NextResponse.json(
-				{
-					error: 'Payment session created but checkout URL is invalid'
-				},
-				{ status: 500 }
-			)
-		}
-
-		// Validation Step 3: Verify checkout URL format (basic Stripe URL validation)
-		if (
-			!paymentResult.checkoutUrl.startsWith(
-				'https://checkout.stripe.com/'
-			)
-		) {
-			return NextResponse.json(
-				{
-					error: 'Payment session created but checkout URL format is invalid'
-				},
-				{ status: 500 }
-			)
-		}
-
-		// Step 8: Send email with new payment link
 		const emailResult = await sendConsultationBillEmail({
 			to: client.email,
 			clientName: client.name,
@@ -215,7 +154,7 @@ export async function POST(
 			practitionerName: practitioner.name || 'Your Practitioner',
 			practitionerEmail: practitioner.email,
 			practitionerImageUrl: practitioner.profile_picture_url || undefined,
-			paymentUrl: paymentResult.checkoutUrl
+			paymentUrl: paymentGatewayUrl
 		})
 
 		// Validation Step 4: Verify email was sent successfully
@@ -256,9 +195,9 @@ export async function POST(
 			)
 		}
 
-		// Step 10: All validations passed - return success
+		// Step 7: All validations passed - return success
 		// If we reach this point, all critical steps have been validated:
-		// ✅ Stripe checkout created with valid URL
+		// ✅ Payment gateway URL generated
 		// ✅ Email sent successfully with valid email ID
 		// ✅ Email communication tracked for audit trail
 		return NextResponse.json({

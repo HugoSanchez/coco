@@ -131,7 +131,8 @@ export async function GET(
 				clientName: client.name,
 				consultationDate: booking.start_time,
 				amount: payableBill.amount,
-				practitionerName: practitioner.name || 'Your Practitioner'
+				practitionerName: practitioner.name || 'Your Practitioner',
+				supabaseClient: supabase
 			})
 
 		if (!paymentResult.success || !paymentResult.checkoutUrl) {
