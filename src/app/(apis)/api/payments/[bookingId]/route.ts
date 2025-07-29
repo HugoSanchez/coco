@@ -14,6 +14,7 @@ import { paymentOrchestrationService } from '@/lib/payments/payment-orchestratio
  * This endpoint replaces direct Stripe checkout URLs in emails with a validation layer.
  * It ensures that every payment attempt gets a fresh, valid checkout session.
  *
+ *
  * Flow:
  * 1. Validate booking exists and is in a payable state
  * 2. Validate associated bill exists and requires payment
@@ -32,24 +33,25 @@ export async function GET(
 	{ params }: { params: { bookingId: string } }
 ) {
 	try {
+		// Instantiate supabase client
 		const supabase = createClient()
+		// Get bookingId from params
 		const bookingId = params.bookingId
 
-		console.log(
-			`[PAYMENT-GATEWAY] Processing payment request for booking: ${bookingId}`
-		)
-
-		// Step 1: Fetch booking details
+		// ------------------------------------------------------------
+		// Step 1: Fetch booking details from DB.
+		// ------------------------------------------------------------
 		const booking = await getBookingById(bookingId, supabase)
-
+		// If booking not found, redirect to error page
 		if (!booking) {
-			console.log(`[PAYMENT-GATEWAY] Booking not found: ${bookingId}`)
 			return NextResponse.redirect(
 				new URL(`/payment/error?reason=booking_not_found`, request.url)
 			)
 		}
 
+		// ------------------------------------------------------------
 		// Step 2: Validate booking is in a payable state
+		// ------------------------------------------------------------
 		if (booking.status === 'canceled') {
 			console.log(`[PAYMENT-GATEWAY] Booking is canceled: ${bookingId}`)
 			return NextResponse.redirect(
@@ -57,72 +59,44 @@ export async function GET(
 			)
 		}
 
-		if (booking.status === 'completed') {
-			console.log(
-				`[PAYMENT-GATEWAY] Booking is already completed: ${bookingId}`
-			)
-			return NextResponse.redirect(
-				new URL(`/payment/error?reason=booking_completed`, request.url)
-			)
-		}
-
+		// ------------------------------------------------------------
 		// Step 3: Fetch and validate bill information
+		// ------------------------------------------------------------
 		const bills = await getBillsForBooking(bookingId, supabase)
 		const payableBill = bills.find(
 			(bill) => bill.status === 'pending' || bill.status === 'sent'
 		)
 
 		if (!payableBill) {
-			console.log(
-				`[PAYMENT-GATEWAY] No payable bill found for booking: ${bookingId}`
-			)
 			return NextResponse.redirect(
-				new URL(`/payment/error?reason=already_paid`, request.url)
+				new URL(`/payment/success?booking_id=${bookingId}`, request.url)
 			)
 		}
 
-		if (payableBill.amount <= 0) {
-			console.log(
-				`[PAYMENT-GATEWAY] Bill amount is zero for booking: ${bookingId}`
-			)
-			return NextResponse.redirect(
-				new URL(
-					`/payment/error?reason=no_payment_required`,
-					request.url
-				)
-			)
-		}
-
-		// Step 4: Fetch required data for checkout session creation
+		// -----------------------------------------------------------------------------
+		// Step 4: Fetch required data and validate all fields for checkout creation
+		// -----------------------------------------------------------------------------
 		const [client, practitioner] = await Promise.all([
 			getClientById(booking.client_id, supabase),
 			getProfileById(booking.user_id, supabase)
 		])
 
-		if (!client || !practitioner) {
-			console.log(
-				`[PAYMENT-GATEWAY] Missing client or practitioner data for booking: ${bookingId}`
-			)
+		// Validate all required data for checkout creation
+		if (
+			!client ||
+			!practitioner ||
+			!client.email ||
+			!client.name ||
+			!booking.start_time
+		) {
 			return NextResponse.redirect(
 				new URL(`/payment/error?reason=missing_data`, request.url)
 			)
 		}
 
-		// Step 5: Validate required fields for checkout creation
-		if (!client.email || !client.name || !booking.start_time) {
-			console.log(
-				`[PAYMENT-GATEWAY] Missing required fields for booking: ${bookingId}`
-			)
-			return NextResponse.redirect(
-				new URL(`/payment/error?reason=invalid_data`, request.url)
-			)
-		}
-
-		// Step 6: Create fresh Stripe checkout session
-		console.log(
-			`[PAYMENT-GATEWAY] Creating checkout session for booking: ${bookingId}`
-		)
-
+		// -----------------------------------------------------------------------------
+		// Step 5: Create fresh Stripe checkout session
+		// -----------------------------------------------------------------------------
 		const paymentResult =
 			await paymentOrchestrationService.orechestrateConsultationCheckout({
 				userId: booking.user_id,
@@ -147,12 +121,14 @@ export async function GET(
 			)
 		}
 
-		// Step 7: Auto-redirect to Stripe checkout
-		console.log(
-			`[PAYMENT-GATEWAY] Redirecting to Stripe checkout for booking: ${bookingId}`
-		)
+		// -----------------------------------------------------------------------------
+		// Step 6: Auto-redirect to Stripe checkout
+		// -----------------------------------------------------------------------------
 		return NextResponse.redirect(paymentResult.checkoutUrl)
 	} catch (error) {
+		// -----------------------------------------------------------------------------
+		// Step 7: Handle unexpected errors
+		// -----------------------------------------------------------------------------
 		console.error('[PAYMENT-GATEWAY] Unexpected error:', error)
 		return NextResponse.redirect(
 			new URL(`/payment/error?reason=server_error`, request.url)

@@ -12,65 +12,39 @@ export const dynamic = 'force-dynamic'
 
 const errorMessages = {
 	booking_not_found: {
-		title: 'Reserva no encontrada',
+		title: 'Parece que ha habido un error',
 		message:
-			'No se pudo encontrar la reserva solicitada. Puede que el enlace sea incorrecto o haya expirado.',
+			'No se pudo encontrar la cita. Puede que el enlace sea incorrecto o haya expirado. Si tienes alguna duda ponte en contacto con tu profesional.',
 		icon: XCircle,
-		color: 'text-red-500'
+		color: 'text-gray-700'
 	},
 	booking_canceled: {
-		title: 'Reserva cancelada',
-		message: 'Esta reserva ha sido cancelada y ya no requiere pago.',
+		title: 'Esta cita ha sido cancelada',
+		message:
+			'Esta reserva ha sido cancelada y por lo tanto ya no puede pagarse. Si tienes alguna duda ponte en contacto con tu profesional.',
 		icon: XCircle,
-		color: 'text-red-500'
-	},
-	booking_completed: {
-		title: 'Reserva completada',
-		message:
-			'Esta reserva ya ha sido completada y no requiere pago adicional.',
-		icon: CheckCircle,
-		color: 'text-green-500'
-	},
-	already_paid: {
-		title: 'Ya pagado',
-		message:
-			'Esta reserva ya ha sido pagada. No se requiere pago adicional.',
-		icon: CheckCircle,
-		color: 'text-green-500'
-	},
-	no_payment_required: {
-		title: 'Sin pago requerido',
-		message: 'Esta reserva no requiere pago.',
-		icon: CheckCircle,
-		color: 'text-green-500'
+		color: 'text-gray-700'
 	},
 	missing_data: {
-		title: 'Datos incompletos',
+		title: 'Parece que ha habido un error',
 		message:
-			'Faltan datos necesarios para procesar el pago. Por favor, contacta con tu profesional.',
+			'Faltan algunos datos necesarios para procesar el pago. Por favor, vuelve a intentarlo en unos minutos o contacta con tu profesional.',
 		icon: AlertTriangle,
-		color: 'text-yellow-500'
-	},
-	invalid_data: {
-		title: 'Datos inválidos',
-		message:
-			'Los datos de la reserva son inválidos. Por favor, contacta con tu profesional.',
-		icon: AlertTriangle,
-		color: 'text-yellow-500'
+		color: 'text-gray-700'
 	},
 	checkout_creation_failed: {
-		title: 'Error al crear pago',
+		title: '¡Ups! ha habido un error',
 		message:
-			'No se pudo crear la sesión de pago. Por favor, inténtalo de nuevo más tarde.',
+			'Por favor, inténtalo de nuevo en unos minutos. En el caso de que el problema persista, ponte en contacto con tu profesional.',
 		icon: XCircle,
-		color: 'text-red-500'
+		color: 'text-gray-700'
 	},
 	server_error: {
-		title: 'Error del servidor',
+		title: '¡Ups! ha habido un error',
 		message:
 			'Ocurrió un error inesperado. Por favor, inténtalo de nuevo más tarde.',
 		icon: XCircle,
-		color: 'text-red-500'
+		color: 'text-gray-900'
 	}
 }
 
@@ -94,7 +68,7 @@ function PaymentErrorContent() {
 					<p className="text-lg text-gray-600">{errorInfo.message}</p>
 				</CardHeader>
 
-				<p className="text-gray-600 text-sm text-normal mt-6">
+				<p className="text-gray-600 text-sm text-normal">
 					Puedes cerrar esta página.
 				</p>
 			</div>
