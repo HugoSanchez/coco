@@ -135,7 +135,7 @@ export function buildConfirmedEventData({
 }) {
 	return {
 		summary: `${clientName} - ${practitionerName}`, // New confirmed title format
-		description: 'Consultation appointment confirmed. Payment received.',
+		description: 'Consultation appointment confirmed.',
 		// Preserve original timing
 		start: originalStart,
 		end: originalEnd,
