@@ -10,6 +10,11 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 // You'll need to add this to your .env.local - get it from Stripe Dashboard
 const webhookSecret = process.env.STRIPE_ACCOUNTS_WEBHOOK_SECRET!
+if (!webhookSecret) {
+	throw new Error(
+		'STRIPE_ACCOUNTS_WEBHOOK_SECRET environment variable is required'
+	)
+}
 
 export async function POST(request: NextRequest) {
 	console.log('Received Stripe account webhook')

@@ -24,8 +24,14 @@ import Stripe from 'stripe'
 // Initialize Stripe client
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
+// Validate webhook secret is configured
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
+if (!webhookSecret) {
+	throw new Error('STRIPE_WEBHOOK_SECRET environment variable is required')
+}
+
 export async function POST(request: NextRequest) {
-	console.log('Stripe webhook received!')
+	console.log('Stripe payments webhook received!')
 	try {
 		///////////////////////////////////////////////////////////
 		///// 1. Create service role client for bypassing RLS
@@ -39,11 +45,27 @@ export async function POST(request: NextRequest) {
 		///// 2. Verify webhook signature
 		///////////////////////////////////////////////////////////
 		const body = await request.text()
-		const sig = request.headers.get('stripe-signature')!
-		const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
-		// Verify webhook signature logic
+		const sig = request.headers.get('stripe-signature')
+
+		if (!sig) {
+			console.error('Missing Stripe signature')
+			return NextResponse.json(
+				{ error: 'Missing signature' },
+				{ status: 400 }
+			)
+		}
+
+		// Verify webhook signature
 		let event: Stripe.Event
-		event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
+		try {
+			event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
+		} catch (err: any) {
+			console.error('Webhook signature verification failed:', err.message)
+			return NextResponse.json(
+				{ error: 'Webhook signature verification failed' },
+				{ status: 400 }
+			)
+		}
 
 		///////////////////////////////////////////////////////////
 		///// 3. Handle checkout session completed
