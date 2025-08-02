@@ -60,7 +60,7 @@ export async function getBillingPreferences(
 			.is('client_id', null) // Not client-specific
 			.is('booking_id', null) // Not booking-specific
 			.eq('is_default', true) // Explicitly marked as default
-			.single()
+			.maybeSingle()
 
 		if (error) {
 			if (error.code === 'PGRST116') {

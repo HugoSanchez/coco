@@ -4,7 +4,10 @@ const nextConfig = {
 		serverComponentsExternalPackages: ['@supabase/supabase-js']
 	},
 	images: {
-		domains: ['xkllkwizcdkydgwzvkdg.supabase.co'] // Replace with your Supabase project URL
+		domains: [
+			// 'xkllkwizcdkydgwzvkdg.supabase.co', // PROD Supabase project
+			'edyluyrleinpebjhxay.supabase.co' // DEV Supabase project
+		]
 	}
 }
 

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import Image from 'next/image'
+
 import { useUser } from '@/contexts/UserContext'
 import {
 	validateUsername,
@@ -175,11 +175,14 @@ export function ProfileSetup({
 								{previewUrl ? (
 									<>
 										<div className="relative w-20 h-20 rounded-full overflow-hidden hover:opacity-90 transition-opacity">
-											<Image
+											<img
 												src={previewUrl}
 												alt="Profile preview"
-												fill
-												style={{ objectFit: 'cover' }}
+												style={{
+													objectFit: 'cover',
+													width: '100%',
+													height: '100%'
+												}}
 												onError={(e) => {
 													console.error(
 														'Error loading image:',

@@ -1,0 +1,149 @@
+;[
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can manage their own billing settings" ON public.billing_settings FOR ALL TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can only delete their own billing preferences" ON public.billing_settings FOR DELETE TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can only insert their own billing preferences" ON public.billing_settings FOR INSERT TO public WITH CHECK ((auth.uid() = user_id));'
+	},
+	//
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can only update their own billing preferences" ON public.billing_settings FOR UPDATE TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can only view their own billing preferences" ON public.billing_settings FOR SELECT TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can manage their own bills" ON public.bills FOR ALL TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can manage their own bookings" ON public.bookings FOR ALL TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can view their own bookings" ON public.bookings FOR SELECT TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can delete own calendar events" ON public.calendar_events FOR DELETE TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can insert own calendar events" ON public.calendar_events FOR INSERT TO public WITH CHECK ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can update own calendar events" ON public.calendar_events FOR UPDATE TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can view own calendar events" ON public.calendar_events FOR SELECT TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can view and update their own calendar info" ON public.calendar_info FOR ALL TO public USING ((auth.uid() = id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can only access their own calendar tokens" ON public.calendar_tokens FOR ALL TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can delete their own clients" ON public.clients FOR DELETE TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can insert their own clients" ON public.clients FOR INSERT TO public WITH CHECK ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can update their own clients" ON public.clients FOR UPDATE TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can view their own clients" ON public.clients FOR SELECT TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can create their own email communications" ON public.email_communications FOR INSERT TO public WITH CHECK ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can update their own email communications" ON public.email_communications FOR UPDATE TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can view their own email communications" ON public.email_communications FOR SELECT TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can delete own payment sessions" ON public.payment_sessions FOR DELETE TO public USING ((booking_id IN ( SELECT bookings.id\n   FROM bookings\n  WHERE (bookings.user_id = auth.uid()))));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can insert own payment sessions" ON public.payment_sessions FOR INSERT TO public WITH CHECK ((booking_id IN ( SELECT bookings.id\n   FROM bookings\n  WHERE (bookings.user_id = auth.uid()))));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can update own payment sessions" ON public.payment_sessions FOR UPDATE TO public USING ((booking_id IN ( SELECT bookings.id\n   FROM bookings\n  WHERE (bookings.user_id = auth.uid()))));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can view own payment sessions" ON public.payment_sessions FOR SELECT TO public USING ((booking_id IN ( SELECT bookings.id\n   FROM bookings\n  WHERE (bookings.user_id = auth.uid()))));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Allow server-side access to profiles" ON public.profiles FOR SELECT TO authenticated USING (true);'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can view and update their own profile" ON public.profiles FOR ALL TO public USING ((auth.uid() = id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Enable insert for users based on user_id" ON public.schedules FOR INSERT TO public WITH CHECK ((( SELECT auth.uid() AS uid) = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can view and update their own schedule" ON public.schedules FOR ALL TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can insert own stripe accounts" ON public.stripe_accounts FOR INSERT TO public WITH CHECK ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can update own stripe accounts" ON public.stripe_accounts FOR UPDATE TO public USING ((auth.uid() = user_id));'
+	},
+	{
+		create_policy_sql:
+			'CREATE POLICY "Users can view own stripe accounts" ON public.stripe_accounts FOR SELECT TO public USING ((auth.uid() = user_id));'
+	}
+]
+
+
+/**
+1. update_bills_updated_at function is missing from the schema in DEV.
+
+
+create trigger update_bills_updated_at BEFORE
+update on bills for EACH row
+execute FUNCTION update_bills_updated_at ();
+
+
+2. update_stripe_accounts_updated_at function is missing from the schema in DEV.
+
+create trigger update_stripe_accounts_updated_at BEFORE
+update on stripe_accounts for EACH row
+execute FUNCTION update_updated_at_column ();
+*/
+

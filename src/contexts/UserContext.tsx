@@ -203,7 +203,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 				.from('stripe_accounts')
 				.select('onboarding_completed, payments_enabled')
 				.eq('user_id', user.id)
-				.single()
+				.maybeSingle()
 
 			if (error || !data) {
 				// No error if no Stripe account exists yet

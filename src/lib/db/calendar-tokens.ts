@@ -91,13 +91,9 @@ export async function getUserCalendarTokens(
 		.from('calendar_tokens')
 		.select('access_token, refresh_token, expiry_date, granted_scopes')
 		.eq('user_id', userId)
-		.single()
+		.maybeSingle()
 
 	if (error) {
-		if (error.code === 'PGRST116') {
-			// No rows returned - user hasn't connected calendar
-			return null
-		}
 		throw error
 	}
 

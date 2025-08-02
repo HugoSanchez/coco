@@ -128,20 +128,17 @@ export function ConnectCalendar({
 				.from('calendar_tokens')
 				.select('*')
 				.eq('user_id', user.id)
-				.single()
+				.maybeSingle()
 
 			if (error) {
-				if (error.code === 'PGRST116') {
-					// PGRST116 = No rows returned (no tokens found)
-					// This means the calendar is not connected
-					setIsConnected(false)
-				} else {
-					// Other database error occurred
-					throw error
-				}
-			} else {
+				// Database error occurred
+				throw error
+			} else if (data) {
 				// Tokens found, calendar is connected
 				setIsConnected(true)
+			} else {
+				// No tokens found, calendar is not connected
+				setIsConnected(false)
 			}
 		} catch (error) {
 			console.error('Error checking calendar connection:', error)

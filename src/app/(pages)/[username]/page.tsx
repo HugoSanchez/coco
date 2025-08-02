@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
-import Image from 'next/image'
+
 import Calendar from '@/components/Calendar'
 import TimeSlots from '@/components/TimeSlots'
 import { ConfirmationForm } from '@/components/ConfirmationForm'
@@ -190,12 +190,10 @@ function BookingPageContent() {
 					<div className="flex flex-col">
 						<div className="flex items-center gap-4 mb-4">
 							{state.userProfile.profile_picture_url && (
-								<Image
+								<img
 									src={state.userProfile.profile_picture_url}
 									alt={state.userProfile.name}
-									width={60}
-									height={60}
-									className="lg:h-16 lg:w-16 h-8 w-8 rounded-full"
+									className="lg:h-16 lg:w-16 h-8 w-8 rounded-full object-cover"
 								/>
 							)}
 							<h2 className="text-3xl font-light">

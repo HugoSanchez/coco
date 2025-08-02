@@ -195,6 +195,7 @@ export async function uploadProfilePicture(userId: string, file: File) {
 		.from('profile-pictures')
 		.upload(fileName, file)
 
+	console.log('uploadError', uploadError)
 	if (uploadError) throw uploadError
 
 	// Get the public URL for the uploaded file

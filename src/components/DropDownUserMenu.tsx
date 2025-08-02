@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { CircleUser, LogOut } from 'lucide-react'
-import Image from 'next/image'
+
 import { useRouter } from 'next/navigation'
 
 export default function DropDownUserMenu(props: any) {
@@ -28,11 +28,9 @@ export default function DropDownUserMenu(props: any) {
 				>
 					{/* Show profile picture if available, otherwise show default icon */}
 					{profile?.profile_picture_url ? (
-						<Image
+						<img
 							src={profile.profile_picture_url}
 							alt={profile.name || 'Profile picture'}
-							width={52}
-							height={52}
 							className="h-8 w-8 rounded-full object-cover"
 						/>
 					) : (
