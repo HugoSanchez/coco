@@ -149,7 +149,7 @@ export function buildConfirmedEventData({
 			},
 			{
 				email: clientEmail,
-				responseStatus: 'accepted' // Client needs to respond to invitation
+				responseStatus: 'needsAction' // Client needs to respond to invitation
 			}
 		],
 		// Add Google Meet conference for confirmed appointments

@@ -499,7 +499,7 @@ export async function updatePendingToConfirmed(
 			eventId: googleEventId,
 			requestBody: updatedEventData,
 			conferenceDataVersion: 1, // Required for Google Meet creation
-			sendUpdates: 'externalOnly' // Send only one consolidated invitation to external attendees
+			sendUpdates: 'all' // Send invitations to all attendees
 		})
 
 		const updatedEvent = response.data

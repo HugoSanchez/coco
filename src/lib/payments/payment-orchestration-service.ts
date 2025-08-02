@@ -26,6 +26,7 @@ import {
 } from '@/lib/db/bills'
 import { getProfileById } from '@/lib/db/profiles'
 import { getBookingById } from '@/lib/db/bookings'
+import { createServiceRoleClient } from '@/lib/supabase/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export class PaymentOrchestrationService {
@@ -77,13 +78,17 @@ export class PaymentOrchestrationService {
 		error?: string
 	}> {
 		try {
+			// Create service role client for database operations that bypass RLS
+			// This is needed because payment orchestration runs server-side without user auth
+			const serviceClient = createServiceRoleClient()
+
 			// STEP 1: Validate practitioner's Stripe account
 			// =============================================
 			// We need to ensure the practitioner has a Stripe Connect account
 			// that is fully onboarded and enabled for payments.
 			const stripeAccount = await getStripeAccountForPayments(
 				userId,
-				supabaseClient
+				serviceClient
 			)
 
 			// Check if account exists and is ready for payments
@@ -107,8 +112,8 @@ export class PaymentOrchestrationService {
 			// ======================================================
 			// Get practitioner email and booking details for Stripe metadata
 			const [practitioner, booking] = await Promise.all([
-				getProfileById(userId, supabaseClient),
-				getBookingById(bookingId, supabaseClient)
+				getProfileById(userId, serviceClient),
+				getBookingById(bookingId, serviceClient)
 			])
 
 			if (!practitioner) {
@@ -151,7 +156,7 @@ export class PaymentOrchestrationService {
 			// Check if a payment session already exists for this booking (e.g., from resend)
 			const existingSessions = await getPaymentSessionsForBooking(
 				bookingId,
-				supabaseClient
+				serviceClient
 			)
 
 			if (existingSessions.length > 0) {
@@ -165,7 +170,7 @@ export class PaymentOrchestrationService {
 						stripe_payment_intent_id: null,
 						completed_at: null
 					},
-					supabaseClient
+					serviceClient
 				)
 			} else {
 				// Create new payment session record
@@ -176,7 +181,7 @@ export class PaymentOrchestrationService {
 						amount: amount,
 						status: 'pending'
 					},
-					supabaseClient
+					serviceClient
 				)
 			}
 

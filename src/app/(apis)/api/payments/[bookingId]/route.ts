@@ -53,7 +53,6 @@ export async function GET(
 		// Step 2: Validate booking is in a payable state
 		// ------------------------------------------------------------
 		if (booking.status === 'canceled') {
-			console.log(`[PAYMENT-GATEWAY] Booking is canceled: ${bookingId}`)
 			return NextResponse.redirect(
 				new URL(`/payment/error?reason=booking_canceled`, request.url)
 			)
@@ -111,7 +110,7 @@ export async function GET(
 
 		if (!paymentResult.success || !paymentResult.checkoutUrl) {
 			console.error(
-				`[PAYMENT-GATEWAY] Failed to create checkout session: ${paymentResult.error}`
+				`Failed to create checkout session: ${paymentResult.error}`
 			)
 			return NextResponse.redirect(
 				new URL(
@@ -129,7 +128,7 @@ export async function GET(
 		// -----------------------------------------------------------------------------
 		// Step 7: Handle unexpected errors
 		// -----------------------------------------------------------------------------
-		console.error('[PAYMENT-GATEWAY] Unexpected error:', error)
+		console.error('Payment gateway error:', error)
 		return NextResponse.redirect(
 			new URL(`/payment/error?reason=server_error`, request.url)
 		)

@@ -1,0 +1,258 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["public"]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model billing_settings {
+  id             String    @id(map: "billing_preferences_pkey") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String?   @db.Uuid
+  billing_amount Decimal?  @db.Decimal(10, 2)
+  billing_type   String
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
+  updated_at     DateTime? @default(now()) @db.Timestamp(6)
+  client_id      String?   @db.Uuid
+  booking_id     String?   @db.Uuid
+  is_default     Boolean?  @default(false)
+  currency       String    @default("EUR")
+  bookings       bookings? @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  clients        clients?  @relation(fields: [client_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profiles       profiles? @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "billing_preferences_user_id_fkey")
+
+  @@schema("public")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bills {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  booking_id           String                 @db.Uuid
+  user_id              String                 @db.Uuid
+  client_id            String?                @db.Uuid
+  amount               Decimal                @db.Decimal(10, 2)
+  currency             String                 @default("EUR") @db.VarChar(3)
+  due_date             DateTime?              @db.Timestamptz(6)
+  billing_type         String                 @db.VarChar(20)
+  status               String                 @default("pending") @db.VarChar(20)
+  sent_at              DateTime?              @db.Timestamptz(6)
+  paid_at              DateTime?              @db.Timestamptz(6)
+  client_name          String                 @db.VarChar(255)
+  client_email         String                 @db.VarChar(255)
+  notes                String?
+  created_at           DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime               @default(now()) @db.Timestamptz(6)
+  refunded_amount      Decimal                @default(0) @db.Decimal(10, 2)
+  stripe_refund_id     String?                @db.VarChar(255)
+  refunded_at          DateTime?              @db.Timestamptz(6)
+  refund_reason        String?
+  bookings             bookings               @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  clients              clients?               @relation(fields: [client_id], references: [id], onUpdate: NoAction)
+  profiles             profiles               @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  email_communications email_communications[]
+
+  @@index([billing_type], map: "idx_bills_billing_type")
+  @@index([booking_id], map: "idx_bills_booking_id")
+  @@index([client_id], map: "idx_bills_client_id")
+  @@index([client_id, status], map: "idx_bills_client_status")
+  @@index([created_at], map: "idx_bills_created_at")
+  @@index([due_date], map: "idx_bills_due_date")
+  @@index([status], map: "idx_bills_status")
+  @@index([user_id], map: "idx_bills_user_id")
+  @@index([user_id, status], map: "idx_bills_user_status")
+  @@schema("public")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bookings {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id              String                 @db.Uuid
+  client_id            String                 @db.Uuid
+  start_time           DateTime               @db.Timestamptz(6)
+  end_time             DateTime               @db.Timestamptz(6)
+  status               String?                @default("scheduled")
+  created_at           DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime?              @default(now()) @db.Timestamptz(6)
+  billing_settings     billing_settings[]
+  bills                bills[]
+  clients              clients                @relation(fields: [client_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profiles             profiles               @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  calendar_events      calendar_events[]
+  email_communications email_communications[]
+  payment_sessions     payment_sessions?
+
+  @@index([client_id])
+  @@index([start_time])
+  @@index([status])
+  @@index([user_id])
+  @@schema("public")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model calendar_events {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  booking_id       String    @db.Uuid
+  user_id          String    @db.Uuid
+  google_event_id  String    @unique
+  google_meet_link String?
+  event_status     String    @default("created")
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime? @default(now()) @db.Timestamptz(6)
+  event_type       String    @default("pending")
+  bookings         bookings  @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profiles         profiles  @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([booking_id], map: "idx_calendar_events_booking_id")
+  @@index([event_type], map: "idx_calendar_events_event_type")
+  @@index([google_event_id], map: "idx_calendar_events_google_event_id")
+  @@index([event_status], map: "idx_calendar_events_status")
+  @@index([user_id], map: "idx_calendar_events_user_id")
+  @@schema("public")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model calendar_tokens {
+  id             String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id        String   @unique @db.Uuid
+  access_token   String
+  refresh_token  String
+  expiry_date    BigInt
+  created_at     DateTime @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+  updated_at     DateTime @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+  granted_scopes String[]
+  profiles       profiles @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([granted_scopes], map: "idx_calendar_tokens_granted_scopes", type: Gin)
+  @@schema("public")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model clients {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id              String                 @db.Uuid
+  name                 String
+  email                String
+  description          String?
+  created_at           DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime?              @default(now()) @db.Timestamptz(6)
+  last_name            String?
+  full_name_search     String?                @default(dbgenerated("\nCASE\n    WHEN ((last_name IS NULL) OR (last_name = ''::text)) THEN name\n    ELSE ((name || ' '::text) || last_name)\nEND"))
+  billing_settings     billing_settings[]
+  bills                bills[]
+  bookings             bookings[]
+  profiles             profiles               @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  email_communications email_communications[]
+
+  @@index([email])
+  @@index([last_name])
+  @@index([user_id])
+  @@index([full_name_search], map: "idx_clients_full_name_search")
+  @@schema("public")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model email_communications {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id         String    @db.Uuid
+  client_id       String?   @db.Uuid
+  email_type      String    @db.VarChar
+  recipient_email String    @db.VarChar
+  recipient_name  String?   @db.VarChar
+  subject         String?   @db.VarChar
+  bill_id         String?   @db.Uuid
+  booking_id      String?   @db.Uuid
+  status          String    @default("pending") @db.VarChar
+  sent_at         DateTime? @db.Timestamptz(6)
+  error_message   String?
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  bills           bills?    @relation(fields: [bill_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  bookings        bookings? @relation(fields: [booking_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clients         clients?  @relation(fields: [client_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([bill_id])
+  @@index([client_id])
+  @@index([created_at])
+  @@index([status])
+  @@index([user_id, created_at(sort: Desc)], map: "email_communications_user_created_idx")
+  @@index([user_id])
+  @@schema("public")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model payment_sessions {
+  id                       String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  booking_id               String?   @unique(map: "unique_booking_payment_session") @db.Uuid
+  stripe_session_id        String    @unique
+  stripe_payment_intent_id String?
+  amount                   Decimal   @db.Decimal
+  status                   String    @default("pending")
+  created_at               DateTime? @default(now()) @db.Timestamptz(6)
+  completed_at             DateTime? @db.Timestamptz(6)
+  bookings                 bookings? @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@schema("public")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model profiles {
+  id                  String             @id @db.Uuid
+  email               String             @unique
+  created_at          DateTime           @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+  updated_at          DateTime           @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+  name                String?
+  description         String?
+  profile_picture_url String?
+  username            String?            @unique
+  billing_settings    billing_settings[]
+  bills               bills[]
+  bookings            bookings[]
+  calendar_events     calendar_events[]
+  calendar_tokens     calendar_tokens?
+  clients             clients[]
+  schedules           schedules?
+  stripe_accounts     stripe_accounts[]
+
+  @@schema("public")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model schedules {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id             String?   @unique @default(dbgenerated("auth.uid()")) @db.Uuid
+  created_at          DateTime  @default(now()) @db.Timestamptz(6)
+  weekly_availability Json?
+  time_zone           String?
+  meeting_duration    BigInt?
+  meeting_price       Decimal?  @db.Decimal
+  currency            String?
+  profiles            profiles? @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@schema("public")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model stripe_accounts {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id              String    @db.Uuid
+  stripe_account_id    String    @unique
+  onboarding_completed Boolean?  @default(false)
+  payments_enabled     Boolean?  @default(false)
+  created_at           DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime? @default(now()) @db.Timestamptz(6)
+  profiles             profiles  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([stripe_account_id], map: "idx_stripe_accounts_stripe_account_id")
+  @@index([user_id], map: "idx_stripe_accounts_user_id")
+  @@schema("public")
+}
