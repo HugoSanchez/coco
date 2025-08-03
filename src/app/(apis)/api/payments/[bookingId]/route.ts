@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceRoleClient } from '@/lib/supabase/server'
 import { getBookingById } from '@/lib/db/bookings'
 import { getBillsForBooking } from '@/lib/db/bills'
 import { getClientById } from '@/lib/db/clients'
@@ -33,8 +33,9 @@ export async function GET(
 	{ params }: { params: { bookingId: string } }
 ) {
 	try {
-		// Instantiate supabase client
-		const supabase = createClient()
+		// Use service role client to bypass RLS for payment operations
+		// Payment links are accessed by clients (not authenticated users)
+		const supabase = createServiceRoleClient()
 		// Get bookingId from params
 		const bookingId = params.bookingId
 
