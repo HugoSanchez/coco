@@ -94,12 +94,30 @@ export function BookingForm({
 		setExistingBookings([])
 
 		try {
-			// Get start and end of the selected day
-			const startOfDay = new Date(date)
-			startOfDay.setHours(0, 0, 0, 0)
-
-			const endOfDay = new Date(date)
-			endOfDay.setHours(23, 59, 59, 999)
+			// Get start and end of the selected day in UTC
+			// The date parameter is already a Date object representing the selected day
+			const startOfDay = new Date(
+				Date.UTC(
+					date.getFullYear(),
+					date.getMonth(),
+					date.getDate(),
+					0,
+					0,
+					0,
+					0
+				)
+			)
+			const endOfDay = new Date(
+				Date.UTC(
+					date.getFullYear(),
+					date.getMonth(),
+					date.getDate(),
+					23,
+					59,
+					59,
+					999
+				)
+			)
 
 			// Call our API endpoint to get combined events
 			const response = await fetch(

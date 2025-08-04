@@ -848,32 +848,10 @@ export async function getGoogleCalendarEventsForDay(
 			userTimeZone
 		)
 
-		// Convert the input date to the user's time zone for proper day boundaries
-		const userDate = fromZonedTime(date, userTimeZone)
-		const startOfDay = fromZonedTime(
-			new Date(
-				userDate.getFullYear(),
-				userDate.getMonth(),
-				userDate.getDate(),
-				0,
-				0,
-				0,
-				0
-			),
-			userTimeZone
-		)
-		const endOfDay = fromZonedTime(
-			new Date(
-				userDate.getFullYear(),
-				userDate.getMonth(),
-				userDate.getDate(),
-				23,
-				59,
-				59,
-				999
-			),
-			userTimeZone
-		)
+		// The input date is now properly in UTC representing the start of the day
+		// We can use it directly for the Google Calendar API
+		const startOfDay = date
+		const endOfDay = new Date(date.getTime() + 24 * 60 * 60 * 1000 - 1) // End of the same day
 
 		console.log(
 			'🗓️ [Calendar Events] Date range calculation for user:',
