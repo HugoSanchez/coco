@@ -175,22 +175,6 @@ export class StripeService {
 		checkoutUrl: string
 	}> {
 		try {
-			console.log('🗓️ [Stripe] Creating checkout session with date:', {
-				consultationDate,
-				parsedDate: parseISO(consultationDate).toISOString(),
-				formattedDateUTC: format(
-					parseISO(consultationDate),
-					"d 'de' MMMM 'de' yyyy 'a las' HH:mm",
-					{ locale: es }
-				),
-				formattedDateMadrid: formatInTimeZone(
-					parseISO(consultationDate),
-					'Europe/Madrid',
-					"d 'de' MMMM 'de' yyyy 'a las' HH:mm",
-					{ locale: es }
-				)
-			})
-
 			const session = await stripe.checkout.sessions.create({
 				payment_method_types: ['card'],
 				mode: 'payment',

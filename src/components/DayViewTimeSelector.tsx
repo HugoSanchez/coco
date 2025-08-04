@@ -231,15 +231,6 @@ export function DayViewTimeSelector({
 		)
 
 		// Call parent callback with ISO date strings for API compatibility
-		console.log('🗓️ [TimeSelector] Creating time slot:', {
-			date: date.toISOString(),
-			startTime: startTime,
-			endTime: finalEndTime,
-			startDate: startDate.toISOString(),
-			endDate: endDate.toISOString(),
-			startDateLocal: startDate.toString(),
-			endDateLocal: endDate.toString()
-		})
 		onTimeSelect(startDate.toISOString(), endDate.toISOString())
 	}, [dragState, date, onTimeSelect])
 

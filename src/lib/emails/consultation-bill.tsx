@@ -45,6 +45,41 @@ function formatDateToSpanish(dateString: string): string {
 	}
 }
 
+/**
+ * Format a date string to Spanish format with time
+ * Example: "2025-06-30T14:30:00Z" -> "30 de Junio de 2025 a las 14:30h"
+ */
+function formatDateWithTimeToSpanish(dateString: string): string {
+	const monthNames = [
+		'Enero',
+		'Febrero',
+		'Marzo',
+		'Abril',
+		'Mayo',
+		'Junio',
+		'Julio',
+		'Agosto',
+		'Septiembre',
+		'Octubre',
+		'Noviembre',
+		'Diciembre'
+	]
+
+	try {
+		const date = new Date(dateString)
+		const day = date.getDate()
+		const month = monthNames[date.getMonth()]
+		const year = date.getFullYear()
+		const hours = date.getHours().toString().padStart(2, '0')
+		const minutes = date.getMinutes().toString().padStart(2, '0')
+
+		return `${day} de ${month} de ${year} a las ${hours}:${minutes}h`
+	} catch (error) {
+		// Fallback to original string if parsing fails
+		return dateString
+	}
+}
+
 interface ConsultationBillEmailProps {
 	clientName: string
 	consultationDate: string
@@ -91,7 +126,8 @@ export default function ConsultationBillEmail({
 						<Text style={text}>
 							Este email es para comunicarte que tu próxima
 							consulta con {practitionerName} está pre-programada
-							para el {formatDateToSpanish(consultationDate)}.
+							para el{' '}
+							{formatDateWithTimeToSpanish(consultationDate)}.
 						</Text>
 
 						<Text style={text}>

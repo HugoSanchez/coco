@@ -35,18 +35,6 @@ export async function POST(request: NextRequest) {
 		const { clientId, startTime, endTime, notes, status } =
 			await request.json()
 
-		console.log('🗓️ [Booking Create] Received booking request:', {
-			clientId,
-			startTime,
-			endTime,
-			notes,
-			status,
-			startTimeParsed: new Date(startTime).toISOString(),
-			endTimeParsed: new Date(endTime).toISOString(),
-			startTimeLocal: new Date(startTime).toString(),
-			endTimeLocal: new Date(endTime).toString()
-		})
-
 		if (!clientId || !startTime || !endTime) {
 			return NextResponse.json(
 				{
