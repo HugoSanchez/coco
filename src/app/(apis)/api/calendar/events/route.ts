@@ -48,6 +48,19 @@ export async function GET(request: NextRequest) {
 		const startDate = new Date(startParam)
 		const endDate = new Date(endParam)
 
+		console.log(
+			'🗓️ [API] Date parsing for user:',
+			user.id,
+			'Start param:',
+			startParam,
+			'Parsed start:',
+			startDate.toISOString(),
+			'End param:',
+			endParam,
+			'Parsed end:',
+			endDate.toISOString()
+		)
+
 		if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
 			return NextResponse.json(
 				{ error: 'Invalid date format' },

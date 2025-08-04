@@ -760,6 +760,47 @@ export async function rescheduleCalendarEvent(
  * @param supabaseClient - Optional Supabase client for backend operations
  * @returns Promise<Array> - Array of events formatted for DayViewTimeSelector
  */
+/**
+ * Gets the user's time zone from their schedule settings
+ */
+async function getUserTimeZone(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<string> {
+	try {
+		const client = supabaseClient || supabase
+		const { data, error } = await client
+			.from('schedules')
+			.select('time_zone')
+			.eq('user_id', userId)
+			.single()
+
+		if (error || !data?.time_zone) {
+			console.log(
+				'🗓️ [Calendar Events] No time zone found for user:',
+				userId,
+				'using UTC'
+			)
+			return 'UTC' // Default to UTC if no time zone found
+		}
+
+		console.log(
+			'🗓️ [Calendar Events] Using time zone for user:',
+			userId,
+			'time zone:',
+			data.time_zone
+		)
+		return data.time_zone
+	} catch (error) {
+		console.log(
+			'🗓️ [Calendar Events] Error getting time zone for user:',
+			userId,
+			'using UTC'
+		)
+		return 'UTC'
+	}
+}
+
 export async function getGoogleCalendarEventsForDay(
 	userId: string,
 	date: Date,
@@ -792,12 +833,58 @@ export async function getGoogleCalendarEventsForDay(
 			userId
 		)
 
-		// Set up date range for the specific day
-		const startOfDay = new Date(date)
-		startOfDay.setHours(0, 0, 0, 0)
+		// Get user's time zone and set up date range for the specific day
+		const userTimeZone = await getUserTimeZone(userId, supabaseClient)
+		console.log(
+			'🗓️ [Calendar Events] Input date for user:',
+			userId,
+			'Raw date:',
+			date,
+			'Date string:',
+			date.toString(),
+			'ISO:',
+			date.toISOString(),
+			'User time zone:',
+			userTimeZone
+		)
 
-		const endOfDay = new Date(date)
-		endOfDay.setHours(23, 59, 59, 999)
+		// Convert the input date to the user's time zone for proper day boundaries
+		const userDate = fromZonedTime(date, userTimeZone)
+		const startOfDay = fromZonedTime(
+			new Date(
+				userDate.getFullYear(),
+				userDate.getMonth(),
+				userDate.getDate(),
+				0,
+				0,
+				0,
+				0
+			),
+			userTimeZone
+		)
+		const endOfDay = fromZonedTime(
+			new Date(
+				userDate.getFullYear(),
+				userDate.getMonth(),
+				userDate.getDate(),
+				23,
+				59,
+				59,
+				999
+			),
+			userTimeZone
+		)
+
+		console.log(
+			'🗓️ [Calendar Events] Date range calculation for user:',
+			userId,
+			'User time zone:',
+			userTimeZone,
+			'Start:',
+			startOfDay.toISOString(),
+			'End:',
+			endOfDay.toISOString()
+		)
 
 		console.log(
 			'🗓️ [Calendar Events] Fetching events from Google API for user:',
