@@ -61,6 +61,7 @@ export interface CreateBookingResult {
 	bill: Bill
 	requiresPayment: boolean
 	paymentUrl?: string
+	warning?: string // Optional warning message for user
 }
 
 /**
@@ -217,6 +218,21 @@ async function createInAdvanceBooking(
 				'Error:',
 				error
 			)
+
+			// Provide specific guidance for common errors
+			let calendarWarning: string | undefined
+			if (
+				error instanceof Error &&
+				error.message.includes('Calendar access expired')
+			) {
+				console.log(
+					'💡 [Booking] User needs to reconnect Google Calendar:',
+					request.userId
+				)
+				calendarWarning =
+					'Your Google Calendar connection has expired. Please reconnect it in your settings to enable automatic calendar events.'
+			}
+
 			// Continue without calendar event - don't block booking creation
 			pendingEventResult = { success: false, googleEventId: null }
 		}

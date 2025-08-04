@@ -17,7 +17,8 @@ import { google } from 'googleapis'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
 	getUserCalendarTokens,
-	updateUserCalendarTokens
+	updateUserCalendarTokens,
+	deleteUserCalendarTokens
 } from '../db/calendar-tokens'
 
 const clientId = process.env.GOOGLE_CLIENT_ID_CALENDAR
@@ -130,6 +131,33 @@ export async function refreshToken(
 			'Error:',
 			error.message || error
 		)
+
+		// Handle invalid_grant errors specifically
+		if (error.message?.includes('invalid_grant')) {
+			console.log(
+				'🧹 [Token] Cleaning up invalid tokens for user:',
+				userId
+			)
+			try {
+				// Clean up the invalid tokens from database
+				await deleteUserCalendarTokens(userId, supabaseClient)
+				console.log(
+					'✅ [Token] Invalid tokens cleaned up for user:',
+					userId
+				)
+			} catch (cleanupError) {
+				console.error(
+					'❌ [Token] Failed to cleanup tokens for user:',
+					userId,
+					'Error:',
+					cleanupError
+				)
+			}
+			throw new Error(
+				'Calendar access expired - please reconnect your Google Calendar'
+			)
+		}
+
 		throw error
 	}
 }
