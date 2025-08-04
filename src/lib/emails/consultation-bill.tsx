@@ -11,6 +11,8 @@ import {
 	Row,
 	Column
 } from '@react-email/components'
+import { formatInTimeZone } from 'date-fns-tz'
+import { es } from 'date-fns/locale'
 
 /**
  * Format a date string to Spanish format
@@ -46,34 +48,20 @@ function formatDateToSpanish(dateString: string): string {
 }
 
 /**
- * Format a date string to Spanish format with time
- * Example: "2025-06-30T14:30:00Z" -> "30 de Junio de 2025 a las 14:30h"
+ * Format a date string to Spanish format with time in practitioner's time zone
+ * Example: "2025-06-30T14:30:00Z" -> "30 de Junio de 2025 a las 16:30h" (Madrid time)
  */
 function formatDateWithTimeToSpanish(dateString: string): string {
-	const monthNames = [
-		'Enero',
-		'Febrero',
-		'Marzo',
-		'Abril',
-		'Mayo',
-		'Junio',
-		'Julio',
-		'Agosto',
-		'Septiembre',
-		'Octubre',
-		'Noviembre',
-		'Diciembre'
-	]
-
 	try {
-		const date = new Date(dateString)
-		const day = date.getDate()
-		const month = monthNames[date.getMonth()]
-		const year = date.getFullYear()
-		const hours = date.getHours().toString().padStart(2, '0')
-		const minutes = date.getMinutes().toString().padStart(2, '0')
-
-		return `${day} de ${month} de ${year} a las ${hours}:${minutes}h`
+		// Format the date in Madrid time zone (practitioner's time zone)
+		return (
+			formatInTimeZone(
+				new Date(dateString),
+				'Europe/Madrid',
+				"d 'de' MMMM 'de' yyyy 'a las' HH:mm",
+				{ locale: es }
+			) + 'h'
+		)
 	} catch (error) {
 		// Fallback to original string if parsing fails
 		return dateString
