@@ -224,8 +224,8 @@ export function DayViewTimeSelector({
 
 		const endDate = new Date(date)
 		endDate.setHours(
-			Math.floor(finalEndTime / 60), // Extract hours
-			finalEndTime % 60, // Extract minutes
+			Math.floor(currentTime / 60), // Extract hours
+			currentTime % 60, // Extract minutes
 			0, // Set seconds to 0
 			0 // Set milliseconds to 0
 		)
@@ -233,8 +233,8 @@ export function DayViewTimeSelector({
 		// Call parent callback with ISO date strings for API compatibility
 		console.log('🗓️ [TimeSelector] Creating time slot:', {
 			date: date.toISOString(),
-			startTime: finalStartTime,
-			endTime: finalEndTime,
+			startTime: startTime,
+			endTime: currentTime,
 			startDate: startDate.toISOString(),
 			endDate: endDate.toISOString(),
 			startDateLocal: startDate.toString(),
