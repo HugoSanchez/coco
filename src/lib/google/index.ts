@@ -60,21 +60,46 @@ export async function refreshToken(
 	refreshToken: string,
 	supabaseClient?: SupabaseClient
 ): Promise<string> {
+	console.log('🔄 [Token] Starting token refresh for user:', userId)
+
 	// Set the credentials to the refresh token
 	oauth2Client.setCredentials({ refresh_token: refreshToken })
 
 	try {
+		console.log(
+			'🔄 [Token] Requesting new access token from Google for user:',
+			userId
+		)
 		// Ask Google for a new access token
 		const tokenResponse = await oauth2Client.getAccessToken()
+
 		// If unsuccessful, throw an error
-		if (!tokenResponse.token)
+		if (!tokenResponse.token) {
+			console.error(
+				'❌ [Token] Google returned no access token for user:',
+				userId
+			)
 			throw new Error('No access token returned after refresh')
-		// Else,
-		else {
-			// Extract expiry duration (defaults to 1 hour if not provided)
-			const expiryDuration = oauth2Client.credentials.expiry_date
-				? oauth2Client.credentials.expiry_date - Date.now()
-				: 3600 * 1000
+		}
+
+		console.log(
+			'✅ [Token] New access token received from Google for user:',
+			userId
+		)
+
+		// Extract expiry duration (defaults to 1 hour if not provided)
+		const expiryDuration = oauth2Client.credentials.expiry_date
+			? oauth2Client.credentials.expiry_date - Date.now()
+			: 3600 * 1000
+
+		console.log(
+			'🔄 [Token] Updating token in database for user:',
+			userId,
+			'Expiry:',
+			new Date(Date.now() + expiryDuration)
+		)
+
+		try {
 			// update the token in the database
 			await updateUserCalendarTokens(
 				tokenResponse,
@@ -82,10 +107,29 @@ export async function refreshToken(
 				expiryDuration,
 				supabaseClient
 			)
-			// and return token
-			return tokenResponse.token
+			console.log(
+				'✅ [Token] Token successfully updated in database for user:',
+				userId
+			)
+		} catch (dbError) {
+			console.error(
+				'❌ [Token] Failed to update token in database for user:',
+				userId,
+				'Error:',
+				dbError
+			)
+			throw new Error('Failed to update refreshed token in database')
 		}
+
+		// and return token
+		return tokenResponse.token
 	} catch (error: any) {
+		console.error(
+			'❌ [Token] Token refresh failed for user:',
+			userId,
+			'Error:',
+			error.message || error
+		)
 		throw error
 	}
 }
@@ -111,35 +155,88 @@ export async function getAuthenticatedCalendar(
 	userId: string,
 	supabaseClient?: SupabaseClient
 ) {
-	// Fetch user's calendar tokens using backend-compatible function
-	const calendarTokens = await getUserCalendarTokens(userId, supabaseClient)
+	console.log(
+		'🔍 [Calendar] Attempting to get authenticated calendar for user:',
+		userId
+	)
+
+	// Step 1: Try to fetch user's calendar tokens
+	let calendarTokens
+	try {
+		console.log(
+			'🔍 [Calendar] Fetching tokens from database for user:',
+			userId
+		)
+		calendarTokens = await getUserCalendarTokens(userId, supabaseClient)
+	} catch (error) {
+		console.error(
+			'❌ [Calendar] Database error fetching tokens for user:',
+			userId,
+			'Error:',
+			error
+		)
+		throw new Error('Failed to retrieve calendar tokens from database')
+	}
 
 	if (!calendarTokens) {
+		console.error(
+			'❌ [Calendar] No tokens found in database for user:',
+			userId
+		)
 		throw new Error('Calendar tokens not found')
 	}
 
-	// Non-null assertion since we've verified tokens exist above
-	const tokens = calendarTokens!
+	console.log(
+		'✅ [Calendar] Tokens found for user:',
+		userId,
+		'Expiry:',
+		calendarTokens.expiry_date
+			? new Date(calendarTokens.expiry_date)
+			: 'No expiry'
+	)
 
-	// Handle token refresh if needed
+	// Step 2: Check if tokens need refresh
 	const now = Date.now()
-	if (
-		(tokens.expiry_date && tokens.expiry_date < now) ||
-		true // Force refresh for now to ensure fresh tokens
-	) {
-		const newAccessToken = await refreshToken(
+	const needsRefresh =
+		(calendarTokens.expiry_date && calendarTokens.expiry_date < now) || true // Force refresh for now to ensure fresh tokens
+
+	if (needsRefresh) {
+		console.log(
+			'🔄 [Calendar] Tokens expired for user:',
 			userId,
-			tokens.refresh_token,
-			supabaseClient
+			'Attempting refresh...'
+		)
+		try {
+			const newAccessToken = await refreshToken(
+				userId,
+				calendarTokens.refresh_token,
+				supabaseClient
+			)
+			console.log(
+				'✅ [Calendar] Token refresh successful for user:',
+				userId
+			)
+			oauth2Client.setCredentials({
+				access_token: newAccessToken,
+				refresh_token: calendarTokens.refresh_token
+			})
+		} catch (error) {
+			console.error(
+				'❌ [Calendar] Token refresh failed for user:',
+				userId,
+				'Error:',
+				error
+			)
+			throw error
+		}
+	} else {
+		console.log(
+			'✅ [Calendar] Using existing valid tokens for user:',
+			userId
 		)
 		oauth2Client.setCredentials({
-			access_token: newAccessToken,
-			refresh_token: tokens.refresh_token
-		})
-	} else {
-		oauth2Client.setCredentials({
-			access_token: tokens.access_token,
-			refresh_token: tokens.refresh_token
+			access_token: calendarTokens.access_token,
+			refresh_token: calendarTokens.refresh_token
 		})
 	}
 

@@ -392,6 +392,11 @@ export async function createPendingCalendarEvent(
 			endTime
 		})
 
+		console.log(
+			'🗓️ [Calendar API] Attempting to create pending event in Google Calendar for user:',
+			userId
+		)
+
 		// Create the pending event in Google Calendar
 		const response = await calendar.events.insert({
 			calendarId: 'primary',
@@ -400,8 +405,18 @@ export async function createPendingCalendarEvent(
 		})
 
 		const createdEvent = response.data
+		console.log(
+			'✅ [Calendar API] Google Calendar event created successfully for user:',
+			userId,
+			'Event ID:',
+			createdEvent.id
+		)
 
 		if (!createdEvent.id) {
+			console.error(
+				'❌ [Calendar API] Google returned event without ID for user:',
+				userId
+			)
 			throw new Error(
 				'Failed to create pending calendar event: No event ID returned'
 			)
@@ -413,12 +428,16 @@ export async function createPendingCalendarEvent(
 			googleMeetLink: undefined // No meet link for pending events
 		}
 	} catch (error: any) {
-		console.error('Pending calendar event creation error:', {
-			message: error.message,
-			code: error.code,
-			status: error.status,
-			userId
-		})
+		console.error(
+			'❌ [Calendar API] Pending calendar event creation error for user:',
+			userId,
+			{
+				message: error.message,
+				code: error.code,
+				status: error.status,
+				userId
+			}
+		)
 
 		return {
 			success: false,

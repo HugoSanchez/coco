@@ -185,16 +185,41 @@ async function createInAdvanceBooking(
 			throw new Error(`Practitioner profile not found: ${request.userId}`)
 		}
 
-		const pendingEventResult = await createPendingCalendarEvent(
-			{
-				userId: request.userId,
-				clientName: client.name,
-				practitionerEmail: practitioner.email,
-				startTime: request.startTime,
-				endTime: request.endTime
-			},
-			supabaseClient
+		console.log(
+			'🗓️ [Booking] Starting calendar event creation for user:',
+			request.userId,
+			'client:',
+			client.name
 		)
+
+		let pendingEventResult
+		try {
+			pendingEventResult = await createPendingCalendarEvent(
+				{
+					userId: request.userId,
+					clientName: client.name,
+					practitionerEmail: practitioner.email,
+					startTime: request.startTime,
+					endTime: request.endTime
+				},
+				supabaseClient
+			)
+			console.log(
+				'✅ [Booking] Calendar event created successfully for user:',
+				request.userId,
+				'Event ID:',
+				pendingEventResult.googleEventId
+			)
+		} catch (error) {
+			console.error(
+				'❌ [Booking] Calendar event creation failed for user:',
+				request.userId,
+				'Error:',
+				error
+			)
+			// Continue without calendar event - don't block booking creation
+			pendingEventResult = { success: false, googleEventId: null }
+		}
 
 		if (pendingEventResult.success && pendingEventResult.googleEventId) {
 			// Store the pending calendar event in database
