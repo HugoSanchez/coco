@@ -24,6 +24,7 @@ export function createClient() {
 		}
 	)
 }
+////
 
 /**
  * Creates a Supabase client specifically for middleware
