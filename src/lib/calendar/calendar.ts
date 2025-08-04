@@ -773,9 +773,24 @@ export async function getGoogleCalendarEventsForDay(
 		googleEventId: string
 	}>
 > {
+	console.log(
+		'🗓️ [Calendar Events] Fetching Google Calendar events for user:',
+		userId,
+		'date:',
+		date.toISOString()
+	)
+
 	try {
 		// Get authenticated calendar client
+		console.log(
+			'🗓️ [Calendar Events] Getting authenticated calendar for user:',
+			userId
+		)
 		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+		console.log(
+			'✅ [Calendar Events] Got authenticated calendar for user:',
+			userId
+		)
 
 		// Set up date range for the specific day
 		const startOfDay = new Date(date)
@@ -783,6 +798,15 @@ export async function getGoogleCalendarEventsForDay(
 
 		const endOfDay = new Date(date)
 		endOfDay.setHours(23, 59, 59, 999)
+
+		console.log(
+			'🗓️ [Calendar Events] Fetching events from Google API for user:',
+			userId,
+			'range:',
+			startOfDay.toISOString(),
+			'to',
+			endOfDay.toISOString()
+		)
 
 		// Fetch events for the day
 		const response = await calendar.events.list({
@@ -794,9 +818,15 @@ export async function getGoogleCalendarEventsForDay(
 		})
 
 		const events = response.data.items || []
+		console.log(
+			'✅ [Calendar Events] Got',
+			events.length,
+			'raw events from Google for user:',
+			userId
+		)
 
 		// Transform events to the format expected by DayViewTimeSelector
-		return events
+		const filteredEvents = events
 			.filter((event) => {
 				// Only include events with time data (skip all-day events)
 				return event.start?.dateTime && event.end?.dateTime && event.id
@@ -808,9 +838,24 @@ export async function getGoogleCalendarEventsForDay(
 				type: 'external', // Mark as external calendar event
 				googleEventId: event.id! // Include Google event ID for filtering
 			}))
+
+		console.log(
+			'✅ [Calendar Events] Returning',
+			filteredEvents.length,
+			'filtered events for user:',
+			userId
+		)
+		return filteredEvents
 	} catch (error: any) {
 		// Silent failure - if Google Calendar access fails, just return empty array
-		console.error('Failed to fetch Google Calendar events:', error.message)
+		console.error(
+			'❌ [Calendar Events] Failed to fetch Google Calendar events for user:',
+			userId,
+			'Error:',
+			error.message,
+			'Full error:',
+			error
+		)
 		return []
 	}
 }

@@ -74,13 +74,30 @@ export async function GET(request: NextRequest) {
 		}
 
 		try {
+			console.log(
+				'🗓️ [API] Attempting to fetch Google Calendar events for user:',
+				user.id,
+				'date:',
+				startDate.toISOString()
+			)
 			googleEvents = await getGoogleCalendarEventsForDay(
 				user.id,
 				startDate,
 				supabase
 			)
+			console.log(
+				'✅ [API] Successfully fetched',
+				googleEvents.length,
+				'Google Calendar events for user:',
+				user.id
+			)
 		} catch (error) {
-			console.log('Could not fetch Google Calendar events:', error)
+			console.error(
+				'❌ [API] Could not fetch Google Calendar events for user:',
+				user.id,
+				'Error:',
+				error
+			)
 		}
 
 		// Format system bookings
@@ -116,6 +133,17 @@ export async function GET(request: NextRequest) {
 		]
 		allEvents.sort(
 			(a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
+		)
+
+		console.log(
+			'📊 [API] Final response for user:',
+			user.id,
+			'System bookings:',
+			formattedSystemBookings.length,
+			'External events:',
+			formattedExternalEvents.length,
+			'Total events:',
+			allEvents.length
 		)
 
 		return NextResponse.json({ events: allEvents })
