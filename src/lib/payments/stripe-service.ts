@@ -1,6 +1,6 @@
 import Stripe from 'stripe'
 import { SupabaseClient } from '@supabase/supabase-js'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 // Initialize Stripe with environment variable
@@ -174,6 +174,16 @@ export class StripeService {
 		checkoutUrl: string
 	}> {
 		try {
+			console.log('🗓️ [Stripe] Creating checkout session with date:', {
+				consultationDate,
+				parsedDate: parseISO(consultationDate).toISOString(),
+				formattedDate: format(
+					parseISO(consultationDate),
+					"d 'de' MMMM 'de' yyyy 'a las' HH:mm",
+					{ locale: es }
+				)
+			})
+
 			const session = await stripe.checkout.sessions.create({
 				payment_method_types: ['card'],
 				mode: 'payment',
@@ -183,7 +193,7 @@ export class StripeService {
 							currency: 'eur',
 							product_data: {
 								name: `Consulta con ${practitionerName}`,
-								description: `Consulta programada para ${format(new Date(consultationDate), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })}h`
+								description: `Consulta programada para ${format(parseISO(consultationDate), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })}h`
 							},
 							unit_amount: Math.round(amount * 100) // Convert to cents
 						},
