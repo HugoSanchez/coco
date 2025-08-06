@@ -26,7 +26,15 @@ import {
 	Check,
 	Loader,
 	RefreshCcw,
-	Mail
+	Mail,
+	Calendar,
+	Clock,
+	CreditCard,
+	RotateCcw,
+	Send,
+	UserCheck,
+	Ban,
+	Copy
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -177,6 +185,24 @@ function BookingActions({
 		}
 	}
 
+	const handleCopyPaymentLink = async () => {
+		const paymentUrl = `${window.location.origin}/api/payments/${booking.id}`
+
+		try {
+			await navigator.clipboard.writeText(paymentUrl)
+			toast({
+				title: 'Link copiado',
+				description: 'El link de pago ha sido copiado al portapapeles.'
+			})
+		} catch (error) {
+			toast({
+				title: 'Error al copiar',
+				description: 'No se pudo copiar el link. Inténtalo de nuevo.',
+				variant: 'destructive'
+			})
+		}
+	}
+
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
@@ -198,7 +224,9 @@ function BookingActions({
 				{booking.payment_status === 'paid' && (
 					<DropdownMenuItem
 						onClick={() => onRefundBooking(booking.id)}
+						className="flex items-center gap-3"
 					>
+						<RotateCcw className="h-3 w-3" />
 						Reembolsar pago
 					</DropdownMenuItem>
 				)}
@@ -206,29 +234,52 @@ function BookingActions({
 					booking.status !== 'canceled' && (
 						<DropdownMenuItem
 							onClick={() => onRescheduleBooking(booking.id)}
+							className="flex items-center gap-3"
 						>
+							<Calendar className="h-3 w-3" />
 							Reprogramar cita
 						</DropdownMenuItem>
 					)}
 				{booking.payment_status === 'pending' && (
-					<DropdownMenuItem
-						onClick={handleResendEmail}
-						disabled={isResending}
-					>
-						{isResending
-							? 'Reenviando...'
-							: 'Reenviar email de pago'}
-					</DropdownMenuItem>
+					<>
+						<DropdownMenuItem
+							onClick={handleCopyPaymentLink}
+							className="flex items-center gap-3"
+						>
+							<Copy className="h-3 w-3" />
+							Copiar link de pago
+						</DropdownMenuItem>
+						<DropdownMenuItem
+							onClick={handleResendEmail}
+							disabled={isResending}
+							className="flex items-center gap-3"
+						>
+							{isResending ? (
+								<Loader className="h-3 w-3 animate-spin" />
+							) : (
+								<Send className="h-3 w-3" />
+							)}
+							{isResending
+								? 'Reenviando...'
+								: 'Reenviar email de pago'}
+						</DropdownMenuItem>
+					</>
 				)}
 				{booking.payment_status !== 'paid' && (
-					<DropdownMenuItem onClick={() => onMarkAsPaid(booking.id)}>
+					<DropdownMenuItem
+						onClick={() => onMarkAsPaid(booking.id)}
+						className="flex items-center gap-3"
+					>
+						<CreditCard className="h-3 w-3" />
 						Marcar cita como pagada
 					</DropdownMenuItem>
 				)}
 				{booking.status === 'pending' && (
 					<DropdownMenuItem
 						onClick={() => onConfirmBooking(booking.id)}
+						className="flex items-center gap-3"
 					>
+						<UserCheck className="h-3 w-3" />
 						Marcar cita como confirmada
 					</DropdownMenuItem>
 				)}
@@ -236,7 +287,9 @@ function BookingActions({
 				{booking.status !== 'canceled' && (
 					<DropdownMenuItem
 						onClick={() => onCancelBooking(booking.id)}
+						className="flex items-center gap-3"
 					>
+						<Ban className="h-3 w-3" />
 						Cancelar cita
 					</DropdownMenuItem>
 				)}
