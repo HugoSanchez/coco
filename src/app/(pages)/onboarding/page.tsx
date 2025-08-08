@@ -112,7 +112,7 @@ function OnboardingContent() {
 				<div className="flex flex-col items-center justify-center mb-20 text-center">
 					<CardHeader className="text-center gap-4">
 						<h1 className="text-5xl font-black text-primary">
-							¡Bienvenido a coco!
+							¡Bienvenid@ a coco!
 						</h1>
 						<p className="text-xl text-gray-600 font-light">
 							En menos de 5 minutos tendrás tu cuenta activada con
