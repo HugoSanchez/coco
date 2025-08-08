@@ -30,6 +30,24 @@ Non-Personal Information
 In general, we use Non-Personal Information to help us improve the Service and customize the user experience. We also aggregate Non-Personal Information in order to track trends and analyze use patterns on the Site. This Privacy Policy does not limit in any way our use or disclosure of Non-Personal Information and we reserve the right to use and disclose such Non-Personal Information to our partners, advertisers and other third parties at our discretion.
 In the event we undergo a business transaction such as a merger, acquisition by another company, or sale of all or a portion of our assets, your Personal Information may be among the assets transferred. You acknowledge and consent that such transfers may occur and are permitted by this Privacy Policy, and that any acquirer of our assets may continue to process your Personal Information as set forth in this Privacy Policy. If our information practices change at any time in the future, we will post the policy changes to the Site so that you may opt out of the new information practices. We suggest that you check the Site periodically if you are concerned about how your information is used.
 
+GOOGLE USER DATA (Google Calendar)
+We integrate with Google Calendar solely to help you manage your agenda and the bookings you create through the Service. In connection with this integration:
+
+- We request only the scopes necessary to read and write calendar events. We do not request or access Google user data that is not required to provide booking functionality.
+- We do not sell, rent, or use Google user data for advertising purposes. We do not share Google user data with third parties, without exemption.
+- We do not persist information from your Google Calendar that is unrelated to appointments created through our platform. For external events that already exist in your Google Calendar, we read them as needed to determine free/busy time and do not store their content.
+- For appointments created through the Service, we may store the event’s start/end time, participant information you provided, and the Google Calendar event ID so that we can update or cancel the appointment from our platform. We do not store other Google event content unless you choose to enter it into the booking within the Service.
+- To maintain a connection to your calendar, we store OAuth tokens (access token, refresh token, expiry) securely. These tokens are used only to perform actions you initiate or that are required to keep your bookings in sync.
+
+RETENTION AND DELETION OF GOOGLE USER DATA
+- We retain Google OAuth tokens only while your Google Calendar is connected to the Service. You may revoke access at any time from within the application (e.g., “Revoke calendar access”) or from your Google Account security settings. When access is revoked, we immediately stop using the tokens and delete them from our database.
+- We retain stored data about appointments created through the Service (including the Google event ID) for as long as your account remains active, in order to provide you with booking history and allow modifications/cancellations.
+- Upon your request to delete your account or your data, we will delete all user data we store—including Google OAuth tokens and any booking-related Google event references—within a commercially reasonable period, not to exceed 30 days. Backups may persist for an additional limited period as part of our routine backup processes, after which the data is permanently removed.
+- We do not retain or store Google user data that is not related to the bookings you create with our platform.
+
+COMPLIANCE WITH GOOGLE API POLICIES
+Our use and transfer of information received from Google APIs to any other app will adhere to the Google API Services User Data Policy (including the Limited Use requirements).
+
 III.           HOW WE PROTECT INFORMATION
 We implement security measures designed to protect your information from unauthorized access. Your account is protected by your account password and we urge you to take steps to keep your personal information safe by not disclosing your password and by logging out of your account after each use. We further protect your information from potential security breaches by implementing certain technological security measures including encryption, firewalls and secure socket layer technology. However, these measures do not guarantee that your information will not be accessed, disclosed, altered or destroyed by breach of such firewalls and secure server software. By using our Service, you acknowledge that you understand and agree to assume these risks.
 
@@ -44,4 +62,4 @@ The Company reserves the right to change this policy and our Terms of Service at
 
 VII.         CONTACT US
 If you have any questions regarding this Privacy Policy or the practices of this Site, please contact us by sending an email to info@itscoco.app.
-Last Updated: This Privacy Policy was last updated on July 17th 2025.
+Last Updated: This Privacy Policy was last updated on August 8th 2025.

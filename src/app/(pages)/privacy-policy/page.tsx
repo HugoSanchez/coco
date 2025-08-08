@@ -179,6 +179,105 @@ export default function PrivacyPolicyPage() {
 								you are concerned about how your information is
 								used.
 							</p>
+
+							{/* Google User Data section */}
+							<h3 className="text-xl font-medium text-gray-900 mb-3">
+								Google User Data (Google Calendar)
+							</h3>
+							<p className="text-gray-600 mb-4">
+								We integrate with Google Calendar solely to help
+								you manage your agenda and the bookings you
+								create through the Service. In connection with
+								this integration:
+							</p>
+							<ul className="list-disc ml-6 text-gray-600 mb-4">
+								<li>
+									We request only the scopes necessary to read
+									and write calendar events. We do not request
+									or access Google user data that is not
+									required to provide booking functionality.
+								</li>
+								<li>
+									We do not sell, rent, or use Google user
+									data for advertising purposes. We do not
+									share Google user data with third parties,
+									without exemption.
+								</li>
+								<li>
+									We do not persist information from your
+									Google Calendar that is unrelated to
+									appointments created through our platform.
+									For external events that already exist in
+									your Google Calendar, we read them as needed
+									to determine free/busy time and do not store
+									their content.
+								</li>
+								<li>
+									For appointments created through the
+									Service, we may store the event’s start/end
+									time, participant information you provided,
+									and the Google Calendar event ID so that we
+									can update or cancel the appointment from
+									our platform. We do not store other Google
+									event content unless you choose to enter it
+									into the booking within the Service.
+								</li>
+								<li>
+									To maintain a connection to your calendar,
+									we store OAuth tokens (access token, refresh
+									token, expiry) securely. These tokens are
+									used only to perform actions you initiate or
+									that are required to keep your bookings in
+									sync.
+								</li>
+							</ul>
+
+							<h3 className="text-xl font-medium text-gray-900 mb-3">
+								Retention and Deletion of Google User Data
+							</h3>
+							<ul className="list-disc ml-6 text-gray-600 mb-4">
+								<li>
+									We retain Google OAuth tokens only while
+									your Google Calendar is connected to the
+									Service. You may revoke access at any time
+									from within the application or from your
+									Google Account security settings. When
+									access is revoked, we immediately stop using
+									the tokens and delete them from our
+									database.
+								</li>
+								<li>
+									We retain stored data about appointments
+									created through the Service (including the
+									Google event ID) for as long as your account
+									remains active, in order to provide booking
+									history and allow
+									modifications/cancellations.
+								</li>
+								<li>
+									Upon your request to delete your account or
+									your data, we will delete all user data we
+									store—including Google OAuth tokens and any
+									booking-related Google event
+									references—within a commercially reasonable
+									period, not to exceed 30 days. Backups may
+									persist for an additional limited period as
+									part of our routine backup processes, after
+									which the data is permanently removed.
+								</li>
+								<li>
+									We do not retain or store Google user data
+									that is not related to the bookings you
+									create with our platform.
+								</li>
+							</ul>
+
+							<p className="text-gray-600 mb-8">
+								Our use and transfer of information received
+								from Google APIs will adhere to the Google API
+								Services User Data Policy (including the Limited
+								Use requirements).
+							</p>
 						</section>
 
 						<section className="mb-8">
@@ -295,7 +394,7 @@ export default function PrivacyPolicyPage() {
 						<div className="border-t pt-6 mt-8">
 							<p className="text-sm text-gray-500">
 								<strong>Last Updated:</strong> This Privacy
-								Policy was last updated on July 17th 2025.
+								Policy was last updated on August 8th 2025.
 							</p>
 						</div>
 					</div>
