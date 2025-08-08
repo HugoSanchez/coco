@@ -156,6 +156,19 @@ export default function Dashboard() {
 	const { toast } = useToast()
 	const router = useRouter()
 
+	// Simple responsive switch for mobile tabs behavior
+	const [isMobile, setIsMobile] = useState(false)
+	const [mobileTab, setMobileTab] = useState<
+		'bookings' | 'clients' | 'stats'
+	>('bookings')
+
+	useEffect(() => {
+		const onResize = () => setIsMobile(window.innerWidth < 768)
+		onResize()
+		window.addEventListener('resize', onResize)
+		return () => window.removeEventListener('resize', onResize)
+	}, [])
+
 	/**
 	 * Fetches dashboard statistics from the API
 	 * Handles loading states and error management
@@ -716,138 +729,336 @@ export default function Dashboard() {
 				</div>
 			</header>
 			<main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:px-16">
-				<div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
-					{/* Revenue Card - Real Data */}
-					<StatCard
-						title={`Facturación Mensual`}
-						value={dashboardStats.data?.revenue.formattedCurrent}
-						change={dashboardStats.data?.revenue.percentageChange}
-						changeLabel="respecto al mes anterior"
-						icon={
-							<DollarSign className="h-4 w-4 text-muted-foreground" />
-						}
-						tooltipContent={`Facturación total confirmada para el mes de ${getCurrentMonthNameCapitalized()}`}
-						loading={dashboardStats.loading}
-						error={dashboardStats.error}
-						onRetry={retryDashboardStats}
-					/>
-					{/* Bookings Card - Real Data */}
-					<StatCard
-						title={`Total Confirmadas`}
-						value={'+' + dashboardStats.data?.bookings.current}
-						change={dashboardStats.data?.bookings.percentageChange}
-						changeLabel="respecto al mes anterior"
-						icon={
-							<CalendarCheck className="h-4 w-4 text-muted-foreground" />
-						}
-						tooltipContent={`Total de citas confirmadas para el mes de ${getCurrentMonthNameCapitalized()}`}
-						loading={dashboardStats.loading}
-						error={dashboardStats.error}
-						onRetry={retryDashboardStats}
-					/>
-					{/* Pending Bookings Card - Real Data */}
-					<StatCard
-						title={`Pendientes de confirmación`}
-						value={
-							'+' + dashboardStats.data?.pendingBookings.current
-						}
-						change={
-							dashboardStats.data?.pendingBookings
-								.percentageChange
-						}
-						changeLabel="respecto al mes anterior"
-						icon={
-							<TriangleAlert className="h-4 w-4 text-muted-foreground" />
-						}
-						tooltipContent={`Número de citas pendientes de confirmación para ${getCurrentMonthNameCapitalized()}`}
-						loading={dashboardStats.loading}
-						error={dashboardStats.error}
-						onRetry={retryDashboardStats}
-					/>
+				{/* Desktop stats grid */}
+				{!isMobile && (
+					<div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
+						{/* Revenue Card - Real Data */}
+						<StatCard
+							title={`Facturación Mensual`}
+							value={
+								dashboardStats.data?.revenue.formattedCurrent
+							}
+							change={
+								dashboardStats.data?.revenue.percentageChange
+							}
+							changeLabel="respecto al mes anterior"
+							icon={
+								<DollarSign className="h-4 w-4 text-muted-foreground" />
+							}
+							tooltipContent={`Facturación total confirmada para el mes de ${getCurrentMonthNameCapitalized()}`}
+							loading={dashboardStats.loading}
+							error={dashboardStats.error}
+							onRetry={retryDashboardStats}
+						/>
+						{/* Bookings Card - Real Data */}
+						<StatCard
+							title={`Total Confirmadas`}
+							value={'+' + dashboardStats.data?.bookings.current}
+							change={
+								dashboardStats.data?.bookings.percentageChange
+							}
+							changeLabel="respecto al mes anterior"
+							icon={
+								<CalendarCheck className="h-4 w-4 text-muted-foreground" />
+							}
+							tooltipContent={`Total de citas confirmadas para el mes de ${getCurrentMonthNameCapitalized()}`}
+							loading={dashboardStats.loading}
+							error={dashboardStats.error}
+							onRetry={retryDashboardStats}
+						/>
+						{/* Pending Bookings Card - Real Data */}
+						<StatCard
+							title={`Pendientes de confirmación`}
+							value={
+								'+' +
+								dashboardStats.data?.pendingBookings.current
+							}
+							change={
+								dashboardStats.data?.pendingBookings
+									.percentageChange
+							}
+							changeLabel="respecto al mes anterior"
+							icon={
+								<TriangleAlert className="h-4 w-4 text-muted-foreground" />
+							}
+							tooltipContent={`Número de citas pendientes de confirmación para ${getCurrentMonthNameCapitalized()}`}
+							loading={dashboardStats.loading}
+							error={dashboardStats.error}
+							onRetry={retryDashboardStats}
+						/>
 
-					{/* Active Clients Card - Real Data */}
-					<StatCard
-						title="Clientes Activos"
-						value={'+' + dashboardStats.data?.activeClients.current}
-						change={
-							dashboardStats.data?.activeClients.percentageChange
-						}
-						changeLabel="respecto a los 30 días anteriores"
-						icon={
-							<Users className="h-4 w-4 text-muted-foreground" />
-						}
-						tooltipContent="Clientes únicos que han tenido al menos una cita en los últimos 30 días."
-						loading={dashboardStats.loading}
-						error={dashboardStats.error}
-						onRetry={retryDashboardStats}
-					/>
-				</div>
-				<div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
-					<Card
-						className="xl:col-span-2"
-						x-chunk="dashboard-01-chunk-4"
-					>
-						<CardHeader className="flex flex-row items-center">
-							<div className="grid gap-2">
-								<CardTitle>Listado de citas</CardTitle>
-								<CardDescription>
-									Listado de todas tus citas agendadas, con su
-									estado de facturación y pago.
-								</CardDescription>
-							</div>
-							<Button
-								size="sm"
-								onClick={() => setIsFilterOpen(true)}
-								className="ml-auto gap-1 bg-gray-100 text-gray-800 hover:bg-gray-200"
-							>
-								Filtrar
-								<FilterX className="h-4 w-4 ml-2" />
-							</Button>
-						</CardHeader>
-						<CardContent>
-							<BookingsTable
-								bookings={bookings}
-								loading={loadingBookings}
-								onCancelBooking={handleCancelBooking}
-								onConfirmBooking={handleConfirmBooking}
-								onMarkAsPaid={handleShowMarkAsPaidDialog}
-								onRefundBooking={handleRefundBooking}
-								onRescheduleBooking={handleRescheduleBooking}
-								onResendEmail={handleResendEmail}
-							/>
-							{/* Load More Button */}
-							{hasMore && !loadingBookings && (
-								<div className="flex justify-center pt-4">
-									<Button
-										variant="ghost"
-										onClick={loadMoreBookings}
-										disabled={loadingMore}
-										className="w-40 hover:bg-gray-50 rounded-full text-xs"
-									>
-										{loadingMore ? (
-											<>
-												<Spinner
-													size="sm"
-													className="mr-2"
-												/>
-												Cargando...
-											</>
-										) : (
-											'Cargar más'
-										)}
-									</Button>
-								</div>
-							)}
-						</CardContent>
-					</Card>
-					<div x-chunk="dashboard-01-chunk-5">
-						<ClientList
-							clients={clients as Client[]}
-							loading={loadingClients}
-							onClientCreated={handleClientCreated}
+						{/* Active Clients Card - Real Data */}
+						<StatCard
+							title="Clientes Activos"
+							value={
+								'+' + dashboardStats.data?.activeClients.current
+							}
+							change={
+								dashboardStats.data?.activeClients
+									.percentageChange
+							}
+							changeLabel="respecto a los 30 días anteriores"
+							icon={
+								<Users className="h-4 w-4 text-muted-foreground" />
+							}
+							tooltipContent="Clientes únicos que han tenido al menos una cita en los últimos 30 días."
+							loading={dashboardStats.loading}
+							error={dashboardStats.error}
+							onRetry={retryDashboardStats}
 						/>
 					</div>
-				</div>
+				)}
+
+				{/* Mobile tabs */}
+				{isMobile && (
+					<div className="md:hidden">
+						<div className="flex bg-gray-100 rounded-full p-1 w-full max-w-md mx-auto mb-3">
+							{[
+								{ key: 'bookings', label: 'Citas' },
+								{ key: 'clients', label: 'Clientes' },
+								{ key: 'stats', label: 'Stats' }
+							].map((t) => (
+								<button
+									key={t.key}
+									className={`flex-1 py-2 text-sm rounded-full transition-colors ${
+										mobileTab === (t.key as any)
+											? 'bg-white shadow-sm text-gray-900'
+											: 'text-gray-600'
+									}`}
+									onClick={() => setMobileTab(t.key as any)}
+								>
+									{t.label}
+								</button>
+							))}
+						</div>
+
+						{/* Mobile content by tab */}
+						{mobileTab === 'stats' && (
+							<div className="grid gap-4">
+								<StatCard
+									title={`Facturación Mensual`}
+									value={
+										dashboardStats.data?.revenue
+											.formattedCurrent
+									}
+									change={
+										dashboardStats.data?.revenue
+											.percentageChange
+									}
+									changeLabel="respecto al mes anterior"
+									icon={
+										<DollarSign className="h-4 w-4 text-muted-foreground" />
+									}
+									tooltipContent={`Facturación total confirmada para el mes de ${getCurrentMonthNameCapitalized()}`}
+									loading={dashboardStats.loading}
+									error={dashboardStats.error}
+									onRetry={retryDashboardStats}
+								/>
+								<StatCard
+									title={`Total Confirmadas`}
+									value={
+										'+' +
+										dashboardStats.data?.bookings.current
+									}
+									change={
+										dashboardStats.data?.bookings
+											.percentageChange
+									}
+									changeLabel="respecto al mes anterior"
+									icon={
+										<CalendarCheck className="h-4 w-4 text-muted-foreground" />
+									}
+									tooltipContent={`Total de citas confirmadas para el mes de ${getCurrentMonthNameCapitalized()}`}
+									loading={dashboardStats.loading}
+									error={dashboardStats.error}
+									onRetry={retryDashboardStats}
+								/>
+								<StatCard
+									title={`Pendientes de confirmación`}
+									value={
+										'+' +
+										dashboardStats.data?.pendingBookings
+											.current
+									}
+									change={
+										dashboardStats.data?.pendingBookings
+											.percentageChange
+									}
+									changeLabel="respecto al mes anterior"
+									icon={
+										<TriangleAlert className="h-4 w-4 text-muted-foreground" />
+									}
+									tooltipContent={`Número de citas pendientes de confirmación para ${getCurrentMonthNameCapitalized()}`}
+									loading={dashboardStats.loading}
+									error={dashboardStats.error}
+									onRetry={retryDashboardStats}
+								/>
+								<StatCard
+									title="Clientes Activos"
+									value={
+										'+' +
+										dashboardStats.data?.activeClients
+											.current
+									}
+									change={
+										dashboardStats.data?.activeClients
+											.percentageChange
+									}
+									changeLabel="respecto a los 30 días anteriores"
+									icon={
+										<Users className="h-4 w-4 text-muted-foreground" />
+									}
+									tooltipContent="Clientes únicos que han tenido al menos una cita en los últimos 30 días."
+									loading={dashboardStats.loading}
+									error={dashboardStats.error}
+									onRetry={retryDashboardStats}
+								/>
+							</div>
+						)}
+
+						{mobileTab === 'bookings' && (
+							<Card x-chunk="dashboard-01-chunk-4">
+								<CardHeader className="flex flex-row items-center">
+									<div className="grid gap-2">
+										<CardTitle>Listado de citas</CardTitle>
+										<CardDescription>
+											Listado de todas tus citas
+											agendadas, con su estado de
+											facturación y pago.
+										</CardDescription>
+									</div>
+									<Button
+										size="sm"
+										onClick={() => setIsFilterOpen(true)}
+										className="ml-auto gap-1 bg-gray-100 text-gray-800 hover:bg-gray-200"
+									>
+										Filtrar
+										<FilterX className="h-4 w-4 ml-2" />
+									</Button>
+								</CardHeader>
+								<CardContent>
+									<BookingsTable
+										bookings={bookings}
+										loading={loadingBookings}
+										onCancelBooking={handleCancelBooking}
+										onConfirmBooking={handleConfirmBooking}
+										onMarkAsPaid={
+											handleShowMarkAsPaidDialog
+										}
+										onRefundBooking={handleRefundBooking}
+										onRescheduleBooking={
+											handleRescheduleBooking
+										}
+										onResendEmail={handleResendEmail}
+									/>
+									{hasMore && !loadingBookings && (
+										<div className="flex justify-center pt-4">
+											<Button
+												variant="ghost"
+												onClick={loadMoreBookings}
+												disabled={loadingMore}
+												className="w-40 hover:bg-gray-50 rounded-full text-xs"
+											>
+												{loadingMore ? (
+													<>
+														<Spinner
+															size="sm"
+															className="mr-2"
+														/>
+														Cargando...
+													</>
+												) : (
+													'Cargar más'
+												)}
+											</Button>
+										</div>
+									)}
+								</CardContent>
+							</Card>
+						)}
+
+						{mobileTab === 'clients' && (
+							<div>
+								<ClientList
+									clients={clients as Client[]}
+									loading={loadingClients}
+									onClientCreated={handleClientCreated}
+								/>
+							</div>
+						)}
+					</div>
+				)}
+
+				{/* Desktop bookings + client list layout */}
+				{!isMobile && (
+					<div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
+						<Card
+							className="xl:col-span-2"
+							x-chunk="dashboard-01-chunk-4"
+						>
+							<CardHeader className="flex flex-row items-center">
+								<div className="grid gap-2">
+									<CardTitle>Listado de citas</CardTitle>
+									<CardDescription>
+										Listado de todas tus citas agendadas,
+										con su estado de facturación y pago.
+									</CardDescription>
+								</div>
+								<Button
+									size="sm"
+									onClick={() => setIsFilterOpen(true)}
+									className="ml-auto gap-1 bg-gray-100 text-gray-800 hover:bg-gray-200"
+								>
+									Filtrar
+									<FilterX className="h-4 w-4 ml-2" />
+								</Button>
+							</CardHeader>
+							<CardContent>
+								<BookingsTable
+									bookings={bookings}
+									loading={loadingBookings}
+									onCancelBooking={handleCancelBooking}
+									onConfirmBooking={handleConfirmBooking}
+									onMarkAsPaid={handleShowMarkAsPaidDialog}
+									onRefundBooking={handleRefundBooking}
+									onRescheduleBooking={
+										handleRescheduleBooking
+									}
+									onResendEmail={handleResendEmail}
+								/>
+								{hasMore && !loadingBookings && (
+									<div className="flex justify-center pt-4">
+										<Button
+											variant="ghost"
+											onClick={loadMoreBookings}
+											disabled={loadingMore}
+											className="w-40 hover:bg-gray-50 rounded-full text-xs"
+										>
+											{loadingMore ? (
+												<>
+													<Spinner
+														size="sm"
+														className="mr-2"
+													/>
+													Cargando...
+												</>
+											) : (
+												'Cargar más'
+											)}
+										</Button>
+									</div>
+								)}
+							</CardContent>
+						</Card>
+						<div x-chunk="dashboard-01-chunk-5">
+							<ClientList
+								clients={clients as Client[]}
+								loading={loadingClients}
+								onClientCreated={handleClientCreated}
+							/>
+						</div>
+					</div>
+				)}
 			</main>
 
 			{/* Filter Sidebar */}
