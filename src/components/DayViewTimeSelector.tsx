@@ -52,6 +52,33 @@ export function DayViewTimeSelector({
 		end: number
 	} | null>(null)
 
+	// Mobile long-press selection state
+	const [isLongPressMode, setIsLongPressMode] = useState(false)
+	const longPressTimerRef = useRef<number | null>(null)
+	const longPressStartYRef = useRef<number | null>(null)
+	const LONG_PRESS_MS = 250
+	const MOVE_THRESHOLD_PX = 10
+
+	const lockScrollDuringSelection = () => {
+		if (scrollContainerRef.current) {
+			scrollContainerRef.current.style.overflowY = 'hidden'
+			scrollContainerRef.current.style.touchAction = 'none'
+		}
+		if (containerRef.current) {
+			containerRef.current.style.touchAction = 'none'
+		}
+	}
+
+	const unlockScrollAfterSelection = () => {
+		if (scrollContainerRef.current) {
+			scrollContainerRef.current.style.overflowY = 'auto'
+			scrollContainerRef.current.style.touchAction = ''
+		}
+		if (containerRef.current) {
+			containerRef.current.style.touchAction = ''
+		}
+	}
+
 	// Initialize selected slot from prop when component mounts or prop changes
 	useEffect(() => {
 		if (initialSelectedSlot) {
@@ -257,9 +284,17 @@ export function DayViewTimeSelector({
 	// Touch event handlers - extract clientY from first touch and delegate to unified handlers
 	const handleTouchStart = useCallback(
 		(e: React.TouchEvent) => {
-			e.preventDefault()
+			// For mobile: start a long-press timer to enter selection mode
 			const touch = e.touches[0]
-			handleDragStart(touch.clientY)
+			longPressStartYRef.current = touch.clientY
+			if (longPressTimerRef.current) {
+				window.clearTimeout(longPressTimerRef.current)
+			}
+			longPressTimerRef.current = window.setTimeout(() => {
+				setIsLongPressMode(true)
+				lockScrollDuringSelection()
+				handleDragStart(touch.clientY)
+			}, LONG_PRESS_MS)
 		},
 		[handleDragStart]
 	)
@@ -267,14 +302,34 @@ export function DayViewTimeSelector({
 	const handleTouchMove = useCallback(
 		(e: React.TouchEvent) => {
 			const touch = e.touches[0]
-			handleDragMove(touch.clientY)
+			// Cancel long-press if user scrolls/moves significantly before activation
+			if (!isLongPressMode && longPressStartYRef.current !== null) {
+				const delta = Math.abs(
+					touch.clientY - longPressStartYRef.current
+				)
+				if (delta > MOVE_THRESHOLD_PX && longPressTimerRef.current) {
+					window.clearTimeout(longPressTimerRef.current)
+					longPressTimerRef.current = null
+				}
+			}
+			if (isLongPressMode) {
+				handleDragMove(touch.clientY)
+			}
 		},
-		[handleDragMove]
+		[handleDragMove, isLongPressMode]
 	)
 
 	const handleTouchEnd = useCallback(() => {
-		handleDragEnd()
-	}, [handleDragEnd])
+		if (longPressTimerRef.current) {
+			window.clearTimeout(longPressTimerRef.current)
+			longPressTimerRef.current = null
+		}
+		if (isLongPressMode) {
+			handleDragEnd()
+			setIsLongPressMode(false)
+			unlockScrollAfterSelection()
+		}
+	}, [handleDragEnd, isLongPressMode])
 
 	// Generate array of hour numbers for rendering (0-23)
 	const hours: number[] = []
