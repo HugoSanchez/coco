@@ -11,6 +11,14 @@ import { CustomerStep } from '@/components/CustomerStep'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
+import confetti from 'canvas-confetti'
+import {
+	Card,
+	CardHeader,
+	CardTitle,
+	CardDescription
+} from '@/components/ui/card'
+import { Check } from 'lucide-react'
 
 // Force dynamic rendering since this page uses useSearchParams
 export const dynamic = 'force-dynamic'
@@ -52,7 +60,7 @@ function OnboardingContent() {
 	// Initialize currentStep based on URL parameter
 	const initialStep = step
 		? Math.max(0, Math.min(parseInt(step) - 1, steps.length - 1))
-		: 0
+		: -1 // -1 represents the Welcome screen
 
 	const [onNext, setOnNext] = useState(false)
 	const [onPrevious, setOnPrevious] = useState(false)
@@ -60,7 +68,8 @@ function OnboardingContent() {
 	const router = useRouter()
 	const calendarConnected = searchParams.get('calendar_connected')
 
-	const CurrentStepComponent = steps[currentStep].component
+	const CurrentStepComponent =
+		currentStep >= 0 ? steps[currentStep].component : null
 
 	// Keep the rest of your useEffects for subsequent updates
 	useEffect(() => {
@@ -83,6 +92,44 @@ function OnboardingContent() {
 			}
 		}
 	}, [searchParams, currentStep])
+
+	// Fire confetti on welcome screen
+	useEffect(() => {
+		if (currentStep === -1) {
+			confetti({ particleCount: 40, spread: 70, origin: { y: 0.6 } })
+		}
+	}, [currentStep])
+
+	const handleStart = () => {
+		setCurrentStep(0)
+		router.push(`/onboarding?step=1`)
+	}
+
+	// Render welcome screen (not a step) when no step is selected
+	if (currentStep === -1) {
+		return (
+			<div className="min-h-screen flex items-center lg:max-w-3xl mx-auto px-4">
+				<div className="flex flex-col items-center justify-center mb-20 text-center">
+					<CardHeader className="text-center gap-4">
+						<h1 className="text-5xl font-black text-primary">
+							¡Bienvenido a coco!
+						</h1>
+						<p className="text-xl text-gray-600 font-light">
+							En menos de 5 minutos tendrás tu cuenta activada con
+							tu agenda y pasarela de pagos integradas. ¿Vamos a
+							por ello?
+						</p>
+					</CardHeader>
+					<Button
+						onClick={handleStart}
+						className="mt-2 px-10 text-base"
+					>
+						Activar cuenta
+					</Button>
+				</div>
+			</div>
+		)
+	}
 
 	const handlePrevious = () => {
 		if (currentStep > 0) {
@@ -118,7 +165,9 @@ function OnboardingContent() {
 				onStepClick={handleStepClick}
 			/>
 			<div className="mt-12">
-				<CurrentStepComponent onComplete={handleStepComplete} />
+				{CurrentStepComponent && (
+					<CurrentStepComponent onComplete={handleStepComplete} />
+				)}
 			</div>
 			<div className="mt-8 flex justify-between">
 				{currentStep > 0 && (
