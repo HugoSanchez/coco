@@ -132,6 +132,18 @@ export async function refreshToken(
 			error.message || error
 		)
 
+		// Structured debug payload for invalid_grant and other auth failures
+		const debugPayload = {
+			userId,
+			errorMessage: error?.message || String(error),
+			name: error?.name,
+			code: error?.code,
+			responseStatus: error?.response?.status,
+			responseData: error?.response?.data,
+			hint: 'If errorMessage includes invalid_grant, user likely revoked access or refresh token aged out.'
+		}
+		console.log('🧪 [Token] Refresh debug payload:', debugPayload)
+
 		// Handle invalid_grant errors specifically
 		if (error.message?.includes('invalid_grant')) {
 			console.log(

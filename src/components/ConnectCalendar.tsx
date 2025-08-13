@@ -96,6 +96,33 @@ export function ConnectCalendar({
 		checkPermissions()
 	}, [])
 
+	// Refresh status when window regains focus (helps after re-connect in another tab)
+	useEffect(() => {
+		const onFocus = () => {
+			checkCalendarConnection()
+			;(async () => {
+				setIsCheckingPermissions(true)
+				try {
+					const {
+						data: { user }
+					} = await supabase.auth.getUser()
+					if (!user) return setPermissionStatus(null)
+					const permissions = await checkCalendarPermissions(
+						user.id,
+						supabase
+					)
+					setPermissionStatus(permissions)
+				} catch (e) {
+					console.error('Error re-checking permissions on focus', e)
+				} finally {
+					setIsCheckingPermissions(false)
+				}
+			})()
+		}
+		window.addEventListener('focus', onFocus)
+		return () => window.removeEventListener('focus', onFocus)
+	}, [])
+
 	/**
 	 * Effect to check calendar connection status on component mount
 	 * Queries the database for existing calendar tokens for the current user
