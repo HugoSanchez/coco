@@ -187,9 +187,36 @@ function SettingsContent() {
 
 	return (
 		<div className="min-h-screen bg-gray-50 pt-16">
+			{/* Mobile tabs header */}
+			<div className="md:hidden px-6 py-4">
+				{window.innerWidth < 768 ? (
+					<h1 className="text-xl font-medium text-gray-900 mb-3">
+						Settings
+					</h1>
+				) : null}
+				<div className="flex gap-2 overflow-x-auto scrollbar-hide py-4">
+					{settingsMenuItems.map((item) => {
+						const isActive = activeSection === item.id
+						return (
+							<button
+								key={item.id}
+								className={`flex-shrink-0 px-4 py-2 text-sm rounded-full border transition-colors ${
+									isActive
+										? 'bg-gray-900 text-white border-gray-900'
+										: 'bg-white text-gray-700 border-gray-300'
+								}`}
+								onClick={() => handleTabChange(item.id)}
+							>
+								{item.label}
+							</button>
+						)
+					})}
+				</div>
+			</div>
+
 			<div className="flex">
-				{/* Left Sidebar Menu */}
-				<div className="w-96 min-h-screen bg-gray-50 border-r border-gray-200">
+				{/* Left Sidebar Menu (hidden on mobile) */}
+				<div className="hidden md:block w-96 min-h-screen bg-gray-50 border-r border-gray-200">
 					<div className="pt-8 px-16">
 						<div className="mb-8">
 							<h1 className="text-xl font-medium text-gray-900 mb-1">
@@ -221,7 +248,7 @@ function SettingsContent() {
 
 				{/* Main Content Area */}
 				<div className="flex-1">
-					<div className="px-8 md:px-24">
+					<div className="px-6 md:px-16 pb-14">
 						{renderSectionContent()}
 					</div>
 				</div>

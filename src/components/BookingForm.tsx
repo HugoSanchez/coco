@@ -307,7 +307,7 @@ export function BookingForm({
 	}
 
 	return (
-		<div className="space-y-6 py-6">
+		<div className="space-y-6 pt-6">
 			{/* Step Indicator - Currently empty but could show progress dots */}
 			<div className="flex items-center justify-between mb-6">
 				{/* Future: Could add step indicator dots here */}
