@@ -28,6 +28,8 @@ import { es } from 'date-fns/locale'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { Spinner } from '@/components/ui/spinner'
+import { ClientFormFields } from '@/components/ClientFormFields'
+import type { Client as DbClient } from '@/lib/db/clients'
 
 interface BookingFormProps {
 	onSuccess?: () => void // Called when booking is successfully created
@@ -58,6 +60,10 @@ export function BookingForm({
 		end: string
 	} | null>(null) // Time slot selected in step 2
 	const [selectedClient, setSelectedClient] = useState<string>('') // Client ID selected in step 3
+	const [clientOptions, setClientOptions] = useState<DbClient[]>(
+		clients as any
+	)
+	const [clientMode, setClientMode] = useState<'select' | 'create'>('select')
 	const [notes, setNotes] = useState('') // Optional notes for the booking
 	const [existingBookings, setExistingBookings] = useState<
 		Array<{
@@ -366,66 +372,116 @@ export function BookingForm({
 			{/* ===== STEP 3: CLIENT SELECTION & BOOKING DETAILS ===== */}
 			{currentStep === 3 && selectedSlot && (
 				<div className="space-y-4">
-					<form onSubmit={handleSubmit} className="space-y-4">
-						{/* Client Selection Dropdown */}
+					{clientMode === 'create' ? (
 						<div className="space-y-2">
-							<Label className="text-md font-normal text-gray-700">
-								Paciente
-							</Label>
-							{/* Searchable dropdown for client selection */}
-							<ClientSearchSelect
-								clients={clients}
-								value={selectedClient}
-								onValueChange={setSelectedClient}
-								placeholder="Buscar paciente..."
-							/>
+							<div className="flex items-center justify-between">
+								<Label className="text-md font-normal text-gray-700">
+									Paciente
+								</Label>
+								<button
+									type="button"
+									onClick={() => setClientMode('select')}
+									className="text-sm text-teal-500 font-medium hover:underline"
+								>
+									Volver
+								</button>
+							</div>
+							<div className="">
+								<ClientFormFields
+									onSuccess={(created) => {
+										setClientMode('select')
+										if (created) {
+											setClientOptions((prev) => {
+												const exists = prev.some(
+													(c) => c.id === created.id
+												)
+												return exists
+													? prev
+													: [created as any, ...prev]
+											})
+											setSelectedClient(created.id)
+										}
+									}}
+									onCancel={() => setClientMode('select')}
+									hideCancelButton
+								/>
+							</div>
 						</div>
+					) : (
+						<form onSubmit={handleSubmit} className="space-y-4">
+							{/* Client Selection Dropdown */}
+							<div className="space-y-2">
+								<div className="flex items-center justify-between">
+									<Label className="text-md font-normal text-gray-700">
+										Paciente
+									</Label>
+									<button
+										type="button"
+										onClick={() => setClientMode('create')}
+										className="text-sm text-teal-500 font-medium hover:underline"
+									>
+										+ Nuevo paciente
+									</button>
+								</div>
+								<ClientSearchSelect
+									clients={clientOptions as any}
+									value={selectedClient}
+									onValueChange={(val) =>
+										setSelectedClient(val)
+									}
+									placeholder="Buscar paciente..."
+								/>
+							</div>
 
-						{/* Optional Notes Field */}
-						<div className="space-y-2">
-							<Label className="text-md font-normal text-gray-700">
-								Notas{' '}
-								<span className="text-xs text-gray-500 font-normal">
-									(opcional)
-								</span>
-							</Label>
-							<Textarea
-								placeholder="Añade cualquier nota sobre la cita..."
-								value={notes}
-								onChange={(e) => setNotes(e.target.value)}
-								className="min-h-[80px]"
-							/>
-						</div>
+							{/* Optional Notes Field */}
+							<div className="space-y-2">
+								<Label className="text-md font-normal text-gray-700">
+									Notas{' '}
+									<span className="text-xs text-gray-500 font-normal">
+										(opcional)
+									</span>
+								</Label>
+								<Textarea
+									placeholder="Añade cualquier nota sobre la cita..."
+									value={notes}
+									onChange={(e) => setNotes(e.target.value)}
+									className="min-h-[80px]"
+								/>
+							</div>
 
-						{/* Booking Summary */}
-						<div>
-							{/* Show formatted date and time for final confirmation */}
-							<h3 className="text-sm mt-10">
-								{format(
-									selectedDate!,
-									"EEEE, d 'de' MMMM 'de' yyyy",
-									{ locale: es }
-								)
-									.replace(/^./, (c) => c.toUpperCase()) // Capitalize first letter
-									.replace(
-										/ de ([a-z])/,
-										(match, p1) => ` de ${p1.toUpperCase()}` // Capitalize month
-									)}{' '}
-								a las{' '}
-								{format(new Date(selectedSlot.start), 'HH:mm')}
-							</h3>
-						</div>
+							{/* Booking Summary */}
+							<div>
+								<h3 className="text-sm mt-10">
+									{format(
+										selectedDate!,
+										"EEEE, d 'de' MMMM 'de' yyyy",
+										{ locale: es }
+									)
+										.replace(/^./, (c) => c.toUpperCase())
+										.replace(
+											/ de ([a-z])/,
+											(match, p1) =>
+												` de ${p1.toUpperCase()}`
+										)}{' '}
+									a las{' '}
+									{format(
+										new Date(selectedSlot.start),
+										'HH:mm'
+									)}
+								</h3>
+							</div>
 
-						{/* Final Submit Button */}
-						<Button
-							type="submit"
-							variant="default"
-							disabled={loading || !selectedClient} // Disabled until client selected
-							className="w-full"
-						>
-							{loading ? 'Creando cita...' : 'Crear Cita'}
-						</Button>
-					</form>
+							{/* Final Submit Button */}
+							<Button
+								type="submit"
+								variant="default"
+								disabled={loading || !selectedClient}
+								className="w-full"
+							>
+								{loading ? 'Creando cita...' : 'Crear Cita'}
+							</Button>
+						</form>
+					)}
 				</div>
 			)}
 

@@ -17,11 +17,13 @@ import {
 } from '@/lib/db/clients'
 import { getClientBillingSettings } from '@/lib/db/billing-settings'
 import { UserPlus, Save } from 'lucide-react'
+import { getClientsForUser } from '@/lib/db/clients'
 
 interface ClientFormFieldsProps {
-	onSuccess: () => void
+	onSuccess: (client?: Client) => void
 	onCancel?: () => void
 	hideSubmitButton?: boolean
+	hideCancelButton?: boolean
 	onFormSubmit?: (e: React.FormEvent) => void
 	onSubmitFunction?: (submitFn: () => Promise<void>) => void
 	onLoadingChange?: (loading: boolean) => void
@@ -34,6 +36,7 @@ export function ClientFormFields({
 	onSuccess,
 	onCancel,
 	hideSubmitButton = false,
+	hideCancelButton = false,
 	onFormSubmit,
 	onSubmitFunction,
 	onLoadingChange,
@@ -116,6 +119,16 @@ export function ClientFormFields({
 			// Upsert client with optional billing settings (works for both create and update)
 			await upsertClientWithBilling(clientPayload, billingPayload)
 
+			// Try to retrieve the created/updated client so caller can auto-select it
+			let createdClient: Client | undefined = undefined
+			try {
+				const list = await getClientsForUser(user.id)
+				createdClient = (list as Client[]).find(
+					(c) =>
+						c.email?.toLowerCase() === formData.email.toLowerCase()
+				)
+			} catch {}
+
 			// Reset form only in create mode (in edit mode, keep the form populated)
 			if (!editMode) {
 				setFormData({
@@ -128,7 +141,7 @@ export function ClientFormFields({
 				})
 			}
 
-			onSuccess()
+			onSuccess(createdClient)
 
 			// Context-aware success message
 			toast({
@@ -326,7 +339,7 @@ export function ClientFormFields({
 								? 'Guardar cambios'
 								: 'Añadir paciente'}
 					</Button>
-					{onCancel && (
+					{onCancel && !hideCancelButton && (
 						<Button
 							type="button"
 							variant="ghost"

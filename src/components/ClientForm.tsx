@@ -17,7 +17,7 @@ import type { Client } from '@/lib/db/clients'
 interface ClientFormProps {
 	isOpen: boolean
 	onClose: () => void
-	onClientCreated: () => void
+	onClientCreated: (client?: Client) => void
 	editMode?: boolean
 	initialData?: Client
 }
