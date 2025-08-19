@@ -8,14 +8,6 @@ import {
 // Force dynamic rendering since this route uses cookies for authentication
 export const dynamic = 'force-dynamic'
 
-// Error class for creating bookings
-// This is used to throw errors that are caught by Sentry
-class createBookingError extends Error {
-	constructor(message: string | undefined) {
-		super(message)
-		this.name = 'createBookingError'
-	}
-}
 /**
  * POST /api/bookings/create
  *
@@ -74,6 +66,15 @@ export async function POST(request: NextRequest) {
 			paymentUrl: result.paymentUrl
 		})
 	} catch (error) {
-		throw new createBookingError(`Error creating booking: ${error}`)
+		console.error('Error creating booking (API):', error)
+		const message =
+			error instanceof Error ? error.message : 'Unknown server error'
+		return NextResponse.json(
+			{
+				error: 'Failed to create booking',
+				details: message
+			},
+			{ status: 500 }
+		)
 	}
 }
