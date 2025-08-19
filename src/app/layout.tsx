@@ -5,6 +5,7 @@ import { Inter } from 'next/font/google'
 import { Toaster } from '@/components/ui/toaster'
 import './globals.css'
 import { UserProvider } from '@/contexts/UserContext'
+import * as Sentry from '@sentry/nextjs'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -23,6 +24,9 @@ export const metadata: Metadata = {
 		siteName: 'Coco App',
 		locale: 'es_ES',
 		type: 'website'
+	},
+	other: {
+		...Sentry.getTraceData()
 	}
 }
 

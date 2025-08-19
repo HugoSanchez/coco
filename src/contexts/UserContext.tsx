@@ -24,6 +24,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import * as Sentry from '@sentry/nextjs'
 import { useRouter } from 'next/navigation'
 
 /**
@@ -147,6 +148,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
 	// Effect: Fetch profile data whenever user changes
 	useEffect(() => {
+		// Sync Sentry user context whenever auth user changes
+		try {
+			if (user) {
+				Sentry.setUser({ id: user.id, email: user.email })
+			} else {
+				Sentry.setUser(null)
+			}
+		} catch (e) {
+			// Ignore Sentry errors in client environments
+		}
+
 		// Only fetch profile if user is authenticated
 		if (user) {
 			refreshProfile()
