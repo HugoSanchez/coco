@@ -106,7 +106,14 @@ export function SideSheet({
 		setCurrentX(null)
 	}
 	return (
-		<Sheet modal={false} open={isOpen}>
+		<Sheet
+			modal={false}
+			open={isOpen}
+			onOpenChange={(open) => {
+				// Close when clicking the overlay or outside the sheet, or pressing Escape
+				if (!open) onClose()
+			}}
+		>
 			{/* Sheet content with custom styling */}
 			<SheetContent
 				side="right"

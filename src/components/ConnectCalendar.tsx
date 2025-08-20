@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
 import { FcGoogle } from 'react-icons/fc'
@@ -50,6 +51,7 @@ export function ConnectCalendar({
 	source = 'onboarding'
 }: ConnectCalendarProps) {
 	const supabase = createSupabaseClient()
+	const searchParams = useSearchParams()
 	const [isConnecting, setIsConnecting] = useState(false)
 	const [isConnected, setIsConnected] = useState(false)
 	const [isDisconnecting, setIsDisconnecting] = useState(false)
@@ -130,6 +132,32 @@ export function ConnectCalendar({
 	useEffect(() => {
 		checkCalendarConnection()
 	}, [])
+
+	// After successful OAuth reconnect (?calendar_connected=true), clear banner suppression state
+	useEffect(() => {
+		const resetBannerIfConnected = async () => {
+			try {
+				const flag = searchParams.get('calendar_connected')
+				if (flag !== 'true') return
+				const {
+					data: { user }
+				} = await supabase.auth.getUser()
+				if (!user) return
+				const dismissedKey = `coco_calendar_banner_dismissed_v1_${user.id}`
+				const countKey = `coco_calendar_banner_close_count_v1_${user.id}`
+				try {
+					localStorage.removeItem(dismissedKey)
+					localStorage.removeItem(countKey)
+				} catch {}
+				try {
+					const url = new URL(window.location.href)
+					url.searchParams.delete('calendar_connected')
+					window.history.replaceState({}, '', url.toString())
+				} catch {}
+			} catch {}
+		}
+		resetBannerIfConnected()
+	}, [searchParams])
 
 	/**
 	 * Checks if the current user has an active Google Calendar connection
