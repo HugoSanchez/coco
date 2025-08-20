@@ -106,15 +106,11 @@ export function SideSheet({
 		setCurrentX(null)
 	}
 	return (
-		<Sheet open={isOpen} onOpenChange={onClose}>
+		<Sheet modal={false} open={isOpen}>
 			{/* Sheet content with custom styling */}
 			<SheetContent
 				side="right"
 				className={`w-full md:w-1/3 max-w-full md:px-2 overflow-y-auto bg-gray-50 [&>button]:hidden p-0`}
-				onPointerDownOutside={(e) => {
-					// Allow closing by clicking outside on mobile
-					onClose()
-				}}
 				onEscapeKeyDown={(e) => {
 					// Allow closing with escape key
 					onClose()

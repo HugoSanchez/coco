@@ -303,6 +303,7 @@ export function ClientFormFields({
 										id="billingAmount"
 										type="number"
 										step="0.01"
+										min={1}
 										value={formData.billingAmount}
 										onChange={(e) =>
 											handleInputChange(
@@ -310,6 +311,17 @@ export function ClientFormFields({
 												e.target.value
 											)
 										}
+										onBlur={(e) => {
+											const v = e.target.value
+											if (!v) return
+											const n = parseFloat(v)
+											if (!isNaN(n) && n < 1) {
+												handleInputChange(
+													'billingAmount',
+													'1'
+												)
+											}
+										}}
 										placeholder="0.00"
 										className="pr-8 h-12"
 									/>

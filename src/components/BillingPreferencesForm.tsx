@@ -57,6 +57,7 @@ export function BillingPreferencesForm({
 							id="billingAmount"
 							type="number"
 							step="0.01"
+							min={1}
 							value={values.billingAmount}
 							onChange={(e) =>
 								handleInputChange(
@@ -64,6 +65,14 @@ export function BillingPreferencesForm({
 									e.target.value
 								)
 							}
+							onBlur={(e) => {
+								const v = e.target.value
+								if (!v) return
+								const n = parseFloat(v)
+								if (!isNaN(n) && n < 1) {
+									handleInputChange('billingAmount', '1')
+								}
+							}}
 							className="pr-8 h-12"
 							disabled={disabled}
 						/>
