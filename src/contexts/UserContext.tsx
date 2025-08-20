@@ -65,6 +65,8 @@ interface UserContextType {
 	refreshProfile: () => Promise<void>
 	checkStripeOnboarding: () => Promise<boolean>
 	stripeOnboardingCompleted: boolean | null
+	calendarConnected: boolean | null
+	checkCalendarConnection: () => Promise<boolean>
 }
 
 // Create the React Context with undefined as default
@@ -106,6 +108,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 	const [stripeOnboardingCompleted, setStripeOnboardingCompleted] = useState<
 		boolean | null
 	>(null)
+
+	// Google Calendar connection status
+	const [calendarConnected, setCalendarConnected] = useState<boolean | null>(
+		null
+	)
 
 	// Effect: Set up authentication state listener
 	useEffect(() => {
@@ -235,13 +242,49 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 		}
 	}
 
+	// Check Google Calendar connection via server route that calls getAuthenticatedCalendar
+	const checkCalendarConnection = async (): Promise<boolean> => {
+		if (!user) {
+			setCalendarConnected(null)
+			return false
+		}
+		try {
+			const res = await fetch('/api/calendar/status', {
+				cache: 'no-store'
+			})
+			if (!res.ok) {
+				setCalendarConnected(false)
+				return false
+			}
+			const data = await res.json()
+			const connected = Boolean(data?.connected)
+			setCalendarConnected(connected)
+			console.log('Calendar connected:', connected)
+			return connected
+		} catch (e) {
+			setCalendarConnected(false)
+			return false
+		}
+	}
+
 	// Effect: Call checkStripeOnboarding when user changes or profile is refreshed
 	useEffect(() => {
 		if (user) {
 			checkStripeOnboarding()
+			checkCalendarConnection()
 		} else {
 			setStripeOnboardingCompleted(null)
+			setCalendarConnected(null)
 		}
+	}, [user])
+
+	// Re-check calendar connection on window focus
+	useEffect(() => {
+		const onFocus = () => {
+			if (user) checkCalendarConnection()
+		}
+		window.addEventListener('focus', onFocus)
+		return () => window.removeEventListener('focus', onFocus)
 	}, [user])
 
 	// Provide the context value to all child components
@@ -253,7 +296,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 				loading,
 				refreshProfile,
 				checkStripeOnboarding,
-				stripeOnboardingCompleted
+				stripeOnboardingCompleted,
+				calendarConnected,
+				checkCalendarConnection
 			}}
 		>
 			{children}

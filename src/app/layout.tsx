@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Header from '@/components/Header'
+import CalendarBanner from '@/components/CalendarBanner'
 import Footer from '@/components/Footer'
 import { Inter } from 'next/font/google'
 import { Toaster } from '@/components/ui/toaster'
@@ -42,6 +43,7 @@ export default function RootLayout({
 			>
 				<UserProvider>
 					<Header />
+					<CalendarBanner />
 					<main className="min-h-screen flex-grow">
 						{children}
 						<Toaster />

@@ -34,11 +34,9 @@ if (!clientId || !clientSecret || !process.env.NEXT_PUBLIC_BASE_URL) {
 	throw new Error('Missing Google Calendar environment variables')
 }
 
-export const oauth2Client = new google.auth.OAuth2(
-	clientId,
-	clientSecret,
-	redirectUri
-)
+export function createOAuthClient() {
+	return new google.auth.OAuth2(clientId, clientSecret, redirectUri)
+}
 
 /**
  * Refreshes an expired Google Calendar access token using the refresh token
@@ -63,6 +61,8 @@ export async function refreshToken(
 ): Promise<string> {
 	console.log('🔄 [Token] Starting token refresh for user:', userId)
 
+	// Use a per-request OAuth2 client to avoid cross-user credential bleed
+	const oauth2Client = createOAuthClient()
 	// Set the credentials to the refresh token
 	oauth2Client.setCredentials({ refresh_token: refreshToken })
 
@@ -195,91 +195,78 @@ export async function getAuthenticatedCalendar(
 	userId: string,
 	supabaseClient?: SupabaseClient
 ) {
-	console.log(
-		'🔍 [Calendar] Attempting to get authenticated calendar for user:',
-		userId
-	)
-
-	// Step 1: Try to fetch user's calendar tokens
-	let calendarTokens
+	// ————————————————————————————————————————————————————————————————
+	// STEP 1 — Load stored Google credentials for this user
+	// We persist three key fields per user in `calendar_tokens`:
+	//   - access_token: short‑lived Google token used on API calls
+	//   - refresh_token: long‑lived token used to mint new access tokens
+	//   - expiry_date: epoch ms when the current access_token expires
+	// If tokens are missing, the caller should route the user to (re)connect.
+	// ————————————————————————————————————————————————————————————————
+	let tokens
 	try {
-		console.log(
-			'🔍 [Calendar] Fetching tokens from database for user:',
-			userId
-		)
-		calendarTokens = await getUserCalendarTokens(userId, supabaseClient)
-	} catch (error) {
-		console.error(
-			'❌ [Calendar] Database error fetching tokens for user:',
-			userId,
-			'Error:',
-			error
-		)
+		tokens = await getUserCalendarTokens(userId, supabaseClient)
+	} catch {
 		throw new Error('Failed to retrieve calendar tokens from database')
 	}
 
-	if (!calendarTokens) {
-		console.error(
-			'❌ [Calendar] No tokens found in database for user:',
-			userId
-		)
+	if (!tokens) {
+		// No stored credentials → caller should guide the user to connect
 		throw new Error('Calendar tokens not found')
 	}
 
-	console.log(
-		'✅ [Calendar] Tokens found for user:',
-		userId,
-		'Expiry:',
-		calendarTokens.expiry_date
-			? new Date(calendarTokens.expiry_date)
-			: 'No expiry'
-	)
-
-	// Step 2: Check if tokens need refresh
+	// ————————————————————————————————————————————————————————————————
+	// STEP 2 — Decide whether we must refresh the access token
+	// Access tokens typically last ~1 hour. We refresh only when:
+	//   a) `expiry_date` exists AND
+	//   b) it is strictly in the past relative to `now`.
+	// If no `expiry_date` was stored, we assume the access token is valid and
+	// let Google reject if it is not (rare, but safe and simple).
+	// ————————————————————————————————————————————————————————————————
 	const now = Date.now()
-	const needsRefresh =
-		(calendarTokens.expiry_date && calendarTokens.expiry_date < now) || true // Force refresh for now to ensure fresh tokens
+	const needsRefresh = tokens.expiry_date != null && tokens.expiry_date < now
+
+	// ————————————————————————————————————————————————————————————————
+	// STEP 3 — Prepare an OAuth2 client for this request
+	// Always create a fresh instance to avoid cross‑request/user credential bleed.
+	// ————————————————————————————————————————————————————————————————
+	const oauth2Client = createOAuthClient()
 
 	if (needsRefresh) {
-		console.log(
-			'🔄 [Calendar] Tokens expired for user:',
-			userId,
-			'Attempting refresh...'
-		)
+		// ————————————————————————————————————————————————————————————————
+		// STEP 4A — Refresh access token using the long‑lived refresh_token
+		// On success we set the new access_token on the client. Any failure is
+		// bubbled up so the caller can guide the user to reconnect if needed.
+		// ————————————————————————————————————————————————————————————————
 		try {
+			// Refresh using the long-lived refresh token, then apply new access token
 			const newAccessToken = await refreshToken(
 				userId,
-				calendarTokens.refresh_token,
+				tokens.refresh_token,
 				supabaseClient
-			)
-			console.log(
-				'✅ [Calendar] Token refresh successful for user:',
-				userId
 			)
 			oauth2Client.setCredentials({
 				access_token: newAccessToken,
-				refresh_token: calendarTokens.refresh_token
+				refresh_token: tokens.refresh_token
 			})
 		} catch (error) {
-			console.error(
-				'❌ [Calendar] Token refresh failed for user:',
-				userId,
-				'Error:',
-				error
-			)
+			// Bubble up so callers can surface a reconnect message if needed
 			throw error
 		}
 	} else {
-		console.log(
-			'✅ [Calendar] Using existing valid tokens for user:',
-			userId
-		)
+		// ————————————————————————————————————————————————————————————————
+		// STEP 4B — Access token still valid; use as‑is
+		// We attach the stored access_token and refresh_token to the client.
+		// ————————————————————————————————————————————————————————————————
 		oauth2Client.setCredentials({
-			access_token: calendarTokens.access_token,
-			refresh_token: calendarTokens.refresh_token
+			access_token: tokens.access_token,
+			refresh_token: tokens.refresh_token
 		})
 	}
 
-	// Return authenticated calendar instance
+	// ————————————————————————————————————————————————————————————————
+	// STEP 5 — Return a ready‑to‑use Calendar client bound to credentials
+	// Callers can directly use the returned client to read/write calendar data.
+	// ————————————————————————————————————————————————————————————————
 	return google.calendar({ version: 'v3', auth: oauth2Client })
 }

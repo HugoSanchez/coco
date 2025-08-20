@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { oauth2Client } from '@/lib/google'
+import { createOAuthClient } from '@/lib/google'
 
 // GET /api/auth/google-calendar
 // It generates the URL for the Google Calendar API authorization flow with event creation permissions
@@ -9,6 +9,7 @@ export async function GET(request: Request) {
 	const { searchParams } = new URL(request.url)
 	const source = searchParams.get('source') || 'onboarding'
 
+	const oauth2Client = createOAuthClient()
 	const authUrl = oauth2Client.generateAuthUrl({
 		scope: [
 			'https://www.googleapis.com/auth/calendar.events',
@@ -17,6 +18,7 @@ export async function GET(request: Request) {
 		],
 		prompt: 'consent',
 		access_type: 'offline',
+		include_granted_scopes: true,
 		response_type: 'code',
 		// Pass source context through OAuth state parameter
 		state: JSON.stringify({ source })

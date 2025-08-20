@@ -86,20 +86,29 @@ export async function GET(request: NextRequest) {
 			}
 
 			// Upsert the calendar tokens with granted scopes
+			// Preserve existing refresh_token if Google didn't return one (common on re-consent)
+			const { data: existingTokenRow } = await supabase
+				.from('calendar_tokens')
+				.select('refresh_token')
+				.eq('user_id', profileUser.id)
+				.single()
+
+			const effectiveRefreshToken =
+				tokens.refresh_token ?? existingTokenRow?.refresh_token ?? null
+
+			const upsertPayload: Record<string, any> = {
+				user_id: profileUser.id,
+				access_token: tokens.access_token,
+				expiry_date: tokens.expiry_date,
+				granted_scopes: grantedScopes
+			}
+			if (effectiveRefreshToken) {
+				upsertPayload.refresh_token = effectiveRefreshToken
+			}
+
 			const { error: tokenError } = await supabase
 				.from('calendar_tokens')
-				.upsert(
-					{
-						user_id: profileUser.id,
-						access_token: tokens.access_token,
-						refresh_token: tokens.refresh_token,
-						expiry_date: tokens.expiry_date,
-						granted_scopes: grantedScopes
-					},
-					{
-						onConflict: 'user_id'
-					}
-				)
+				.upsert(upsertPayload, { onConflict: 'user_id' })
 
 			if (tokenError) throw tokenError
 
