@@ -272,6 +272,88 @@ export async function getLastMonthRevenue(
 }
 
 /**
+ * Retrieves expected revenue for the NEXT 30 days based on bookings
+ * Sums bill amounts for bookings scheduled in the next 30 days (excluding canceled bookings)
+ */
+export async function getRevenueNext30Days(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<number> {
+	const client = supabaseClient || supabase
+
+	try {
+		const now = new Date()
+		const in30 = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+		const { data, error } = await client
+			.from('bookings')
+			.select(
+				`
+				id,
+				bill:bills(amount, status, currency)
+			`
+			)
+			.eq('user_id', userId)
+			.neq('status', 'canceled')
+			.gte('start_time', now.toISOString())
+			.lt('start_time', in30.toISOString())
+
+		if (error) throw error
+
+		const total = (data || []).reduce((sum, row: any) => {
+			const bill = Array.isArray(row.bill) ? row.bill[0] : row.bill
+			return sum + (bill?.amount || 0)
+		}, 0)
+
+		return Math.round(total * 100) / 100
+	} catch (error) {
+		console.error('Unexpected error in getRevenueNext30Days:', error)
+		throw error
+	}
+}
+
+/**
+ * Retrieves expected revenue for the PREVIOUS 30 days based on bookings
+ * Sums bill amounts for bookings scheduled in the previous 30 days (excluding canceled)
+ */
+export async function getRevenuePrev30Days(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<number> {
+	const client = supabaseClient || supabase
+
+	try {
+		const now = new Date()
+		const prev30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+		const { data, error } = await client
+			.from('bookings')
+			.select(
+				`
+				id,
+				bill:bills(amount, status, currency)
+			`
+			)
+			.eq('user_id', userId)
+			.neq('status', 'canceled')
+			.gte('start_time', prev30.toISOString())
+			.lt('start_time', now.toISOString())
+
+		if (error) throw error
+
+		const total = (data || []).reduce((sum, row: any) => {
+			const bill = Array.isArray(row.bill) ? row.bill[0] : row.bill
+			return sum + (bill?.amount || 0)
+		}, 0)
+
+		return Math.round(total * 100) / 100
+	} catch (error) {
+		console.error('Unexpected error in getRevenuePrev30Days:', error)
+		throw error
+	}
+}
+
+/**
  * Retrieves complete revenue statistics for dashboard display
  * Combines current month, previous month, and percentage change calculations
  *
@@ -297,10 +379,10 @@ export async function getRevenueStats(
 	supabaseClient?: SupabaseClient
 ): Promise<RevenueStats> {
 	try {
-		// Fetch both current and previous month revenue in parallel for better performance
+		// Next 30 days vs previous 30 days expected revenue
 		const [currentRevenue, previousRevenue] = await Promise.all([
-			getCurrentMonthRevenue(userId, supabaseClient),
-			getLastMonthRevenue(userId, supabaseClient)
+			getRevenueNext30Days(userId, supabaseClient),
+			getRevenuePrev30Days(userId, supabaseClient)
 		])
 
 		// Calculate percentage change
@@ -480,6 +562,80 @@ export async function getLastMonthBookings(
 }
 
 /**
+ * Counts confirmed bookings (scheduled or completed) in the NEXT 30 days
+ */
+export async function getConfirmedBookingsNext30Days(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<number> {
+	const client = supabaseClient || supabase
+
+	try {
+		const now = new Date()
+		const in30 = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+		const { count, error } = await client
+			.from('bookings')
+			.select('*', { count: 'exact', head: true })
+			.eq('user_id', userId)
+			.in('status', ['scheduled', 'completed'])
+			.gte('start_time', now.toISOString())
+			.lt('start_time', in30.toISOString())
+
+		if (error) {
+			throw new Error(
+				`Failed to fetch next-30-days confirmed bookings: ${error.message}`
+			)
+		}
+
+		return count || 0
+	} catch (error) {
+		console.error(
+			'Unexpected error in getConfirmedBookingsNext30Days:',
+			error
+		)
+		throw error
+	}
+}
+
+/**
+ * Counts confirmed bookings (scheduled or completed) in the PREVIOUS 30 days
+ */
+export async function getConfirmedBookingsPrev30Days(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<number> {
+	const client = supabaseClient || supabase
+
+	try {
+		const now = new Date()
+		const prev30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+		const { count, error } = await client
+			.from('bookings')
+			.select('*', { count: 'exact', head: true })
+			.eq('user_id', userId)
+			.in('status', ['scheduled', 'completed'])
+			.gte('start_time', prev30.toISOString())
+			.lt('start_time', now.toISOString())
+
+		if (error) {
+			throw new Error(
+				`Failed to fetch prev-30-days confirmed bookings: ${error.message}`
+			)
+		}
+
+		return count || 0
+	} catch (error) {
+		console.error(
+			'Unexpected error in getConfirmedBookingsPrev30Days:',
+			error
+		)
+		throw error
+	}
+}
+
+/**
  * Retrieves complete booking statistics for dashboard display
  * Combines current month, previous month, and percentage change calculations
  *
@@ -505,10 +661,10 @@ export async function getBookingStats(
 	supabaseClient?: SupabaseClient
 ): Promise<BookingStats> {
 	try {
-		// Fetch both current and previous month bookings in parallel for better performance
+		// Next 30 days vs previous 30 days for confirmed bookings
 		const [currentBookings, previousBookings] = await Promise.all([
-			getCurrentMonthBookings(userId, supabaseClient),
-			getLastMonthBookings(userId, supabaseClient)
+			getConfirmedBookingsNext30Days(userId, supabaseClient),
+			getConfirmedBookingsPrev30Days(userId, supabaseClient)
 		])
 
 		// Calculate percentage change
@@ -693,6 +849,80 @@ export async function getLastMonthPendingBookings(
 }
 
 /**
+ * Counts pending bookings scheduled in the NEXT 30 days (from now)
+ */
+export async function getPendingBookingsNext30Days(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<number> {
+	const client = supabaseClient || supabase
+
+	try {
+		const now = new Date()
+		const in30 = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+		const { count, error } = await client
+			.from('bookings')
+			.select('*', { count: 'exact', head: true })
+			.eq('user_id', userId)
+			.eq('status', 'pending')
+			.gte('start_time', now.toISOString())
+			.lt('start_time', in30.toISOString())
+
+		if (error) {
+			throw new Error(
+				`Failed to fetch next-30-days pending bookings: ${error.message}`
+			)
+		}
+
+		return count || 0
+	} catch (error) {
+		console.error(
+			'Unexpected error in getPendingBookingsNext30Days:',
+			error
+		)
+		throw error
+	}
+}
+
+/**
+ * Counts pending bookings scheduled in the PREVIOUS 30 days (ending now)
+ */
+export async function getPendingBookingsPrev30Days(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<number> {
+	const client = supabaseClient || supabase
+
+	try {
+		const now = new Date()
+		const prev30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+		const { count, error } = await client
+			.from('bookings')
+			.select('*', { count: 'exact', head: true })
+			.eq('user_id', userId)
+			.eq('status', 'pending')
+			.gte('start_time', prev30.toISOString())
+			.lt('start_time', now.toISOString())
+
+		if (error) {
+			throw new Error(
+				`Failed to fetch prev-30-days pending bookings: ${error.message}`
+			)
+		}
+
+		return count || 0
+	} catch (error) {
+		console.error(
+			'Unexpected error in getPendingBookingsPrev30Days:',
+			error
+		)
+		throw error
+	}
+}
+
+/**
  * Retrieves statistics for pending bookings (current vs previous month)
  * Provides comprehensive analytics for dashboard cards
  *
@@ -721,10 +951,10 @@ export async function getPendingBookingStats(
 	supabaseClient?: SupabaseClient
 ): Promise<BookingStats> {
 	try {
-		// Execute both queries in parallel for better performance
+		// Next 30 days vs previous 30 days
 		const [currentTotal, previousTotal] = await Promise.all([
-			getCurrentMonthPendingBookings(userId, supabaseClient),
-			getLastMonthPendingBookings(userId, supabaseClient)
+			getPendingBookingsNext30Days(userId, supabaseClient),
+			getPendingBookingsPrev30Days(userId, supabaseClient)
 		])
 
 		// Calculate percentage change with proper null handling
@@ -888,6 +1118,78 @@ export async function getActiveClientsPrevious30Days(
 }
 
 /**
+ * Counts unique clients with bookings in the NEXT 30 days (from now).
+ * Excludes canceled bookings.
+ */
+export async function getActiveClientsNext30Days(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<number> {
+	const client = supabaseClient || supabase
+
+	try {
+		const now = new Date()
+		const in30 = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+		const { data, error } = await client
+			.from('bookings')
+			.select('client_id')
+			.eq('user_id', userId)
+			.neq('status', 'canceled')
+			.gte('start_time', now.toISOString())
+			.lt('start_time', in30.toISOString())
+
+		if (error) {
+			throw new Error(
+				`Failed to fetch upcoming active clients: ${error.message}`
+			)
+		}
+
+		const uniqueClientIds = new Set((data || []).map((b) => b.client_id))
+		return uniqueClientIds.size
+	} catch (error) {
+		console.error('Unexpected error in getActiveClientsNext30Days:', error)
+		throw error
+	}
+}
+
+/**
+ * Counts unique clients with bookings in the PREVIOUS 30 days (ending now).
+ * Excludes canceled bookings.
+ */
+export async function getActiveClientsPrev30Days(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<number> {
+	const client = supabaseClient || supabase
+
+	try {
+		const now = new Date()
+		const prev30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+		const { data, error } = await client
+			.from('bookings')
+			.select('client_id')
+			.eq('user_id', userId)
+			.neq('status', 'canceled')
+			.gte('start_time', prev30.toISOString())
+			.lt('start_time', now.toISOString())
+
+		if (error) {
+			throw new Error(
+				`Failed to fetch previous active clients: ${error.message}`
+			)
+		}
+
+		const uniqueClientIds = new Set((data || []).map((b) => b.client_id))
+		return uniqueClientIds.size
+	} catch (error) {
+		console.error('Unexpected error in getActiveClientsPrev30Days:', error)
+		throw error
+	}
+}
+
+/**
  * Retrieves statistics for active clients (last 30 days vs previous 30 days)
  * Provides comprehensive analytics for dashboard cards
  *
@@ -916,11 +1218,11 @@ export async function getActiveClientsStats(
 	supabaseClient?: SupabaseClient
 ): Promise<BookingStats> {
 	try {
-		// Execute both queries in parallel for better performance
+		// Upcoming 30 days vs previous 30 days
 		const [currentActiveClients, previousActiveClients] = await Promise.all(
 			[
-				getActiveClientsLast30Days(userId, supabaseClient),
-				getActiveClientsPrevious30Days(userId, supabaseClient)
+				getActiveClientsNext30Days(userId, supabaseClient),
+				getActiveClientsPrev30Days(userId, supabaseClient)
 			]
 		)
 

@@ -88,7 +88,7 @@ export default function Header() {
 			<div className="mx-auto px-6 md:px-16 h-full flex justify-between items-center">
 				{/* Logo/brand link */}
 				<Link
-					href="/"
+					href={user ? '/dashboard' : '/'}
 					className="text-xl font-bold text-primary tracking-wide"
 				>
 					coco.

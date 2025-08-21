@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import { useToast } from '@/components/ui/use-toast'
 import { useRouter } from 'next/navigation'
@@ -12,9 +12,7 @@ import {
 	BookingFiltersState
 } from '@/components/BookingFilters'
 import {
-	Activity,
 	FilterX,
-	CreditCard,
 	DollarSign,
 	Users,
 	Plus,
@@ -31,13 +29,7 @@ import {
 } from '@/components/ui/card'
 import { StatCard } from '@/components/StatCard'
 import { getClientsForUser, Client, getClientFullName } from '@/lib/db/clients'
-import {
-	getBookingsWithBills,
-	BookingWithBills,
-	PaginatedBookingsResult,
-	PaginationOptions,
-	BookingFilterOptions
-} from '@/lib/db/bookings'
+import { getBookingsWithBills, BookingWithBills } from '@/lib/db/bookings'
 import { BookingForm } from '@/components/BookingForm'
 import { Spinner } from '@/components/ui/spinner'
 import { RefundConfirmationModal } from '@/components/RefundConfirmationModal'
@@ -745,7 +737,7 @@ export default function Dashboard() {
 							icon={
 								<DollarSign className="h-4 w-4 text-muted-foreground" />
 							}
-							tooltipContent={`Facturación total confirmada para el mes de ${getCurrentMonthNameCapitalized()}`}
+							tooltipContent={`Facturación total confirmada para los próximos 30 días. Comparado con los 30 días anteriores.`}
 							loading={dashboardStats.loading}
 							error={dashboardStats.error}
 							onRetry={retryDashboardStats}
@@ -761,7 +753,7 @@ export default function Dashboard() {
 							icon={
 								<CalendarCheck className="h-4 w-4 text-muted-foreground" />
 							}
-							tooltipContent={`Total de citas confirmadas para el mes de ${getCurrentMonthNameCapitalized()}`}
+							tooltipContent={`Total de citas confirmadas para los próximos 30 días. Comparado con los 30 días anteriores.`}
 							loading={dashboardStats.loading}
 							error={dashboardStats.error}
 							onRetry={retryDashboardStats}
@@ -781,7 +773,7 @@ export default function Dashboard() {
 							icon={
 								<TriangleAlert className="h-4 w-4 text-muted-foreground" />
 							}
-							tooltipContent={`Número de citas pendientes de confirmación para ${getCurrentMonthNameCapitalized()}`}
+							tooltipContent={`Número de citas pendientes de confirmación para los próximos 30 días. Comparado con los 30 días anteriores.`}
 							loading={dashboardStats.loading}
 							error={dashboardStats.error}
 							onRetry={retryDashboardStats}
@@ -797,11 +789,11 @@ export default function Dashboard() {
 								dashboardStats.data?.activeClients
 									.percentageChange
 							}
-							changeLabel="respecto a los 30 días anteriores"
+							changeLabel="respecto al mes anterior"
 							icon={
 								<Users className="h-4 w-4 text-muted-foreground" />
 							}
-							tooltipContent="Clientes únicos que han tenido al menos una cita en los últimos 30 días."
+							tooltipContent="Clientes únicos con citas agendadas en los próximos 30 días. Comparado con los 30 días anteriores."
 							loading={dashboardStats.loading}
 							error={dashboardStats.error}
 							onRetry={retryDashboardStats}
