@@ -527,3 +527,40 @@ export async function getBookingsWithBills(
 		total: undefined // Can be added later if needed for UI
 	}
 }
+
+/**
+ * Returns bookings missing a linked calendar event for a given user.
+ * - Uses a left relation to calendar_events and filters where the related
+ *   google_event_id is null.
+ * - Caller supplies limit to cap rows (e.g., threshold + 1 for overflow detection).
+ */
+export async function getBookingsMissingCalendarEvents(
+	userId: string,
+	limit: number,
+	supabaseClient?: SupabaseClient
+) {
+	const client = supabaseClient || supabase
+
+	// Only consider FUTURE bookings to avoid backfilling historical data
+	const nowIso = new Date().toISOString()
+
+	const { data, error } = await client
+		.from('bookings')
+		.select(`*, calendar_events:calendar_events(google_event_id)`)
+		.eq('user_id', userId)
+		.neq('status', 'canceled')
+		.gte('start_time', nowIso)
+		// Important: for 1:N embeds, filter the whole relation to be null
+		// Using calendar_events.google_event_id may still match when any child is null
+		// We want bookings with NO related calendar_events at all
+		.is('calendar_events', null)
+		.order('start_time', { ascending: true })
+		.limit(limit)
+
+	if (error) throw error
+
+	// Defensive: ensure we only return bookings with zero related events
+	return (data || []).filter(
+		(b: any) => !b.calendar_events || b.calendar_events.length === 0
+	)
+}

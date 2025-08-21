@@ -109,7 +109,8 @@ export async function POST(
 						userId: user.id,
 						clientEmail: client.email,
 						practitionerName: practitioner.name || 'Practitioner',
-						practitionerEmail: practitioner.email
+						practitionerEmail: practitioner.email,
+						bookingId
 					},
 					supabase
 				)

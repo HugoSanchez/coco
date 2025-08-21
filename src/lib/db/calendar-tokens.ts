@@ -101,6 +101,49 @@ export async function getUserCalendarTokens(
 }
 
 /**
+ * Retrieves the existing refresh_token for a user (if any).
+ * Used during OAuth callback to avoid overwriting a valid refresh_token with undefined.
+ */
+export async function getExistingRefreshToken(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<string | null> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('calendar_tokens')
+		.select('refresh_token')
+		.eq('user_id', userId)
+		.maybeSingle()
+
+	if (error) return null
+	return (data as any)?.refresh_token ?? null
+}
+
+/**
+ * Upserts calendar tokens for a user.
+ * Ensures a single row per user via onConflict: 'user_id'.
+ */
+export async function upsertCalendarTokens(
+	payload: {
+		user_id: string
+		access_token?: string | null
+		refresh_token?: string | null
+		expiry_date?: number | null
+		granted_scopes?: string[] | null
+	},
+	supabaseClient?: SupabaseClient
+) {
+	const client = supabaseClient || supabase
+	const { error } = await client
+		.from('calendar_tokens')
+		.upsert(payload as any, { onConflict: 'user_id' })
+
+	if (error) throw error
+	console.log('🧩 [Calendar Tokens] Upserted', payload)
+	return true
+}
+
+/**
  * Deletes all calendar tokens for a specific user
  *
  * This function is called when:

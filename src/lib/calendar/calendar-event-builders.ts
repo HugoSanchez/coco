@@ -21,7 +21,8 @@ export function buildFullEventData({
 	startTime,
 	endTime,
 	bookingNotes,
-	conferenceRequestId
+	conferenceRequestId,
+	bookingId
 }: {
 	clientName: string
 	clientEmail: string
@@ -31,6 +32,7 @@ export function buildFullEventData({
 	endTime: string
 	bookingNotes?: string
 	conferenceRequestId: string
+	bookingId?: string
 }) {
 	return {
 		summary: `${clientName} - ${practitionerName}`,
@@ -65,7 +67,8 @@ export function buildFullEventData({
 		},
 		guestsCanModify: false,
 		guestsCanInviteOthers: false,
-		guestsCanSeeOtherGuests: false
+		guestsCanSeeOtherGuests: false,
+		...(bookingId ? { extendedProperties: { private: { bookingId } } } : {})
 	}
 }
 
@@ -77,12 +80,14 @@ export function buildPendingEventData({
 	clientName,
 	practitionerEmail,
 	startTime,
-	endTime
+	endTime,
+	bookingId
 }: {
 	clientName: string
 	practitionerEmail: string
 	startTime: string
 	endTime: string
+	bookingId?: string
 }) {
 	return {
 		summary: `${clientName} - Pending`, // Clear pending status in title
@@ -108,7 +113,8 @@ export function buildPendingEventData({
 		// Restrict guest permissions since this is just a placeholder
 		guestsCanModify: false,
 		guestsCanInviteOthers: false,
-		guestsCanSeeOtherGuests: false
+		guestsCanSeeOtherGuests: false,
+		...(bookingId ? { extendedProperties: { private: { bookingId } } } : {})
 	}
 }
 
@@ -123,7 +129,8 @@ export function buildConfirmedEventData({
 	practitionerEmail,
 	originalStart,
 	originalEnd,
-	conferenceRequestId
+	conferenceRequestId,
+	bookingId
 }: {
 	clientName: string
 	clientEmail: string
@@ -132,6 +139,7 @@ export function buildConfirmedEventData({
 	originalStart: any // Google Calendar start object
 	originalEnd: any // Google Calendar end object
 	conferenceRequestId: string
+	bookingId?: string
 }) {
 	return {
 		summary: `${clientName} - ${practitionerName}`, // New confirmed title format
@@ -164,7 +172,8 @@ export function buildConfirmedEventData({
 		// Guest permissions for confirmed appointments
 		guestsCanModify: false,
 		guestsCanInviteOthers: false,
-		guestsCanSeeOtherGuests: false
+		guestsCanSeeOtherGuests: false,
+		...(bookingId ? { extendedProperties: { private: { bookingId } } } : {})
 	}
 }
 

@@ -24,11 +24,3 @@
 	"include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
 	"exclude": ["node_modules"]
 }
-
-/**
-Ok wonderful.
-
-Lastly, we should probably consider the case where a user has created bookings without a calendar properly connected. In that case, bookings will succesfully be created as well as checkout sessions, the only thing is that these bookings will not be reflected in the user's calendar.
-
-So I'm wondering if it makes sense to
-*/

@@ -31,8 +31,10 @@
 import { google } from 'googleapis'
 import { createClient as createSupabaseClient } from '@/lib/supabase/client'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { fromZonedTime, toZonedTime } from 'date-fns-tz'
-import { getUserEmail } from '../db/profiles'
+import { fromZonedTime } from 'date-fns-tz'
+import { getUserEmail, getProfileById } from '../db/profiles'
+import { getClientById } from '../db/clients'
+import { getBookingsMissingCalendarEvents } from '../db/bookings'
 import { getAuthenticatedCalendar } from '../google'
 import {
 	buildFullEventData,
@@ -40,16 +42,15 @@ import {
 	buildConfirmedEventData,
 	generateConferenceRequestId
 } from './calendar-event-builders'
+import { createCalendarEvent as createCalendarEventDb } from '../db/calendar-events'
 import {
 	parseISO,
 	isWithinInterval,
 	setHours,
 	setMinutes,
 	addMinutes,
-	parse,
 	isBefore,
 	isAfter,
-	areIntervalsOverlapping,
 	startOfMonth,
 	endOfMonth,
 	eachDayOfInterval,
@@ -254,6 +255,7 @@ export interface CreatePendingCalendarEventPayload {
 	practitionerEmail: string // Practitioner's email for calendar attendee
 	startTime: string // ISO string
 	endTime: string // ISO string
+	bookingId?: string // Optional: tag Google event for idempotent reconciliation
 }
 
 /**
@@ -266,6 +268,7 @@ export interface UpdatePendingToConfirmedPayload {
 	clientEmail: string
 	practitionerName: string
 	practitionerEmail: string
+	bookingId?: string // Optional: tag confirmed event for idempotent reconciliation
 }
 
 /**
@@ -317,7 +320,8 @@ export async function createCalendarEventWithInvite(
 			startTime,
 			endTime,
 			bookingNotes,
-			conferenceRequestId
+			conferenceRequestId,
+			bookingId: (payload as any).bookingId
 		})
 
 		// Create the event
@@ -389,13 +393,9 @@ export async function createPendingCalendarEvent(
 			clientName,
 			practitionerEmail,
 			startTime,
-			endTime
+			endTime,
+			bookingId: (payload as any).bookingId
 		})
-
-		console.log(
-			'🗓️ [Calendar API] Attempting to create pending event in Google Calendar for user:',
-			userId
-		)
 
 		// Create the pending event in Google Calendar
 		const response = await calendar.events.insert({
@@ -405,12 +405,6 @@ export async function createPendingCalendarEvent(
 		})
 
 		const createdEvent = response.data
-		console.log(
-			'✅ [Calendar API] Google Calendar event created successfully for user:',
-			userId,
-			'Event ID:',
-			createdEvent.id
-		)
 
 		if (!createdEvent.id) {
 			console.error(
@@ -509,7 +503,8 @@ export async function updatePendingToConfirmed(
 			practitionerEmail,
 			originalStart,
 			originalEnd,
-			conferenceRequestId
+			conferenceRequestId,
+			bookingId: payload.bookingId
 		})
 
 		// Update the existing event in Google Calendar
@@ -814,64 +809,17 @@ export async function getGoogleCalendarEventsForDay(
 		googleEventId: string
 	}>
 > {
-	console.log(
-		'🗓️ [Calendar Events] Fetching Google Calendar events for user:',
-		userId,
-		'date:',
-		date.toISOString()
-	)
-
 	try {
 		// Get authenticated calendar client
-		console.log(
-			'🗓️ [Calendar Events] Getting authenticated calendar for user:',
-			userId
-		)
 		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
-		console.log(
-			'✅ [Calendar Events] Got authenticated calendar for user:',
-			userId
-		)
 
 		// Get user's time zone and set up date range for the specific day
 		const userTimeZone = await getUserTimeZone(userId, supabaseClient)
-		console.log(
-			'🗓️ [Calendar Events] Input date for user:',
-			userId,
-			'Raw date:',
-			date,
-			'Date string:',
-			date.toString(),
-			'ISO:',
-			date.toISOString(),
-			'User time zone:',
-			userTimeZone
-		)
 
 		// The input date is now properly in UTC representing the start of the day
 		// We can use it directly for the Google Calendar API
 		const startOfDay = date
 		const endOfDay = new Date(date.getTime() + 24 * 60 * 60 * 1000 - 1) // End of the same day
-
-		console.log(
-			'🗓️ [Calendar Events] Date range calculation for user:',
-			userId,
-			'User time zone:',
-			userTimeZone,
-			'Start:',
-			startOfDay.toISOString(),
-			'End:',
-			endOfDay.toISOString()
-		)
-
-		console.log(
-			'🗓️ [Calendar Events] Fetching events from Google API for user:',
-			userId,
-			'range:',
-			startOfDay.toISOString(),
-			'to',
-			endOfDay.toISOString()
-		)
 
 		// Fetch events for the day
 		const response = await calendar.events.list({
@@ -883,12 +831,7 @@ export async function getGoogleCalendarEventsForDay(
 		})
 
 		const events = response.data.items || []
-		console.log(
-			'✅ [Calendar Events] Got',
-			events.length,
-			'raw events from Google for user:',
-			userId
-		)
+		console.log('🗓️ [Calendar Events] Retrieved', events.length, 'events')
 
 		// Transform events to the format expected by DayViewTimeSelector
 		const filteredEvents = events
@@ -904,12 +847,6 @@ export async function getGoogleCalendarEventsForDay(
 				googleEventId: event.id! // Include Google event ID for filtering
 			}))
 
-		console.log(
-			'✅ [Calendar Events] Returning',
-			filteredEvents.length,
-			'filtered events for user:',
-			userId
-		)
 		return filteredEvents
 	} catch (error: any) {
 		// Silent failure - if Google Calendar access fails, just return empty array
@@ -922,5 +859,201 @@ export async function getGoogleCalendarEventsForDay(
 			error
 		)
 		return []
+	}
+}
+
+/**
+ * Reconciles future bookings for a user by ensuring a Google Calendar event exists.
+ *
+ * MVP scope (threshold-based):
+ * - No date horizon. We only act if the count of bookings missing calendar events
+ *   is small (<= limit, default 50). Otherwise, we skip entirely.
+ * - Creates pending events (idempotent via extendedProperties.private.bookingId).
+ * - Does not perform deep Google searches yet (that can be added later).
+ *
+ * Iteration ideas (later):
+ * - Search Google by privateExtendedProperty=bookingId to backfill DB links
+ * - Prefer full confirmed events when client email is available
+ * - Add retry/backoff and user-facing summaries
+ */
+export async function reconcileCalendarEventsForUser(
+	userId: string,
+	options: { limit?: number } = {},
+	supabaseClient?: SupabaseClient
+) {
+	////////////////////////////////////////////////////////
+	//// Step 0: Configuration (small, safe batch only)
+	////////////////////////////////////////////////////////
+	const threshold = options.limit ?? 50
+	console.log('🧩 [Reconcile] Start', { userId, threshold })
+
+	try {
+		const client = supabaseClient || supabase
+
+		////////////////////////////////////////////////////////
+		//// Step 1: Read bookings missing calendar events
+		//// - Fetch up to threshold + 1 to detect overflow
+		////////////////////////////////////////////////////////
+		const candidates = await getBookingsMissingCalendarEvents(
+			userId,
+			threshold + 1,
+			client
+		)
+		console.log('🧩 [Reconcile] Missing candidates', candidates.length)
+		////////////////////////////////////////////////////////
+		//// Step 2: Short-circuit if nothing to do
+		////////////////////////////////////////////////////////
+		if (candidates.length === 0) {
+			return { processed: 0, created: 0 }
+		}
+
+		////////////////////////////////////////////////////////
+		//// Step 3: Skip if too many (likely intentional usage)
+		////////////////////////////////////////////////////////
+		if (candidates.length > threshold) {
+			console.log('🧩 [Reconcile] Skipping; exceeds threshold', {
+				candidates: candidates.length,
+				threshold
+			})
+			return { processed: 0, created: 0, skipped: true }
+		}
+
+		////////////////////////////////////////////////////////
+		//// Step 4: Prepare practitioner identity (email/name)
+		//// - Avoid fetching per booking; do it once
+		////////////////////////////////////////////////////////
+		let created = 0
+		const practitionerProfile = await getProfileById(userId, client)
+		const practitionerEmail =
+			practitionerProfile?.email ||
+			(await getUserEmail(userId, client)) ||
+			''
+
+		////////////////////////////////////////////////////////
+		//// Step 5: Create events based on booking.status
+		//// - scheduled/completed → confirmed (if client email available), else pending
+		//// - other statuses → pending placeholder
+		//// - Idempotency: pass bookingId for pending events
+		////////////////////////////////////////////////////////
+		for (const booking of candidates) {
+			try {
+				const isConfirmed =
+					booking.status === 'scheduled' ||
+					booking.status === 'completed'
+
+				if (isConfirmed) {
+					// Try to create confirmed event if we can resolve client email
+					const clientRow = await getClientById(
+						booking.client_id,
+						client
+					)
+					if (clientRow && clientRow.email) {
+						const result = await createCalendarEventWithInvite(
+							{
+								userId,
+								clientName: clientRow.name,
+								clientEmail: clientRow.email,
+								practitionerName:
+									practitionerProfile?.name || 'Practitioner',
+								practitionerEmail,
+								startTime: booking.start_time,
+								endTime: booking.end_time,
+								bookingNotes: undefined
+							},
+							client
+						)
+
+						if (result.success && result.googleEventId) {
+							await createCalendarEventDb(
+								{
+									booking_id: booking.id,
+									user_id: userId,
+									google_event_id: result.googleEventId,
+									event_type: 'confirmed',
+									event_status: 'created'
+								},
+								client
+							)
+							created += 1
+						}
+					} else {
+						// Fallback to pending when we cannot invite the client
+						const pending = await createPendingCalendarEvent(
+							{
+								userId,
+								clientName: clientRow?.name || 'Cliente',
+								practitionerEmail,
+								startTime: booking.start_time,
+								endTime: booking.end_time,
+								bookingId: booking.id
+							},
+							client
+						)
+						if (pending.success && pending.googleEventId) {
+							await createCalendarEventDb(
+								{
+									booking_id: booking.id,
+									user_id: userId,
+									google_event_id: pending.googleEventId,
+									event_type: 'pending',
+									event_status: 'created'
+								},
+								client
+							)
+							created += 1
+						}
+					}
+				} else {
+					// Pending placeholder
+					const pendingClientRow = await getClientById(
+						booking.client_id,
+						client
+					)
+					const pending = await createPendingCalendarEvent(
+						{
+							userId,
+							clientName: pendingClientRow?.name || 'Cliente',
+							practitionerEmail,
+							startTime: booking.start_time,
+							endTime: booking.end_time,
+							bookingId: booking.id
+						},
+						client
+					)
+					if (pending.success && pending.googleEventId) {
+						await createCalendarEventDb(
+							{
+								booking_id: booking.id,
+								user_id: userId,
+								google_event_id: pending.googleEventId,
+								event_type: 'pending',
+								event_status: 'created'
+							},
+							client
+						)
+						created += 1
+					}
+				}
+			} catch (e) {
+				// Keep going; this is a best-effort convenience, not a hard requirement
+				console.error(
+					'🧩 [Reconcile] Failed creating event for booking',
+					booking.id,
+					e
+				)
+			}
+		}
+
+		////////////////////////////////////////////////////////
+		//// Step 6: Summary
+		////////////////////////////////////////////////////////
+		console.log('🧩 [Reconcile] Done', {
+			processed: candidates.length,
+			created
+		})
+		return { processed: candidates.length, created }
+	} catch (e) {
+		console.error('🧩 [Reconcile] Fatal error', e)
+		return { processed: 0, created: 0, error: 'reconcile_failed' }
 	}
 }

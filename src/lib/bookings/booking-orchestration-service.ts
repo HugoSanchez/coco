@@ -201,7 +201,9 @@ async function createInAdvanceBooking(
 					clientName: client.name,
 					practitionerEmail: practitioner.email,
 					startTime: request.startTime,
-					endTime: request.endTime
+					endTime: request.endTime,
+					// Tag the Google event for idempotent reconciliation later
+					bookingId: booking.id
 				},
 				supabaseClient
 			)

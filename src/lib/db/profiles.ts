@@ -262,6 +262,20 @@ export async function getUserEmail(
 	return profile.email
 }
 
+// Retrieves a user's profile by email (helper for OAuth callbacks)
+export async function getProfileByEmail(
+	email: string,
+	supabaseClient?: SupabaseClient
+) {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('profiles')
+		.select('*')
+		.eq('email', email)
+		.single()
+	return { data, error }
+}
+
 // TODO: Add additional profile-related functions as needed:
 // - deleteProfile()
 // - searchProfiles()

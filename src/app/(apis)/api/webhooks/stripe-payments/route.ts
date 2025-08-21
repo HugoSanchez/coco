@@ -149,7 +149,8 @@ export async function POST(request: NextRequest) {
 						userId: practitionerUserId,
 						clientEmail,
 						practitionerName,
-						practitionerEmail
+						practitionerEmail,
+						bookingId
 					},
 					supabase
 				)
