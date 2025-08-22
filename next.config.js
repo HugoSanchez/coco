@@ -8,7 +8,21 @@ const nextConfig = {
 			// 'xkllkwizcdkydgwzvkdg.supabase.co', // PROD Supabase project
 			'edyluyrleinpebjhxay.supabase.co' // DEV Supabase project
 		]
-	}
+	},
+	async rewrites() {
+		return [
+			{
+				source: '/ingest/static/:path*',
+				destination: 'https://eu-assets.i.posthog.com/static/:path*'
+			},
+			{
+				source: '/ingest/:path*',
+				destination: 'https://eu.i.posthog.com/:path*'
+			}
+		]
+	},
+	// This is required to support PostHog trailing slash API requests
+	skipTrailingSlashRedirect: true
 }
 
 module.exports = nextConfig

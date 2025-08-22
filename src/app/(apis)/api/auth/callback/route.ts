@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { PostHog } from 'posthog-node'
 
 // Force dynamic rendering since this route uses cookies for authentication
 export const dynamic = 'force-dynamic'
@@ -21,6 +22,32 @@ export async function GET(request: Request) {
 		const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
 		if (data?.user) {
+			// Capture auth analytics (signup vs signin) using PostHog server SDK
+			try {
+				if (process.env.POSTHOG_KEY) {
+					const ph = new PostHog(process.env.POSTHOG_KEY!, {
+						host: process.env.POSTHOG_HOST
+					})
+					const user = data.user
+					const isNewSignup =
+						Date.now() - new Date(user.created_at).getTime() <
+						10 * 60 * 1000 // 10 minutes heuristic
+					await ph.capture({
+						distinctId: user.id,
+						event: isNewSignup
+							? 'user_signed_up'
+							: 'user_logged_in',
+						properties: {
+							email: user.email,
+							source: redirectTo || 'auth_callback'
+						}
+					})
+					await ph.shutdown()
+				}
+			} catch (_) {
+				// Swallow analytics errors; do not block auth flow
+			}
+
 			// If there's a specific redirect from middleware, use it
 			if (redirectTo) {
 				finalRedirect = new URL(redirectTo, requestUrl.origin)
