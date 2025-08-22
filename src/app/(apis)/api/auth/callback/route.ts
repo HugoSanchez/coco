@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { PostHog } from 'posthog-node'
+import { sendSignupNotificationEmail } from '@/lib/emails/email-service'
 
 // Force dynamic rendering since this route uses cookies for authentication
 export const dynamic = 'force-dynamic'
@@ -43,6 +44,12 @@ export async function GET(request: Request) {
 						}
 					})
 					await ph.shutdown()
+
+					if (isNewSignup) {
+						await sendSignupNotificationEmail({
+							newUserEmail: user.email || ''
+						})
+					}
 				}
 			} catch (_) {
 				// Swallow analytics errors; do not block auth flow
