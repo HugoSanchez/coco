@@ -1,6 +1,6 @@
 'use client'
 
-import { SideSheet } from './SideSheet'
+import { SideSheetHeadless } from './SideSheetHeadless'
 import { ClientFormFields } from './ClientFormFields'
 import type { Client } from '@/lib/db/clients'
 
@@ -66,7 +66,7 @@ export function ClientForm({
 	initialData
 }: ClientFormProps) {
 	return (
-		<SideSheet
+		<SideSheetHeadless
 			isOpen={isOpen}
 			onClose={onClose}
 			title={
@@ -92,6 +92,6 @@ export function ClientForm({
 				editMode={editMode}
 				initialData={initialData}
 			/>
-		</SideSheet>
+		</SideSheetHeadless>
 	)
 }

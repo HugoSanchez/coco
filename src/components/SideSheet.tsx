@@ -110,6 +110,7 @@ export function SideSheet({
 			modal={false}
 			open={isOpen}
 			onOpenChange={(open) => {
+				console.log('open', open)
 				// Close when clicking the overlay or outside the sheet, or pressing Escape
 				if (!open) onClose()
 			}}

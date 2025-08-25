@@ -10,6 +10,7 @@
 		"types:generate": "supabase gen types typescript --project-id xkllkwizcdkydgwzvkdg > src/types/database.types.ts"
 	},
 	"dependencies": {
+		"@headlessui/react": "^2.2.7",
 		"@hookform/resolvers": "^3.9.0",
 		"@radix-ui/react-alert-dialog": "^1.1.14",
 		"@radix-ui/react-avatar": "^1.1.0",

@@ -6,7 +6,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { useRouter } from 'next/navigation'
 import { ClientList } from '@/components/ClientList'
 import { BookingsTable, Booking } from '@/components/BookingsTable'
-import { SideSheet } from '@/components/SideSheet'
+import { SideSheetHeadless } from '@/components/SideSheetHeadless'
 import {
 	BookingFilters,
 	BookingFiltersState
@@ -488,12 +488,8 @@ export default function Dashboard() {
 
 	const handleRescheduleBooking = (bookingId: string) => {
 		console.log('Opening reschedule slidesheet for booking:', bookingId)
-
-		// Add a small delay to ensure dropdown closes first
-		setTimeout(() => {
-			setReschedulingBookingId(bookingId)
-			setIsRescheduleOpen(true)
-		}, 100)
+		setReschedulingBookingId(bookingId)
+		setIsRescheduleOpen(true)
 	}
 
 	const handleResendEmail = async (bookingId: string) => {
@@ -1054,7 +1050,7 @@ export default function Dashboard() {
 			</main>
 
 			{/* Filter Sidebar */}
-			<SideSheet
+			<SideSheetHeadless
 				isOpen={isFilterOpen}
 				onClose={() => setIsFilterOpen(false)}
 				title="Filtros"
@@ -1064,10 +1060,10 @@ export default function Dashboard() {
 					filters={filters}
 					onFiltersChange={setFilters}
 				/>
-			</SideSheet>
+			</SideSheetHeadless>
 
 			{/* New Booking Sidebar */}
-			<SideSheet
+			<SideSheetHeadless
 				isOpen={isNewBookingOpen}
 				onClose={() => setIsNewBookingOpen(false)}
 				title="Nueva Cita"
@@ -1099,10 +1095,10 @@ export default function Dashboard() {
 					}}
 					onCancel={() => setIsNewBookingOpen(false)}
 				/>
-			</SideSheet>
+			</SideSheetHeadless>
 
 			{/* Reschedule Sidebar */}
-			<SideSheet
+			<SideSheetHeadless
 				isOpen={isRescheduleOpen}
 				onClose={() => {
 					console.log('Closing reschedule slidesheet')
@@ -1131,7 +1127,7 @@ export default function Dashboard() {
 						}}
 					/>
 				)}
-			</SideSheet>
+			</SideSheetHeadless>
 
 			{/* Refund Confirmation Modal */}
 			{refundingBookingId &&
