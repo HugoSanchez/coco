@@ -435,7 +435,7 @@ export function BookingsTable({
 								<TableHead className="hidden md:table-cell font-semibold w-[140px] text-center">
 									Fecha
 								</TableHead>
-								<TableHead className="hidden font-semibold w-[100px] text-center">
+								<TableHead className="hidden md:table-cell font-semibold w-[100px] text-center">
 									Hora
 								</TableHead>
 								<TableHead className="hidden sm:table-cell font-semibold w-[160px] text-center">
@@ -489,7 +489,7 @@ export function BookingsTable({
 										</TableCell>
 
 										{/* Time */}
-										<TableCell className="hidden text-center py-2">
+										<TableCell className="hidden md:table-cell text-center py-2">
 											<span className="font-light">
 												{format(
 													booking.startTime ||
