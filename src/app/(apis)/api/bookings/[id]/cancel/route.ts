@@ -11,6 +11,11 @@ import {
 } from '@/lib/calendar/calendar'
 import { paymentOrchestrationService } from '@/lib/payments/payment-orchestration-service'
 import { getBillsForBooking } from '@/lib/db/bills'
+import {
+	sendCancellationNotificationEmail,
+	sendCancellationRefundNotificationEmail
+} from '@/lib/emails/email-service'
+import { getProfileById } from '@/lib/db/profiles'
 
 /**
  * POST /api/bookings/[id]/cancel
@@ -211,6 +216,39 @@ export async function POST(
 
 		// 4. Update booking status to canceled (matches database constraint)
 		await updateBookingStatus(bookingId, 'canceled', supabase)
+
+		// 4.5 Send emails (best-effort)
+		try {
+			const profile = await getProfileById(user.id, supabase)
+			const practitionerName = profile?.name || undefined
+			const paidBill = bills.find((b) => b.status === 'paid') || null
+			const clientEmail =
+				booking.client?.email || paidBill?.client_email || ''
+			const clientName =
+				booking.client?.name || paidBill?.client_name || 'Paciente'
+			if (clientEmail) {
+				if (willRefund && refundId) {
+					await sendCancellationRefundNotificationEmail({
+						to: clientEmail,
+						clientName,
+						amount: paidBill?.amount || 0,
+						currency: paidBill?.currency || 'EUR',
+						practitionerName,
+						refundId,
+						consultationDate: booking.start_time
+					})
+				} else {
+					await sendCancellationNotificationEmail({
+						to: clientEmail,
+						clientName,
+						consultationDate: booking.start_time,
+						practitionerName
+					})
+				}
+			}
+		} catch (emailError) {
+			console.warn('Cancel email send failed:', emailError)
+		}
 
 		// 5. Return success with appropriate message
 		const isPending = booking.status === 'pending'

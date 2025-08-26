@@ -1,6 +1,9 @@
 import { Resend } from 'resend'
 import { render } from '@react-email/render'
 import ConsultationBillEmail from './consultation-bill'
+import RefundNotificationEmail from './refund-notification'
+import CancellationNotificationEmail from './cancellation-notification'
+import CancellationRefundNotificationEmail from './cancellation-refund-notification'
 
 /**
  * Get Resend client instance
@@ -205,6 +208,148 @@ export async function sendSignupNotificationEmail({
 		}
 	}
 }
+
+/**
+ * Send refund notification to patient
+ */
+export async function sendRefundNotificationEmail({
+	to,
+	clientName,
+	amount,
+	currency = 'EUR',
+	practitionerName,
+	refundId,
+	consultationDate
+}: {
+	to: string
+	clientName: string
+	amount: number
+	currency?: string
+	practitionerName?: string
+	refundId?: string
+	consultationDate?: string
+}) {
+	try {
+		const resend = getResendClient()
+		const html = await render(
+			RefundNotificationEmail({
+				clientName,
+				amount,
+				currency,
+				practitionerName,
+				refundId,
+				consultationDate
+			})
+		)
+		const result = await resend.emails.send({
+			from: EMAIL_CONFIG.from,
+			replyTo: EMAIL_CONFIG.replyTo,
+			to: [to],
+			subject: 'Confirmación de reembolso',
+			html
+		})
+		if (result.error) throw new Error(result.error.message)
+		return { success: true, emailId: result.data?.id }
+	} catch (error) {
+		console.error('Refund email failed:', error)
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : 'Unknown error'
+		}
+	}
+}
+
+/**
+ * Send cancellation notification to patient
+ */
+export async function sendCancellationNotificationEmail({
+	to,
+	clientName,
+	consultationDate,
+	practitionerName
+}: {
+	to: string
+	clientName: string
+	consultationDate?: string
+	practitionerName?: string
+}) {
+	try {
+		const resend = getResendClient()
+		const html = await render(
+			CancellationNotificationEmail({
+				clientName,
+				consultationDate,
+				practitionerName
+			})
+		)
+		const result = await resend.emails.send({
+			from: EMAIL_CONFIG.from,
+			replyTo: EMAIL_CONFIG.replyTo,
+			to: [to],
+			subject: 'Cita cancelada',
+			html
+		})
+		if (result.error) throw new Error(result.error.message)
+		return { success: true, emailId: result.data?.id }
+	} catch (error) {
+		console.error('Cancellation email failed:', error)
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : 'Unknown error'
+		}
+	}
+}
+
+/**
+ * Send cancellation + refund notification to patient
+ */
+export async function sendCancellationRefundNotificationEmail({
+	to,
+	clientName,
+	amount,
+	currency = 'EUR',
+	practitionerName,
+	refundId,
+	consultationDate
+}: {
+	to: string
+	clientName: string
+	amount: number
+	currency?: string
+	practitionerName?: string
+	refundId?: string
+	consultationDate?: string
+}) {
+	try {
+		const resend = getResendClient()
+		const html = await render(
+			CancellationRefundNotificationEmail({
+				clientName,
+				amount,
+				currency,
+				practitionerName,
+				refundId,
+				consultationDate
+			})
+		)
+		const result = await resend.emails.send({
+			from: EMAIL_CONFIG.from,
+			replyTo: EMAIL_CONFIG.replyTo,
+			to: [to],
+			subject: `${practitionerName} ha cancelado tu cita`,
+			html
+		})
+		if (result.error) throw new Error(result.error.message)
+		return { success: true, emailId: result.data?.id }
+	} catch (error) {
+		console.error('Cancellation+Refund email failed:', error)
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : 'Unknown error'
+		}
+	}
+}
+
 /**
  * Test if Resend client can be initialized
  */

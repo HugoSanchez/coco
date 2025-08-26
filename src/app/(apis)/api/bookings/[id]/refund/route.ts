@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getBookingById } from '@/lib/db/bookings'
 import { paymentOrchestrationService } from '@/lib/payments/payment-orchestration-service'
+import { getBillsForBooking } from '@/lib/db/bills'
+import { sendRefundNotificationEmail } from '@/lib/emails/email-service'
+import { getProfileById } from '@/lib/db/profiles'
 
 /**
  * POST /api/bookings/[id]/refund
@@ -91,7 +94,33 @@ export async function POST(
 			)
 		}
 
-		// 3. Return success response
+		// 3. Best-effort email notification
+		try {
+			const paidBill = (
+				await getBillsForBooking(bookingId, supabase)
+			).find((b) => b.status === 'paid' || b.status === 'refunded')
+			const clientEmail =
+				booking.client?.email || paidBill?.client_email || ''
+			const clientName =
+				booking.client?.name || paidBill?.client_name || 'Paciente'
+			const profile = await getProfileById(user.id, supabase)
+			const practitionerName = profile?.name || undefined
+			if (clientEmail && paidBill) {
+				await sendRefundNotificationEmail({
+					to: clientEmail,
+					clientName,
+					amount: paidBill.amount,
+					currency: paidBill.currency,
+					practitionerName,
+					refundId: refundResult.refundId,
+					consultationDate: booking.start_time
+				})
+			}
+		} catch (emailError) {
+			console.warn('Refund email send failed:', emailError)
+		}
+
+		// 4. Return success response
 		return NextResponse.json({
 			success: true,
 			message: 'Refund processed successfully',
