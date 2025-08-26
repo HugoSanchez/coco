@@ -10,6 +10,7 @@ import {
 	cancelCalendarEvent
 } from '@/lib/calendar/calendar'
 import { paymentOrchestrationService } from '@/lib/payments/payment-orchestration-service'
+import { getBillsForBooking } from '@/lib/db/bills'
 
 /**
  * POST /api/bookings/[id]/cancel
@@ -67,12 +68,19 @@ export async function POST(
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 		}
 
-		// Check if booking is already canceled
+		// Whether a refund would be required for this cancellation (paid bill exists)
+		let willRefund = false
+		const bills = await getBillsForBooking(bookingId, supabase)
+		willRefund = bills.some((b) => b.status === 'paid')
+
+		// Idempotency: if booking is already canceled, return success and do nothing
 		if (booking.status === 'canceled') {
-			return NextResponse.json(
-				{ error: 'Booking is already canceled' },
-				{ status: 400 }
-			)
+			return NextResponse.json({
+				success: true,
+				message: 'Booking already canceled',
+				booking: { id: bookingId, status: 'canceled' },
+				willRefund
+			})
 		}
 
 		// 2. Handle calendar event cancellation based on booking status
@@ -166,6 +174,41 @@ export async function POST(
 			}
 		}
 
+		// 3.5. Refund payment if the booking has a paid bill (confirmed, paid)
+		let refundId: string | undefined
+		if (willRefund) {
+			try {
+				const refundResult =
+					await paymentOrchestrationService.refundBookingPayment(
+						bookingId,
+						'cancellation',
+						supabase
+					)
+
+				if (!refundResult.success) {
+					return NextResponse.json(
+						{
+							error: `Refund failed: ${refundResult.error || 'Unknown error'}`
+						},
+						{ status: 502 }
+					)
+				}
+
+				refundId = refundResult.refundId
+			} catch (refundError) {
+				return NextResponse.json(
+					{
+						error: 'Failed to refund payment',
+						details:
+							refundError instanceof Error
+								? refundError.message
+								: 'Unknown error'
+					},
+					{ status: 502 }
+				)
+			}
+		}
+
 		// 4. Update booking status to canceled (matches database constraint)
 		await updateBookingStatus(bookingId, 'canceled', supabase)
 
@@ -180,7 +223,9 @@ export async function POST(
 				id: bookingId,
 				status: 'canceled',
 				wasReservation: isPending
-			}
+			},
+			willRefund,
+			refundId
 		})
 	} catch (error) {
 		console.error('Booking cancellation error:', error)

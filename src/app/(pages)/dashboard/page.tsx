@@ -39,6 +39,7 @@ import { StripeConfigurationModal } from '@/components/StripeConfigurationModal'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { getCurrentMonthNameCapitalized } from '@/lib/utils'
+import { CancelConfirmationModal } from '@/components/CancelConfirmationModal'
 
 /**
  * Interface for dashboard statistics API response
@@ -129,6 +130,9 @@ export default function Dashboard() {
 	const [markingAsPaidBookingId, setMarkingAsPaidBookingId] = useState<
 		string | null
 	>(null)
+	const [cancelingBookingId, setCancelingBookingId] = useState<string | null>(
+		null
+	)
 	const [isRescheduleOpen, setIsRescheduleOpen] = useState(false)
 	const [reschedulingBookingId, setReschedulingBookingId] = useState<
 		string | null
@@ -330,16 +334,19 @@ export default function Dashboard() {
 			setBookings((prev) =>
 				prev.map((booking) => {
 					if (booking.id === bookingId) {
-						const updatedBooking = {
+						const updatedBooking: any = {
 							...booking,
 							status: 'canceled' as const
 						}
 
-						// If payment is still pending, mark it as canceled too
-						if (
+						// If server indicates a refund occurred/will occur, reflect immediately
+						if (result?.willRefund) {
+							updatedBooking.payment_status = 'refunded' as const
+						} else if (
 							booking.payment_status === 'pending' ||
 							booking.payment_status === 'not_applicable'
 						) {
+							// Otherwise, if payment was pending or N/A, mark as canceled
 							updatedBooking.payment_status = 'canceled' as const
 						}
 
@@ -484,6 +491,10 @@ export default function Dashboard() {
 
 	const handleShowMarkAsPaidDialog = (bookingId: string) => {
 		setMarkingAsPaidBookingId(bookingId)
+	}
+
+	const handleShowCancelDialog = (bookingId: string) => {
+		setCancelingBookingId(bookingId)
 	}
 
 	const handleRescheduleBooking = (bookingId: string) => {
@@ -928,7 +939,7 @@ export default function Dashboard() {
 									<BookingsTable
 										bookings={bookings}
 										loading={loadingBookings}
-										onCancelBooking={handleCancelBooking}
+										onCancelBooking={handleShowCancelDialog}
 										onConfirmBooking={handleConfirmBooking}
 										onMarkAsPaid={
 											handleShowMarkAsPaidDialog
@@ -1005,7 +1016,7 @@ export default function Dashboard() {
 								<BookingsTable
 									bookings={bookings}
 									loading={loadingBookings}
-									onCancelBooking={handleCancelBooking}
+									onCancelBooking={handleShowCancelDialog}
 									onConfirmBooking={handleConfirmBooking}
 									onMarkAsPaid={handleShowMarkAsPaidDialog}
 									onRefundBooking={handleRefundBooking}
@@ -1223,6 +1234,31 @@ export default function Dashboard() {
 					setShowStripeConfigModal(false)
 				}}
 			/>
+
+			{/* Cancel Confirmation Modal */}
+			{cancelingBookingId &&
+				(() => {
+					const booking = bookings.find(
+						(b) => b.id === cancelingBookingId
+					)
+					const isPaid = booking?.payment_status === 'paid'
+					return (
+						<CancelConfirmationModal
+							isOpen={!!cancelingBookingId}
+							onOpenChange={(open) => {
+								if (!open) setCancelingBookingId(null)
+							}}
+							onConfirm={async () => {
+								const id = cancelingBookingId
+								setCancelingBookingId(null)
+								if (id) {
+									await handleCancelBooking(id)
+								}
+							}}
+							isPaid={!!isPaid}
+						/>
+					)
+				})()}
 		</div>
 	)
 }
