@@ -197,6 +197,10 @@ export function BookingForm({
 					: null
 			const defaultAmount = Number(userDefault?.billing_amount || 0)
 
+			// Persist resolved amounts for later interactions (e.g., switching to follow-up)
+			setResolvedClientPrice(clientAmount)
+			setResolvedDefaultPrice(defaultAmount)
+
 			const {
 				showSelect,
 				consultationType: type,

@@ -59,7 +59,7 @@ export function SideSheetHeadless({
 								leaveFrom="translate-x-0"
 								leaveTo="translate-x-full"
 							>
-								<Dialog.Panel className="pointer-events-auto w-screen md:max-w-md lg:max-w-lg bg-gray-50 shadow-xl">
+								<Dialog.Panel className="pointer-events-auto w-screen md:max-w-md lg:max-w-lg bg-gray-50 shadow-xl coco-sidesheet">
 									<div className="h-full flex flex-col p-6">
 										<div className="mb-4">
 											<Dialog.Title className="text-xl md:text-2xl font-bold">
@@ -71,7 +71,7 @@ export function SideSheetHeadless({
 												</p>
 											)}
 										</div>
-										<div className="flex-1 overflow-y-auto">
+										<div className="flex-1 overflow-y-auto scrollbar-hide">
 											{children}
 										</div>
 									</div>

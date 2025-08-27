@@ -118,7 +118,7 @@ export function SideSheet({
 			{/* Sheet content with custom styling */}
 			<SheetContent
 				side="right"
-				className={`w-full md:w-1/3 max-w-full md:px-2 overflow-y-auto bg-gray-50 [&>button]:hidden p-0`}
+				className={`coco-sidesheet w-full md:w-1/3 max-w-full md:px-2 overflow-y-auto scrollbar-hide bg-gray-50 [&>button]:hidden p-0`}
 				onEscapeKeyDown={(e) => {
 					// Allow closing with escape key
 					onClose()

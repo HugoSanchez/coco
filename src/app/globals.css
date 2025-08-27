@@ -95,6 +95,15 @@ input.hide-number-spinner[type='number'] {
 	}
 }
 
+/* Disable focus rings inside side sheets only */
+.coco-sidesheet input:focus,
+.coco-sidesheet textarea:focus,
+.coco-sidesheet [role='combobox']:focus,
+.coco-sidesheet button[aria-haspopup='listbox']:focus {
+	outline: none !important;
+	box-shadow: none !important;
+}
+
 /* Completely hide scrollbar for specific elements, with increased specificity */
 .scrollbar-hide,
 .scrollbar-hide * {
