@@ -10,6 +10,7 @@ import {
 export interface BillingPreferences {
 	billingType: 'in-advance' | 'right-after' | 'monthly'
 	billingAmount: string
+	firstConsultationAmount?: string
 }
 
 // Define which billing types are currently available
@@ -73,6 +74,39 @@ export function BillingPreferencesForm({
 									handleInputChange('billingAmount', '1')
 								}
 							}}
+							className="pr-8 h-12"
+							disabled={disabled}
+						/>
+						<span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500">
+							€
+						</span>
+					</div>
+				</div>
+				<div className="space-y-2">
+					<div>
+						<label
+							htmlFor="firstConsultationAmount"
+							className="block text-md font-medium text-gray-700"
+						>
+							Precio primera consulta (opcional)
+						</label>
+						<p className="text-sm text-gray-500 mb-2">
+							Si lo dejas vacío, se usará el precio habitual.
+						</p>
+					</div>
+					<div className="relative">
+						<Input
+							id="firstConsultationAmount"
+							type="number"
+							step="0.01"
+							min={0}
+							value={values.firstConsultationAmount || ''}
+							onChange={(e) =>
+								handleInputChange(
+									'firstConsultationAmount',
+									e.target.value
+								)
+							}
 							className="pr-8 h-12"
 							disabled={disabled}
 						/>

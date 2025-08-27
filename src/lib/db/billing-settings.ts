@@ -41,6 +41,7 @@ export interface BillingSettings {
 export interface BillingPreferences {
 	billingType: BillingType
 	billingAmount: string
+	firstConsultationAmount?: string
 }
 
 /**
@@ -72,7 +73,9 @@ export async function getBillingPreferences(
 
 		return {
 			billingType: data.billing_type,
-			billingAmount: data.billing_amount?.toString() || ''
+			billingAmount: data.billing_amount?.toString() || '',
+			firstConsultationAmount:
+				data.first_consultation_amount?.toString() || ''
 		}
 	} catch (error) {
 		console.error('Error in getBillingPreferences:', error)
@@ -92,10 +95,23 @@ export async function saveBillingPreferences(
 	preferences: BillingPreferences
 ): Promise<BillingSettings[]> {
 	try {
-		const billingData = {
+		const billingData: any = {
 			billing_amount: parseFloat(preferences.billingAmount) || null,
 			billing_type: preferences.billingType,
 			currency: 'EUR'
+		}
+
+		// Optional first consultation amount
+		if (
+			preferences.firstConsultationAmount != null &&
+			preferences.firstConsultationAmount !== ''
+		) {
+			const parsed = parseFloat(preferences.firstConsultationAmount)
+			billingData.first_consultation_amount = isNaN(parsed)
+				? null
+				: parsed
+		} else {
+			billingData.first_consultation_amount = null
 		}
 
 		// First, attempt to update existing default settings

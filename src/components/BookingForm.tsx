@@ -33,8 +33,17 @@ import type { Client as DbClient } from '@/lib/db/clients'
 import { Input } from '@/components/ui/input'
 import {
 	getClientBillingSettings,
-	getUserDefaultBillingSettings
+	getUserDefaultBillingSettings,
+	getBillingPreferences
 } from '@/lib/db/billing-settings'
+import { hasAnyNonCanceledBookings } from '@/lib/db/bookings'
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue
+} from '@/components/ui/select'
 
 interface BookingFormProps {
 	onSuccess?: () => void // Called when booking is successfully created
@@ -84,7 +93,7 @@ export function BookingForm({
 	const [loadingBookings, setLoadingBookings] = useState(false) // Loading state for fetching day bookings
 	const [isPriceDirty, setIsPriceDirty] = useState(false)
 	const [priceSource, setPriceSource] = useState<
-		'default' | 'client' | 'custom' | null
+		'default' | 'client' | 'custom' | 'first' | null
 	>(null)
 	const [resolvedClientPrice, setResolvedClientPrice] = useState<
 		number | null
@@ -92,10 +101,27 @@ export function BookingForm({
 	const [resolvedDefaultPrice, setResolvedDefaultPrice] = useState<
 		number | null
 	>(null)
+	const [firstConsultationAmount, setFirstConsultationAmount] =
+		useState<string>('')
+	const [consultationType, setConsultationType] = useState<
+		'first' | 'followup'
+	>('followup')
+	const [showConsultationType, setShowConsultationType] =
+		useState<boolean>(false)
 
 	// Context and utilities
 	const { user, profile } = useUser() // Current user and profile data
 	const { toast } = useToast() // Toast notification system
+
+	// Load user's default first consultation amount once
+	useEffect(() => {
+		const loadFirstAmount = async () => {
+			if (!user?.id) return
+			const prefs = await getBillingPreferences(user.id)
+			setFirstConsultationAmount(prefs?.firstConsultationAmount || '')
+		}
+		loadFirstAmount()
+	}, [user?.id])
 
 	// Re-fetch existing bookings when returning to step 2 if date is already selected
 	useEffect(() => {
@@ -108,48 +134,108 @@ export function BookingForm({
 		}
 	}, [currentStep, selectedDate])
 
-	// Auto-fill price when entering Step 3 or when client changes
-	useEffect(() => {
-		const loadSuggestedPrice = async () => {
-			if (!user?.id || currentStep !== 3) return
-
-			try {
-				// Try client-specific settings first
-				if (selectedClient) {
-					const clientSettings = await getClientBillingSettings(
-						user.id,
-						selectedClient
-					)
-					if (clientSettings?.billing_amount != null) {
-						const clientAmount = Number(
-							clientSettings.billing_amount
-						)
-						setCustomPrice(String(clientAmount))
-						setIsPriceDirty(false)
-						setPriceSource('client')
-						setResolvedClientPrice(clientAmount)
-						setResolvedDefaultPrice(null)
-						return
-					}
+	// Derive pricing and dropdown visibility in a single place to avoid races
+	function derivePricing({
+		hasPrev,
+		firstAmount,
+		clientAmount,
+		defaultAmount,
+		forcedType
+	}: {
+		hasPrev: boolean
+		firstAmount: number | null
+		clientAmount: number | null
+		defaultAmount: number
+		forcedType?: 'first' | 'followup'
+	}) {
+		const eligible = !hasPrev && firstAmount != null
+		if (eligible) {
+			const type = forcedType ?? 'first'
+			if (type === 'first') {
+				return {
+					showSelect: true,
+					consultationType: 'first',
+					price: firstAmount!,
+					source: 'first'
 				}
-
-				// Fallback to user default settings
-				const userDefault = await getUserDefaultBillingSettings(user.id)
-				if (userDefault?.billing_amount != null) {
-					const defaultAmount = Number(userDefault.billing_amount)
-					setCustomPrice(String(defaultAmount))
-					setIsPriceDirty(false)
-					setPriceSource('default')
-					setResolvedDefaultPrice(defaultAmount)
-					setResolvedClientPrice(null)
-				}
-			} catch (err) {
-				console.error('Error loading suggested price:', err)
+			}
+			return {
+				showSelect: true,
+				consultationType: 'followup',
+				price: clientAmount ?? defaultAmount,
+				source: clientAmount != null ? 'client' : 'default'
 			}
 		}
+		return {
+			showSelect: false,
+			consultationType: 'followup',
+			price: clientAmount ?? defaultAmount,
+			source: clientAmount != null ? 'client' : 'default'
+		}
+	}
 
-		loadSuggestedPrice()
-	}, [user?.id, selectedClient, currentStep])
+	// Single effect: when entering step 3 or changing client, fetch everything and derive once
+	useEffect(() => {
+		const run = async () => {
+			if (!user?.id || currentStep !== 3 || !selectedClient) return
+
+			// Fetch in parallel to avoid sequential delays
+			const [clientSettings, userDefault, prefs, hasPrev] =
+				await Promise.all([
+					getClientBillingSettings(user.id, selectedClient),
+					getUserDefaultBillingSettings(user.id),
+					getBillingPreferences(user.id),
+					hasAnyNonCanceledBookings(user.id, selectedClient)
+				])
+
+			const firstAmount = prefs?.firstConsultationAmount
+				? Number(prefs.firstConsultationAmount)
+				: null
+			const clientAmount =
+				clientSettings?.billing_amount != null
+					? Number(clientSettings.billing_amount)
+					: null
+			const defaultAmount = Number(userDefault?.billing_amount || 0)
+
+			const {
+				showSelect,
+				consultationType: type,
+				price,
+				source
+			} = derivePricing({
+				hasPrev,
+				firstAmount,
+				clientAmount,
+				defaultAmount
+			})
+
+			setShowConsultationType(showSelect)
+			setConsultationType(type as 'first' | 'followup')
+			if (!isPriceDirty) {
+				setCustomPrice(String(price))
+				setPriceSource(
+					source as 'default' | 'first' | 'client' | 'custom'
+				)
+			}
+		}
+		run()
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [user?.id, currentStep, selectedClient])
+
+	// When first price arrives while 'first' is selected, apply it once (if user hasn't edited)
+	useEffect(() => {
+		if (
+			currentStep === 3 &&
+			consultationType === 'first' &&
+			firstConsultationAmount &&
+			!isPriceDirty
+		) {
+			setCustomPrice(String(Number(firstConsultationAmount)))
+			setIsPriceDirty(false)
+			setPriceSource('first')
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [firstConsultationAmount])
 
 	// Fetch existing bookings when date changes
 	const fetchExistingBookings = async (date: Date) => {
@@ -333,7 +419,8 @@ export function BookingForm({
 					endTime: selectedSlot!.end,
 					notes,
 					// Only send override if user modified the suggested value
-					overrideAmount
+					overrideAmount,
+					consultationType
 				})
 			})
 
@@ -514,6 +601,72 @@ export function BookingForm({
 								/>
 							</div>
 
+							{/* Consultation Type - only if first price exists */}
+							{showConsultationType && (
+								<div className="space-y-2">
+									<Label className="text-md font-normal text-gray-700">
+										Tipo de consulta
+									</Label>
+									<Select
+										value={consultationType}
+										onValueChange={(val) => {
+											setConsultationType(val as any)
+											if (val === 'first') {
+												setPriceSource('first')
+												if (firstConsultationAmount) {
+													setCustomPrice(
+														String(
+															Number(
+																firstConsultationAmount
+															)
+														)
+													)
+													setIsPriceDirty(false)
+												}
+											} else {
+												if (!isPriceDirty) {
+													if (
+														resolvedClientPrice !=
+														null
+													) {
+														setCustomPrice(
+															String(
+																resolvedClientPrice
+															)
+														)
+														setPriceSource('client')
+													} else if (
+														resolvedDefaultPrice !=
+														null
+													) {
+														setCustomPrice(
+															String(
+																resolvedDefaultPrice
+															)
+														)
+														setPriceSource(
+															'default'
+														)
+													}
+												}
+											}
+										}}
+									>
+										<SelectTrigger className="h-12">
+											<SelectValue placeholder="Selecciona tipo de consulta" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="first">
+												Primera consulta
+											</SelectItem>
+											<SelectItem value="followup">
+												Consulta de seguimiento
+											</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
+							)}
+
 							{/* Optional Custom Price Field */}
 							<div className="space-y-2">
 								<Label className="text-md font-normal text-gray-700">
@@ -582,7 +735,9 @@ export function BookingForm({
 												? 'Tarifa del paciente'
 												: priceSource === 'default'
 													? 'Tarifa habitual'
-													: 'Tarifa puntual'}
+													: priceSource === 'first'
+														? 'Primera consulta'
+														: 'Tarifa puntual'}
 										</span>
 									)}
 								</div>

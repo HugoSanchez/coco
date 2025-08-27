@@ -48,6 +48,7 @@ export interface CreateBookingPayload {
 	start_time: string
 	end_time: string
 	status?: 'pending' | 'scheduled' | 'completed' | 'canceled'
+	consultation_type?: 'first' | 'followup'
 }
 
 /**
@@ -563,4 +564,27 @@ export async function getBookingsMissingCalendarEvents(
 	return (data || []).filter(
 		(b: any) => !b.calendar_events || b.calendar_events.length === 0
 	)
+}
+
+/**
+ * Returns true if a client has any non-canceled bookings with the given user.
+ * Useful to determine whether a booking should default to "first" or "followup".
+ */
+export async function hasAnyNonCanceledBookings(
+	userId: string,
+	clientId: string,
+	supabaseClient?: SupabaseClient
+): Promise<boolean> {
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
+		.from('bookings')
+		.select('id')
+		.eq('user_id', userId)
+		.eq('client_id', clientId)
+		.neq('status', 'canceled')
+		.limit(1)
+
+	if (error) throw error
+	return (data || []).length > 0
 }

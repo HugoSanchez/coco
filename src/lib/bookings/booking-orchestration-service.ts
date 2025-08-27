@@ -56,6 +56,7 @@ export interface CreateBookingRequest {
 	notes?: string
 	status?: 'pending' | 'scheduled' | 'completed' | 'canceled'
 	overrideAmount?: number
+	consultationType?: 'first' | 'followup'
 }
 
 /**
@@ -165,7 +166,8 @@ async function createInAdvanceBooking(
 				client_id: request.clientId,
 				start_time: request.startTime,
 				end_time: request.endTime,
-				status: 'scheduled'
+				status: 'scheduled',
+				consultation_type: request.consultationType
 			},
 			supabaseClient
 		)
@@ -245,7 +247,8 @@ async function createInAdvanceBooking(
 		client_id: request.clientId,
 		start_time: request.startTime,
 		end_time: request.endTime,
-		status: 'pending' // Pending until payment
+		status: 'pending', // Pending until payment
+		consultation_type: request.consultationType
 	}
 
 	const booking = await createBooking(bookingPayload, supabaseClient)
@@ -589,6 +592,13 @@ export async function createBookingSimple(
 
 		// If a custom price override was provided, apply it for this booking only
 		let resolvedBilling = { ...billing }
+		// Apply first consultation pricing if selected and available
+		if (
+			request.consultationType === 'first' &&
+			(billing as any).first_consultation_amount != null
+		) {
+			resolvedBilling.amount = (billing as any).first_consultation_amount
+		}
 		if (
 			request.overrideAmount != null &&
 			typeof request.overrideAmount === 'number' &&
