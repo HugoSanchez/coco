@@ -83,6 +83,12 @@ export async function POST(request: NextRequest) {
 		)
 
 		if (!result.success) {
+			console.error('[Stripe] Create onboarding link failed', {
+				accountId: stripeAccount.stripe_account_id,
+				returnUrl,
+				refreshUrl,
+				error: result.error
+			})
 			return NextResponse.json(
 				{
 					error: 'Failed to create onboarding link',

@@ -79,6 +79,10 @@ export async function POST() {
 		const result = await stripeService.createConnectAccount(userEmail)
 
 		if (!result.success) {
+			console.error('[Stripe] Create Connect Account failed', {
+				email: userEmail,
+				error: result.error
+			})
 			return NextResponse.json(
 				{
 					error: 'Failed to create Stripe account',

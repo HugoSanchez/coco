@@ -226,6 +226,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
 			if (error || !data) {
 				// No error if no Stripe account exists yet
+				console.log('[stripe-status] no record for user', user.id, {
+					error
+				})
 				setStripeOnboardingCompleted(false)
 				return false
 			}
@@ -233,7 +236,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 			const isCompleted =
 				data.onboarding_completed && data.payments_enabled
 			setStripeOnboardingCompleted(isCompleted)
-			console.log('Stripe onboarding completed:', isCompleted)
+			console.log('[stripe-status]', {
+				userId: user.id,
+				onboarding_completed: data.onboarding_completed,
+				payments_enabled: data.payments_enabled,
+				derived_isCompleted: isCompleted
+			})
 			return isCompleted
 		} catch (error) {
 			console.error('Error checking Stripe status:', error)

@@ -43,6 +43,15 @@ export async function GET() {
 		// This will be null if user hasn't created a Stripe account yet
 		const stripeAccount = await getStripeAccountByUserId(user.id, supabase)
 
+		// Debug: minimal log to verify what the API is returning vs. client context
+		console.log('[onboarding-status]', {
+			userId: user.id,
+			hasRecord: Boolean(stripeAccount),
+			onboarding_completed: stripeAccount?.onboarding_completed ?? null,
+			payments_enabled: stripeAccount?.payments_enabled ?? null,
+			stripe_account_id: stripeAccount?.stripe_account_id ?? null
+		})
+
 		// Step 3: Return comprehensive onboarding status
 		// Frontend uses these flags to determine what UI to show
 		return NextResponse.json({
