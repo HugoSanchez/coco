@@ -301,12 +301,12 @@ export function BookingForm({
 				// Normalize decimal separator and parse
 				const normalized = customPrice.replace(',', '.')
 				const parsed = parseFloat(normalized)
-				if (Number.isNaN(parsed) || parsed < 1) {
+				if (Number.isNaN(parsed) || parsed < 0) {
 					setLoading(false)
 					return toast({
 						title: 'Precio inválido',
 						description:
-							'El precio personalizado debe ser un número mayor o igual a 1.',
+							'El precio personalizado debe ser un número mayor o igual a 0.',
 						variant: 'destructive',
 						color: 'error'
 					})
@@ -526,8 +526,7 @@ export function BookingForm({
 									<Input
 										type="number"
 										inputMode="decimal"
-										min={1}
-										step={0.01}
+										min={0}
 										placeholder="Introduce un precio en EUR"
 										value={customPrice}
 										onChange={(e) => {

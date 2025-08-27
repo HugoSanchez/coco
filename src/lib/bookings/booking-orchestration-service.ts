@@ -31,13 +31,17 @@ import {
 	CreateBillPayload,
 	Bill,
 	updateBillStatus,
+	markBillAsPaid,
 	deleteBill
 } from '@/lib/db/bills'
 import { sendConsultationBillEmail } from '@/lib/emails/email-service'
 import { getProfileById } from '@/lib/db/profiles'
 
 import { createEmailCommunication } from '@/lib/db/email-communications'
-import { createPendingCalendarEvent } from '@/lib/calendar/calendar'
+import {
+	createPendingCalendarEvent,
+	createCalendarEventWithInvite
+} from '@/lib/calendar/calendar'
 import { createCalendarEvent } from '@/lib/db/calendar-events'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -152,6 +156,90 @@ async function createInAdvanceBooking(
 	billing: any,
 	supabaseClient?: SupabaseClient
 ): Promise<CreateBookingResult> {
+	// Fast-track zero-amount bookings: immediately confirm and invite
+	if (billing.amount === 0) {
+		// Create booking already scheduled
+		const booking = await createBooking(
+			{
+				user_id: request.userId,
+				client_id: request.clientId,
+				start_time: request.startTime,
+				end_time: request.endTime,
+				status: 'scheduled'
+			},
+			supabaseClient
+		)
+
+		// Create bill (0 EUR) and mark it as paid
+		const bill = await createBillForBooking(
+			booking,
+			billing,
+			request.clientId,
+			supabaseClient
+		)
+		await markBillAsPaid(bill.id, supabaseClient)
+
+		// Create confirmed calendar event directly
+		try {
+			const client = await getClientById(request.clientId, supabaseClient)
+			const practitioner = await getProfileById(
+				request.userId,
+				supabaseClient
+			)
+
+			if (!client)
+				throw new Error(`Client not found: ${request.clientId}`)
+			if (!practitioner)
+				throw new Error(
+					`Practitioner profile not found: ${request.userId}`
+				)
+
+			const eventResult = await createCalendarEventWithInvite(
+				{
+					userId: request.userId,
+					clientName: client.name,
+					clientEmail: client.email,
+					practitionerName: practitioner.name || 'Your Practitioner',
+					practitionerEmail: practitioner.email,
+					startTime: request.startTime,
+					endTime: request.endTime,
+					bookingNotes: request.notes,
+					bookingId: booking.id as any
+				},
+				supabaseClient
+			)
+
+			if (eventResult.success && eventResult.googleEventId) {
+				await createCalendarEvent(
+					{
+						booking_id: booking.id,
+						user_id: request.userId,
+						google_event_id: eventResult.googleEventId,
+						event_type: 'confirmed',
+						event_status: 'created'
+					},
+					supabaseClient
+				)
+			} else {
+				console.error(
+					`Failed to create confirmed calendar event for booking ${booking.id}:`,
+					eventResult.error
+				)
+			}
+		} catch (calendarError) {
+			console.error(
+				`Confirmed calendar creation error for booking ${booking.id}:`,
+				calendarError
+			)
+		}
+
+		return {
+			booking,
+			bill,
+			requiresPayment: false
+		}
+	}
+	// Non-zero amount bookings (normal booking flow)
 	const bookingPayload: CreateBookingPayload = {
 		user_id: request.userId,
 		client_id: request.clientId,
@@ -505,7 +593,7 @@ export async function createBookingSimple(
 			request.overrideAmount != null &&
 			typeof request.overrideAmount === 'number' &&
 			!Number.isNaN(request.overrideAmount) &&
-			request.overrideAmount >= 1
+			request.overrideAmount >= 0
 		) {
 			resolvedBilling.amount =
 				Math.round(request.overrideAmount * 100) / 100

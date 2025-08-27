@@ -243,6 +243,7 @@ export interface CreateCalendarEventPayload {
 	startTime: string // ISO string
 	endTime: string // ISO string
 	bookingNotes?: string
+	bookingId?: string // Optional: tag Google event for idempotent reconciliation
 }
 
 /**
