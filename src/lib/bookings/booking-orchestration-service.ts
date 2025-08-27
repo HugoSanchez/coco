@@ -51,6 +51,7 @@ export interface CreateBookingRequest {
 	endTime: string
 	notes?: string
 	status?: 'pending' | 'scheduled' | 'completed' | 'canceled'
+	overrideAmount?: number
 }
 
 /**
@@ -498,27 +499,39 @@ export async function createBookingSimple(
 			supabaseClient
 		)
 
+		// If a custom price override was provided, apply it for this booking only
+		let resolvedBilling = { ...billing }
+		if (
+			request.overrideAmount != null &&
+			typeof request.overrideAmount === 'number' &&
+			!Number.isNaN(request.overrideAmount) &&
+			request.overrideAmount >= 1
+		) {
+			resolvedBilling.amount =
+				Math.round(request.overrideAmount * 100) / 100
+		}
+
 		// Call appropriate function based on billing type
 		// Each function will COPY the billing data into the booking record
-		switch (billing.type) {
+		switch (resolvedBilling.type) {
 			case 'in-advance':
 				return await createInAdvanceBooking(
 					request,
-					billing,
+					resolvedBilling,
 					supabaseClient
 				)
 
 			case 'right-after':
 				return await createRightAfterBooking(
 					request,
-					billing,
+					resolvedBilling,
 					supabaseClient
 				)
 
 			case 'monthly':
 				return await createMonthlyBooking(
 					request,
-					billing,
+					resolvedBilling,
 					supabaseClient
 				)
 

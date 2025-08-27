@@ -30,6 +30,11 @@ import { useToast } from '@/components/ui/use-toast'
 import { Spinner } from '@/components/ui/spinner'
 import { ClientFormFields } from '@/components/ClientFormFields'
 import type { Client as DbClient } from '@/lib/db/clients'
+import { Input } from '@/components/ui/input'
+import {
+	getClientBillingSettings,
+	getUserDefaultBillingSettings
+} from '@/lib/db/billing-settings'
 
 interface BookingFormProps {
 	onSuccess?: () => void // Called when booking is successfully created
@@ -65,6 +70,7 @@ export function BookingForm({
 	)
 	const [clientMode, setClientMode] = useState<'select' | 'create'>('select')
 	const [notes, setNotes] = useState('') // Optional notes for the booking
+	const [customPrice, setCustomPrice] = useState('') // Optional custom price (EUR)
 	const [existingBookings, setExistingBookings] = useState<
 		Array<{
 			start: string
@@ -76,6 +82,16 @@ export function BookingForm({
 		}>
 	>([])
 	const [loadingBookings, setLoadingBookings] = useState(false) // Loading state for fetching day bookings
+	const [isPriceDirty, setIsPriceDirty] = useState(false)
+	const [priceSource, setPriceSource] = useState<
+		'default' | 'client' | 'custom' | null
+	>(null)
+	const [resolvedClientPrice, setResolvedClientPrice] = useState<
+		number | null
+	>(null)
+	const [resolvedDefaultPrice, setResolvedDefaultPrice] = useState<
+		number | null
+	>(null)
 
 	// Context and utilities
 	const { user, profile } = useUser() // Current user and profile data
@@ -91,6 +107,49 @@ export function BookingForm({
 			fetchExistingBookings(selectedDate)
 		}
 	}, [currentStep, selectedDate])
+
+	// Auto-fill price when entering Step 3 or when client changes
+	useEffect(() => {
+		const loadSuggestedPrice = async () => {
+			if (!user?.id || currentStep !== 3) return
+
+			try {
+				// Try client-specific settings first
+				if (selectedClient) {
+					const clientSettings = await getClientBillingSettings(
+						user.id,
+						selectedClient
+					)
+					if (clientSettings?.billing_amount != null) {
+						const clientAmount = Number(
+							clientSettings.billing_amount
+						)
+						setCustomPrice(String(clientAmount))
+						setIsPriceDirty(false)
+						setPriceSource('client')
+						setResolvedClientPrice(clientAmount)
+						setResolvedDefaultPrice(null)
+						return
+					}
+				}
+
+				// Fallback to user default settings
+				const userDefault = await getUserDefaultBillingSettings(user.id)
+				if (userDefault?.billing_amount != null) {
+					const defaultAmount = Number(userDefault.billing_amount)
+					setCustomPrice(String(defaultAmount))
+					setIsPriceDirty(false)
+					setPriceSource('default')
+					setResolvedDefaultPrice(defaultAmount)
+					setResolvedClientPrice(null)
+				}
+			} catch (err) {
+				console.error('Error loading suggested price:', err)
+			}
+		}
+
+		loadSuggestedPrice()
+	}, [user?.id, selectedClient, currentStep])
 
 	// Fetch existing bookings when date changes
 	const fetchExistingBookings = async (date: Date) => {
@@ -236,6 +295,26 @@ export function BookingForm({
 		setLoading(true)
 
 		try {
+			// Optional: validate and prepare custom price override
+			let overrideAmount: number | undefined
+			if (isPriceDirty && customPrice.trim() !== '') {
+				// Normalize decimal separator and parse
+				const normalized = customPrice.replace(',', '.')
+				const parsed = parseFloat(normalized)
+				if (Number.isNaN(parsed) || parsed < 1) {
+					setLoading(false)
+					return toast({
+						title: 'Precio inválido',
+						description:
+							'El precio personalizado debe ser un número mayor o igual a 1.',
+						variant: 'destructive',
+						color: 'error'
+					})
+				}
+				// Round to 2 decimals safely
+				overrideAmount = Math.round(parsed * 100) / 100
+			}
+
 			// Call our new server-side booking API
 			// This handles all the complex billing logic server-side:
 			// - Authentication and proper environment variable access
@@ -252,7 +331,9 @@ export function BookingForm({
 					clientId: selectedClient,
 					startTime: selectedSlot!.start,
 					endTime: selectedSlot!.end,
-					notes
+					notes,
+					// Only send override if user modified the suggested value
+					overrideAmount
 				})
 			})
 
@@ -431,6 +512,81 @@ export function BookingForm({
 									}
 									placeholder="Buscar paciente..."
 								/>
+							</div>
+
+							{/* Optional Custom Price Field */}
+							<div className="space-y-2">
+								<Label className="text-md font-normal text-gray-700">
+									Precio
+								</Label>
+								<div className="relative">
+									<span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+										€
+									</span>
+									<Input
+										type="number"
+										inputMode="decimal"
+										min={1}
+										step={0.01}
+										placeholder="Introduce un precio en EUR"
+										value={customPrice}
+										onChange={(e) => {
+											const val = e.target.value
+											setCustomPrice(val)
+
+											// Compare against known client/default amounts to decide source dynamically
+											const normalized = val.replace(
+												',',
+												'.'
+											)
+											const parsed =
+												parseFloat(normalized)
+											const approxEq = (
+												a: number,
+												b: number
+											) => Math.abs(a - b) < 0.005
+
+											if (
+												!Number.isNaN(parsed) &&
+												resolvedClientPrice != null &&
+												approxEq(
+													parsed,
+													resolvedClientPrice
+												)
+											) {
+												setIsPriceDirty(false)
+												setPriceSource('client')
+												return
+											}
+
+											if (
+												!Number.isNaN(parsed) &&
+												resolvedDefaultPrice != null &&
+												approxEq(
+													parsed,
+													resolvedDefaultPrice
+												)
+											) {
+												setIsPriceDirty(false)
+												setPriceSource('default')
+												return
+											}
+
+											setIsPriceDirty(true)
+											setPriceSource('custom')
+										}}
+										className="pl-7 pr-28 hide-number-spinner"
+									/>
+									{priceSource && (
+										<span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+											{priceSource === 'client'
+												? 'Tarifa del paciente'
+												: priceSource === 'default'
+													? 'Tarifa habitual'
+													: 'Tarifa puntual'}
+										</span>
+									)}
+								</div>
 							</div>
 
 							{/* Optional Notes Field */}

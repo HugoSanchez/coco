@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 		}
 
 		// Step 2: Parse and validate request body
-		const { clientId, startTime, endTime, notes, status } =
+		const { clientId, startTime, endTime, notes, status, overrideAmount } =
 			await request.json()
 
 		if (!clientId || !startTime || !endTime) {
@@ -51,7 +51,8 @@ export async function POST(request: NextRequest) {
 			startTime,
 			endTime,
 			notes,
-			status
+			status,
+			overrideAmount
 		}
 
 		// Step 4: Create booking using orchestration service
