@@ -22,7 +22,14 @@
 
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import {
+	createContext,
+	useContext,
+	useEffect,
+	useState,
+	useCallback,
+	useRef
+} from 'react'
 import { createClient } from '@/lib/supabase/client'
 import * as Sentry from '@sentry/nextjs'
 import { useRouter } from 'next/navigation'
@@ -214,66 +221,83 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 	}
 
 	// Function to check Stripe onboarding status
-	const checkStripeOnboarding = async (): Promise<boolean> => {
+	const stripeCheckInFlight = useRef<Promise<boolean> | null>(null)
+	const checkStripeOnboarding = useCallback(async (): Promise<boolean> => {
 		if (!user) return false
+		if (stripeCheckInFlight.current) return stripeCheckInFlight.current
 
-		try {
-			const { data, error } = await supabase
-				.from('stripe_accounts')
-				.select('onboarding_completed, payments_enabled')
-				.eq('user_id', user.id)
-				.maybeSingle()
+		const promise = (async () => {
+			try {
+				const { data, error } = await supabase
+					.from('stripe_accounts')
+					.select('onboarding_completed, payments_enabled')
+					.eq('user_id', user.id)
+					.maybeSingle()
 
-			if (error || !data) {
-				// No error if no Stripe account exists yet
-				console.log('[stripe-status] no record for user', user.id, {
-					error
+				if (error || !data) {
+					console.log('[stripe-status] no record for user', user.id, {
+						error
+					})
+					setStripeOnboardingCompleted(false)
+					return false
+				}
+
+				const isCompleted =
+					data.onboarding_completed && data.payments_enabled
+				setStripeOnboardingCompleted(isCompleted)
+				console.log('[stripe-status]', {
+					userId: user.id,
+					onboarding_completed: data.onboarding_completed,
+					payments_enabled: data.payments_enabled,
+					derived_isCompleted: isCompleted
 				})
+				return isCompleted
+			} catch (error) {
+				console.error('Error checking Stripe status:', error)
 				setStripeOnboardingCompleted(false)
 				return false
+			} finally {
+				stripeCheckInFlight.current = null
 			}
+		})()
 
-			const isCompleted =
-				data.onboarding_completed && data.payments_enabled
-			setStripeOnboardingCompleted(isCompleted)
-			console.log('[stripe-status]', {
-				userId: user.id,
-				onboarding_completed: data.onboarding_completed,
-				payments_enabled: data.payments_enabled,
-				derived_isCompleted: isCompleted
-			})
-			return isCompleted
-		} catch (error) {
-			console.error('Error checking Stripe status:', error)
-			setStripeOnboardingCompleted(false)
-			return false
-		}
-	}
+		stripeCheckInFlight.current = promise
+		return promise
+	}, [user, supabase])
 
-	// Check Google Calendar connection via server route that calls getAuthenticatedCalendar
-	const checkCalendarConnection = async (): Promise<boolean> => {
+	const calendarCheckInFlight = useRef<Promise<boolean> | null>(null)
+	const checkCalendarConnection = useCallback(async (): Promise<boolean> => {
 		if (!user) {
 			setCalendarConnected(null)
 			return false
 		}
-		try {
-			const res = await fetch('/api/calendar/status', {
-				cache: 'no-store'
-			})
-			if (!res.ok) {
+		if (calendarCheckInFlight.current) return calendarCheckInFlight.current
+
+		const promise = (async () => {
+			try {
+				const res = await fetch('/api/calendar/status', {
+					cache: 'no-store'
+				})
+				if (!res.ok) {
+					setCalendarConnected(false)
+					return false
+				}
+				const data = await res.json()
+				const connected = Boolean(data?.connected)
+				setCalendarConnected(connected)
+				console.log('Calendar connected:', connected)
+				return connected
+			} catch (e) {
 				setCalendarConnected(false)
 				return false
+			} finally {
+				calendarCheckInFlight.current = null
 			}
-			const data = await res.json()
-			const connected = Boolean(data?.connected)
-			setCalendarConnected(connected)
-			console.log('Calendar connected:', connected)
-			return connected
-		} catch (e) {
-			setCalendarConnected(false)
-			return false
-		}
-	}
+		})()
+
+		calendarCheckInFlight.current = promise
+		return promise
+	}, [user])
 
 	// Effect: Call checkStripeOnboarding when user changes or profile is refreshed
 	useEffect(() => {
