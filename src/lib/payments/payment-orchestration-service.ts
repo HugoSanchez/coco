@@ -132,6 +132,26 @@ export class PaymentOrchestrationService {
 
 			// STEP 2: Create Stripe checkout session
 			// =======================================
+			// Reuse existing pending session if still open to allow multi-device clicks
+			const existingSessionsPre = await getPaymentSessionsForBooking(
+				bookingId,
+				serviceClient
+			)
+			const latestPending = existingSessionsPre.find(
+				(s) => s.status === 'pending' && s.stripe_session_id
+			)
+			if (latestPending?.stripe_session_id) {
+				const retrieved = await stripeService.retrieveCheckoutSession(
+					latestPending.stripe_session_id
+				)
+				if (retrieved.success && retrieved.status !== 'expired') {
+					return {
+						success: true,
+						checkoutUrl: retrieved.url
+					}
+				}
+			}
+
 			// Use the Stripe service to create a checkout session. This handles
 			// all the Stripe API communication and returns both the session ID
 			// and the checkout URL that the client will be redirected to.

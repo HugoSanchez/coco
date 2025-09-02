@@ -297,6 +297,31 @@ export class StripeService {
 			}
 		}
 	}
+
+	/**
+	 * Retrieve a Stripe checkout session by ID
+	 */
+	async retrieveCheckoutSession(sessionId: string): Promise<{
+		success: boolean
+		status?: string
+		url?: string
+		error?: string
+	}> {
+		try {
+			const session = await stripe.checkout.sessions.retrieve(sessionId)
+			return {
+				success: true,
+				status: (session.status as string) || undefined,
+				url: (session.url as string) || undefined
+			}
+		} catch (error) {
+			console.error('Error retrieving checkout session:', error)
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'Unknown error'
+			}
+		}
+	}
 }
 
 // Export a singleton instance

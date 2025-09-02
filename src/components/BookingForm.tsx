@@ -672,80 +672,85 @@ export function BookingForm({
 							)}
 
 							{/* Optional Custom Price Field */}
-							<div className="space-y-2">
-								<Label className="text-md font-normal text-gray-700">
-									Precio
-								</Label>
-								<div className="relative">
-									<span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-										€
-									</span>
-									<Input
-										type="number"
-										inputMode="decimal"
-										min={0}
-										placeholder="Introduce un precio en EUR"
-										value={customPrice}
-										onChange={(e) => {
-											const val = e.target.value
-											setCustomPrice(val)
-
-											// Compare against known client/default amounts to decide source dynamically
-											const normalized = val.replace(
-												',',
-												'.'
-											)
-											const parsed =
-												parseFloat(normalized)
-											const approxEq = (
-												a: number,
-												b: number
-											) => Math.abs(a - b) < 0.005
-
-											if (
-												!Number.isNaN(parsed) &&
-												resolvedClientPrice != null &&
-												approxEq(
-													parsed,
-													resolvedClientPrice
-												)
-											) {
-												setIsPriceDirty(false)
-												setPriceSource('client')
-												return
-											}
-
-											if (
-												!Number.isNaN(parsed) &&
-												resolvedDefaultPrice != null &&
-												approxEq(
-													parsed,
-													resolvedDefaultPrice
-												)
-											) {
-												setIsPriceDirty(false)
-												setPriceSource('default')
-												return
-											}
-
-											setIsPriceDirty(true)
-											setPriceSource('custom')
-										}}
-										className="pl-7 pr-28 hide-number-spinner"
-									/>
-									{priceSource && (
-										<span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-											{priceSource === 'client'
-												? 'Tarifa del paciente'
-												: priceSource === 'default'
-													? 'Tarifa habitual'
-													: priceSource === 'first'
-														? 'Primera consulta'
-														: 'Tarifa puntual'}
+							{selectedClient && (
+								<div className="space-y-2">
+									<Label className="text-md font-normal text-gray-700">
+										Precio
+									</Label>
+									<div className="relative">
+										<span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+											€
 										</span>
-									)}
+										<Input
+											type="number"
+											inputMode="decimal"
+											min={0}
+											placeholder="Introduce un precio en EUR"
+											value={customPrice}
+											onChange={(e) => {
+												const val = e.target.value
+												setCustomPrice(val)
+
+												// Compare against known client/default amounts to decide source dynamically
+												const normalized = val.replace(
+													',',
+													'.'
+												)
+												const parsed =
+													parseFloat(normalized)
+												const approxEq = (
+													a: number,
+													b: number
+												) => Math.abs(a - b) < 0.005
+
+												if (
+													!Number.isNaN(parsed) &&
+													resolvedClientPrice !=
+														null &&
+													approxEq(
+														parsed,
+														resolvedClientPrice
+													)
+												) {
+													setIsPriceDirty(false)
+													setPriceSource('client')
+													return
+												}
+
+												if (
+													!Number.isNaN(parsed) &&
+													resolvedDefaultPrice !=
+														null &&
+													approxEq(
+														parsed,
+														resolvedDefaultPrice
+													)
+												) {
+													setIsPriceDirty(false)
+													setPriceSource('default')
+													return
+												}
+
+												setIsPriceDirty(true)
+												setPriceSource('custom')
+											}}
+											className="pl-7 pr-28 hide-number-spinner"
+										/>
+										{priceSource && (
+											<span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+												{priceSource === 'client'
+													? 'Tarifa del paciente'
+													: priceSource === 'default'
+														? 'Tarifa habitual'
+														: priceSource ===
+															  'first'
+															? 'Primera consulta'
+															: 'Tarifa puntual'}
+											</span>
+										)}
+									</div>
 								</div>
-							</div>
+							)}
 
 							{/* Optional Notes Field */}
 							<div className="space-y-2">

@@ -471,7 +471,7 @@ export function BookingsTable({
 										className="hover:bg-gray-50/50 transition-colors h-14"
 									>
 										{/* Client */}
-										<TableCell className="py-2">
+										<TableCell className="py-2 pr-0">
 											<div className="font-medium">
 												{booking.customerName}
 											</div>
