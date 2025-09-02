@@ -213,6 +213,11 @@ export class StripeService {
 				}
 			})
 
+			console.log('[payments][stripe] created_session', {
+				bookingId,
+				sessionId: session.id
+			})
+
 			return {
 				sessionId: session.id,
 				checkoutUrl: session.url || ''

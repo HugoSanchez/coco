@@ -144,14 +144,17 @@ export class PaymentOrchestrationService {
 				const retrieved = await stripeService.retrieveCheckoutSession(
 					latestPending.stripe_session_id
 				)
-				if (retrieved.success && retrieved.status !== 'expired') {
+				if (
+					retrieved.success &&
+					retrieved.status === 'open' &&
+					retrieved.url
+				) {
 					return {
 						success: true,
 						checkoutUrl: retrieved.url
 					}
 				}
 			}
-
 			// Use the Stripe service to create a checkout session. This handles
 			// all the Stripe API communication and returns both the session ID
 			// and the checkout URL that the client will be redirected to.
@@ -173,36 +176,47 @@ export class PaymentOrchestrationService {
 
 			// STEP 3: Track payment session in our database
 			// ==============================================
-			// Check if a payment session already exists for this booking (e.g., from resend)
-			const existingSessions = await getPaymentSessionsForBooking(
-				bookingId,
-				serviceClient
-			)
+			try {
+				// Check if a payment session already exists for this booking (e.g., from resend)
+				const existingSessions = await getPaymentSessionsForBooking(
+					bookingId,
+					serviceClient
+				)
 
-			if (existingSessions.length > 0) {
-				// Update existing payment session with new Stripe session ID
-				await updatePaymentSession(
-					existingSessions[0].id,
-					{
-						stripe_session_id: sessionId,
-						amount: amount,
-						status: 'pending',
-						stripe_payment_intent_id: null,
-						completed_at: null
-					},
-					serviceClient
-				)
-			} else {
-				// Create new payment session record
-				await createPaymentSession(
-					{
-						booking_id: bookingId,
-						stripe_session_id: sessionId,
-						amount: amount,
-						status: 'pending'
-					},
-					serviceClient
-				)
+				if (existingSessions.length > 0) {
+					// Update existing payment session with new Stripe session ID
+					await updatePaymentSession(
+						existingSessions[0].id,
+						{
+							stripe_session_id: sessionId,
+							amount: amount,
+							status: 'pending',
+							stripe_payment_intent_id: null,
+							completed_at: null
+						},
+						serviceClient
+					)
+				} else {
+					// Create new payment session record
+					await createPaymentSession(
+						{
+							booking_id: bookingId,
+							stripe_session_id: sessionId,
+							amount: amount,
+							status: 'pending'
+						},
+						serviceClient
+					)
+				}
+			} catch (dbError) {
+				console.error('[payments][orch] db_track_error', {
+					bookingId,
+					error:
+						dbError instanceof Error
+							? dbError.message
+							: String(dbError)
+				})
+				// Non-fatal: continue and return checkoutUrl to avoid blocking client
 			}
 
 			// STEP 4: Return success with checkout URL
