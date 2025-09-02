@@ -86,7 +86,10 @@ export async function POST(request: NextRequest) {
 	} catch (error) {
 		console.error('Error creating booking (API):', error)
 		Sentry.captureException(error, {
-			tags: { component: 'api:bookings', method: 'create' }
+			tags: { component: 'api:bookings', method: 'create' },
+			extra: {
+				request: request.body
+			}
 		})
 		const message =
 			error instanceof Error ? error.message : 'Unknown server error'
