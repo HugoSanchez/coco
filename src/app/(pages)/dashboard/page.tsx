@@ -113,7 +113,13 @@ const transformBooking = (dbBooking: BookingWithBills): Booking => {
 }
 
 export default function Dashboard() {
-	const { user, profile, loading, stripeOnboardingCompleted } = useUser()
+	const {
+		user,
+		profile,
+		loading,
+		stripeOnboardingCompleted,
+		calendarConnected
+	} = useUser()
 	const [clients, setClients] = useState<Client[]>([])
 	const [loadingClients, setLoadingClients] = useState(true)
 	const [bookings, setBookings] = useState<Booking[]>([])
@@ -151,6 +157,19 @@ export default function Dashboard() {
 
 	const { toast } = useToast()
 	const router = useRouter()
+
+	// Minimal guard: only redirect if we definitively know both are false
+	useEffect(() => {
+		if (!user) return
+		if (stripeOnboardingCompleted === null || calendarConnected === null)
+			return
+		if (
+			stripeOnboardingCompleted === false &&
+			calendarConnected === false
+		) {
+			router.replace('/onboarding')
+		}
+	}, [user, stripeOnboardingCompleted, calendarConnected, router])
 
 	// Simple responsive switch for mobile tabs behavior
 	const [isMobile, setIsMobile] = useState(false)

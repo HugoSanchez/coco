@@ -40,13 +40,26 @@ const settingsMenuItems = [
 ]
 
 function SettingsContent() {
-	const { user, loading } = useUser()
+	const { user, stripeOnboardingCompleted, calendarConnected } = useUser()
 	const searchParams = useSearchParams()
 	const router = useRouter()
 	const [activeSection, setActiveSection] = useState<SettingsSection | null>(
 		null
 	) // Start with null to show loading
 	const [isInitialized, setIsInitialized] = useState(false)
+
+	// Minimal guard: send brand-new users to onboarding
+	useEffect(() => {
+		if (!user) return
+		if (stripeOnboardingCompleted === null || calendarConnected === null)
+			return
+		if (
+			stripeOnboardingCompleted === false &&
+			calendarConnected === false
+		) {
+			router.replace('/onboarding')
+		}
+	}, [user, stripeOnboardingCompleted, calendarConnected, router])
 
 	// Set active section from URL parameter and handle calendar connection feedback
 	useEffect(() => {
