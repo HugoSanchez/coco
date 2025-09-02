@@ -8,6 +8,7 @@ import {
 import { updatePendingToConfirmed } from '@/lib/calendar/calendar'
 import { getProfileById } from '@/lib/db/profiles'
 import { getClientById } from '@/lib/db/clients'
+import * as Sentry from '@sentry/nextjs'
 
 /**
  * POST /api/bookings/[id]/confirm
@@ -34,6 +35,11 @@ export async function POST(
 		} = await supabase.auth.getUser()
 
 		if (authError || !user) {
+			Sentry.captureMessage('bookings:confirm unauthorized', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId: params.id }
+			})
 			return NextResponse.json(
 				{ error: 'Authentication required' },
 				{ status: 401 }
@@ -46,6 +52,11 @@ export async function POST(
 		const booking = await getBookingById(bookingId, supabase)
 
 		if (!booking) {
+			Sentry.captureMessage('bookings:confirm not_found', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId }
+			})
 			return NextResponse.json(
 				{ error: 'Booking not found' },
 				{ status: 404 }
@@ -54,11 +65,21 @@ export async function POST(
 
 		// Verify user owns this booking
 		if (booking.user_id !== user.id) {
+			Sentry.captureMessage('bookings:confirm unauthorized_owner', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId, userId: user.id }
+			})
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 		}
 
 		// Check if booking is already confirmed
 		if (booking.status === 'scheduled') {
+			Sentry.captureMessage('bookings:confirm already_confirmed', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId }
+			})
 			return NextResponse.json(
 				{ error: 'Booking is already confirmed' },
 				{ status: 400 }
@@ -67,6 +88,11 @@ export async function POST(
 
 		// Only allow confirmation of pending bookings
 		if (booking.status !== 'pending') {
+			Sentry.captureMessage('bookings:confirm invalid_status', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId, status: booking.status }
+			})
 			return NextResponse.json(
 				{ error: 'Only pending bookings can be confirmed' },
 				{ status: 400 }
@@ -145,6 +171,14 @@ export async function POST(
 						`Calendar event updated from pending to confirmed for booking ${bookingId}: ${calendarResult.googleEventId}`
 					)
 				} else {
+					Sentry.captureMessage(
+						'bookings:confirm calendar_update_failed',
+						{
+							level: 'warning',
+							tags: { component: 'api:bookings' },
+							extra: { bookingId }
+						}
+					)
 					console.error(
 						`Failed to update calendar event for booking ${bookingId}:`,
 						calendarResult.error
@@ -152,6 +186,11 @@ export async function POST(
 					// Don't fail the confirmation if calendar update fails
 				}
 			} else {
+				Sentry.captureMessage('bookings:confirm no_pending_event', {
+					level: 'warning',
+					tags: { component: 'api:bookings' },
+					extra: { bookingId }
+				})
 				console.warn(
 					`No pending calendar event found for booking ${bookingId}`
 				)
@@ -163,6 +202,14 @@ export async function POST(
 				`Calendar update error for booking ${bookingId}:`,
 				calendarError
 			)
+			Sentry.captureException(calendarError, {
+				tags: {
+					component: 'api:bookings',
+					method: 'confirm',
+					stage: 'calendar'
+				},
+				extra: { bookingId }
+			})
 			// Don't fail the confirmation if calendar update fails
 		}
 
@@ -176,6 +223,10 @@ export async function POST(
 		})
 	} catch (error) {
 		console.error('Booking confirmation error:', error)
+		Sentry.captureException(error, {
+			tags: { component: 'api:bookings', method: 'confirm' },
+			extra: { bookingId: params.id }
+		})
 		return NextResponse.json(
 			{
 				error: 'Failed to confirm booking',

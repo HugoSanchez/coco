@@ -4,6 +4,7 @@ import {
 	createBookingSimple,
 	CreateBookingRequest
 } from '@/lib/bookings/booking-orchestration-service'
+import * as Sentry from '@sentry/nextjs'
 
 // Force dynamic rendering since this route uses cookies for authentication
 export const dynamic = 'force-dynamic'
@@ -25,6 +26,10 @@ export async function POST(request: NextRequest) {
 		} = await supabase.auth.getUser()
 
 		if (authError || !user) {
+			Sentry.captureMessage('bookings:create unauthorized', {
+				level: 'warning',
+				tags: { component: 'api:bookings' }
+			})
 			return NextResponse.json(
 				{ error: 'Authentication required' },
 				{ status: 401 }
@@ -43,6 +48,10 @@ export async function POST(request: NextRequest) {
 		} = await request.json()
 
 		if (!clientId || !startTime || !endTime) {
+			Sentry.captureMessage('bookings:create missing_fields', {
+				level: 'warning',
+				tags: { component: 'api:bookings' }
+			})
 			return NextResponse.json(
 				{
 					error: 'Missing required fields: clientId, startTime, endTime'
@@ -76,6 +85,9 @@ export async function POST(request: NextRequest) {
 		})
 	} catch (error) {
 		console.error('Error creating booking (API):', error)
+		Sentry.captureException(error, {
+			tags: { component: 'api:bookings', method: 'create' }
+		})
 		const message =
 			error instanceof Error ? error.message : 'Unknown server error'
 		return NextResponse.json(

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getBookingByIdAndUser, rescheduleBooking } from '@/lib/db/bookings'
 import { getCalendarEventsForBooking } from '@/lib/db/calendar-events'
 import { rescheduleCalendarEvent } from '@/lib/calendar/calendar'
+import * as Sentry from '@sentry/nextjs'
 
 export async function POST(
 	request: NextRequest,
@@ -12,31 +13,43 @@ export async function POST(
 		const supabase = createClient()
 		const bookingId = params.id
 
-		// Get authenticated user
 		const {
 			data: { user },
 			error: authError
 		} = await supabase.auth.getUser()
 
 		if (authError || !user) {
+			Sentry.captureMessage('bookings:reschedule unauthorized', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId }
+			})
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 		}
 
-		// Parse request body
 		const { newStartTime, newEndTime } = await request.json()
 
 		if (!newStartTime || !newEndTime) {
+			Sentry.captureMessage('bookings:reschedule missing_fields', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId }
+			})
 			return NextResponse.json(
 				{ error: 'New start time and end time are required' },
 				{ status: 400 }
 			)
 		}
 
-		// Validate date format
 		const startDate = new Date(newStartTime)
 		const endDate = new Date(newEndTime)
 
 		if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+			Sentry.captureMessage('bookings:reschedule invalid_date', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId }
+			})
 			return NextResponse.json(
 				{ error: 'Invalid date format' },
 				{ status: 400 }
@@ -44,13 +57,17 @@ export async function POST(
 		}
 
 		if (startDate >= endDate) {
+			Sentry.captureMessage('bookings:reschedule invalid_range', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId }
+			})
 			return NextResponse.json(
 				{ error: 'Start time must be before end time' },
 				{ status: 400 }
 			)
 		}
 
-		// Check if booking exists and belongs to user
 		const booking = await getBookingByIdAndUser(
 			bookingId,
 			user.id,
@@ -58,14 +75,23 @@ export async function POST(
 		)
 
 		if (!booking) {
+			Sentry.captureMessage('bookings:reschedule not_found', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId }
+			})
 			return NextResponse.json(
 				{ error: 'Booking not found' },
 				{ status: 404 }
 			)
 		}
 
-		// Check if booking can be rescheduled
 		if (booking.status === 'canceled' || booking.status === 'completed') {
+			Sentry.captureMessage('bookings:reschedule invalid_status', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId, status: booking.status }
+			})
 			return NextResponse.json(
 				{
 					error: 'Cannot reschedule canceled or completed bookings'
@@ -74,7 +100,6 @@ export async function POST(
 			)
 		}
 
-		// Get the calendar event associated with this booking
 		const calendarEvents = await getCalendarEventsForBooking(
 			bookingId,
 			supabase
@@ -83,9 +108,8 @@ export async function POST(
 		let calendarUpdateSuccess = true
 		let calendarError: string | undefined
 
-		// Update Google Calendar if a calendar event exists
 		if (calendarEvents.length > 0) {
-			const calendarEvent = calendarEvents[0] // Take the first (and typically only) event
+			const calendarEvent = calendarEvents[0]
 
 			if (calendarEvent.google_event_id) {
 				const calendarResult = await rescheduleCalendarEvent(
@@ -105,11 +129,18 @@ export async function POST(
 						'Failed to reschedule Google Calendar event:',
 						calendarResult.error
 					)
+					Sentry.captureMessage(
+						'bookings:reschedule calendar_update_failed',
+						{
+							level: 'warning',
+							tags: { component: 'api:bookings' },
+							extra: { bookingId }
+						}
+					)
 				}
 			}
 		}
 
-		// Update the booking in the database
 		let updatedBooking
 		try {
 			updatedBooking = await rescheduleBooking(
@@ -121,14 +152,16 @@ export async function POST(
 			)
 		} catch (updateError) {
 			console.error('Error updating booking:', updateError)
+			Sentry.captureException(updateError, {
+				tags: { component: 'api:bookings', method: 'reschedule' },
+				extra: { bookingId }
+			})
 			return NextResponse.json(
 				{ error: 'Failed to reschedule booking' },
 				{ status: 500 }
 			)
 		}
 
-		// If calendar update failed, return a warning but still consider the operation successful
-		// since the booking time was updated in the database
 		if (!calendarUpdateSuccess) {
 			return NextResponse.json({
 				success: true,
@@ -147,6 +180,10 @@ export async function POST(
 		})
 	} catch (error) {
 		console.error('Error in reschedule API:', error)
+		Sentry.captureException(error, {
+			tags: { component: 'api:bookings', method: 'reschedule' },
+			extra: { bookingId: params.id }
+		})
 		return NextResponse.json(
 			{ error: 'Internal server error' },
 			{ status: 500 }

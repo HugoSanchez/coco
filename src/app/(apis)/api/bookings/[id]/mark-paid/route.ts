@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getBookingById } from '@/lib/db/bookings'
 import { getBillForBookingAndMarkAsPaid } from '@/lib/db/bills'
+import * as Sentry from '@sentry/nextjs'
 
 /**
  * POST /api/bookings/[id]/mark-paid
@@ -29,6 +30,11 @@ export async function POST(
 		} = await supabase.auth.getUser()
 
 		if (authError || !user) {
+			Sentry.captureMessage('bookings:mark-paid unauthorized', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId: params.id }
+			})
 			return NextResponse.json(
 				{ error: 'Authentication required' },
 				{ status: 401 }
@@ -41,6 +47,11 @@ export async function POST(
 		const booking = await getBookingById(bookingId, supabase)
 
 		if (!booking) {
+			Sentry.captureMessage('bookings:mark-paid not_found', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId }
+			})
 			return NextResponse.json(
 				{ error: 'Booking not found' },
 				{ status: 404 }
@@ -49,6 +60,11 @@ export async function POST(
 
 		// Verify user owns this booking
 		if (booking.user_id !== user.id) {
+			Sentry.captureMessage('bookings:mark-paid unauthorized_owner', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId, userId: user.id }
+			})
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 		}
 
@@ -60,6 +76,10 @@ export async function POST(
 				`Error marking bill as paid for booking ${bookingId}:`,
 				billError
 			)
+			Sentry.captureException(billError, {
+				tags: { component: 'api:bookings', method: 'mark-paid' },
+				extra: { bookingId }
+			})
 
 			// Check if it's because no bill exists
 			if (
@@ -86,7 +106,7 @@ export async function POST(
 			// Other bill errors
 			return NextResponse.json(
 				{
-					error: 'Failed to mark bill as paid',
+					error: 'Failed to mark as paid',
 					details:
 						billError instanceof Error
 							? billError.message
@@ -105,6 +125,10 @@ export async function POST(
 		})
 	} catch (error) {
 		console.error('Mark as paid error:', error)
+		Sentry.captureException(error, {
+			tags: { component: 'api:bookings', method: 'mark-paid' },
+			extra: { bookingId: params.id }
+		})
 		return NextResponse.json(
 			{
 				error: 'Failed to mark as paid',

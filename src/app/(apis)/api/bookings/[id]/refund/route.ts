@@ -5,6 +5,7 @@ import { paymentOrchestrationService } from '@/lib/payments/payment-orchestratio
 import { getBillsForBooking } from '@/lib/db/bills'
 import { sendRefundNotificationEmail } from '@/lib/emails/email-service'
 import { getProfileById } from '@/lib/db/profiles'
+import * as Sentry from '@sentry/nextjs'
 
 /**
  * POST /api/bookings/[id]/refund
@@ -39,6 +40,11 @@ export async function POST(
 		} = await supabase.auth.getUser()
 
 		if (authError || !user) {
+			Sentry.captureMessage('bookings:refund unauthorized', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId: params.id }
+			})
 			return NextResponse.json(
 				{ error: 'Authentication required' },
 				{ status: 401 }
@@ -60,6 +66,11 @@ export async function POST(
 		const booking = await getBookingById(bookingId, supabase)
 
 		if (!booking) {
+			Sentry.captureMessage('bookings:refund not_found', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId }
+			})
 			return NextResponse.json(
 				{ error: 'Booking not found' },
 				{ status: 404 }
@@ -68,6 +79,11 @@ export async function POST(
 
 		// Verify user owns this booking
 		if (booking.user_id !== user.id) {
+			Sentry.captureMessage('bookings:refund unauthorized_owner', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId, userId: user.id }
+			})
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 		}
 
@@ -84,7 +100,10 @@ export async function POST(
 			const statusCode = refundResult.error?.includes('No paid bill')
 				? 400 // Bad Request - nothing to refund
 				: 500 // Internal Server Error - processing failed
-
+			Sentry.captureException(new Error('bookings:refund failed'), {
+				tags: { component: 'api:bookings' },
+				extra: { bookingId, error: refundResult.error }
+			})
 			return NextResponse.json(
 				{
 					error: 'Refund failed',
@@ -133,6 +152,10 @@ export async function POST(
 		})
 	} catch (error) {
 		console.error('Booking refund error:', error)
+		Sentry.captureException(error, {
+			tags: { component: 'api:bookings', method: 'refund' },
+			extra: { bookingId: params.id }
+		})
 		return NextResponse.json(
 			{
 				error: 'Failed to process refund',

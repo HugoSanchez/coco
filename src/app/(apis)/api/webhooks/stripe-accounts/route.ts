@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
 import { updateStripeAccountStatus } from '@/lib/db/stripe-accounts'
+import * as Sentry from '@sentry/nextjs'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 	apiVersion: '2025-05-28.basil'
@@ -25,6 +26,13 @@ export async function POST(request: NextRequest) {
 
 		if (!signature) {
 			console.error('Missing Stripe signature')
+			Sentry.captureMessage(
+				'webhooks:stripe-accounts missing signature',
+				{
+					level: 'warning',
+					tags: { component: 'webhook', kind: 'stripe-accounts' }
+				}
+			)
 			return NextResponse.json(
 				{ error: 'Missing signature' },
 				{ status: 400 }
@@ -41,6 +49,13 @@ export async function POST(request: NextRequest) {
 			)
 		} catch (err: any) {
 			console.error('Webhook signature verification failed:', err.message)
+			Sentry.captureException(err, {
+				tags: {
+					component: 'webhook',
+					kind: 'stripe-accounts',
+					stage: 'verify'
+				}
+			})
 			return NextResponse.json(
 				{ error: 'Webhook signature verification failed' },
 				{ status: 400 }
@@ -68,6 +83,9 @@ export async function POST(request: NextRequest) {
 		return NextResponse.json({ received: true })
 	} catch (error) {
 		console.error('Webhook error:', error)
+		Sentry.captureException(error, {
+			tags: { component: 'webhook', kind: 'stripe-accounts' }
+		})
 		return NextResponse.json(
 			{ error: 'Webhook handler failed' },
 			{ status: 500 }
@@ -108,11 +126,14 @@ async function handleAccountUpdated(event: Stripe.Event) {
 				`No user found for Stripe account ${account.id}:`,
 				findError
 			)
+			Sentry.captureMessage('webhooks:stripe-accounts user_not_found', {
+				level: 'warning',
+				tags: { component: 'webhook', kind: 'stripe-accounts' },
+				extra: { stripeAccountId: account.id }
+			})
 			return
 		}
 
-		// Only update database if account is now ready for payments
-		// Don't spam the DB with updates for every partial completion step
 		if (isReadyForPayments) {
 			await updateStripeAccountStatus(
 				stripeAccountRecord.user_id,
@@ -122,13 +143,16 @@ async function handleAccountUpdated(event: Stripe.Event) {
 				},
 				supabase
 			)
-
-			console.log(
-				`Stripe account ready for user ${stripeAccountRecord.user_id}`
-			)
 		}
 	} catch (error) {
 		console.error('Error updating database from webhook:', error)
+		Sentry.captureException(error, {
+			tags: {
+				component: 'webhook',
+				kind: 'stripe-accounts',
+				stage: 'db_update'
+			}
+		})
 		// Don't throw - we don't want to fail the webhook delivery
 	}
 }
@@ -154,7 +178,6 @@ async function handleAccountDeauthorized(event: Stripe.Event) {
 			process.env.SUPABASE_SERVICE_ROLE_KEY!
 		)
 
-		// Find and disable the account in our database
 		const { data: stripeAccountRecord, error: findError } = await supabase
 			.from('stripe_accounts')
 			.select('user_id')
@@ -166,10 +189,17 @@ async function handleAccountDeauthorized(event: Stripe.Event) {
 				`No user found for deauthorized Stripe account ${account.id}:`,
 				findError
 			)
+			Sentry.captureMessage(
+				'webhooks:stripe-accounts user_not_found_deauth',
+				{
+					level: 'warning',
+					tags: { component: 'webhook', kind: 'stripe-accounts' },
+					extra: { stripeAccountId: account.id }
+				}
+			)
 			return
 		}
 
-		// Disable payments for this account
 		await updateStripeAccountStatus(
 			stripeAccountRecord.user_id,
 			{
@@ -180,5 +210,12 @@ async function handleAccountDeauthorized(event: Stripe.Event) {
 		)
 	} catch (error) {
 		console.error('Error handling account deauthorization:', error)
+		Sentry.captureException(error, {
+			tags: {
+				component: 'webhook',
+				kind: 'stripe-accounts',
+				stage: 'deauth'
+			}
+		})
 	}
 }

@@ -7,6 +7,7 @@ import { getBillsForBooking } from '@/lib/db/bills'
 
 import { sendConsultationBillEmail } from '@/lib/emails/email-service'
 import { createEmailCommunication } from '@/lib/db/email-communications'
+import * as Sentry from '@sentry/nextjs'
 
 /**
  * POST /api/bookings/[id]/resend-email
@@ -42,10 +43,11 @@ export async function POST(
 		} = await supabase.auth.getUser()
 
 		if (authError || !user) {
-			console.log(
-				`[RESEND] Authentication failed for booking ${bookingId}:`,
-				authError
-			)
+			Sentry.captureMessage('bookings:resend unauthorized', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId }
+			})
 			return NextResponse.json(
 				{ error: 'Authentication required' },
 				{ status: 401 }
@@ -57,7 +59,11 @@ export async function POST(
 		const booking = await getBookingById(bookingId, supabase)
 
 		if (!booking) {
-			console.log(`[RESEND] Booking not found: ${bookingId}`)
+			Sentry.captureMessage('bookings:resend not_found', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId }
+			})
 			return NextResponse.json(
 				{ error: 'Booking not found' },
 				{ status: 404 }
@@ -66,6 +72,11 @@ export async function POST(
 
 		// Verify the booking belongs to the authenticated practitioner
 		if (booking.user_id !== user.id) {
+			Sentry.captureMessage('bookings:resend unauthorized_owner', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId, userId: user.id }
+			})
 			return NextResponse.json(
 				{ error: 'Unauthorized: Booking does not belong to you' },
 				{ status: 403 }
@@ -82,6 +93,14 @@ export async function POST(
 		])
 
 		if (!client || !practitioner) {
+			Sentry.captureMessage(
+				'bookings:resend missing_client_or_practitioner',
+				{
+					level: 'warning',
+					tags: { component: 'api:bookings' },
+					extra: { bookingId }
+				}
+			)
 			return NextResponse.json(
 				{ error: 'Missing client or practitioner information' },
 				{ status: 400 }
@@ -91,6 +110,11 @@ export async function POST(
 		// Step 4: Validate booking is eligible for resend
 		// Cannot resend email for canceled bookings
 		if (booking.status === 'canceled') {
+			Sentry.captureMessage('bookings:resend canceled_booking', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId }
+			})
 			return NextResponse.json(
 				{
 					error: 'Cannot resend email for canceled bookings'
@@ -104,6 +128,11 @@ export async function POST(
 		)
 
 		if (!resendableBill) {
+			Sentry.captureMessage('bookings:resend no_resendable_bill', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId }
+			})
 			return NextResponse.json(
 				{
 					error: 'Cannot resend email: no resendable bill found (bill must be pending or sent, not paid/canceled/refunded)'
@@ -113,6 +142,11 @@ export async function POST(
 		}
 
 		if (resendableBill.amount <= 0) {
+			Sentry.captureMessage('bookings:resend non_payable', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId }
+			})
 			return NextResponse.json(
 				{
 					error: 'Cannot resend email for bookings that do not require payment'
@@ -133,6 +167,11 @@ export async function POST(
 
 		// Validate required fields
 		if (!client.email || !client.name || !booking.start_time) {
+			Sentry.captureMessage('bookings:resend missing_fields', {
+				level: 'warning',
+				tags: { component: 'api:bookings' },
+				extra: { bookingId }
+			})
 			return NextResponse.json(
 				{ error: 'Missing required client or booking information' },
 				{ status: 400 }
@@ -159,6 +198,10 @@ export async function POST(
 
 		// Validation Step 4: Verify email was sent successfully
 		if (!emailResult.success) {
+			Sentry.captureException(new Error('bookings:resend email_failed'), {
+				tags: { component: 'api:bookings' },
+				extra: { bookingId, error: emailResult.error }
+			})
 			return NextResponse.json(
 				{
 					error: `Failed to send confirmation email: ${emailResult.error}`
@@ -187,6 +230,14 @@ export async function POST(
 			// Validation Step 6: Email communication tracking failure
 			// This is critical for audit trail and preventing abuse
 			console.error('Failed to track email communication:', trackingError)
+			Sentry.captureException(trackingError, {
+				tags: {
+					component: 'api:bookings',
+					method: 'resend-email',
+					stage: 'track'
+				},
+				extra: { bookingId }
+			})
 			return NextResponse.json(
 				{
 					error: 'Email sent successfully but failed to record communication history'
@@ -210,6 +261,10 @@ export async function POST(
 			`Unexpected error during email resend for booking ${params.id}:`,
 			error
 		)
+		Sentry.captureException(error, {
+			tags: { component: 'api:bookings', method: 'resend-email' },
+			extra: { bookingId: params.id }
+		})
 		return NextResponse.json(
 			{
 				error: 'Failed to resend confirmation email',

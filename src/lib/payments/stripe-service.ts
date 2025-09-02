@@ -3,6 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import { format, parseISO } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { es } from 'date-fns/locale'
+import * as Sentry from '@sentry/nextjs'
 
 // Initialize Stripe with environment variable
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
@@ -35,6 +36,12 @@ export class StripeService {
 				accountId: account.id
 			}
 		} catch (error) {
+			Sentry.captureException(error, {
+				tags: {
+					component: 'stripe-service',
+					method: 'createConnectAccount'
+				}
+			})
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error'
@@ -67,6 +74,12 @@ export class StripeService {
 				url: accountLink.url
 			}
 		} catch (error) {
+			Sentry.captureException(error, {
+				tags: {
+					component: 'stripe-service',
+					method: 'createOnboardingLink'
+				}
+			})
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error'
@@ -76,18 +89,6 @@ export class StripeService {
 
 	/**
 	 * Get the real-time status of a Stripe Connect account
-	 *
-	 * This function calls Stripe's Account API to get the actual account status,
-	 * checking if the account is ready to accept payments and receive payouts.
-	 *
-	 * Key capabilities checked:
-	 * - charges_enabled: Can accept payments from customers
-	 * - payouts_enabled: Can receive payouts to bank account
-	 * - details_submitted: Required account information has been provided
-	 * - requirements.currently_due: Any pending verification requirements
-	 *
-	 * @param accountId - The Stripe Connect account ID to check
-	 * @returns Promise with account status and payment readiness
 	 */
 	async getAccountStatus(accountId: string): Promise<{
 		success: boolean
@@ -102,20 +103,11 @@ export class StripeService {
 		}
 	}> {
 		try {
-			// Fetch account details from Stripe API
 			const account = await stripe.accounts.retrieve(accountId)
-
-			// Extract key status fields
 			const charges_enabled = account.charges_enabled || false
 			const payouts_enabled = account.payouts_enabled || false
 			const details_submitted = account.details_submitted || false
 			const requirements_due = account.requirements?.currently_due || []
-
-			// Account is ready for payments if:
-			// 1. Can accept charges (payments from customers)
-			// 2. Can receive payouts (money to bank account)
-			// 3. Has submitted required details
-			// 4. Has no outstanding requirements
 			const paymentsEnabled =
 				charges_enabled &&
 				payouts_enabled &&
@@ -135,6 +127,12 @@ export class StripeService {
 			}
 		} catch (error) {
 			console.error('Error fetching Stripe account status:', error)
+			Sentry.captureException(error, {
+				tags: {
+					component: 'stripe-service',
+					method: 'getAccountStatus'
+				}
+			})
 			return {
 				success: false,
 				paymentsEnabled: false,
@@ -213,17 +211,18 @@ export class StripeService {
 				}
 			})
 
-			console.log('[payments][stripe] created_session', {
-				bookingId,
-				sessionId: session.id
-			})
-
 			return {
 				sessionId: session.id,
 				checkoutUrl: session.url || ''
 			}
 		} catch (error) {
 			console.error('Error creating checkout session:', error)
+			Sentry.captureException(error, {
+				tags: {
+					component: 'stripe-service',
+					method: 'createConsultationCheckout'
+				}
+			})
 			throw new Error(
 				`Failed to create checkout session: ${
 					error instanceof Error ? error.message : 'Unknown error'
@@ -234,10 +233,6 @@ export class StripeService {
 
 	/**
 	 * Expires a Stripe checkout session to prevent payment completion
-	 *
-	 * Note: Stripe checkout sessions automatically expire after 24 hours,
-	 * but we can manually expire them to immediately invalidate payment links.
-	 * This is useful when a booking is cancelled before payment is completed.
 	 */
 	async expireCheckoutSession(sessionId: string): Promise<{
 		success: boolean
@@ -251,6 +246,12 @@ export class StripeService {
 			}
 		} catch (error) {
 			console.error('Error expiring checkout session:', error)
+			Sentry.captureException(error, {
+				tags: {
+					component: 'stripe-service',
+					method: 'expireCheckoutSession'
+				}
+			})
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error'
@@ -260,15 +261,6 @@ export class StripeService {
 
 	/**
 	 * Process a full refund for a consultation payment
-	 *
-	 * This method creates a full refund for a payment intent.
-	 * For consultation bookings, we only support full refunds to keep things simple.
-	 * The refund will be processed back to the original payment method.
-	 *
-	 * @param paymentIntentId - The Stripe payment intent ID to refund
-	 * @param reason - Optional reason for the refund (for Stripe records)
-	 * @param bookingId - The booking ID for metadata tracking
-	 * @returns Promise with refund result containing Stripe refund ID
 	 */
 	async processRefund(
 		paymentIntentId: string,
@@ -280,7 +272,6 @@ export class StripeService {
 		error?: string
 	}> {
 		try {
-			// Create full refund in Stripe
 			const refund = await stripe.refunds.create({
 				payment_intent: paymentIntentId,
 				reason: (reason as any) || 'requested_by_customer',
@@ -296,6 +287,9 @@ export class StripeService {
 			}
 		} catch (error) {
 			console.error('Error processing refund:', error)
+			Sentry.captureException(error, {
+				tags: { component: 'stripe-service', method: 'processRefund' }
+			})
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error'
@@ -321,6 +315,12 @@ export class StripeService {
 			}
 		} catch (error) {
 			console.error('Error retrieving checkout session:', error)
+			Sentry.captureException(error, {
+				tags: {
+					component: 'stripe-service',
+					method: 'retrieveCheckoutSession'
+				}
+			})
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error'

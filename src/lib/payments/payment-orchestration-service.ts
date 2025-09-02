@@ -28,6 +28,7 @@ import { getProfileById } from '@/lib/db/profiles'
 import { getBookingById } from '@/lib/db/bookings'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import * as Sentry from '@sentry/nextjs'
 
 export class PaymentOrchestrationService {
 	/**
@@ -216,6 +217,13 @@ export class PaymentOrchestrationService {
 							? dbError.message
 							: String(dbError)
 				})
+				Sentry.captureException(dbError, {
+					tags: {
+						component: 'payments-orchestrator',
+						stage: 'db_track'
+					},
+					extra: { bookingId }
+				})
 				// Non-fatal: continue and return checkoutUrl to avoid blocking client
 			}
 
@@ -229,6 +237,10 @@ export class PaymentOrchestrationService {
 		} catch (error) {
 			// STEP 5: Error handling
 			// ======================
+			Sentry.captureException(error, {
+				tags: { component: 'payments-orchestrator' },
+				extra: { bookingId, userId }
+			})
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error'

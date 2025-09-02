@@ -44,6 +44,7 @@ import {
 } from '@/lib/calendar/calendar'
 import { createCalendarEvent } from '@/lib/db/calendar-events'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import * as Sentry from '@sentry/nextjs'
 
 /**
  * Interface for creating a booking
@@ -227,12 +228,26 @@ async function createInAdvanceBooking(
 					`Failed to create confirmed calendar event for booking ${booking.id}:`,
 					eventResult.error
 				)
+				Sentry.captureException(eventResult.error, {
+					tags: {
+						component: 'booking-orchestrator',
+						stage: 'confirmed_calendar'
+					},
+					extra: { bookingId: booking.id, userId: request.userId }
+				})
 			}
 		} catch (calendarError) {
 			console.error(
 				`Confirmed calendar creation error for booking ${booking.id}:`,
 				calendarError
 			)
+			Sentry.captureException(calendarError, {
+				tags: {
+					component: 'booking-orchestrator',
+					stage: 'confirmed_calendar'
+				},
+				extra: { bookingId: booking.id, userId: request.userId }
+			})
 		}
 
 		return {
@@ -359,6 +374,13 @@ async function createInAdvanceBooking(
 			`Pending calendar creation error for booking ${booking.id}:`,
 			calendarError
 		)
+		Sentry.captureException(calendarError, {
+			tags: {
+				component: 'booking-orchestrator',
+				stage: 'pending_calendar'
+			},
+			extra: { bookingId: booking.id, userId: request.userId }
+		})
 	}
 
 	// If amount > 0, requires payment - create payment session and send email
@@ -427,6 +449,13 @@ async function createInAdvanceBooking(
 						'Failed to track successful email:',
 						trackingError
 					)
+					Sentry.captureException(trackingError, {
+						tags: {
+							component: 'booking-orchestrator',
+							stage: 'email_track_sent'
+						},
+						extra: { bookingId: booking.id, billId: bill.id }
+					})
 				}
 
 				return {
@@ -459,6 +488,13 @@ async function createInAdvanceBooking(
 						'Failed to track failed email:',
 						trackingError
 					)
+					Sentry.captureException(trackingError, {
+						tags: {
+							component: 'booking-orchestrator',
+							stage: 'email_track_failed'
+						},
+						extra: { bookingId: booking.id, billId: bill.id }
+					})
 				}
 
 				// Email failed - throw error to trigger cleanup
@@ -472,6 +508,17 @@ async function createInAdvanceBooking(
 			console.error(
 				`Error in payment flow for booking ${booking.id}: ${error instanceof Error ? error.message : 'Unknown error'}`
 			)
+			Sentry.captureException(error, {
+				tags: {
+					component: 'booking-orchestrator',
+					stage: 'payment_flow'
+				},
+				extra: {
+					bookingId: booking.id,
+					userId: request.userId,
+					clientId: request.clientId
+				}
+			})
 
 			// Cleanup: Delete the booking and bill we created
 			try {
@@ -482,6 +529,13 @@ async function createInAdvanceBooking(
 					`Cleanup failed for booking ${booking.id}:`,
 					cleanupError
 				)
+				Sentry.captureException(cleanupError, {
+					tags: {
+						component: 'booking-orchestrator',
+						stage: 'cleanup'
+					},
+					extra: { bookingId: booking.id, billId: bill.id }
+				})
 				// Don't throw cleanup errors - original error is more important
 			}
 
@@ -638,6 +692,13 @@ export async function createBookingSimple(
 		}
 	} catch (error) {
 		console.error('Error creating booking:', error)
+		Sentry.captureException(error, {
+			tags: {
+				component: 'booking-orchestrator',
+				stage: 'createBookingSimple'
+			},
+			extra: { userId: request.userId, clientId: request.clientId }
+		})
 		throw error
 	}
 }
