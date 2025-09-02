@@ -35,7 +35,12 @@ import { X } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 
 export default function CalendarBanner() {
-	const { user, calendarConnected, checkCalendarConnection } = useUser()
+	const {
+		user,
+		calendarConnected,
+		checkCalendarConnection,
+		stripeOnboardingCompleted
+	} = useUser()
 
 	// Local dismissal state (session-only)
 	const [dismissed, setDismissed] = useState(false)
@@ -78,12 +83,22 @@ export default function CalendarBanner() {
 
 	// Ensure we have the latest status when component mounts
 	useEffect(() => {
-		if (user && calendarConnected == null) {
+		if (
+			user &&
+			stripeOnboardingCompleted === true &&
+			calendarConnected == null
+		) {
 			checkCalendarConnection()
 		}
-	}, [user, calendarConnected, checkCalendarConnection])
+	}, [
+		user,
+		stripeOnboardingCompleted,
+		calendarConnected,
+		checkCalendarConnection
+	])
 
 	if (!user) return null
+	if (stripeOnboardingCompleted !== true) return null
 	if (persistDismissed || dismissed) return null
 	if (calendarConnected !== false) return null
 
