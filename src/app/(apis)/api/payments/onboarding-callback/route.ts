@@ -5,6 +5,7 @@ import {
 } from '@/lib/db/stripe-accounts'
 import { stripeService } from '@/lib/payments/stripe-service'
 import { createClient } from '@/lib/supabase/server'
+import { captureEvent } from '@/lib/posthog/server'
 
 // Force dynamic rendering since this route processes redirects
 export const dynamic = 'force-dynamic'
@@ -122,6 +123,14 @@ export async function GET(request: NextRequest) {
 
 		// Step 5: Redirect based on account readiness with specific reason
 		if (isReadyForPayments) {
+			// Capture server-side onboarding completion (best-effort)
+			try {
+				await captureEvent({
+					userId,
+					event: 'onboarding_step_completed',
+					properties: { step: 'stripe_connect_completed' }
+				})
+			} catch {}
 			// Account is fully ready - proceed to next onboarding step
 			return NextResponse.redirect(
 				new URL('/onboarding?step=5&stripe_ready=true', request.url)

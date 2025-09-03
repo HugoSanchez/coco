@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { PostHog } from 'posthog-node'
-import { sendSignupNotificationEmail } from '@/lib/emails/email-service'
+import { captureEvent } from '@/lib/posthog/server'
 
 // Force dynamic rendering since this route uses cookies for authentication
 export const dynamic = 'force-dynamic'
@@ -23,34 +22,18 @@ export async function GET(request: Request) {
 		const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
 		if (data?.user) {
-			// Capture auth analytics (signup vs signin) using PostHog server SDK
+			// Capture auth analytics (signup vs signin) using reusable helper
 			try {
-				if (process.env.POSTHOG_KEY) {
-					const ph = new PostHog(process.env.POSTHOG_KEY!, {
-						host: process.env.POSTHOG_HOST
-					})
-					const user = data.user
-					const isNewSignup =
-						Date.now() - new Date(user.created_at).getTime() <
-						10 * 60 * 1000 // 10 minutes heuristic
-					await ph.capture({
-						distinctId: user.id,
-						event: isNewSignup
-							? 'user_signed_up'
-							: 'user_logged_in',
-						properties: {
-							email: user.email,
-							source: redirectTo || 'auth_callback'
-						}
-					})
-					await ph.shutdown()
-
-					if (isNewSignup) {
-						await sendSignupNotificationEmail({
-							newUserEmail: user.email || ''
-						})
-					}
-				}
+				const user = data.user
+				const isNewSignup =
+					Date.now() - new Date(user.created_at).getTime() <
+					10 * 60 * 1000 // 10 minutes heuristic
+				await captureEvent({
+					userId: user.id,
+					userEmail: user.email,
+					event: isNewSignup ? 'user_signed_up' : 'user_logged_in',
+					properties: { source: redirectTo || 'auth_callback' }
+				})
 			} catch (_) {
 				// Swallow analytics errors; do not block auth flow
 			}

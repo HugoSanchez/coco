@@ -12,6 +12,7 @@ import {
 	uploadProfilePicture
 } from '@/lib/db/profiles'
 import { useToast } from '@/components/ui/use-toast'
+import { captureOnboardingStep } from '@/lib/posthog/client'
 
 interface ProfileSetupProps {
 	onComplete: () => void
@@ -99,6 +100,9 @@ export function ProfileSetup({
 			})
 
 			await refreshProfile() // Refresh the global profile state
+
+			// Track onboarding step completion (client-side)
+			captureOnboardingStep('account_profile_saved')
 
 			// Show success toast only if enabled
 			if (showSuccessToast) {

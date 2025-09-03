@@ -13,6 +13,7 @@ import {
 	BillingPreferencesForm,
 	BillingPreferences
 } from '@/components/BillingPreferencesForm'
+import { captureOnboardingStep } from '@/lib/posthog/client'
 
 interface BillingPreferencesStepProps {
 	onComplete: () => void
@@ -72,6 +73,9 @@ export function BillingPreferencesStep({
 		try {
 			// Save billing preferences using the new unified system
 			await saveBillingPreferences(user?.id, billingPrefs)
+
+			// Track onboarding step completion (client-side)
+			captureOnboardingStep('billing_preferences_saved')
 
 			// Show success toast if enabled
 			if (showSuccessToast) {

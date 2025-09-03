@@ -33,6 +33,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import * as Sentry from '@sentry/nextjs'
 import { useRouter } from 'next/navigation'
+import posthog from 'posthog-js'
 
 /**
  * Interface for user profile data from the profiles table
@@ -136,6 +137,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 			// Only redirect to login on actual logout events, not on initial load
 			if (event === 'SIGNED_OUT') {
 				setProfile(null)
+				try {
+					posthog.reset()
+				} catch (e) {
+					// ignore
+				}
 				router.push('/login') // Redirect to login page on logout
 			}
 		})
@@ -171,6 +177,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 			}
 		} catch (e) {
 			// Ignore Sentry errors in client environments
+		}
+
+		// Identify user in PostHog on the client when authenticated
+		try {
+			const allowClientCapture =
+				process.env.NODE_ENV === 'production' ||
+				process.env.NEXT_PUBLIC_POSTHOG_CAPTURE_DEV === 'true'
+			if (user && allowClientCapture) {
+				posthog.identify(
+					user.id,
+					user.email ? { email: user.email } : undefined
+				)
+			} else if (!user) {
+				posthog.reset()
+			}
+		} catch (e) {
+			// Ignore PostHog errors in client environments
 		}
 
 		// Only fetch profile if user is authenticated

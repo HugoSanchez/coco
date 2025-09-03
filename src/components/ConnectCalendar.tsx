@@ -9,6 +9,7 @@ import {
 	checkCalendarPermissions,
 	type CalendarPermissionStatus
 } from '@/lib/db/calendar-tokens'
+import { captureOnboardingStep } from '@/lib/posthog/client'
 
 /**
  * Props for the ConnectCalendar component
@@ -154,6 +155,9 @@ export function ConnectCalendar({
 					url.searchParams.delete('calendar_connected')
 					window.history.replaceState({}, '', url.toString())
 				} catch {}
+
+				// Track onboarding step once we detected the successful connect
+				captureOnboardingStep('calendar_connected')
 			} catch {}
 		}
 		resetBannerIfConnected()

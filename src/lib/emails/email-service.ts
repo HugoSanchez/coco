@@ -174,42 +174,6 @@ export async function sendBulkConsultationBills(
 }
 
 /**
- * Send a simple admin notification on new signup
- */
-export async function sendSignupNotificationEmail({
-	newUserEmail
-}: {
-	newUserEmail: string
-}) {
-	try {
-		const resend = getResendClient()
-		const subject = 'New signup'
-		const html = `<p>A new user just signed up: <strong>${
-			newUserEmail || 'unknown email'
-		}</strong></p>`
-
-		const result = await resend.emails.send({
-			from: EMAIL_CONFIG.from,
-			replyTo: EMAIL_CONFIG.replyTo,
-			to: 'hugo@itsverso.com',
-			subject,
-			html
-		})
-
-		if (result.error) {
-			throw new Error(result.error.message)
-		}
-
-		return { success: true, emailId: result.data?.id }
-	} catch (error) {
-		return {
-			success: false,
-			error: error instanceof Error ? error.message : 'Unknown error'
-		}
-	}
-}
-
-/**
  * Send refund notification to patient
  */
 export async function sendRefundNotificationEmail({

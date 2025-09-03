@@ -19,6 +19,7 @@ import {
 	CardDescription
 } from '@/components/ui/card'
 import { Check } from 'lucide-react'
+import { captureOnboardingStep } from '@/lib/posthog/client'
 
 // Force dynamic rendering since this page uses useSearchParams
 export const dynamic = 'force-dynamic'
@@ -145,6 +146,8 @@ function OnboardingContent() {
 			const nextStep = currentStep + 1
 			router.push(`/onboarding?step=${nextStep + 1}`)
 		} else if (currentStep === steps.length - 1) {
+			// User finished onboarding; by our flow, they have created their first client
+			captureOnboardingStep('first_client_created')
 			router.push('/dashboard')
 		}
 	}

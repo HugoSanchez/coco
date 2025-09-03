@@ -5,6 +5,7 @@ import {
 	CreateBookingRequest
 } from '@/lib/bookings/booking-orchestration-service'
 import * as Sentry from '@sentry/nextjs'
+import { captureEvent } from '@/lib/posthog/server'
 
 // Force dynamic rendering since this route uses cookies for authentication
 export const dynamic = 'force-dynamic'
@@ -74,6 +75,21 @@ export async function POST(request: NextRequest) {
 
 		// Step 4: Create booking using orchestration service
 		const result = await createBookingSimple(bookingRequest, supabase)
+
+		// Step 4.5: Capture PostHog event (best-effort)
+		await captureEvent({
+			userId: user.id,
+			event: 'booking_created',
+			userEmail: user.email,
+			properties: {
+				booking_id: result.booking.id,
+				client_id: result.booking.client_id,
+				user_id: result.booking.user_id,
+				requires_payment: result.requiresPayment,
+				amount: result.bill?.amount,
+				currency: result.bill?.currency
+			}
+		})
 
 		// Step 5: Return success response
 		return NextResponse.json({
