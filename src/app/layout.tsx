@@ -27,6 +27,7 @@ export const metadata: Metadata = {
 		type: 'website'
 	},
 	other: {
+		google: 'notranslate',
 		...Sentry.getTraceData()
 	}
 }
@@ -37,7 +38,7 @@ export default function RootLayout({
 	children: React.ReactNode
 }) {
 	return (
-		<html lang="en">
+		<html lang="es" translate="no">
 			<body
 				className={`${inter.className} flex flex-col h-full bg-gray-50`}
 			>

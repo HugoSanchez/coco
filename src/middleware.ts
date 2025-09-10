@@ -7,6 +7,8 @@ export async function middleware(request: NextRequest) {
 	const { pathname } = request.nextUrl
 	// Create response object early so we can pass it to the Supabase client
 	const response = NextResponse.next()
+	// Set global Content-Language header to help browsers avoid translating Spanish content
+	response.headers.set('Content-Language', 'es')
 	// Create a Supabase client
 	const supabase = createMiddlewareClient(request, response)
 	// Define protected routes
