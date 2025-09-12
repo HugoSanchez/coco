@@ -182,7 +182,7 @@ export class StripeService {
 							currency: 'eur',
 							product_data: {
 								name: `Consulta con ${practitionerName}`,
-								description: `Consulta programada para ${formatInTimeZone(parseISO(consultationDate), 'Europe/Madrid', "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })}h`
+								description: `Consulta del ${formatInTimeZone(parseISO(consultationDate), 'Europe/Madrid', "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })}h`
 							},
 							unit_amount: Math.round(amount * 100) // Convert to cents
 						},

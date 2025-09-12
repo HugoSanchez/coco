@@ -73,7 +73,7 @@ export async function sendConsultationBillEmail({
 		const subject =
 			billingTrigger === 'before_consultation'
 				? `Pre-confirmación de Consulta con ${practitionerName} - Pago Requerido`
-				: `Factura de Consulta Completada`
+				: `Factura de consulta con ${practitionerName}`
 
 		// Send email via Resend
 		const resend = getResendClient()

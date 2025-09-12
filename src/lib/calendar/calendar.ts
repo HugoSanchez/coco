@@ -40,6 +40,7 @@ import {
 	buildFullEventData,
 	buildPendingEventData,
 	buildConfirmedEventData,
+	buildInternalConfirmedEventData,
 	generateConferenceRequestId
 } from './calendar-event-builders'
 import { createCalendarEvent as createCalendarEventDb } from '../db/calendar-events'
@@ -356,6 +357,74 @@ export async function createCalendarEventWithInvite(
 		return {
 			success: false,
 			error: `Failed to create calendar event: ${error.message}`
+		}
+	}
+}
+
+/**
+ * Creates a confirmed Google Calendar event for practitioner only (no client invite)
+ * Intended for historical bookings to avoid sending notifications.
+ */
+export async function createInternalConfirmedCalendarEvent(
+	payload: {
+		userId: string
+		clientName: string
+		practitionerName: string
+		practitionerEmail: string
+		startTime: string
+		endTime: string
+		bookingNotes?: string
+		bookingId?: string
+	},
+	supabaseClient?: SupabaseClient
+): Promise<CalendarEventResult> {
+	const {
+		userId,
+		clientName,
+		practitionerName,
+		practitionerEmail,
+		startTime,
+		endTime,
+		bookingNotes
+	} = payload
+
+	try {
+		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+
+		const eventData = buildInternalConfirmedEventData({
+			clientName,
+			practitionerName,
+			practitionerEmail,
+			startTime,
+			endTime,
+			bookingNotes,
+			bookingId: (payload as any).bookingId
+		})
+
+		const response = await calendar.events.insert({
+			calendarId: 'primary',
+			requestBody: eventData,
+			sendUpdates: 'none'
+		})
+
+		const createdEvent = response.data
+		if (!createdEvent.id) {
+			throw new Error(
+				'Failed to create internal confirmed event: No event ID returned'
+			)
+		}
+
+		return { success: true, googleEventId: createdEvent.id }
+	} catch (error: any) {
+		console.error('Calendar internal confirmed event creation error:', {
+			message: error.message,
+			code: error.code,
+			status: error.status,
+			userId
+		})
+		return {
+			success: false,
+			error: `Failed to create internal confirmed event: ${error.message}`
 		}
 	}
 }

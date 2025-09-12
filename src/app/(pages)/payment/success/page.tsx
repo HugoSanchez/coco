@@ -67,28 +67,51 @@ function BookingConfirmationContent() {
 				<CardHeader className="text-center gap-4">
 					<Check className="h-12 w-12 text-accent mx-auto" />
 					<h1 className="text-4xl font-black text-primary">
-						¡Cita confirmada!
+						{new Date(bookingDetails.consultationDate) < new Date()
+							? 'Pago recibido'
+							: '¡Cita confirmada!'}
 					</h1>
 
-					<p className="text-lg text-gray-600">
-						Enhorabuena, tu cita con{' '}
-						{bookingDetails.practitionerName} para el{' '}
-						<span className="font-bold text-primary">
-							{new Date(
-								bookingDetails.consultationDate
-							).toLocaleDateString('es-ES', {
-								weekday: 'long',
-								year: 'numeric',
-								month: 'long',
-								day: 'numeric',
-								hour: '2-digit',
-								minute: '2-digit'
-							})}
-							{'h '}
-						</span>
-						está confirmada. En breves recibirás un email con los
-						detalles.
-					</p>
+					{new Date(bookingDetails.consultationDate) < new Date() ? (
+						<p className="text-lg text-gray-600">
+							Hemos registrado el pago de tu consulta del{' '}
+							<span className="font-bold text-primary">
+								{new Date(
+									bookingDetails.consultationDate
+								).toLocaleDateString('es-ES', {
+									weekday: 'long',
+									year: 'numeric',
+									month: 'long',
+									day: 'numeric',
+									hour: '2-digit',
+									minute: '2-digit'
+								})}
+								{'h '}
+							</span>
+							. Recibirás la factura por email.
+						</p>
+					) : (
+						<p className="text-lg text-gray-600">
+							Enhorabuena, tu cita con{' '}
+							{bookingDetails.practitionerName}
+							para el{' '}
+							<span className="font-bold text-primary">
+								{new Date(
+									bookingDetails.consultationDate
+								).toLocaleDateString('es-ES', {
+									weekday: 'long',
+									year: 'numeric',
+									month: 'long',
+									day: 'numeric',
+									hour: '2-digit',
+									minute: '2-digit'
+								})}
+								{'h '}
+							</span>
+							está confirmada. En breves recibirás un email con
+							los detalles.
+						</p>
+					)}
 				</CardHeader>
 				<p className="text-gray-600 text-sm text-normal">
 					Puedes cerrar esta página.

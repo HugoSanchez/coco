@@ -100,7 +100,11 @@ export default function ConsultationBillEmail({
 	return (
 		<Html>
 			<Head />
-			<Preview>{'Confirmar Consulta - Pago Requerido'}</Preview>
+			<Preview>
+				{billingTrigger === 'after_consultation'
+					? 'Consulta pendiente de pago'
+					: 'Confirmar Consulta - Pago Requerido'}
+			</Preview>
 			<Body style={main}>
 				<Container style={container}>
 					{/* Logo */}
@@ -111,20 +115,39 @@ export default function ConsultationBillEmail({
 						<Text style={greeting}>
 							{`Hola ${clientName.trim()},`}
 						</Text>
-						<Text style={text}>
-							Este email es para comunicarte que tu próxima
-							consulta con {practitionerName} está pre-programada
-							para el{' '}
-							{formatDateWithTimeToSpanish(consultationDate)}.
-						</Text>
+						{billingTrigger === 'after_consultation' ? (
+							<>
+								<Text style={text}>
+									{`${practitionerName} ha registrado tu consulta del ${formatDateWithTimeToSpanish(consultationDate)}.`}
+								</Text>
+								<Text style={text}>
+									Puedes abobar la consulta a través del
+									enlace que te proporcionamos a continuación.
+									Si tienes cualquier duda, por favor ponte en
+									contacto con {practitionerName}.
+								</Text>
+							</>
+						) : (
+							<>
+								<Text style={text}>
+									Este email es para comunicarte que tu
+									próxima consulta con {practitionerName} está
+									pre-programada para el{' '}
+									{formatDateWithTimeToSpanish(
+										consultationDate
+									)}
+									.
+								</Text>
 
-						<Text style={text}>
-							<strong>{`Para confirmar tu cita, por favor sigue las instrucciones de pago que encontrarás a continuación.`}</strong>
-						</Text>
+								<Text style={text}>
+									<strong>{`Para confirmar tu cita, por favor sigue las instrucciones de pago que encontrarás a continuación.`}</strong>
+								</Text>
 
-						<Text style={text}>
-							{`Una vez realizado el pago, recibirás un email con los detalles de la cita así como la factura correspondiente. Si tienes cualquier duda, puedes ponerte en contacto con ${practitionerName}.`}
-						</Text>
+								<Text style={text}>
+									{`Una vez realizado el pago, recibirás un email con los detalles de la cita así como la factura correspondiente. Si tienes cualquier duda, puedes ponerte en contacto con ${practitionerName}.`}
+								</Text>
+							</>
+						)}
 					</Section>
 
 					{/* Payment Button */}
@@ -133,13 +156,17 @@ export default function ConsultationBillEmail({
 							{paymentUrl ? (
 								<a href={paymentUrl} style={payButton}>
 									<Text style={buttonText}>
-										Confirmar consulta
+										{billingTrigger === 'after_consultation'
+											? 'Pagar consulta'
+											: 'Confirmar consulta'}
 									</Text>
 								</a>
 							) : (
 								<div style={payButton}>
 									<Text style={buttonText}>
-										Confirmar consulta
+										{billingTrigger === 'after_consultation'
+											? 'Pagar consulta'
+											: 'Confirmar consulta'}
 									</Text>
 								</div>
 							)}

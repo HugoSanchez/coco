@@ -7,6 +7,7 @@
  * - buildFullEventData: Complete appointment with client invitation and Google Meet
  * - buildPendingEventData: Placeholder event for payment processing
  * - buildConfirmedEventData: Updated event data for converting pending to confirmed
+ * - buildInternalConfirmedEventData: Confirmed appointment stored only in practitioner's calendar (no client invite, no Meet)
  */
 
 /**
@@ -170,6 +171,56 @@ export function buildConfirmedEventData({
 			}
 		},
 		// Guest permissions for confirmed appointments
+		guestsCanModify: false,
+		guestsCanInviteOthers: false,
+		guestsCanSeeOtherGuests: false,
+		...(bookingId ? { extendedProperties: { private: { bookingId } } } : {})
+	}
+}
+
+/**
+ * Builds event data for a confirmed appointment without inviting the client
+ * Used for historical (past) bookings to avoid sending notifications
+ */
+export function buildInternalConfirmedEventData({
+	clientName,
+	practitionerName,
+	practitionerEmail,
+	startTime,
+	endTime,
+	bookingNotes,
+	bookingId
+}: {
+	clientName: string
+	practitionerName: string
+	practitionerEmail: string
+	startTime: string
+	endTime: string
+	bookingNotes?: string
+	bookingId?: string
+}) {
+	return {
+		summary: `${clientName} - ${practitionerName}`,
+		description: bookingNotes
+			? `Consultation (historical).
+\nNotes: ${bookingNotes}`
+			: 'Consultation (historical).',
+		start: {
+			dateTime: startTime,
+			timeZone: 'UTC'
+		},
+		end: {
+			dateTime: endTime,
+			timeZone: 'UTC'
+		},
+		// Only practitioner as attendee; no client invite, no conference
+		attendees: [
+			{
+				email: practitionerEmail,
+				responseStatus: 'accepted'
+			}
+		],
+		colorId: '10',
 		guestsCanModify: false,
 		guestsCanInviteOthers: false,
 		guestsCanSeeOtherGuests: false,

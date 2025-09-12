@@ -77,7 +77,8 @@ const getStatusLabel = (status: string) => {
 		case 'scheduled':
 			return 'Confirmada'
 		case 'completed':
-			return 'Completada'
+			// Show completed as confirmed in UI
+			return 'Confirmada'
 		case 'canceled':
 			return 'Cancelada'
 		default:
@@ -93,7 +94,8 @@ const getStatusColor = (status: string) => {
 		case 'scheduled':
 			return 'bg-teal-100 border-0 text-teal-800 font-medium'
 		case 'completed':
-			return 'bg-green-100 text-green-700 border-green-200'
+			// Style completed as confirmed in UI
+			return 'bg-teal-100 border-0 text-teal-800 font-medium'
 		case 'canceled':
 			return 'bg-red-50 text-red-800 border-0 font-medium'
 		default:

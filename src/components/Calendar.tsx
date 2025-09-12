@@ -35,6 +35,7 @@ interface CalendarProps {
 	onSelectDate: (date: Date) => void
 	availableSlots: { [day: string]: TimeSlot[] }
 	onMonthChange: (newMonth: Date) => void
+	allowPastDates?: boolean
 }
 
 /**
@@ -74,7 +75,8 @@ export default function Calendar({
 	onSelectDate,
 	onMonthChange,
 	selectedDay,
-	availableSlots
+	availableSlots,
+	allowPastDates
 }: CalendarProps) {
 	// State to track the currently displayed month
 	const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -86,13 +88,14 @@ export default function Calendar({
 	 * currently set to a past month.
 	 */
 	useEffect(() => {
+		if (allowPastDates) return
 		// Ensure the initial month is set to the current month or later
 		const today = new Date()
 		if (isBefore(currentMonth, startOfMonth(today))) {
 			setCurrentMonth(startOfMonth(today))
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [])
+	}, [allowPastDates])
 
 	/**
 	 * Navigate to the previous month
@@ -103,7 +106,10 @@ export default function Calendar({
 	const prevMonth = () => {
 		const newMonth = subMonths(currentMonth, 1)
 		// Only allow navigation if not going before current month
-		if (!isBefore(startOfMonth(newMonth), startOfMonth(new Date()))) {
+		if (
+			allowPastDates ||
+			!isBefore(startOfMonth(newMonth), startOfMonth(new Date()))
+		) {
 			onMonthChange(subMonths(currentMonth, 1))
 			setCurrentMonth(newMonth)
 		}
@@ -136,10 +142,12 @@ export default function Calendar({
 			<div className="flex items-center justify-between mb-4">
 				{/* Previous month button */}
 				<button
-					disabled={isSameMonth(currentMonth, new Date())}
+					disabled={
+						!allowPastDates && isSameMonth(currentMonth, new Date())
+					}
 					onClick={prevMonth}
 					className={`p-2 ${
-						isSameMonth(currentMonth, new Date())
+						!allowPastDates && isSameMonth(currentMonth, new Date())
 							? ''
 							: 'rounded-full bg-teal-100'
 					}`}
@@ -179,14 +187,17 @@ export default function Calendar({
 				{days.map((day) => {
 					// Determine various states for the day
 					const isCurrentMonth = isSameMonth(day, currentMonth)
-					const isSelectable =
-						isCurrentMonth &&
-						startOfDay(day) >= startOfDay(new Date())
+					const isSelectable = allowPastDates
+						? isCurrentMonth
+						: isCurrentMonth &&
+							startOfDay(day) >= startOfDay(new Date())
 					const dateKey = format(day, 'yyyy-MM-dd')
-					const hasAvailableSlots =
-						availableSlots[dateKey] &&
-						availableSlots[dateKey].length > 0 &&
-						startOfDay(day) >= startOfDay(new Date())
+					const hasAvailableSlots = allowPastDates
+						? availableSlots[dateKey] &&
+							availableSlots[dateKey].length > 0
+						: availableSlots[dateKey] &&
+							availableSlots[dateKey].length > 0 &&
+							startOfDay(day) >= startOfDay(new Date())
 
 					return (
 						<div

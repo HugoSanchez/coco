@@ -496,6 +496,7 @@ export function BookingForm({
 							availableSlots={{}} // TODO: Pass real availability data
 							onSelectDate={handleDateSelect}
 							onMonthChange={handleMonthChange}
+							allowPastDates
 						/>
 					</div>
 				</div>

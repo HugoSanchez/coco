@@ -40,7 +40,8 @@ import { getProfileById } from '@/lib/db/profiles'
 import { createEmailCommunication } from '@/lib/db/email-communications'
 import {
 	createPendingCalendarEvent,
-	createCalendarEventWithInvite
+	createCalendarEventWithInvite,
+	createInternalConfirmedCalendarEvent
 } from '@/lib/calendar/calendar'
 import { createCalendarEvent } from '@/lib/db/calendar-events'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -150,6 +151,137 @@ async function createBillForBooking(
 }
 
 /**
+ * Creates a booking in the past with in-advance billing semantics
+ * - Marks booking as completed
+ * - Creates an internal confirmed calendar event (no invitations)
+ * - Sends post-consultation email with payment link
+ */
+async function createPastBooking(
+	request: CreateBookingRequest,
+	billing: any,
+	supabaseClient?: SupabaseClient
+): Promise<CreateBookingResult> {
+	// Create booking as completed
+	const booking = await createBooking(
+		{
+			user_id: request.userId,
+			client_id: request.clientId,
+			start_time: request.startTime,
+			end_time: request.endTime,
+			status: 'completed',
+			consultation_type: request.consultationType
+		},
+		supabaseClient
+	)
+
+	// Create bill (pending) for historical booking
+	const bill = await createBillForBooking(
+		booking,
+		billing,
+		request.clientId,
+		supabaseClient
+	)
+
+	// Create internal confirmed calendar event (no invites/notifications)
+	try {
+		const client = await getClientById(request.clientId, supabaseClient)
+		const practitioner = await getProfileById(
+			request.userId,
+			supabaseClient
+		)
+
+		if (!client) throw new Error(`Client not found: ${request.clientId}`)
+		if (!practitioner)
+			throw new Error(`Practitioner profile not found: ${request.userId}`)
+
+		const eventResult = await createInternalConfirmedCalendarEvent(
+			{
+				userId: request.userId,
+				clientName: client.name,
+				practitionerName: practitioner.name || 'Your Practitioner',
+				practitionerEmail: practitioner.email,
+				startTime: request.startTime,
+				endTime: request.endTime,
+				bookingNotes: request.notes,
+				bookingId: booking.id as any
+			},
+			supabaseClient
+		)
+
+		if (eventResult.success && eventResult.googleEventId) {
+			await createCalendarEvent(
+				{
+					booking_id: booking.id,
+					user_id: request.userId,
+					google_event_id: eventResult.googleEventId,
+					event_type: 'confirmed',
+					event_status: 'created'
+				},
+				supabaseClient
+			)
+		}
+	} catch (calendarError) {
+		console.error(
+			`Internal confirmed calendar creation error for booking ${booking.id}:`,
+			calendarError
+		)
+		Sentry.captureException(calendarError, {
+			tags: {
+				component: 'booking-orchestrator',
+				stage: 'internal_confirmed_calendar'
+			},
+			extra: { bookingId: booking.id, userId: request.userId }
+		})
+	}
+
+	// Send post-consultation email with payment link
+	try {
+		const client = await getClientById(request.clientId, supabaseClient)
+		const practitioner = await getProfileById(
+			request.userId,
+			supabaseClient
+		)
+		if (client && practitioner) {
+			const baseUrl =
+				process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+			const paymentGatewayUrl = `${baseUrl}/api/payments/${booking.id}`
+			const emailResult = await sendConsultationBillEmail({
+				to: client.email,
+				clientName: client.name,
+				consultationDate: request.startTime,
+				amount: billing.amount,
+				billingTrigger: 'after_consultation',
+				practitionerName: practitioner.name || 'Your Practitioner',
+				practitionerEmail: practitioner.email,
+				practitionerImageUrl:
+					practitioner.profile_picture_url || undefined,
+				paymentUrl: paymentGatewayUrl
+			})
+			if (emailResult.success) {
+				await updateBillStatus(bill.id, 'sent', supabaseClient)
+				try {
+					await createEmailCommunication(
+						{
+							user_id: booking.user_id,
+							client_id: booking.client_id,
+							bill_id: bill.id,
+							booking_id: booking.id,
+							email_type: 'consultation_bill',
+							recipient_email: client.email,
+							recipient_name: client.name,
+							status: 'sent'
+						},
+						supabaseClient
+					)
+				} catch (_) {}
+			}
+		}
+	} catch (_) {}
+
+	return { booking, bill, requiresPayment: true }
+}
+
+/**
  * Creates a booking with in-advance payment
  * Enhanced with complete payment link generation and email sending
  */
@@ -158,6 +290,11 @@ async function createInAdvanceBooking(
 	billing: any,
 	supabaseClient?: SupabaseClient
 ): Promise<CreateBookingResult> {
+	// Route past bookings to dedicated flow
+	const isPastBooking = new Date(request.startTime).getTime() < Date.now()
+	if (isPastBooking && billing.amount > 0) {
+		return await createPastBooking(request, billing, supabaseClient)
+	}
 	// Fast-track zero-amount bookings: immediately confirm and invite
 	if (billing.amount === 0) {
 		// Create booking already scheduled
