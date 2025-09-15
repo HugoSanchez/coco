@@ -3,7 +3,6 @@ import { markPaymentSessionCompleted } from '@/lib/db/payment-sessions'
 import { updateBookingStatus } from '@/lib/db/bookings'
 import { getBillForBookingAndMarkAsPaid } from '@/lib/db/bills'
 import {
-	createCalendarEvent,
 	getCalendarEventsForBooking,
 	updateCalendarEventType
 } from '@/lib/db/calendar-events'
@@ -11,6 +10,7 @@ import { updatePendingToConfirmed } from '@/lib/calendar/calendar'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 import * as Sentry from '@sentry/nextjs'
+import { captureEvent } from '@/lib/posthog/server'
 
 /**
  * Stripe webhook handler
@@ -101,6 +101,22 @@ export async function POST(request: NextRequest) {
 			await updateBookingStatus(bookingId, 'scheduled', supabase)
 			// 5. Update bill status to 'paid' - using service role client
 			await getBillForBookingAndMarkAsPaid(bookingId, supabase)
+			// 6. Capture event in PostHog.
+			await captureEvent({
+				userId: session.metadata?.practitioner_user_id!,
+				userEmail: session.metadata?.practitioner_email || null,
+				event: 'payment_completed',
+				properties: {
+					booking_id: bookingId,
+					amount: session.amount_total,
+					currency: session.currency,
+					practitioner_id: session.metadata?.practitioner_user_id,
+					practitioner_email: session.metadata?.practitioner_email,
+					consultation_date: session.metadata?.start_time,
+					stripe_session_id: session.id,
+					stripe_payment_intent_id: session.payment_intent
+				}
+			})
 
 			///////////////////////////////////////////////////////////
 			///// 4. Update pending calendar event to confirmed
