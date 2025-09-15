@@ -108,13 +108,7 @@ export async function POST(request: NextRequest) {
 				event: 'payment_event_succeeded',
 				properties: {
 					booking_id: bookingId,
-					amount: session.amount_total,
-					currency: session.currency,
-					practitioner_id: session.metadata?.practitioner_user_id,
-					practitioner_email: session.metadata?.practitioner_email,
-					consultation_date: session.metadata?.start_time,
-					stripe_session_id: session.id,
-					stripe_payment_intent_id: session.payment_intent
+					amount: session.amount_total
 				}
 			})
 
