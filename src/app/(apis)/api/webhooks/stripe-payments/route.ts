@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
 			await captureEvent({
 				userId: session.metadata?.practitioner_user_id!,
 				userEmail: session.metadata?.practitioner_email || null,
-				event: 'payment_completed',
+				event: 'payment_event_succeeded',
 				properties: {
 					booking_id: bookingId,
 					amount: session.amount_total,
