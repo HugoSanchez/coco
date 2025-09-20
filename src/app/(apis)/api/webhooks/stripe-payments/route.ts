@@ -10,6 +10,7 @@ import { updatePendingToConfirmed } from '@/lib/calendar/calendar'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 import * as Sentry from '@sentry/nextjs'
+import { captureEvent } from '@/lib/posthog/server'
 
 /**
  * Stripe webhook handler
@@ -101,8 +102,27 @@ export async function POST(request: NextRequest) {
 			// 5. Update bill status to 'paid' - using service role client
 			await getBillForBookingAndMarkAsPaid(bookingId, supabase)
 
+			// 6. Capture analytics: successful payment
+			try {
+				await captureEvent({
+					userId: session.metadata?.practitioner_user_id || 'unknown',
+					event: 'payment_succeeded',
+					userEmail: session.metadata?.practitioner_email,
+					properties: {
+						booking_id: bookingId,
+						stripe_session_id: session.id,
+						payment_intent_id: session.payment_intent,
+						amount:
+							typeof session.amount_total === 'number'
+								? session.amount_total / 100
+								: undefined,
+						currency: session.currency?.toUpperCase()
+					}
+				})
+			} catch (_) {}
+
 			///////////////////////////////////////////////////////////
-			///// 4. Update pending calendar event to confirmed
+			///// 7. Update pending calendar event to confirmed
 			///////////////////////////////////////////////////////////
 			try {
 				// Extract all needed data from session metadata (no database calls needed!)
