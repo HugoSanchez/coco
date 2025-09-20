@@ -94,7 +94,9 @@ async function getAppropriateBillingSettings(
 			id: clientBilling.id,
 			type: clientBilling.billing_type,
 			amount: clientBilling.billing_amount || 0,
-			currency: clientBilling.currency
+			currency: clientBilling.currency,
+			first_consultation_amount:
+				clientBilling.first_consultation_amount ?? null
 		}
 	}
 
@@ -109,7 +111,9 @@ async function getAppropriateBillingSettings(
 			id: userDefaultSettings.id,
 			type: userDefaultSettings.billing_type,
 			amount: userDefaultSettings.billing_amount || 0,
-			currency: userDefaultSettings.currency
+			currency: userDefaultSettings.currency,
+			first_consultation_amount:
+				userDefaultSettings.first_consultation_amount ?? null
 		}
 	}
 
@@ -146,6 +150,12 @@ async function createBillForBooking(
 		currency: billing.currency,
 		billing_type: billing.type as 'in-advance' | 'right-after' | 'monthly'
 	}
+
+	console.log('[Orchestrator] Creating bill for booking', {
+		bookingId: booking.id,
+		amount: billing.amount,
+		type: billing.type
+	})
 
 	return await createBill(billPayload, supabaseClient)
 }
@@ -786,9 +796,10 @@ export async function createBookingSimple(
 		// Apply first consultation pricing if selected and available
 		if (
 			request.consultationType === 'first' &&
-			(billing as any).first_consultation_amount != null
+			billing?.first_consultation_amount != null
 		) {
-			resolvedBilling.amount = (billing as any).first_consultation_amount
+			resolvedBilling.amount =
+				billing?.first_consultation_amount as number
 		}
 		if (
 			request.overrideAmount != null &&

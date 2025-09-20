@@ -33,6 +33,7 @@ export interface BillingSettings {
 	is_default: boolean
 	created_at: string
 	updated_at: string
+	first_consultation_amount?: number | null
 }
 
 /**
