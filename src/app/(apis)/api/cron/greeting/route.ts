@@ -21,6 +21,10 @@ export async function GET(request: Request) {
 	///// Step 1: Send greeting
 	///////////////////////////////////////////////////////////////
 	console.log('Greeting cron job triggered!')
+	console.log('Greeting cron job triggered!')
+	console.log('Greeting cron job triggered!')
+	console.log('Greeting cron job triggered!')
+	console.log('Greeting cron job triggered!')
 
 	///////////////////////////////////////////////////////////////
 	///// Step 2: Return success
