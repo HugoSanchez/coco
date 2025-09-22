@@ -89,3 +89,26 @@ export function getUrl(path: string): string {
 	const baseUrl = getBaseUrl()
 	return `${baseUrl}${path}`
 }
+
+/**
+ * Computes when a payment email should be sent based on a lead-time policy.
+ * - leadHours: null or 0 => immediate (now)
+ * - leadHours: -1 => after consultation (endIso)
+ * - leadHours: >0 => that many hours before startIso
+ * Returns an ISO string, or null if no schedule should be set.
+ */
+export function computeEmailScheduledAt(
+	leadHours: number | null | undefined,
+	startIso: string,
+	endIso: string,
+	now: Date = new Date()
+): string | null {
+	if (leadHours == null || leadHours === 0) return now.toISOString()
+	if (leadHours === -1) return endIso
+	if (leadHours > 0) {
+		const start = new Date(startIso)
+		const when = new Date(start.getTime() - leadHours * 60 * 60 * 1000)
+		return when.toISOString()
+	}
+	return null
+}

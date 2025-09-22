@@ -61,6 +61,7 @@ export interface CreateBillPayload {
 	client_name: string
 	client_email: string
 	billing_type: 'in-advance' | 'right-after' | 'monthly'
+	email_scheduled_at?: string | null
 	notes?: string
 }
 
@@ -103,6 +104,7 @@ export async function createBill(
 		client_name: payload.client_name,
 		client_email: payload.client_email,
 		billing_type: payload.billing_type,
+		email_scheduled_at: payload.email_scheduled_at || null,
 		notes: payload.notes || null,
 		status: 'pending' as const
 	}
@@ -606,4 +608,47 @@ export async function getBillForBookingAndMarkAsPaid(
 	}
 	await markBillAsPaid(bills[0].id, supabaseClient)
 	return bills[0]
+}
+
+/**
+ * Atomically claims a small batch of bills whose payment emails are due to send.
+ * Sets email_send_locked_at to now() to prevent concurrent senders from picking the same rows.
+ *
+ * @param nowIso ISO timestamp used for filtering and locking
+ * @param limit Max number of rows to claim per run
+ */
+export async function claimDueBillsForEmail(
+	nowIso: string,
+	limit: number = 25,
+	supabaseClient?: SupabaseClient
+): Promise<Bill[]> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('bills')
+		.update({ email_send_locked_at: nowIso })
+		.lte('email_scheduled_at', nowIso)
+		.is('sent_at', null)
+		.eq('status', 'pending')
+		.is('email_send_locked_at', null)
+		.select('*')
+		.limit(limit)
+		.order('email_scheduled_at', { ascending: true })
+
+	if (error) throw error
+	return (data as any) || []
+}
+
+/**
+ * Releases the send lock for a bill so it can be retried in a later run.
+ */
+export async function releaseBillEmailLock(
+	billId: string,
+	supabaseClient?: SupabaseClient
+): Promise<void> {
+	const client = supabaseClient || supabase
+	const { error } = await client
+		.from('bills')
+		.update({ email_send_locked_at: null })
+		.eq('id', billId)
+	if (error) throw error
 }

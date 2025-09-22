@@ -34,6 +34,11 @@ export interface BillingSettings {
 	created_at: string
 	updated_at: string
 	first_consultation_amount?: number | null
+	/**
+	 * When to send the payment email relative to the booking.
+	 * NULL or 0 => immediate; positive hours => that many hours before start_time; -1 => after at end_time
+	 */
+	payment_email_lead_hours?: number | null
 }
 
 /**

@@ -36,6 +36,7 @@ import {
 } from '@/lib/db/bills'
 import { sendConsultationBillEmail } from '@/lib/emails/email-service'
 import { getProfileById } from '@/lib/db/profiles'
+import { getBookingById } from '@/lib/db/bookings'
 
 import { createEmailCommunication } from '@/lib/db/email-communications'
 import {
@@ -44,6 +45,7 @@ import {
 	createInternalConfirmedCalendarEvent
 } from '@/lib/calendar/calendar'
 import { createCalendarEvent } from '@/lib/db/calendar-events'
+import { computeEmailScheduledAt } from '@/lib/utils'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import * as Sentry from '@sentry/nextjs'
 
@@ -96,7 +98,9 @@ async function getAppropriateBillingSettings(
 			amount: clientBilling.billing_amount || 0,
 			currency: clientBilling.currency,
 			first_consultation_amount:
-				clientBilling.first_consultation_amount ?? null
+				clientBilling.first_consultation_amount ?? null,
+			payment_email_lead_hours:
+				clientBilling.payment_email_lead_hours ?? null
 		}
 	}
 
@@ -113,7 +117,10 @@ async function getAppropriateBillingSettings(
 			amount: userDefaultSettings.billing_amount || 0,
 			currency: userDefaultSettings.currency,
 			first_consultation_amount:
-				userDefaultSettings.first_consultation_amount ?? null
+				userDefaultSettings.first_consultation_amount ?? null,
+			// New: lead time for scheduling payment email
+			payment_email_lead_hours:
+				userDefaultSettings.payment_email_lead_hours ?? null
 		}
 	}
 
@@ -148,7 +155,8 @@ async function createBillForBooking(
 		client_email: client.email,
 		amount: billing.amount,
 		currency: billing.currency,
-		billing_type: billing.type as 'in-advance' | 'right-after' | 'monthly'
+		billing_type: billing.type as 'in-advance' | 'right-after' | 'monthly',
+		email_scheduled_at: billing.email_scheduled_at || null
 	}
 
 	console.log('[Orchestrator] Creating bill for booking', {
@@ -292,6 +300,78 @@ async function createPastBooking(
 }
 
 /**
+ * Sends the consultation bill email for a given bill (before consultation flow).
+ * - Builds the payment URL
+ * - Sends the email
+ * - Marks bill as 'sent' upon success and records email communication
+ */
+export async function sendBillPaymentEmail(
+	bill: Bill,
+	supabaseClient?: SupabaseClient
+): Promise<{ success: boolean; paymentUrl?: string; error?: string }> {
+	try {
+		if (!bill.booking_id) {
+			return { success: false, error: 'Bill missing booking_id' }
+		}
+		// Fetch entities needed
+		const booking = await getBookingById(bill.booking_id, supabaseClient)
+		const client = await getClientById(bill.client_id!, supabaseClient)
+		const practitioner = await getProfileById(bill.user_id, supabaseClient)
+
+		if (!booking) return { success: false, error: 'Booking not found' }
+		if (!client) return { success: false, error: 'Client not found' }
+		if (!practitioner)
+			return { success: false, error: 'Practitioner not found' }
+
+		const baseUrl =
+			process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+		const paymentGatewayUrl = `${baseUrl}/api/payments/${bill.booking_id}`
+
+		const emailResult = await sendConsultationBillEmail({
+			to: client.email,
+			clientName: client.name,
+			consultationDate: booking.start_time,
+			amount: bill.amount,
+			billingTrigger: 'before_consultation',
+			practitionerName: practitioner.name || 'Your Practitioner',
+			practitionerEmail: practitioner.email,
+			practitionerImageUrl: practitioner.profile_picture_url || undefined,
+			paymentUrl: paymentGatewayUrl
+		})
+
+		if (emailResult.success) {
+			await updateBillStatus(bill.id, 'sent', supabaseClient)
+			try {
+				await createEmailCommunication(
+					{
+						user_id: bill.user_id,
+						client_id: bill.client_id!,
+						bill_id: bill.id,
+						booking_id: bill.booking_id,
+						email_type: 'consultation_bill',
+						recipient_email: client.email,
+						recipient_name: client.name,
+						status: 'sent'
+					},
+					supabaseClient
+				)
+			} catch (_) {}
+			return { success: true, paymentUrl: paymentGatewayUrl }
+		}
+
+		return {
+			success: false,
+			error: emailResult.error || 'Email sending failed'
+		}
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : 'Unknown error'
+		}
+	}
+}
+
+/**
  * Creates a booking with in-advance payment
  * Enhanced with complete payment link generation and email sending
  */
@@ -415,10 +495,16 @@ async function createInAdvanceBooking(
 
 	const booking = await createBooking(bookingPayload, supabaseClient)
 
+	const emailScheduledAt = computeEmailScheduledAt(
+		billing.payment_email_lead_hours,
+		request.startTime,
+		request.endTime
+	)
+
 	// Create bill for this booking with 'pending' status
 	const bill = await createBillForBooking(
 		booking,
-		billing,
+		{ ...billing, email_scheduled_at: emailScheduledAt },
 		request.clientId,
 		supabaseClient
 	)
@@ -534,6 +620,17 @@ async function createInAdvanceBooking(
 	const requiresPayment = billing.amount > 0
 
 	if (requiresPayment) {
+		// Only send the email immediately if the scheduled time has arrived
+		const dueNow =
+			!emailScheduledAt || new Date(emailScheduledAt) <= new Date()
+		if (!dueNow) {
+			return {
+				booking,
+				bill,
+				requiresPayment: true,
+				paymentUrl: undefined
+			}
+		}
 		try {
 			// Get client and practitioner info for payment session
 			const client = await getClientById(request.clientId, supabaseClient)
