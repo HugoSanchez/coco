@@ -48,6 +48,7 @@ export interface BillingPreferences {
 	billingType: BillingType
 	billingAmount: string
 	firstConsultationAmount?: string
+	paymentEmailLeadHours?: string
 }
 
 /**
@@ -81,7 +82,11 @@ export async function getBillingPreferences(
 			billingType: data.billing_type,
 			billingAmount: data.billing_amount?.toString() || '',
 			firstConsultationAmount:
-				data.first_consultation_amount?.toString() || ''
+				data.first_consultation_amount?.toString() || '',
+			paymentEmailLeadHours:
+				(data as any).payment_email_lead_hours != null
+					? String((data as any).payment_email_lead_hours)
+					: '0'
 		}
 	} catch (error) {
 		console.error('Error in getBillingPreferences:', error)
@@ -118,6 +123,17 @@ export async function saveBillingPreferences(
 				: parsed
 		} else {
 			billingData.first_consultation_amount = null
+		}
+
+		// Optional payment email lead hours
+		if (
+			preferences.paymentEmailLeadHours != null &&
+			preferences.paymentEmailLeadHours !== ''
+		) {
+			const parsedLead = parseInt(preferences.paymentEmailLeadHours, 10)
+			billingData.payment_email_lead_hours = isNaN(parsedLead)
+				? null
+				: parsedLead
 		}
 
 		// First, attempt to update existing default settings

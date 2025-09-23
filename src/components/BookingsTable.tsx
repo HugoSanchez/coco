@@ -38,6 +38,9 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { SideSheet } from '@/components/SideSheet'
+import BookingDetailsPanel from '@/components/BookingDetailsPanel'
+import { Info } from 'lucide-react'
 
 export interface Booking {
 	id: string
@@ -152,7 +155,8 @@ function BookingActions({
 	onMarkAsPaid,
 	onRefundBooking,
 	onRescheduleBooking,
-	onResendEmail
+	onResendEmail,
+	onViewDetails
 }: {
 	isMobile: boolean
 	booking: Booking
@@ -162,6 +166,7 @@ function BookingActions({
 	onRefundBooking: (bookingId: string) => void
 	onRescheduleBooking: (bookingId: string) => void
 	onResendEmail: (bookingId: string) => void
+	onViewDetails: (booking: Booking) => void
 }) {
 	const { toast } = useToast()
 	const [isResending, setIsResending] = useState(false)
@@ -308,7 +313,8 @@ function BookingCard({
 	onMarkAsPaid,
 	onRefundBooking,
 	onRescheduleBooking,
-	onResendEmail
+	onResendEmail,
+	onViewDetails
 }: {
 	booking: Booking
 	onCancelBooking: (bookingId: string) => void
@@ -317,6 +323,7 @@ function BookingCard({
 	onRefundBooking: (bookingId: string) => void
 	onRescheduleBooking: (bookingId: string) => void
 	onResendEmail: (bookingId: string) => void
+	onViewDetails: (booking: Booking) => void
 }) {
 	return (
 		<div className="bg-white border rounded-lg p-4 mb-3 hover:bg-gray-50/50 transition-colors">
@@ -373,6 +380,7 @@ function BookingCard({
 						onRefundBooking={onRefundBooking}
 						onRescheduleBooking={onRescheduleBooking}
 						onResendEmail={onResendEmail}
+						onViewDetails={onViewDetails}
 					/>
 				</div>
 			</div>
@@ -391,6 +399,22 @@ export function BookingsTable({
 	onResendEmail
 }: BookingsTableProps) {
 	const isMobile = window.innerWidth > 768
+	const [detailsOpen, setDetailsOpen] = useState(false)
+	const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
+	const [details, setDetails] = useState<any>(null)
+
+	const openDetails = async (b: Booking) => {
+		setSelectedBooking(b)
+		setDetails(null)
+		setDetailsOpen(true)
+		try {
+			const res = await fetch(`/api/bookings/${b.id}`)
+			if (res.ok) {
+				const data = await res.json()
+				setDetails(data)
+			}
+		} catch (_) {}
+	}
 	if (loading) {
 		return (
 			<div className="flex justify-center items-center py-8">
@@ -421,6 +445,7 @@ export function BookingsTable({
 						onRefundBooking={onRefundBooking}
 						onRescheduleBooking={onRescheduleBooking}
 						onResendEmail={onResendEmail}
+						onViewDetails={openDetails}
 					/>
 				))}
 			</div>
@@ -470,7 +495,8 @@ export function BookingsTable({
 								bookings.map((booking) => (
 									<TableRow
 										key={booking.id}
-										className="hover:bg-gray-50/50 transition-colors h-14"
+										className="hover:bg-gray-50/50 transition-colors h-14 cursor-pointer"
+										onClick={() => openDetails(booking)}
 									>
 										{/* Client */}
 										<TableCell className="py-2 pr-0">
@@ -549,7 +575,10 @@ export function BookingsTable({
 										</TableCell>
 
 										{/* Actions */}
-										<TableCell className="text-right py-2">
+										<TableCell
+											className="text-right py-2"
+											onClick={(e) => e.stopPropagation()}
+										>
 											<BookingActions
 												isMobile={isMobile}
 												booking={booking}
@@ -567,6 +596,7 @@ export function BookingsTable({
 													onRescheduleBooking
 												}
 												onResendEmail={onResendEmail}
+												onViewDetails={openDetails}
 											/>
 										</TableCell>
 									</TableRow>
@@ -576,6 +606,14 @@ export function BookingsTable({
 					</Table>
 				</div>
 			</div>
+			<SideSheet
+				isOpen={detailsOpen}
+				onClose={() => setDetailsOpen(false)}
+				title="Detalles de la cita"
+				description={undefined}
+			>
+				<BookingDetailsPanel details={details} />
+			</SideSheet>
 		</div>
 	)
 }

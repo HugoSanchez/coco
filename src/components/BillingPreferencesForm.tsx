@@ -6,11 +6,17 @@ import {
 	SelectTrigger,
 	SelectValue
 } from '@/components/ui/select'
+import { Info } from 'lucide-react'
 
 export interface BillingPreferences {
 	billingType: 'in-advance' | 'right-after' | 'monthly'
 	billingAmount: string
 	firstConsultationAmount?: string
+	/**
+	 * When to send the payment email for in-advance billing.
+	 * Values are hours relative to start_time: '0' (immediately), '24', '72', '168', or '-1' (after consultation).
+	 */
+	paymentEmailLeadHours?: string
 }
 
 // Define which billing types are currently available
@@ -36,6 +42,16 @@ export function BillingPreferencesForm({
 		value: string
 	) => {
 		onChange({ ...values, [field]: value })
+	}
+
+	// Human-readable description for when the payment email will be sent
+	const getPaymentTimingText = (): string => {
+		const lead = values.paymentEmailLeadHours ?? '0'
+		if (lead === '-1') return 'pocos minutos después de la cita.'
+		if (lead === '0' || lead === '')
+			return 'inmediatamente al crear la cita.'
+		if (lead === '168') return '7 días antes de la cita.'
+		return `${lead} horas antes de la cita.`
 	}
 
 	return (
@@ -118,82 +134,44 @@ export function BillingPreferencesForm({
 				<div className="space-y-2">
 					<div>
 						<label
-							htmlFor="billingType"
+							htmlFor="paymentEmailLeadHours"
 							className="block text-md font-medium text-gray-700"
 						>
-							Tipo de facturación
+							Cuándo enviar el email de pago
 						</label>
 						<p className="text-sm text-gray-500 mb-2">
-							Selecciona cuándo quieres facturar a tus pacientes.
+							Aplica a nuevas citas con facturación por
+							adelantado.
 						</p>
 					</div>
 					<Select
-						value={values.billingType}
-						onValueChange={(value) => {
-							// Only allow selection of available billing types
-							if (isBillingTypeAvailable(value)) {
-								handleInputChange('billingType', value as any)
-							}
-						}}
+						value={values.paymentEmailLeadHours ?? '0'}
+						onValueChange={(value) =>
+							handleInputChange('paymentEmailLeadHours', value)
+						}
 						disabled={disabled}
 					>
 						<SelectTrigger className="h-12">
-							<SelectValue placeholder="Selecciona tipo de facturación" />
+							<SelectValue placeholder="Selecciona cuándo enviar el email" />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem
-								value="in-advance"
-								className={`${
-									isBillingTypeAvailable('in-advance')
-										? 'hover:bg-gray-100 cursor-pointer'
-										: 'opacity-50 cursor-not-allowed'
-								}`}
-							>
-								Por Adelantado{' '}
-								<span className="text-xs text-gray-500">
-									- El pago se solicita al reservar la cita
-								</span>
-							</SelectItem>
-							<SelectItem
-								value="right-after"
-								className={`${
-									isBillingTypeAvailable('right-after')
-										? 'hover:bg-gray-100 cursor-pointer'
-										: 'opacity-50 cursor-not-allowed'
-								}`}
-							>
-								Después de la Consulta{' '}
-								<span className="text-xs text-gray-500">
-									- Enviar factura automáticamente tras la
-									consulta
-								</span>
-								{!isBillingTypeAvailable('right-after') && (
-									<span className="text-xs text-black font-medium ml-1">
-										(Próximamente)
-									</span>
-								)}
-							</SelectItem>
-							<SelectItem
-								value="monthly"
-								className={`${
-									isBillingTypeAvailable('monthly')
-										? 'hover:bg-gray-100 cursor-pointer'
-										: 'opacity-50 cursor-not-allowed'
-								}`}
-							>
-								Mensual{' '}
-								<span className="text-xs text-gray-500">
-									- Enviar una factura a final de mes
-								</span>
-								{!isBillingTypeAvailable('monthly') && (
-									<span className="text-xs text-black font-medium ml-1">
-										(Próximamente)
-									</span>
-								)}
+							<SelectItem value="0">Inmediatamente</SelectItem>
+							<SelectItem value="24">24 horas antes</SelectItem>
+							<SelectItem value="72">72 horas antes</SelectItem>
+							<SelectItem value="168">1 semana antes</SelectItem>
+							<SelectItem value="-1">
+								Después de la consulta
 							</SelectItem>
 						</SelectContent>
 					</Select>
 				</div>
+				<p className="text-sm text-gray-600 flex items-center gap-1">
+					<Info className="h-4 w-4 text-teal-600" />
+					<span>
+						Tus pacientes recibirán un email para abonar la consulta{' '}
+						<strong>{getPaymentTimingText()}</strong>
+					</span>
+				</p>
 			</div>
 		</div>
 	)

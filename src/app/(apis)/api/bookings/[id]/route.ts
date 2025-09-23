@@ -57,7 +57,7 @@ export async function GET(
 		// Get client information
 		const { data: client } = await supabase
 			.from('clients')
-			.select('name, email')
+			.select('name, last_name, email')
 			.eq('id', booking.client_id)
 			.single()
 
@@ -71,19 +71,24 @@ export async function GET(
 		// Get bill information
 		const { data: bills } = await supabase
 			.from('bills')
-			.select('amount, currency')
+			.select(
+				'id, amount, currency, status, email_scheduled_at, sent_at, paid_at, created_at'
+			)
 			.eq('booking_id', booking.id)
 
 		// Format the response for display
 		const response = {
 			bookingId: booking.id,
 			clientName: client?.name || 'Cliente',
+			clientLastName: client?.last_name || null,
+			clientEmail: client?.email || null,
 			practitionerName: practitioner?.name || 'Profesional',
 			consultationDate: booking.start_time,
 			consultationTime: booking.start_time,
 			status: booking.status,
 			amount: bills?.[0]?.amount || 0,
-			currency: bills?.[0]?.currency || 'EUR'
+			currency: bills?.[0]?.currency || 'EUR',
+			bill: bills && bills.length > 0 ? bills[0] : null
 		}
 
 		return NextResponse.json(response)
