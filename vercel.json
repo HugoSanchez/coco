@@ -1,8 +1,3 @@
 {
-	"crons": [
-		{
-			"path": "/api/cron/send-scheduled-bills",
-			"schedule": "*/15 * * * *"
-		}
-	]
+	"crons": []
 }
