@@ -93,8 +93,7 @@ function BookingConfirmationContent() {
 					) : (
 						<p className="text-lg text-gray-600">
 							Enhorabuena, tu cita con{' '}
-							{bookingDetails.practitionerName}
-							para el{' '}
+							{bookingDetails.practitionerName} para el{' '}
 							<span className="font-bold text-primary">
 								{new Date(
 									bookingDetails.consultationDate
