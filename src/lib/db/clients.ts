@@ -130,6 +130,7 @@ export interface ClientBillingSettingsPayload {
 	billing_amount?: number | null
 	billing_type: string
 	currency?: string
+	payment_email_lead_hours?: number | null
 }
 
 /**
@@ -166,6 +167,7 @@ export interface UpsertBillingPayload {
 	billing_amount?: number | null
 	billing_type?: BillingType
 	currency?: string
+	payment_email_lead_hours?: number | null
 }
 
 /**
@@ -212,7 +214,8 @@ export async function createClientBillingSettings(
 		is_default: false, // Not default settings (client-specific override)
 		billing_amount: payload.billing_amount,
 		billing_type: payload.billing_type,
-		currency: payload.currency || 'EUR' // Default to EUR if not specified
+		currency: payload.currency || 'EUR', // Default to EUR if not specified
+		payment_email_lead_hours: payload.payment_email_lead_hours ?? null
 	}
 
 	const { data, error } = await supabase
@@ -333,7 +336,9 @@ export async function upsertClientWithBilling(
 				is_default: false,
 				billing_amount: billingPayload.billing_amount || null,
 				billing_type: billingPayload.billing_type || 'in-advance',
-				currency: billingPayload.currency || 'EUR'
+				currency: billingPayload.currency || 'EUR',
+				payment_email_lead_hours:
+					billingPayload.payment_email_lead_hours ?? null
 			}
 
 			if (existingBillingSettings) {
@@ -359,7 +364,9 @@ export async function upsertClientWithBilling(
 				client_id: clientData.id,
 				billing_amount: billingPayload.billing_amount || null,
 				billing_type: billingPayload.billing_type || 'in-advance',
-				currency: billingPayload.currency || 'EUR'
+				currency: billingPayload.currency || 'EUR',
+				payment_email_lead_hours:
+					billingPayload.payment_email_lead_hours ?? null
 			})
 		}
 	}

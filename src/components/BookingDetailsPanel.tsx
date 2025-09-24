@@ -7,9 +7,13 @@ import { Check, Clock, AlertCircle } from 'lucide-react'
 
 interface BookingDetailsPanelProps {
 	details: any
+	onClose?: () => void
 }
 
-export function BookingDetailsPanel({ details }: BookingDetailsPanelProps) {
+export function BookingDetailsPanel({
+	details,
+	onClose
+}: BookingDetailsPanelProps) {
 	const bill = details?.bill
 
 	const fmt = (iso?: string | null, pattern: string = 'dd/MM/yyyy HH:mm') =>
@@ -205,22 +209,6 @@ export function BookingDetailsPanel({ details }: BookingDetailsPanelProps) {
 						</span>
 					)}
 				</div>
-				{bill?.status === 'pending' && paymentUrl && (
-					<div className="pt-1">
-						<Button
-							variant="secondary"
-							onClick={async () => {
-								try {
-									await navigator.clipboard.writeText(
-										paymentUrl
-									)
-								} catch (_) {}
-							}}
-						>
-							Copiar link de pago
-						</Button>
-					</div>
-				)}
 			</div>
 
 			{/* Communications */}

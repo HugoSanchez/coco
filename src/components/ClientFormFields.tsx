@@ -16,6 +16,13 @@ import {
 	type Client
 } from '@/lib/db/clients'
 import { getClientBillingSettings } from '@/lib/db/billing-settings'
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue
+} from '@/components/ui/select'
 import { UserPlus, Save } from 'lucide-react'
 import { getClientsForUser } from '@/lib/db/clients'
 
@@ -54,7 +61,8 @@ export function ClientFormFields({
 		email: initialData?.email || '',
 		description: initialData?.description || '',
 		shouldBill: false, // We'll load this from billing settings separately
-		billingAmount: '' // We'll load this from billing settings separately
+		billingAmount: '', // We'll load this from billing settings separately
+		paymentEmailLeadHours: '0'
 	})
 
 	// Load existing billing settings when in edit mode
@@ -74,7 +82,15 @@ export function ClientFormFields({
 						setFormData((prev) => ({
 							...prev,
 							shouldBill: true,
-							billingAmount: amountString
+							billingAmount: amountString,
+							paymentEmailLeadHours:
+								(billingSettings as any)
+									.payment_email_lead_hours != null
+									? String(
+											(billingSettings as any)
+												.payment_email_lead_hours
+										)
+									: '0'
 						}))
 					}
 				} catch (error) {
@@ -112,7 +128,11 @@ export function ClientFormFields({
 						? parseFloat(formData.billingAmount)
 						: null,
 					billing_type: 'in-advance', // Default to in-advance billing
-					currency: 'EUR' // Default currency
+					currency: 'EUR', // Default currency
+					payment_email_lead_hours:
+						formData.paymentEmailLeadHours !== ''
+							? parseInt(formData.paymentEmailLeadHours, 10)
+							: null
 				}
 			}
 
@@ -137,7 +157,8 @@ export function ClientFormFields({
 					email: '',
 					description: '',
 					shouldBill: false,
-					billingAmount: ''
+					billingAmount: '',
+					paymentEmailLeadHours: '0'
 				})
 			}
 
@@ -328,6 +349,48 @@ export function ClientFormFields({
 									<span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500">
 										€
 									</span>
+								</div>
+
+								{/* Per-patient email timing */}
+								<div className="space-y-2">
+									<div>
+										<label className="block text-md font-medium text-gray-700">
+											Cuándo enviar el email de pago
+										</label>
+										<p className="text-sm text-gray-500 mb-2">
+											Solo para este paciente.
+										</p>
+									</div>
+									<Select
+										value={formData.paymentEmailLeadHours}
+										onValueChange={(val) =>
+											handleInputChange(
+												'paymentEmailLeadHours',
+												val
+											)
+										}
+									>
+										<SelectTrigger className="h-12">
+											<SelectValue placeholder="Selecciona cuándo enviar el email" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="0">
+												Inmediatamente
+											</SelectItem>
+											<SelectItem value="24">
+												24 horas antes
+											</SelectItem>
+											<SelectItem value="72">
+												72 horas antes
+											</SelectItem>
+											<SelectItem value="168">
+												1 semana antes
+											</SelectItem>
+											<SelectItem value="-1">
+												Después de la consulta
+											</SelectItem>
+										</SelectContent>
+									</Select>
 								</div>
 							</div>
 						)}

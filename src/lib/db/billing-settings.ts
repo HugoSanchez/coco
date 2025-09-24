@@ -270,28 +270,70 @@ export async function upsertClientBillingSettings(
 	clientId: string,
 	billingType: BillingType,
 	billingAmount: number,
-	currency: string = 'EUR'
+	currency: string = 'EUR',
+	paymentEmailLeadHours?: number | null
 ): Promise<BillingSettings> {
+	const payload: any = {
+		user_id: userId,
+		client_id: clientId,
+		booking_id: null,
+		billing_type: billingType,
+		billing_amount: billingAmount,
+		currency,
+		is_default: false
+	}
+	// Allow explicit null to clear the value
+	if (paymentEmailLeadHours !== undefined) {
+		payload.payment_email_lead_hours = paymentEmailLeadHours
+	}
+
 	const { data, error } = await supabase
 		.from('billing_settings')
-		.upsert(
-			{
-				user_id: userId,
-				client_id: clientId,
-				booking_id: null,
-				billing_type: billingType,
-				billing_amount: billingAmount,
-				currency: currency,
-				is_default: false
-			},
-			{
-				onConflict: 'user_id,client_id',
-				ignoreDuplicates: false
-			}
-		)
+		.upsert(payload, {
+			onConflict: 'user_id,client_id',
+			ignoreDuplicates: false
+		})
 		.select()
 		.single()
 
 	if (error) throw error
 	return data
+}
+
+/**
+ * Returns client-specific billing preferences in a form-friendly shape.
+ */
+export async function getClientBillingPreferences(
+	userId: string,
+	clientId: string,
+	supabaseClient?: SupabaseClient
+): Promise<{
+	billingType?: BillingType
+	billingAmount?: string
+	paymentEmailLeadHours?: string
+} | null> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('billing_settings')
+		.select('*')
+		.eq('user_id', userId)
+		.eq('client_id', clientId)
+		.is('booking_id', null)
+		.maybeSingle()
+
+	if (error) {
+		return null
+	}
+	if (!data) return null
+	return {
+		billingType: data.billing_type as BillingType,
+		billingAmount:
+			data.billing_amount != null
+				? String(data.billing_amount)
+				: undefined,
+		paymentEmailLeadHours:
+			(data as any).payment_email_lead_hours != null
+				? String((data as any).payment_email_lead_hours)
+				: undefined
+	}
 }

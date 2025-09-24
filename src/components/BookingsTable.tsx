@@ -326,7 +326,10 @@ function BookingCard({
 	onViewDetails: (booking: Booking) => void
 }) {
 	return (
-		<div className="bg-white border rounded-lg p-4 mb-3 hover:bg-gray-50/50 transition-colors">
+		<div
+			className="bg-white border rounded-lg p-4 mb-3 hover:bg-gray-50/50 transition-colors cursor-pointer"
+			onClick={() => onViewDetails(booking)}
+		>
 			<div className="flex justify-between items-center">
 				<div className="flex-1 min-w-0">
 					{/* Name, Date, and Amount on same line */}
@@ -612,7 +615,10 @@ export function BookingsTable({
 				title="Detalles de la cita"
 				description={undefined}
 			>
-				<BookingDetailsPanel details={details} />
+				<BookingDetailsPanel
+					details={details}
+					onClose={() => setDetailsOpen(false)}
+				/>
 			</SideSheet>
 		</div>
 	)
