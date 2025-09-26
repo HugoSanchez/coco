@@ -374,3 +374,43 @@ export async function upsertClientWithBilling(
 	// Return the client
 	return clientData
 }
+
+/**
+ * Checks if a client with the given email already exists for a user.
+ * Case-insensitive match on email. Optionally exclude a specific client ID (for edit mode).
+ *
+ * @param userId - The user who owns the clients
+ * @param email - The email to check
+ * @param excludeClientId - Optional client ID to exclude from the search
+ * @returns Promise<{ exists: boolean; existingClientId?: string | null }>
+ */
+export async function clientEmailExists(
+	userId: string,
+	email: string,
+	excludeClientId?: string
+): Promise<{ exists: boolean; existingClientId?: string | null }> {
+	const trimmedEmail = (email || '').trim()
+	if (!trimmedEmail) {
+		return { exists: false, existingClientId: null }
+	}
+
+	let query = supabase
+		.from('clients')
+		.select('id')
+		.eq('user_id', userId)
+		.ilike('email', trimmedEmail)
+		.limit(1)
+
+	if (excludeClientId) {
+		query = query.neq('id', excludeClientId)
+	}
+
+	const { data, error } = await query
+	if (error) throw error
+
+	const exists = (data?.length ?? 0) > 0
+	return {
+		exists,
+		existingClientId: exists ? (data?.[0]?.id ?? null) : null
+	}
+}

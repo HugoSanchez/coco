@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,7 +13,8 @@ import {
 	type ClientBillingSettingsPayload,
 	type UpsertClientPayload,
 	type UpsertBillingPayload,
-	type Client
+	type Client,
+	clientEmailExists
 } from '@/lib/db/clients'
 import { getClientBillingSettings } from '@/lib/db/billing-settings'
 import {
@@ -24,6 +25,7 @@ import {
 	SelectValue
 } from '@/components/ui/select'
 import { UserPlus, Save } from 'lucide-react'
+import { Spinner } from '@/components/ui/spinner'
 import { getClientsForUser } from '@/lib/db/clients'
 
 interface ClientFormFieldsProps {
@@ -64,6 +66,17 @@ export function ClientFormFields({
 		billingAmount: '', // We'll load this from billing settings separately
 		paymentEmailLeadHours: '0'
 	})
+
+	// Duplicate email detection state
+	const [checkingDuplicate, setCheckingDuplicate] = useState(false)
+	const [duplicateExists, setDuplicateExists] = useState(false)
+	const [existingClientId, setExistingClientId] = useState<string | null>(
+		null
+	)
+	const [confirmingDuplicate, setConfirmingDuplicate] = useState(false)
+	// Debounce + stale request guards
+	const emailDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+	const lastRequestIdRef = useRef<number>(0)
 
 	// Load existing billing settings when in edit mode
 	useEffect(() => {
@@ -108,6 +121,31 @@ export function ClientFormFields({
 		if (onLoadingChange) onLoadingChange(true)
 		try {
 			if (!user) throw new Error('Not authenticated')
+
+			// Re-check duplicate quickly on submit to be safe
+			let shouldConfirmDuplicate = false
+			try {
+				const emailToCheck = (formData.email || '').trim()
+				if (emailToCheck && !editMode) {
+					setCheckingDuplicate(true)
+					const { exists } = await clientEmailExists(
+						user.id,
+						emailToCheck,
+						undefined
+					)
+					setDuplicateExists(Boolean(exists))
+					shouldConfirmDuplicate = Boolean(exists)
+				}
+			} catch {
+				// do nothing; advisory only
+			} finally {
+				setCheckingDuplicate(false)
+			}
+
+			if (shouldConfirmDuplicate && !confirmingDuplicate) {
+				setConfirmingDuplicate(true)
+				return
+			}
 
 			// Prepare client data for upsert (include ID for edit mode)
 			const clientPayload: UpsertClientPayload = {
@@ -200,7 +238,8 @@ export function ClientFormFields({
 		onLoadingChange,
 		toast,
 		editMode,
-		initialData
+		initialData,
+		confirmingDuplicate
 	])
 
 	// Expose the submit function to parent
@@ -221,7 +260,81 @@ export function ClientFormFields({
 
 	const handleInputChange = (field: string, value: string | boolean) => {
 		setFormData((prev) => ({ ...prev, [field]: value }))
+		if (field === 'email') {
+			// Reset duplicate state while the user edits the email
+			setDuplicateExists(false)
+			setExistingClientId(null)
+		}
 	}
+
+	const isValidEmail = useCallback((value: string) => {
+		const v = value.trim()
+		if (!v) return false
+		// Simple validity check; avoids false positives without overfitting
+		return /.+@.+\..+/.test(v)
+	}, [])
+
+	const checkDuplicateEmailValue = useCallback(
+		async (emailValue: string) => {
+			if (!user) return
+			const email = (emailValue || '').trim()
+			if (!email) {
+				setDuplicateExists(false)
+				setExistingClientId(null)
+				return
+			}
+
+			const requestId = ++lastRequestIdRef.current
+			try {
+				setCheckingDuplicate(true)
+				const { exists, existingClientId } = await clientEmailExists(
+					user.id,
+					email,
+					editMode && initialData?.id ? initialData.id : undefined
+				)
+				if (requestId !== lastRequestIdRef.current) return
+				setDuplicateExists(Boolean(exists))
+				setExistingClientId(existingClientId ?? null)
+			} catch {
+				if (requestId !== lastRequestIdRef.current) return
+				setDuplicateExists(false)
+				setExistingClientId(null)
+			} finally {
+				if (requestId === lastRequestIdRef.current) {
+					setCheckingDuplicate(false)
+				}
+			}
+		},
+		[user, editMode, initialData]
+	)
+
+	const checkDuplicateEmail = useCallback(async () => {
+		await checkDuplicateEmailValue(formData.email)
+	}, [checkDuplicateEmailValue, formData.email])
+
+	// Debounced duplicate check on email input changes
+	useEffect(() => {
+		if (emailDebounceRef.current) {
+			clearTimeout(emailDebounceRef.current)
+			emailDebounceRef.current = null
+		}
+		const currentEmail = formData.email
+		if (!isValidEmail(currentEmail)) {
+			// Reset when invalid / empty
+			setDuplicateExists(false)
+			setExistingClientId(null)
+			return
+		}
+		emailDebounceRef.current = setTimeout(() => {
+			checkDuplicateEmailValue(currentEmail)
+		}, 600)
+		return () => {
+			if (emailDebounceRef.current) {
+				clearTimeout(emailDebounceRef.current)
+				emailDebounceRef.current = null
+			}
+		}
+	}, [formData.email, isValidEmail, checkDuplicateEmailValue])
 
 	return (
 		<form onSubmit={handleSubmit} className="space-y-6 mt-6">
@@ -261,10 +374,22 @@ export function ClientFormFields({
 						onChange={(e) =>
 							handleInputChange('email', e.target.value)
 						}
+						onBlur={checkDuplicateEmail}
 						placeholder="paciente@ejemplo.com"
 						className="h-12"
 						required
 					/>
+					{checkingDuplicate && (
+						<div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
+							<Spinner size="sm" color="dark" />
+							<span>Comprobando duplicados…</span>
+						</div>
+					)}
+					{!checkingDuplicate && duplicateExists && (
+						<div className="text-xs text-red-700 font-medium mt-1 ml-1">
+							Ya existe un paciente con este email.
+						</div>
+					)}
 				</div>
 				<div className="space-y-2">
 					<Label htmlFor="description">Notas opcionales</Label>
@@ -400,6 +525,12 @@ export function ClientFormFields({
 			{/* Actions */}
 			{!hideSubmitButton && (
 				<div className="flex flex-col space-y-3 pt-6">
+					{confirmingDuplicate && !editMode && (
+						<div className="text-sm text-yellow-800 bg-yellow-100 border border-yellow-200 rounded px-3 py-2">
+							Ya existe un paciente con este email. ¿Crear de
+							todos modos?
+						</div>
+					)}
 					<Button
 						type="submit"
 						variant="default"
@@ -412,16 +543,24 @@ export function ClientFormFields({
 								: 'Creando...'
 							: editMode
 								? 'Guardar cambios'
-								: 'Añadir paciente'}
+								: confirmingDuplicate
+									? 'Confirmar duplicado'
+									: 'Añadir paciente'}
 					</Button>
 					{onCancel && !hideCancelButton && (
 						<Button
 							type="button"
 							variant="ghost"
-							onClick={onCancel}
+							onClick={() => {
+								if (confirmingDuplicate) {
+									setConfirmingDuplicate(false)
+									return
+								}
+								onCancel()
+							}}
 							className="w-full text-md font-medium text-gray-600 hover:text-gray-800"
 						>
-							Cancelar
+							{confirmingDuplicate ? 'Cancelar' : 'Cancelar'}
 						</Button>
 					)}
 				</div>
