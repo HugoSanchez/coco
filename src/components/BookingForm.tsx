@@ -788,6 +788,7 @@ export function BookingForm({
 										new Date(selectedSlot.start),
 										'HH:mm'
 									)}
+									{'h'}
 								</h3>
 							</div>
 

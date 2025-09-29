@@ -234,6 +234,32 @@ export async function getProfileById(
 }
 
 /**
+ * Retrieves multiple profiles by their user IDs in a single query.
+ * Useful to avoid N+1 queries when many bookings need practitioner data.
+ *
+ * @param userIds - Array of user UUIDs
+ * @param supabaseClient - Optional Supabase client instance
+ * @returns Promise<Array<Profile>> - Matching profile rows (may be fewer than userIds)
+ */
+export async function getProfilesByIds(
+	userIds: string[],
+	supabaseClient?: SupabaseClient
+): Promise<Profile[]> {
+	if (!userIds || userIds.length === 0) return []
+
+	// Use provided client or fall back to default
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
+		.from('profiles')
+		.select('*')
+		.in('id', userIds)
+
+	if (error) throw error
+	return (data as any) || []
+}
+
+/**
  * Retrieves a user's email by their user ID
  * Convenience function for cases where only email is needed
  *

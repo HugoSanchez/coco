@@ -191,6 +191,106 @@ export async function getEmailCommunicationsByStatus(
 }
 
 /**
+ * Checks if an email communication of a specific type was recorded for a given booking
+ * within a provided time window.
+ *
+ * WHY THIS EXISTS
+ * ----------------
+ * Our cron tasks should be idempotent. When sending daily appointment reminders,
+ * we want to ensure each booking receives at most one reminder per day. This helper
+ * answers: "Has a reminder already been logged today for this booking?".
+ *
+ * USAGE
+ * -----
+ * hasEmailCommunicationOfTypeForBookingBetween(
+ *   bookingId,
+ *   'appointment_reminder',
+ *   windowStartIso,
+ *   windowEndIso,
+ *   supabase // optional
+ * )
+ */
+export async function wasEmailOfTypeSentForBookingBetween(
+	bookingId: string,
+	emailType: string,
+	windowStartIso: string,
+	windowEndIso: string,
+	supabaseClient?: SupabaseClient
+): Promise<boolean> {
+	// ------------------------------------------------------------
+	// Step 1: Pick client (service role or default RLS client)
+	// ------------------------------------------------------------
+	const client = supabaseClient || supabase
+
+	// ------------------------------------------------------------
+	// Step 2: Query for any email records for this booking + type
+	//         whose created_at falls within [windowStart, windowEnd]
+	// ------------------------------------------------------------
+	const { data, error } = await client
+		.from('email_communications')
+		.select('id')
+		.eq('booking_id', bookingId)
+		.eq('email_type', emailType)
+		.gte('created_at', windowStartIso)
+		.lte('created_at', windowEndIso)
+		.limit(1)
+
+	if (error) throw error
+
+	// ------------------------------------------------------------
+	// Step 3: Return existence flag (idempotency signal)
+	// ------------------------------------------------------------
+	return (data?.length || 0) > 0
+}
+
+/**
+ * Returns true if there is at least one 'sent' email_communications row
+ * for the given booking + email_type, regardless of date.
+ *
+ * Use this stricter idempotency when we only want ONE reminder per booking,
+ * independent of time windows or re-runs.
+ */
+export async function wasEmailOfTypeSentForBooking(
+	bookingId: string,
+	emailType: string,
+	supabaseClient?: SupabaseClient
+): Promise<boolean> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('email_communications')
+		.select('id')
+		.eq('booking_id', bookingId)
+		.eq('email_type', emailType)
+		.eq('status', 'sent')
+		.limit(1)
+
+	if (error) throw error
+	return (data?.length || 0) > 0
+}
+
+/**
+ * Returns a Set of booking IDs that have a 'sent' email_communications row
+ * for the given email_type among the provided bookingIds.
+ */
+export async function getBookingIdsWithSentEmailOfType(
+	bookingIds: string[],
+	emailType: string,
+	supabaseClient?: SupabaseClient
+): Promise<Set<string>> {
+	if (!bookingIds || bookingIds.length === 0) return new Set()
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('email_communications')
+		.select('booking_id')
+		.in('booking_id', bookingIds)
+		.eq('email_type', emailType)
+		.eq('status', 'sent')
+
+	if (error) throw error
+	return new Set((data || []).map((row: any) => row.booking_id))
+}
+
+/**
  * Updates the status of an email communication
  * Used to mark emails as sent/failed after attempting to send them
  *

@@ -72,7 +72,7 @@ export async function sendConsultationBillEmail({
 		// Determine subject based on billing trigger
 		const subject =
 			billingTrigger === 'before_consultation'
-				? `Pre-confirmación de Consulta con ${practitionerName} - Pago Requerido`
+				? `Confirma tu consulta con ${practitionerName} - Pago Requerido`
 				: `Factura de consulta con ${practitionerName}`
 
 		// Send email via Resend
@@ -307,6 +307,86 @@ export async function sendCancellationRefundNotificationEmail({
 		return { success: true, emailId: result.data?.id }
 	} catch (error) {
 		console.error('Cancellation+Refund email failed:', error)
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : 'Unknown error'
+		}
+	}
+}
+
+/**
+ * Send appointment reminder email (simple text email)
+ *
+ * PURPOSE
+ * -------
+ * Daily cron sends a concise reminder to each patient with a booking today.
+ * This helper composes a plain-text email with optional payment link.
+ *
+ * NOTES
+ * -----
+ * - Uses Resend directly (no React template) to keep the message minimal.
+ * - Localized time formatting is expected to be handled by the caller
+ *   (e.g., formatInTimeZone to Europe/Madrid) and passed as displayTime.
+ */
+export async function sendAppointmentReminderEmail({
+	to,
+	patientName,
+	practitionerName,
+	displayTime,
+	paymentUrl
+}: {
+	to: string
+	patientName: string
+	practitionerName: string
+	displayTime: string
+	paymentUrl?: string
+}) {
+	try {
+		const resend = getResendClient()
+
+		// ------------------------------------------------------------
+		// Step 1: Build subject and body in Spanish
+		// ------------------------------------------------------------
+		const subject = 'Recordatorio de consulta'
+
+		const paymentLine = paymentUrl
+			? `\n\nRecuerda que puedes pagar tu consulta fácilmente a través de este enlace: ${paymentUrl}`
+			: ''
+
+		const text = `Hola ${patientName},\n\nEste email es para recordarte tu consulta de hoy con ${practitionerName} a las ${displayTime}h. En caso de no poder asistir por favor asegúrate de hacérselo saber.${paymentLine}\n\n¡Que tengas un buen día!\n${practitionerName} y el equipo de Coco\n\n\n\n`
+
+		// Also provide a minimal HTML version for better UX (bold + hyperlink)
+		const htmlPayment = paymentUrl
+			? `<p>Recuerda que puedes pagar tu consulta fácilmente haciendo click <a href="${paymentUrl}" target="_blank" rel="noopener noreferrer">aquí</a>.</p>`
+			: ''
+		const html = `
+				<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111827;line-height:1.6">
+					<p>Hola ${patientName},</p>
+					<p>Este email es para recordarte tu consulta de hoy con ${practitionerName} a las ${displayTime}h. En caso de no poder asistir por favor házselo saber.</p>
+					${htmlPayment}
+					<p>¡Que tengas un buen día!</p>
+					<p style="margin-top:16px">${practitionerName} y el equipo de Coco</p>
+				</div>`
+
+		// ------------------------------------------------------------
+		// Step 2: Send email via Resend (text-only for simplicity)
+		// ------------------------------------------------------------
+		const result = await resend.emails.send({
+			from: EMAIL_CONFIG.from,
+			replyTo: EMAIL_CONFIG.replyTo,
+			to: [to],
+			subject,
+			text,
+			html
+		})
+
+		if (result.error) {
+			throw new Error(result.error.message)
+		}
+
+		return { success: true, emailId: result.data?.id }
+	} catch (error) {
+		console.error('Appointment reminder email failed:', error)
 		return {
 			success: false,
 			error: error instanceof Error ? error.message : 'Unknown error'

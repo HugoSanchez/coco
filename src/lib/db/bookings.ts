@@ -197,6 +197,140 @@ export async function getBookingsForDateRange(
 }
 
 /**
+ * Retrieves bookings across ALL users for a specific date window
+ * Includes related client and practitioner profile information.
+ *
+ * WHY
+ * ---
+ * Cron tasks (like daily appointment reminders) need to process bookings
+ * for every practitioner, not a single user. This helper runs with a
+ * service role client and returns the minimal data the cron needs.
+ *
+ * FILTERS
+ * -------
+ * - start_time between [startDate, endDate]
+ * - status != 'canceled'
+ * - ordered by start_time ascending
+ */
+export async function getBookingsForDateRangeAllUsers(
+	startDate: string,
+	endDate: string,
+	supabaseClient?: SupabaseClient
+): Promise<
+	Array<
+		Booking & {
+			client: {
+				id: string
+				name: string
+				last_name: string | null
+				email: string
+			} | null
+			user: { id: string; name: string | null; email: string } | null
+		}
+	>
+> {
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
+		.from('bookings')
+		.select(
+			`
+            *,
+            client:clients(id, name, last_name, email)
+        `
+		)
+		.gte('start_time', startDate)
+		.lte('start_time', endDate)
+		.neq('status', 'canceled')
+		.order('start_time', { ascending: true })
+
+	if (error) throw error
+	return (data as any) || []
+}
+
+/**
+ * Paged variant: retrieves bookings across ALL users for a specific date window
+ * using cursor-based pagination on (start_time, id) to ensure stable ordering.
+ *
+ * PARAMETERS
+ * ----------
+ * - startDate, endDate: ISO strings defining the window
+ * - limit: max items to return per page (e.g., 100)
+ * - cursorStartTime: ISO string of the last seen start_time
+ * - cursorId: UUID of the last seen booking (tie-breaker for identical start_time)
+ *
+ * RETURNS
+ * -------
+ * { items, nextCursor }
+ * - nextCursor is null when there are no more items
+ */
+export async function getBookingsForDateRangeAllUsersPaged(
+	startDate: string,
+	endDate: string,
+	limit: number,
+	cursorStartTime?: string | null,
+	cursorId?: string | null,
+	supabaseClient?: SupabaseClient
+): Promise<{
+	items: Array<
+		Booking & {
+			client: {
+				id: string
+				name: string
+				last_name: string | null
+				email: string
+			} | null
+			user: { id: string; name: string | null; email: string } | null
+		}
+	>
+	nextCursor: { startTime: string; id: string } | null
+}> {
+	const client = supabaseClient || supabase
+
+	// Base query with filters and relations
+	let query = client
+		.from('bookings')
+		.select(
+			`
+            *,
+            client:clients(id, name, last_name, email),
+            reminders:email_communications!left(id,email_type,status)
+        `
+		)
+		.gte('start_time', startDate)
+		.lte('start_time', endDate)
+		.neq('status', 'canceled')
+		// Only allow bookings that have NO sent reminder rows
+		.eq('reminders.email_type', 'appointment_reminder')
+		.eq('reminders.status', 'sent')
+		.is('reminders', null)
+		.order('start_time', { ascending: true })
+		.order('id', { ascending: true })
+
+	// Apply cursor for stable pagination: (start_time > cursorStartTime) OR
+	// (start_time = cursorStartTime AND id > cursorId)
+	if (cursorStartTime) {
+		query = query.or(
+			`and(start_time.gt.${cursorStartTime}),and(start_time.eq.${cursorStartTime},id.gt.${cursorId})`
+		) as any
+	}
+
+	const { data, error } = await query.limit(limit)
+	if (error) throw error
+
+	const items = (data as any) || []
+	if (!items.length) {
+		return { items: [], nextCursor: null }
+	}
+
+	const last = items[items.length - 1]
+	return {
+		items,
+		nextCursor: { startTime: last.start_time, id: last.id }
+	}
+}
+
+/**
  * Creates a new booking in the database
  * Note: Time slot conflicts are prevented at the UI level via DayViewTimeSelector
  *
