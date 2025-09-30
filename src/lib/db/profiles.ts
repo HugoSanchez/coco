@@ -68,6 +68,8 @@ export interface Profile {
 	email: string
 	description: string | null
 	profile_picture_url: string | null
+	// Default address for in-person appointments
+	default_in_person_location_text?: string | null
 }
 
 /**
@@ -159,10 +161,11 @@ export async function updateProfile(
 	userId: string,
 	profileData: Partial<Profile>
 ) {
-	const { error } = await supabase.from('profiles').upsert({
-		id: userId, // Ensure we're updating the correct user's profile
-		...profileData
-	})
+	// Prefer update with filter to avoid RLS insert permission requirements
+	const { error } = await supabase
+		.from('profiles')
+		.update(profileData)
+		.eq('id', userId)
 
 	if (error) throw error
 }

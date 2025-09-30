@@ -13,6 +13,7 @@ import {
 } from '@/lib/db/profiles'
 import { useToast } from '@/components/ui/use-toast'
 import { captureOnboardingStep } from '@/lib/posthog/client'
+import { usePathname } from 'next/navigation'
 
 interface ProfileSetupProps {
 	onComplete: () => void
@@ -35,6 +36,7 @@ export function ProfileSetup({
 }: ProfileSetupProps) {
 	const { user, profile, refreshProfile } = useUser()
 	const { toast } = useToast()
+	const pathname = usePathname()
 	const [name, setName] = useState('')
 	const [username, setUsername] = useState('')
 	const [description, setDescription] = useState('')
@@ -51,6 +53,15 @@ export function ProfileSetup({
 			setPreviewUrl(profile.profile_picture_url || null)
 		}
 	}, [profile])
+
+	// Settings-only: default in-person location
+	const showDefaultLocation = pathname === '/settings'
+	const [defaultLocation, setDefaultLocation] = useState('')
+	useEffect(() => {
+		if (profile?.default_in_person_location_text) {
+			setDefaultLocation(profile.default_in_person_location_text)
+		}
+	}, [profile?.default_in_person_location_text])
 
 	const handleUsernameChange = async (
 		e: React.ChangeEvent<HTMLInputElement>
@@ -96,7 +107,13 @@ export function ProfileSetup({
 				username: username.toLowerCase().trim().replace(/\s+/g, '-'),
 				description,
 				email: user.email,
-				profile_picture_url
+				profile_picture_url,
+				...(showDefaultLocation && defaultLocation.trim()
+					? {
+							default_in_person_location_text:
+								defaultLocation.trim()
+						}
+					: {})
 			})
 
 			await refreshProfile() // Refresh the global profile state
@@ -335,6 +352,27 @@ export function ProfileSetup({
 						rows={3}
 					/>
 				</div>
+				{showDefaultLocation && (
+					<div>
+						<label
+							htmlFor="default_location"
+							className="block text-md font-medium text-gray-700"
+						>
+							Dirección
+						</label>
+						<p className="text-sm text-gray-500 mb-2">
+							Se usará como dirección por defecto para citas
+							presenciales.
+						</p>
+						<Input
+							id="default_location"
+							type="text"
+							value={defaultLocation}
+							onChange={(e) => setDefaultLocation(e.target.value)}
+							className="autofill:bg-white transition-none text-gray-700"
+						/>
+					</div>
+				)}
 				<div className="">
 					<Button
 						type="submit"

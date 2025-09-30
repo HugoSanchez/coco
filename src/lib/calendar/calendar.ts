@@ -245,6 +245,8 @@ export interface CreateCalendarEventPayload {
 	endTime: string // ISO string
 	bookingNotes?: string
 	bookingId?: string // Optional: tag Google event for idempotent reconciliation
+	mode?: 'online' | 'in_person'
+	locationText?: string | null
 }
 
 /**
@@ -258,6 +260,8 @@ export interface CreatePendingCalendarEventPayload {
 	startTime: string // ISO string
 	endTime: string // ISO string
 	bookingId?: string // Optional: tag Google event for idempotent reconciliation
+	mode?: 'online' | 'in_person'
+	locationText?: string | null
 }
 
 /**
@@ -271,6 +275,8 @@ export interface UpdatePendingToConfirmedPayload {
 	practitionerName: string
 	practitionerEmail: string
 	bookingId?: string // Optional: tag confirmed event for idempotent reconciliation
+	mode?: 'online' | 'in_person'
+	locationText?: string | null
 }
 
 /**
@@ -323,7 +329,12 @@ export async function createCalendarEventWithInvite(
 			endTime,
 			bookingNotes,
 			conferenceRequestId,
-			bookingId: (payload as any).bookingId
+			bookingId: (payload as any).bookingId,
+			location:
+				(payload as any).mode === 'in_person'
+					? (payload as any).locationText
+					: undefined,
+			includeMeet: (payload as any).mode !== 'in_person'
 		})
 
 		// Create the event
@@ -464,7 +475,11 @@ export async function createPendingCalendarEvent(
 			practitionerEmail,
 			startTime,
 			endTime,
-			bookingId: (payload as any).bookingId
+			bookingId: (payload as any).bookingId,
+			location:
+				(payload as any).mode === 'in_person'
+					? (payload as any).locationText
+					: undefined
 		})
 
 		// Create the pending event in Google Calendar
@@ -574,7 +589,12 @@ export async function updatePendingToConfirmed(
 			originalStart,
 			originalEnd,
 			conferenceRequestId,
-			bookingId: payload.bookingId
+			bookingId: payload.bookingId,
+			location:
+				(payload as any).mode === 'in_person'
+					? (payload as any).locationText
+					: undefined,
+			includeMeet: (payload as any).mode !== 'in_person'
 		})
 
 		// Update the existing event in Google Calendar

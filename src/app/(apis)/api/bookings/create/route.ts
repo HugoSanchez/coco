@@ -45,7 +45,9 @@ export async function POST(request: NextRequest) {
 			notes,
 			status,
 			overrideAmount,
-			consultationType
+			consultationType,
+			mode,
+			locationText
 		} = await request.json()
 
 		if (!clientId || !startTime || !endTime) {
@@ -70,7 +72,12 @@ export async function POST(request: NextRequest) {
 			notes,
 			status,
 			overrideAmount,
-			consultationType
+			consultationType,
+			mode: mode === 'in_person' ? 'in_person' : 'online',
+			locationText:
+				mode === 'in_person' && typeof locationText === 'string'
+					? locationText
+					: null
 		}
 
 		// Step 4: Create booking using orchestration service

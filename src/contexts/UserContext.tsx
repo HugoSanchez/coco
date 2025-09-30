@@ -54,6 +54,7 @@ interface UserProfile {
 	email: string
 	description?: string
 	profile_picture_url?: string
+	default_in_person_location_text?: string | null
 }
 
 /**

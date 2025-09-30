@@ -23,7 +23,9 @@ export function buildFullEventData({
 	endTime,
 	bookingNotes,
 	conferenceRequestId,
-	bookingId
+	bookingId,
+	location,
+	includeMeet
 }: {
 	clientName: string
 	clientEmail: string
@@ -34,8 +36,10 @@ export function buildFullEventData({
 	bookingNotes?: string
 	conferenceRequestId: string
 	bookingId?: string
+	location?: string | null
+	includeMeet?: boolean
 }) {
-	return {
+	const base: any = {
 		summary: `${clientName} - ${practitionerName}`,
 		description: bookingNotes
 			? `Consultation appointment.\n\nNotes: ${bookingNotes}`
@@ -58,19 +62,21 @@ export function buildFullEventData({
 				responseStatus: 'needsAction'
 			}
 		],
-		conferenceData: {
-			createRequest: {
-				requestId: conferenceRequestId,
-				conferenceSolutionKey: {
-					type: 'hangoutsMeet'
-				}
-			}
-		},
 		guestsCanModify: false,
 		guestsCanInviteOthers: false,
 		guestsCanSeeOtherGuests: false,
 		...(bookingId ? { extendedProperties: { private: { bookingId } } } : {})
 	}
+	if (location) base.location = location
+	if (includeMeet) {
+		base.conferenceData = {
+			createRequest: {
+				requestId: conferenceRequestId,
+				conferenceSolutionKey: { type: 'hangoutsMeet' }
+			}
+		}
+	}
+	return base
 }
 
 /**
@@ -82,15 +88,17 @@ export function buildPendingEventData({
 	practitionerEmail,
 	startTime,
 	endTime,
-	bookingId
+	bookingId,
+	location
 }: {
 	clientName: string
 	practitionerEmail: string
 	startTime: string
 	endTime: string
 	bookingId?: string
+	location?: string | null
 }) {
-	return {
+	const base: any = {
 		summary: `${clientName} - Pending`, // Clear pending status in title
 		description:
 			'Pending payment confirmation. This appointment is not yet confirmed.',
@@ -117,6 +125,8 @@ export function buildPendingEventData({
 		guestsCanSeeOtherGuests: false,
 		...(bookingId ? { extendedProperties: { private: { bookingId } } } : {})
 	}
+	if (location) base.location = location
+	return base
 }
 
 /**
@@ -131,7 +141,9 @@ export function buildConfirmedEventData({
 	originalStart,
 	originalEnd,
 	conferenceRequestId,
-	bookingId
+	bookingId,
+	location,
+	includeMeet
 }: {
 	clientName: string
 	clientEmail: string
@@ -141,8 +153,10 @@ export function buildConfirmedEventData({
 	originalEnd: any // Google Calendar end object
 	conferenceRequestId: string
 	bookingId?: string
+	location?: string | null
+	includeMeet?: boolean
 }) {
-	return {
+	const base: any = {
 		summary: `${clientName} - ${practitionerName}`, // New confirmed title format
 		description: 'Consultation appointment confirmed.',
 		// Preserve original timing
@@ -161,21 +175,22 @@ export function buildConfirmedEventData({
 				responseStatus: 'needsAction' // Client needs to respond to invitation
 			}
 		],
-		// Add Google Meet conference for confirmed appointments
-		conferenceData: {
-			createRequest: {
-				requestId: conferenceRequestId,
-				conferenceSolutionKey: {
-					type: 'hangoutsMeet'
-				}
-			}
-		},
 		// Guest permissions for confirmed appointments
 		guestsCanModify: false,
 		guestsCanInviteOthers: false,
 		guestsCanSeeOtherGuests: false,
 		...(bookingId ? { extendedProperties: { private: { bookingId } } } : {})
 	}
+	if (location) base.location = location
+	if (includeMeet) {
+		base.conferenceData = {
+			createRequest: {
+				requestId: conferenceRequestId,
+				conferenceSolutionKey: { type: 'hangoutsMeet' }
+			}
+		}
+	}
+	return base
 }
 
 /**

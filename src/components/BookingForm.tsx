@@ -14,7 +14,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ClientSearchSelect } from '@/components/ClientSearchSelect'
@@ -31,6 +31,8 @@ import { Spinner } from '@/components/ui/spinner'
 import { ClientFormFields } from '@/components/ClientFormFields'
 import type { Client as DbClient } from '@/lib/db/clients'
 import { Input } from '@/components/ui/input'
+import { updateProfile } from '@/lib/db/profiles'
+import { Check } from 'lucide-react'
 import {
 	getClientBillingSettings,
 	getUserDefaultBillingSettings,
@@ -109,8 +111,14 @@ export function BookingForm({
 	const [showConsultationType, setShowConsultationType] =
 		useState<boolean>(false)
 
+	// New: appointment mode and location fields
+	const [mode, setMode] = useState<'online' | 'in_person'>('online')
+	const [locationText, setLocationText] = useState<string>('')
+	const [savingDefault, setSavingDefault] = useState<boolean>(false)
+	const [savedDefault, setSavedDefault] = useState<boolean>(false)
+
 	// Context and utilities
-	const { user, profile } = useUser() // Current user and profile data
+	const { user, profile, refreshProfile } = useUser() // Current user and profile data
 	const { toast } = useToast() // Toast notification system
 
 	// Load user's default first consultation amount once
@@ -174,52 +182,66 @@ export function BookingForm({
 		}
 	}
 
-	// Single effect: when entering step 3 or changing client, fetch everything and derive once
+	// Single effect: when entering step 3 or changing client, fetch prices once
 	useEffect(() => {
 		const run = async () => {
-			if (!user?.id || currentStep !== 3 || !selectedClient) return
+			if (!user?.id || currentStep !== 3) return
 
-			// Fetch in parallel to avoid sequential delays
-			const [clientSettings, userDefault, prefs, hasPrev] =
-				await Promise.all([
-					getClientBillingSettings(user.id, selectedClient),
-					getUserDefaultBillingSettings(user.id),
-					getBillingPreferences(user.id),
-					hasAnyNonCanceledBookings(user.id, selectedClient)
-				])
+			if (selectedClient) {
+				// Full resolution when a client is selected
+				const [clientSettings, userDefault, prefs, hasPrev] =
+					await Promise.all([
+						getClientBillingSettings(user.id, selectedClient),
+						getUserDefaultBillingSettings(user.id),
+						getBillingPreferences(user.id),
+						hasAnyNonCanceledBookings(user.id, selectedClient)
+					])
 
-			const firstAmount = prefs?.firstConsultationAmount
-				? Number(prefs.firstConsultationAmount)
-				: null
-			const clientAmount =
-				clientSettings?.billing_amount != null
-					? Number(clientSettings.billing_amount)
+				const firstAmount = prefs?.firstConsultationAmount
+					? Number(prefs.firstConsultationAmount)
 					: null
-			const defaultAmount = Number(userDefault?.billing_amount || 0)
+				const clientAmount =
+					clientSettings?.billing_amount != null
+						? Number(clientSettings.billing_amount)
+						: null
+				const defaultAmount = Number(userDefault?.billing_amount || 0)
 
-			// Persist resolved amounts for later interactions (e.g., switching to follow-up)
-			setResolvedClientPrice(clientAmount)
-			setResolvedDefaultPrice(defaultAmount)
+				// Persist resolved amounts for later interactions (e.g., switching to follow-up)
+				setResolvedClientPrice(clientAmount)
+				setResolvedDefaultPrice(defaultAmount)
 
-			const {
-				showSelect,
-				consultationType: type,
-				price,
-				source
-			} = derivePricing({
-				hasPrev,
-				firstAmount,
-				clientAmount,
-				defaultAmount
-			})
+				const {
+					showSelect,
+					consultationType: type,
+					price,
+					source
+				} = derivePricing({
+					hasPrev,
+					firstAmount,
+					clientAmount,
+					defaultAmount
+				})
 
-			setShowConsultationType(showSelect)
-			setConsultationType(type as 'first' | 'followup')
-			if (!isPriceDirty) {
-				setCustomPrice(String(price))
-				setPriceSource(
-					source as 'default' | 'first' | 'client' | 'custom'
-				)
+				setShowConsultationType(showSelect)
+				setConsultationType(type as 'first' | 'followup')
+				if (!isPriceDirty) {
+					setCustomPrice(String(price))
+					setPriceSource(
+						source as 'default' | 'first' | 'client' | 'custom'
+					)
+				}
+			} else {
+				// No client selected: show user's default price
+				const userDefault = await getUserDefaultBillingSettings(user.id)
+				const defaultAmount = Number(userDefault?.billing_amount || 0)
+				setResolvedClientPrice(null)
+				setResolvedDefaultPrice(defaultAmount)
+				setShowConsultationType(false)
+				setConsultationType('followup')
+				if (!isPriceDirty) {
+					setCustomPrice(String(defaultAmount))
+					setPriceSource('default')
+				}
 			}
 		}
 		run()
@@ -240,6 +262,61 @@ export function BookingForm({
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [firstConsultationAmount])
+
+	// Prefill default location when switching to in-person
+	useEffect(() => {
+		if (mode === 'in_person') {
+			const def = profile?.default_in_person_location_text || ''
+			if (!locationText) setLocationText(def)
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [mode, locationText, profile?.default_in_person_location_text])
+
+	// ===== Helpers for default in-person address =====
+	const isAddressEqualToDefault = useCallback(
+		(address: string, defaultAddress?: string | null) => {
+			return address.trim() === (defaultAddress || '').trim()
+		},
+		[]
+	)
+
+	const isDefaultAddress = useMemo(
+		() =>
+			isAddressEqualToDefault(
+				locationText,
+				profile?.default_in_person_location_text
+			),
+		[
+			isAddressEqualToDefault,
+			locationText,
+			profile?.default_in_person_location_text
+		]
+	)
+
+	const handleSaveAddressAsDefault = useCallback(async () => {
+		if (!user?.id || !locationText.trim()) return
+		try {
+			setSavingDefault(true)
+			await updateProfile(user.id, {
+				default_in_person_location_text: locationText.trim()
+			})
+			// Mark inline state as saved (UI will show check)
+			// We'll clear this when the user edits the address again
+			// or switches mode
+			// Use a local flag to avoid toast inside sidesheet
+			;(setSavedDefault as any)?.(true)
+		} catch (error) {
+			console.error(error)
+			;(setSavedDefault as any)?.(false)
+		} finally {
+			setSavingDefault(false)
+		}
+	}, [locationText, user?.id])
+
+	// Reset inline saved indicator when address changes or mode toggles
+	useEffect(() => {
+		;(setSavedDefault as any)?.(false)
+	}, [locationText, mode])
 
 	// Fetch existing bookings when date changes
 	const fetchExistingBookings = async (date: Date) => {
@@ -424,7 +501,11 @@ export function BookingForm({
 					notes,
 					// Only send override if user modified the suggested value
 					overrideAmount,
-					consultationType
+					consultationType,
+					mode,
+					locationText:
+						mode === 'in_person' ? locationText || null : null,
+					saveLocationAsDefault: false
 				})
 			})
 
@@ -672,102 +753,152 @@ export function BookingForm({
 								</div>
 							)}
 
-							{/* Optional Custom Price Field */}
-							{selectedClient && (
+							{/* Price Field (always visible) */}
+							<div className="space-y-2">
+								<Label className="text-md font-normal text-gray-700">
+									Precio
+								</Label>
+								<div className="relative">
+									<span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+										€
+									</span>
+									<Input
+										type="number"
+										inputMode="decimal"
+										min={0}
+										placeholder="Introduce un precio en EUR"
+										value={customPrice}
+										onChange={(e) => {
+											const val = e.target.value
+											setCustomPrice(val)
+
+											// Compare against known client/default amounts to decide source dynamically
+											const normalized = val.replace(
+												',',
+												'.'
+											)
+											const parsed =
+												parseFloat(normalized)
+											const approxEq = (
+												a: number,
+												b: number
+											) => Math.abs(a - b) < 0.005
+
+											if (
+												!Number.isNaN(parsed) &&
+												resolvedClientPrice != null &&
+												approxEq(
+													parsed,
+													resolvedClientPrice
+												)
+											) {
+												setIsPriceDirty(false)
+												setPriceSource('client')
+												return
+											}
+
+											if (
+												!Number.isNaN(parsed) &&
+												resolvedDefaultPrice != null &&
+												approxEq(
+													parsed,
+													resolvedDefaultPrice
+												)
+											) {
+												setIsPriceDirty(false)
+												setPriceSource('default')
+												return
+											}
+
+											setIsPriceDirty(true)
+											setPriceSource('custom')
+										}}
+										className="pl-7 pr-28 hide-number-spinner"
+									/>
+									{priceSource && (
+										<span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+											{priceSource === 'client'
+												? 'Tarifa del paciente'
+												: priceSource === 'default'
+													? 'Tarifa habitual'
+													: priceSource === 'first'
+														? 'Primera consulta'
+														: 'Tarifa puntual'}
+										</span>
+									)}
+								</div>
+							</div>
+
+							{/* Mode select: Online or Presencial - Step 3 */}
+							<div className="space-y-2">
+								<Label className="text-md font-normal text-gray-700">
+									Tipo de cita
+								</Label>
+								<Select
+									value={mode}
+									onValueChange={(val) => setMode(val as any)}
+								>
+									<SelectTrigger className="h-12">
+										<SelectValue placeholder="Selecciona modalidad" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="online">
+											Online
+										</SelectItem>
+										<SelectItem value="in_person">
+											Presencial
+										</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+
+							{/* Location input when presencial (optional) - Step 3 */}
+							{mode === 'in_person' && (
 								<div className="space-y-2">
 									<Label className="text-md font-normal text-gray-700">
-										Precio
+										Dirección{' '}
+										<span className="text-xs text-gray-500 font-normal">
+											(opcional)
+										</span>
 									</Label>
 									<div className="relative">
-										<span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-											€
-										</span>
 										<Input
-											type="number"
-											inputMode="decimal"
-											min={0}
-											placeholder="Introduce un precio en EUR"
-											value={customPrice}
-											onChange={(e) => {
-												const val = e.target.value
-												setCustomPrice(val)
-
-												// Compare against known client/default amounts to decide source dynamically
-												const normalized = val.replace(
-													',',
-													'.'
-												)
-												const parsed =
-													parseFloat(normalized)
-												const approxEq = (
-													a: number,
-													b: number
-												) => Math.abs(a - b) < 0.005
-
-												if (
-													!Number.isNaN(parsed) &&
-													resolvedClientPrice !=
-														null &&
-													approxEq(
-														parsed,
-														resolvedClientPrice
-													)
-												) {
-													setIsPriceDirty(false)
-													setPriceSource('client')
-													return
-												}
-
-												if (
-													!Number.isNaN(parsed) &&
-													resolvedDefaultPrice !=
-														null &&
-													approxEq(
-														parsed,
-														resolvedDefaultPrice
-													)
-												) {
-													setIsPriceDirty(false)
-													setPriceSource('default')
-													return
-												}
-
-												setIsPriceDirty(true)
-												setPriceSource('custom')
-											}}
-											className="pl-7 pr-28 hide-number-spinner"
+											placeholder="Introduce la dirección (calle, ciudad)"
+											value={locationText}
+											onChange={(e) =>
+												setLocationText(e.target.value)
+											}
+											className="h-12 pr-20"
 										/>
-										{priceSource && (
-											<span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-												{priceSource === 'client'
-													? 'Tarifa del paciente'
-													: priceSource === 'default'
-														? 'Tarifa habitual'
-														: priceSource ===
-															  'first'
-															? 'Primera consulta'
-															: 'Tarifa puntual'}
-											</span>
-										)}
+										<div className="absolute inset-y-0 right-2 flex items-center">
+											{savedDefault ? (
+												<div className="flex items-center text-teal-600 text-sm">
+													<Check className="h-4 w-4 mr-1" />
+													Guardado
+												</div>
+											) : isDefaultAddress ? (
+												<div className="flex items-center text-teal-600 text-sm">
+													<Check className="h-4 w-4 mr-1" />
+													Predeterminada
+												</div>
+											) : (
+												<button
+													type="button"
+													onClick={
+														handleSaveAddressAsDefault
+													}
+													className="text-teal-600 hover:text-teal-700 text-sm font-medium"
+													disabled={savingDefault}
+												>
+													{savingDefault
+														? 'Guardando...'
+														: 'Guardar'}
+												</button>
+											)}
+										</div>
 									</div>
 								</div>
 							)}
-
-							{/* Optional Notes Field */}
-							<div className="space-y-2">
-								<Label className="text-md font-normal text-gray-700">
-									Notas{' '}
-									<span className="text-xs text-gray-500 font-normal">
-										(opcional)
-									</span>
-								</Label>
-								<Textarea
-									placeholder="Añade cualquier nota sobre la cita..."
-									value={notes}
-									onChange={(e) => setNotes(e.target.value)}
-									className="min-h-[80px]"
-								/>
-							</div>
 
 							{/* Booking Summary */}
 							<div>
@@ -805,41 +936,6 @@ export function BookingForm({
 					)}
 				</div>
 			)}
-
-			{/* ===== BOTTOM NAVIGATION BAR ===== */}
-			<div className="pt-4 border-t border-gray-200">
-				<div className="flex items-center">
-					{/* Back Button - only show if not on first step */}
-					{currentStep > 1 && (
-						<Button
-							type="button"
-							variant="ghost"
-							onClick={handleBack}
-							className="flex-1 flex items-center justify-center gap-2 text-gray-600 hover:text-gray-800"
-						>
-							<ArrowLeft className="h-4 w-4" />
-							Atrás
-						</Button>
-					)}
-
-					{/* Visual separator between back and cancel buttons */}
-					{currentStep > 1 && (
-						<div className="h-8 w-px bg-gray-300 mx-2"></div>
-					)}
-
-					{/* Cancel Button - available on all steps */}
-					{onCancel && (
-						<Button
-							type="button"
-							variant="ghost"
-							onClick={onCancel}
-							className="flex-1 text-gray-600 hover:text-gray-800"
-						>
-							Cancelar
-						</Button>
-					)}
-				</div>
-			</div>
 		</div>
 	)
 }

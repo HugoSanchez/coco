@@ -136,7 +136,9 @@ export async function POST(
 						clientEmail: client.email,
 						practitionerName: practitioner.name || 'Practitioner',
 						practitionerEmail: practitioner.email,
-						bookingId
+						bookingId,
+						mode: (booking as any).mode,
+						locationText: (booking as any).location_text || null
 					},
 					supabase
 				)

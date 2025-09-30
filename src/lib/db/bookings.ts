@@ -49,6 +49,10 @@ export interface CreateBookingPayload {
 	end_time: string
 	status?: 'pending' | 'scheduled' | 'completed' | 'canceled'
 	consultation_type?: 'first' | 'followup'
+	// Scheduling mode: defaults to 'online' at the API/service layer
+	mode?: 'online' | 'in_person'
+	// Only present when mode is 'in_person'
+	location_text?: string | null
 }
 
 /**

@@ -61,6 +61,10 @@ export interface CreateBookingRequest {
 	status?: 'pending' | 'scheduled' | 'completed' | 'canceled'
 	overrideAmount?: number
 	consultationType?: 'first' | 'followup'
+	// Scheduling mode: defaults to 'online' if not provided
+	mode?: 'online' | 'in_person'
+	// Only when mode is 'in_person'
+	locationText?: string | null
 }
 
 /**
@@ -187,7 +191,12 @@ async function createPastBooking(
 			start_time: request.startTime,
 			end_time: request.endTime,
 			status: 'completed',
-			consultation_type: request.consultationType
+			consultation_type: request.consultationType,
+			mode: request.mode || 'online',
+			location_text:
+				request.mode === 'in_person'
+					? request.locationText || null
+					: null
 		},
 		supabaseClient
 	)
@@ -395,7 +404,12 @@ async function createInAdvanceBooking(
 				start_time: request.startTime,
 				end_time: request.endTime,
 				status: 'scheduled',
-				consultation_type: request.consultationType
+				consultation_type: request.consultationType,
+				mode: request.mode || 'online',
+				location_text:
+					request.mode === 'in_person'
+						? request.locationText || null
+						: null
 			},
 			supabaseClient
 		)
@@ -434,7 +448,12 @@ async function createInAdvanceBooking(
 					startTime: request.startTime,
 					endTime: request.endTime,
 					bookingNotes: request.notes,
-					bookingId: booking.id as any
+					bookingId: booking.id as any,
+					mode: request.mode,
+					locationText:
+						request.mode === 'in_person'
+							? request.locationText || null
+							: null
 				},
 				supabaseClient
 			)
@@ -490,7 +509,10 @@ async function createInAdvanceBooking(
 		start_time: request.startTime,
 		end_time: request.endTime,
 		status: 'pending', // Pending until payment
-		consultation_type: request.consultationType
+		consultation_type: request.consultationType,
+		mode: request.mode || 'online',
+		location_text:
+			request.mode === 'in_person' ? request.locationText || null : null
 	}
 
 	const booking = await createBooking(bookingPayload, supabaseClient)
@@ -543,7 +565,12 @@ async function createInAdvanceBooking(
 					startTime: request.startTime,
 					endTime: request.endTime,
 					// Tag the Google event for idempotent reconciliation later
-					bookingId: booking.id
+					bookingId: booking.id,
+					mode: request.mode,
+					locationText:
+						request.mode === 'in_person'
+							? request.locationText || null
+							: null
 				},
 				supabaseClient
 			)
@@ -809,7 +836,10 @@ async function createRightAfterBooking(
 		client_id: request.clientId,
 		start_time: request.startTime,
 		end_time: request.endTime,
-		status: request.status || 'scheduled' // Confirmed immediately
+		status: request.status || 'scheduled', // Confirmed immediately
+		mode: request.mode || 'online',
+		location_text:
+			request.mode === 'in_person' ? request.locationText || null : null
 	}
 
 	const booking = await createBooking(bookingPayload, supabaseClient)
@@ -843,7 +873,10 @@ async function createMonthlyBooking(
 		client_id: request.clientId,
 		start_time: request.startTime,
 		end_time: request.endTime,
-		status: request.status || 'scheduled' // Confirmed immediately
+		status: request.status || 'scheduled', // Confirmed immediately
+		mode: request.mode || 'online',
+		location_text:
+			request.mode === 'in_person' ? request.locationText || null : null
 	}
 
 	const booking = await createBooking(bookingPayload, supabaseClient)

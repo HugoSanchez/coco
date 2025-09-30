@@ -7,10 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
+    PostgrestVersion: "13.0.4"
   }
   public: {
     Tables: {
@@ -22,8 +22,10 @@ export type Database = {
           client_id: string | null
           created_at: string | null
           currency: string
+          first_consultation_amount: number | null
           id: string
           is_default: boolean | null
+          payment_email_lead_hours: number | null
           updated_at: string | null
           user_id: string | null
         }
@@ -34,8 +36,10 @@ export type Database = {
           client_id?: string | null
           created_at?: string | null
           currency?: string
+          first_consultation_amount?: number | null
           id?: string
           is_default?: boolean | null
+          payment_email_lead_hours?: number | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -46,8 +50,10 @@ export type Database = {
           client_id?: string | null
           created_at?: string | null
           currency?: string
+          first_consultation_amount?: number | null
           id?: string
           is_default?: boolean | null
+          payment_email_lead_hours?: number | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -86,6 +92,8 @@ export type Database = {
           created_at: string
           currency: string
           due_date: string | null
+          email_scheduled_at: string | null
+          email_send_locked_at: string | null
           id: string
           notes: string | null
           paid_at: string | null
@@ -108,6 +116,8 @@ export type Database = {
           created_at?: string
           currency?: string
           due_date?: string | null
+          email_scheduled_at?: string | null
+          email_send_locked_at?: string | null
           id?: string
           notes?: string | null
           paid_at?: string | null
@@ -130,6 +140,8 @@ export type Database = {
           created_at?: string
           currency?: string
           due_date?: string | null
+          email_scheduled_at?: string | null
+          email_send_locked_at?: string | null
           id?: string
           notes?: string | null
           paid_at?: string | null
@@ -162,9 +174,12 @@ export type Database = {
       bookings: {
         Row: {
           client_id: string
+          consultation_type: string | null
           created_at: string | null
           end_time: string
           id: string
+          location_text: string | null
+          mode: string
           start_time: string
           status: string | null
           updated_at: string | null
@@ -172,9 +187,12 @@ export type Database = {
         }
         Insert: {
           client_id: string
+          consultation_type?: string | null
           created_at?: string | null
           end_time: string
           id?: string
+          location_text?: string | null
+          mode?: string
           start_time: string
           status?: string | null
           updated_at?: string | null
@@ -182,9 +200,12 @@ export type Database = {
         }
         Update: {
           client_id?: string
+          consultation_type?: string | null
           created_at?: string | null
           end_time?: string
           id?: string
+          location_text?: string | null
+          mode?: string
           start_time?: string
           status?: string | null
           updated_at?: string | null
@@ -244,32 +265,12 @@ export type Database = {
           },
         ]
       }
-      calendar_info: {
-        Row: {
-          calendar_name: string | null
-          created_at: string
-          id: string
-          updated_at: string
-        }
-        Insert: {
-          calendar_name?: string | null
-          created_at?: string
-          id: string
-          updated_at?: string
-        }
-        Update: {
-          calendar_name?: string | null
-          created_at?: string
-          id?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       calendar_tokens: {
         Row: {
           access_token: string
           created_at: string
           expiry_date: number
+          granted_scopes: string[] | null
           id: string
           refresh_token: string
           updated_at: string
@@ -279,6 +280,7 @@ export type Database = {
           access_token: string
           created_at?: string
           expiry_date: number
+          granted_scopes?: string[] | null
           id?: string
           refresh_token: string
           updated_at?: string
@@ -288,6 +290,7 @@ export type Database = {
           access_token?: string
           created_at?: string
           expiry_date?: number
+          granted_scopes?: string[] | null
           id?: string
           refresh_token?: string
           updated_at?: string
@@ -445,6 +448,7 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          default_in_person_location_text: string | null
           description: string | null
           email: string
           id: string
@@ -455,6 +459,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          default_in_person_location_text?: string | null
           description?: string | null
           email: string
           id: string
@@ -465,6 +470,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          default_in_person_location_text?: string | null
           description?: string | null
           email?: string
           id?: string
@@ -536,53 +542,14 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "stripe_accounts_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      gtrgm_compress: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_decompress: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_in: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_options: {
-        Args: { "": unknown }
-        Returns: undefined
-      }
-      gtrgm_out: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      set_limit: {
-        Args: { "": number }
-        Returns: number
-      }
-      show_limit: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      show_trgm: {
-        Args: { "": string }
-        Returns: string[]
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never

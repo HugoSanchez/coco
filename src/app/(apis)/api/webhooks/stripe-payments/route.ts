@@ -206,7 +206,11 @@ export async function POST(request: NextRequest) {
 						clientEmail,
 						practitionerName,
 						practitionerEmail,
-						bookingId
+						bookingId,
+						mode: (session.metadata?.mode as any) || undefined,
+						locationText:
+							(session.metadata?.location_text as any) ||
+							undefined
 					},
 					supabase
 				)
