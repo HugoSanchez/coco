@@ -95,7 +95,14 @@ export async function POST(request: NextRequest) {
 			await markPaymentSessionCompleted(
 				session.id,
 				session.payment_intent as string,
-				supabase
+				supabase,
+				{
+					bookingId,
+					amount:
+						typeof session.amount_total === 'number'
+							? session.amount_total / 100
+							: null
+				}
 			)
 			// 4. Update booking status to 'scheduled' (payment received) - using service role client
 			await updateBookingStatus(bookingId, 'scheduled', supabase)

@@ -16,6 +16,7 @@
 import { Tables, TablesInsert, TablesUpdate } from '@/types/database.types'
 import { createClient as createSupabaseClient } from '@/lib/supabase/client'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import * as Sentry from '@sentry/nextjs'
 const supabase = createSupabaseClient()
 
 /**
@@ -324,17 +325,70 @@ export async function updatePaymentSessionByStripeSessionId(
 export async function markPaymentSessionCompleted(
 	stripeSessionId: string,
 	stripePaymentIntentId: string,
-	supabaseClient?: SupabaseClient
+	supabaseClient?: SupabaseClient,
+	fallback?: { bookingId: string; amount?: number | null }
 ): Promise<PaymentSession> {
-	return updatePaymentSessionByStripeSessionId(
-		stripeSessionId,
-		{
-			status: 'completed',
-			stripe_payment_intent_id: stripePaymentIntentId,
-			completed_at: new Date().toISOString()
-		},
-		supabaseClient
-	)
+	try {
+		return await updatePaymentSessionByStripeSessionId(
+			stripeSessionId,
+			{
+				status: 'completed',
+				stripe_payment_intent_id: stripePaymentIntentId,
+				completed_at: new Date().toISOString()
+			},
+			supabaseClient
+		)
+	} catch (error: any) {
+		// If no rows were updated (PGRST116), attempt a safe upsert using bookingId from webhook metadata
+		if (error && error.code === 'PGRST116' && fallback?.bookingId) {
+			const client = supabaseClient || supabase
+
+			// Soft-report to Sentry as a warning to keep visibility without breaking webhook flow
+			try {
+				Sentry.captureMessage(
+					'payments:mark_session_completed_fallback_upsert',
+					{
+						level: 'warning',
+						tags: {
+							component: 'payment-sessions',
+							stage: 'fallback_upsert'
+						},
+						extra: {
+							bookingId: fallback.bookingId,
+							stripeSessionId,
+							hadAmount: typeof fallback.amount === 'number'
+						}
+					}
+				)
+			} catch (_) {}
+
+			const amountValue =
+				typeof fallback.amount === 'number' ? fallback.amount : 0
+
+			const { data, error: upsertError } = await client
+				.from('payment_sessions')
+				.upsert(
+					[
+						{
+							booking_id: fallback.bookingId,
+							stripe_session_id: stripeSessionId,
+							amount: amountValue,
+							status: 'completed',
+							stripe_payment_intent_id: stripePaymentIntentId,
+							completed_at: new Date().toISOString()
+						}
+					],
+					{ onConflict: 'booking_id' }
+				)
+				.select()
+				.single()
+
+			if (upsertError) throw upsertError
+			return data as PaymentSession
+		}
+
+		throw error
+	}
 }
 
 /**

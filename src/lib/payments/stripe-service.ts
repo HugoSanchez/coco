@@ -173,43 +173,55 @@ export class StripeService {
 		checkoutUrl: string
 	}> {
 		try {
-			const session = await stripe.checkout.sessions.create({
-				payment_method_types: ['card'],
-				mode: 'payment',
-				line_items: [
-					{
-						price_data: {
-							currency: 'eur',
-							product_data: {
-								name: `Consulta con ${practitionerName}`,
-								description: `Consulta del ${formatInTimeZone(parseISO(consultationDate), 'Europe/Madrid', "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })}h`
+			// Use Stripe idempotency to deduplicate near-simultaneous creates
+			// Rationale:
+			// - Emails/link scanners or multi-device opens can hit our payments route twice.
+			// - An idempotency key ensures Stripe returns the same checkout session
+			//   for identical inputs instead of creating duplicates.
+			// - We derive the key from stable inputs so genuine changes (price/time)
+			//   naturally create a new session with a different key.
+			const idempotencyKey = `booking:${bookingId}:${Math.round(amount * 100)}:${startTime}:${endTime}`
+
+			const session = await stripe.checkout.sessions.create(
+				{
+					payment_method_types: ['card'],
+					mode: 'payment',
+					line_items: [
+						{
+							price_data: {
+								currency: 'eur',
+								product_data: {
+									name: `Consulta con ${practitionerName}`,
+									description: `Consulta del ${formatInTimeZone(parseISO(consultationDate), 'Europe/Madrid', "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })}h`
+								},
+								unit_amount: Math.round(amount * 100) // Convert to cents
 							},
-							unit_amount: Math.round(amount * 100) // Convert to cents
-						},
-						quantity: 1
+							quantity: 1
+						}
+					],
+					customer_email: clientEmail,
+					metadata: {
+						booking_id: bookingId,
+						consultation_date: consultationDate,
+						client_name: clientName,
+						practitioner_name: practitionerName,
+						practitioner_email: practitionerEmail,
+						practitioner_user_id: practitionerUserId,
+						start_time: startTime,
+						end_time: endTime
+					},
+					success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/payment/success?booking_id=${bookingId}`,
+					cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/payment/cancelled`,
+					payment_intent_data: {
+						application_fee_amount: Math.round(amount * 100 * 0.0), // 5% platform fee
+						on_behalf_of: practitionerStripeAccountId, // Fix for cross-region settlement
+						transfer_data: {
+							destination: practitionerStripeAccountId
+						}
 					}
-				],
-				customer_email: clientEmail,
-				metadata: {
-					booking_id: bookingId,
-					consultation_date: consultationDate,
-					client_name: clientName,
-					practitioner_name: practitionerName,
-					practitioner_email: practitionerEmail,
-					practitioner_user_id: practitionerUserId,
-					start_time: startTime,
-					end_time: endTime
 				},
-				success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/payment/success?booking_id=${bookingId}`,
-				cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/payment/cancelled`,
-				payment_intent_data: {
-					application_fee_amount: Math.round(amount * 100 * 0.0), // 5% platform fee
-					on_behalf_of: practitionerStripeAccountId, // Fix for cross-region settlement
-					transfer_data: {
-						destination: practitionerStripeAccountId
-					}
-				}
-			})
+				{ idempotencyKey }
+			)
 
 			return {
 				sessionId: session.id,

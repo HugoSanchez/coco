@@ -142,10 +142,6 @@ export default function ConsultationBillEmail({
 								<Text style={text}>
 									<strong>{`Para confirmar tu cita, por favor sigue las instrucciones de pago que encontrarás a continuación.`}</strong>
 								</Text>
-
-								<Text style={text}>
-									{`Una vez realizado el pago, recibirás un email con los detalles de la cita así como la factura correspondiente. Si tienes cualquier duda, puedes ponerte en contacto con ${practitionerName}.`}
-								</Text>
 							</>
 						)}
 					</Section>
