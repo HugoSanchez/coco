@@ -832,7 +832,7 @@ export function BookingForm({
 							{/* Mode select: Online or Presencial - Step 3 */}
 							<div className="space-y-2">
 								<Label className="text-md font-normal text-gray-700">
-									Tipo de cita
+									Formato de cita
 								</Label>
 								<Select
 									value={mode}
