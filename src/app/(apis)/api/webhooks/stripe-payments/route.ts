@@ -93,6 +93,9 @@ export async function POST(request: NextRequest) {
 		if (event.type === 'checkout.session.completed') {
 			// 1. Get session object to get metadata
 			const session = event.data.object as Stripe.Checkout.Session
+			const connectedAccountId = (event as any).account as
+				| string
+				| undefined
 			// 2. Get booking ID from metadata
 			const bookingId = session.metadata?.booking_id
 			if (!bookingId) return NextResponse.json({ received: true })
@@ -123,7 +126,10 @@ export async function POST(request: NextRequest) {
 			try {
 				const paymentIntent = await stripe.paymentIntents.retrieve(
 					session.payment_intent as string,
-					{ expand: ['latest_charge'] }
+					{ expand: ['latest_charge'] },
+					connectedAccountId
+						? { stripeAccount: connectedAccountId }
+						: undefined
 				)
 				const charge = (paymentIntent as any)?.latest_charge as
 					| Stripe.Charge

@@ -212,15 +212,14 @@ export class StripeService {
 					},
 					success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/payment/success?booking_id=${bookingId}`,
 					cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/payment/cancelled`,
+					// Direct charges: collect platform fee via application_fee_amount
+					// No transfer_data/on_behalf_of here; charge is created on the connected account
 					payment_intent_data: {
-						application_fee_amount: Math.round(amount * 100 * 0.0), // 5% platform fee
-						on_behalf_of: practitionerStripeAccountId, // Fix for cross-region settlement
-						transfer_data: {
-							destination: practitionerStripeAccountId
-						}
+						application_fee_amount: Math.round(amount * 100 * 0.0)
 					}
 				},
-				{ idempotencyKey }
+				// Create session on connected (practitioner) account and keep idempotent
+				{ idempotencyKey, stripeAccount: practitionerStripeAccountId }
 			)
 
 			return {
@@ -277,21 +276,52 @@ export class StripeService {
 	async processRefund(
 		paymentIntentId: string,
 		reason?: string,
-		bookingId?: string
+		bookingId?: string,
+		practitionerStripeAccountId?: string
 	): Promise<{
 		success: boolean
 		refundId?: string
 		error?: string
 	}> {
 		try {
-			const refund = await stripe.refunds.create({
-				payment_intent: paymentIntentId,
-				reason: (reason as any) || 'requested_by_customer',
-				metadata: {
-					booking_id: bookingId || '',
-					refund_reason: reason || 'Full refund requested'
+			// First attempt: on the connected account (direct charges)
+			// If the PI lives on the platform (legacy destination charge), Stripe
+			// will throw a resource_missing error and we retry without the header.
+			let refund
+			try {
+				refund = await stripe.refunds.create(
+					{
+						payment_intent: paymentIntentId,
+						reason: (reason as any) || 'requested_by_customer',
+						metadata: {
+							booking_id: bookingId || '',
+							refund_reason: reason || 'Full refund requested'
+						}
+					},
+					practitionerStripeAccountId
+						? { stripeAccount: practitionerStripeAccountId }
+						: undefined
+				)
+			} catch (err: any) {
+				const isDirectAttempt = Boolean(practitionerStripeAccountId)
+				const isMissing =
+					err?.code === 'resource_missing' ||
+					err?.raw?.code === 'resource_missing' ||
+					err?.statusCode === 404
+				if (isDirectAttempt && isMissing) {
+					// Fallback: try on platform account for legacy charges
+					refund = await stripe.refunds.create({
+						payment_intent: paymentIntentId,
+						reason: (reason as any) || 'requested_by_customer',
+						metadata: {
+							booking_id: bookingId || '',
+							refund_reason: reason || 'Full refund requested'
+						}
+					})
+				} else {
+					throw err
 				}
-			})
+			}
 
 			return {
 				success: true,

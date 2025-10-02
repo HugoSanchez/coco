@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Check, Clock, AlertCircle } from 'lucide-react'
+import { useEffect } from 'react'
 
 interface BookingDetailsPanelProps {
 	details: any
@@ -15,6 +16,16 @@ export function BookingDetailsPanel({
 	onClose
 }: BookingDetailsPanelProps) {
 	const bill = details?.bill
+
+	useEffect(() => {
+		if (details) {
+			console.log('[BookingDetailsPanel] details debug', {
+				bookingId: details?.bookingId,
+				bill: details?.bill,
+				stripe_receipt_url: details?.bill?.stripe_receipt_url
+			})
+		}
+	}, [details])
 
 	const fmt = (iso?: string | null, pattern: string = 'dd/MM/yyyy HH:mm') =>
 		iso ? format(new Date(iso), pattern, { locale: es }) : null
@@ -251,6 +262,25 @@ export function BookingDetailsPanel({
 					)}
 				</div>
 			</div>
+
+			{/* Receipt */}
+			{bill?.stripe_receipt_url && (
+				<div className="space-y-1">
+					<label className="text-xs text-gray-500 block">
+						Recibo
+					</label>
+					<div className="text-sm py-2 ">
+						<a
+							href={bill.stripe_receipt_url}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="text-teal-700 border border-gray-200 bg-gray-100 rounded-md p-2 hover:bg-gray-200"
+						>
+							Ver recibo
+						</a>
+					</div>
+				</div>
+			)}
 		</div>
 	)
 }

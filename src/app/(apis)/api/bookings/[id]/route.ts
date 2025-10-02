@@ -72,9 +72,16 @@ export async function GET(
 		const { data: bills } = await supabase
 			.from('bills')
 			.select(
-				'id, amount, currency, status, email_scheduled_at, sent_at, paid_at, created_at'
+				'id, amount, currency, status, email_scheduled_at, sent_at, paid_at, created_at, stripe_receipt_url'
 			)
 			.eq('booking_id', booking.id)
+
+		// Debug: verify receipt URL presence on server
+		console.log('[GET /api/bookings/:id] receipt debug', {
+			bookingId: booking.id,
+			firstBill: bills?.[0],
+			stripe_receipt_url: bills?.[0]?.stripe_receipt_url
+		})
 
 		// Format the response for display
 		const response = {

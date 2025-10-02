@@ -415,7 +415,9 @@ export class PaymentOrchestrationService {
 				const refundResult = await stripeService.processRefund(
 					completedSession.stripe_payment_intent_id,
 					reason,
-					bookingId
+					bookingId,
+					// Direct charges: refund on the connected account
+					stripeAccount.stripe_account_id
 				)
 
 				if (!refundResult.success) {
