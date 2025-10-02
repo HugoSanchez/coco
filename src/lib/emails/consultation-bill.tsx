@@ -110,8 +110,8 @@ export default function ConsultationBillEmail({
 					{/* Logo */}
 					<Section style={logoSection}></Section>
 
-					{/* Greeting */}
-					<Section style={section}>
+					{/* Greeting + Button (kept in same section for consistent spacing) */}
+					<Section style={sectionTightNoGap}>
 						<Text style={greeting}>
 							{`Hola ${clientName.trim()},`}
 						</Text>
@@ -120,8 +120,8 @@ export default function ConsultationBillEmail({
 								<Text style={text}>
 									{`${practitionerName} ha registrado tu consulta del ${formatDateWithTimeToSpanish(consultationDate)}.`}
 								</Text>
-								<Text style={text}>
-									Puedes abobar la consulta a través del
+								<Text style={textTight}>
+									Puedes abonar la consulta a través del
 									enlace que te proporcionamos a continuación.
 									Si tienes cualquier duda, por favor ponte en
 									contacto con {practitionerName}.
@@ -132,22 +132,18 @@ export default function ConsultationBillEmail({
 								<Text style={text}>
 									Este email es para comunicarte que tu
 									próxima consulta con {practitionerName} está
-									pre-programada para el{' '}
+									programada para el{' '}
 									{formatDateWithTimeToSpanish(
 										consultationDate
 									)}
 									.
 								</Text>
 
-								<Text style={text}>
+								<Text style={textTight}>
 									<strong>{`Para confirmar tu cita, por favor sigue las instrucciones de pago que encontrarás a continuación.`}</strong>
 								</Text>
 							</>
 						)}
-					</Section>
-
-					{/* Payment Button */}
-					<Section style={section}>
 						<div style={buttonContainer}>
 							{paymentUrl ? (
 								<a href={paymentUrl} style={payButton}>
@@ -229,6 +225,16 @@ const section = {
 	marginBottom: '40px'
 }
 
+const sectionTight = {
+	padding: '0 40px',
+	marginBottom: '24px'
+}
+
+const sectionTightNoGap = {
+	padding: '0 40px',
+	marginBottom: '0'
+}
+
 const greeting = {
 	color: '#333333',
 	fontSize: '16px',
@@ -238,6 +244,14 @@ const greeting = {
 }
 
 const text = {
+	color: '#333333',
+	fontSize: '16px',
+	lineHeight: '24px',
+	margin: '0 0 24px',
+	fontWeight: '400'
+}
+
+const textTight = {
 	color: '#333333',
 	fontSize: '16px',
 	lineHeight: '24px',
@@ -267,10 +281,7 @@ const footerText = {
 	lineHeight: '20px'
 }
 
-const buttonContainer = {
-	textAlign: 'left' as const,
-	margin: '0 0 32px'
-}
+const buttonContainer = { textAlign: 'left' as const, margin: '32px 0 28px' }
 
 const payButton = {
 	display: 'inline-block',

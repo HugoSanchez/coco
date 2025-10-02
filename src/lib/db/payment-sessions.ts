@@ -343,6 +343,41 @@ export async function markPaymentSessionCompleted(
 		if (error && error.code === 'PGRST116' && fallback?.bookingId) {
 			const client = supabaseClient || supabase
 
+			// Collect lightweight diagnostics to help future debugging
+			let existingSample: Array<{
+				id: string
+				status: string
+				stripe_session_id: string | null
+				created_at: string | null
+				completed_at: string | null
+			}> = []
+			let stripeIdMatchCount = 0
+			try {
+				const { data: existingForBooking } = await client
+					.from('payment_sessions')
+					.select(
+						'id,status,stripe_session_id,created_at,completed_at'
+					)
+					.eq('booking_id', fallback.bookingId)
+					.order('created_at', { ascending: false })
+					.limit(5)
+
+				existingSample = (existingForBooking || []).map((r: any) => ({
+					id: r.id,
+					status: r.status,
+					stripe_session_id: r.stripe_session_id,
+					created_at: r.created_at,
+					completed_at: r.completed_at
+				}))
+
+				const { data: matchForStripe } = await client
+					.from('payment_sessions')
+					.select('id')
+					.eq('stripe_session_id', stripeSessionId)
+
+				stripeIdMatchCount = (matchForStripe || []).length
+			} catch (_) {}
+
 			// Soft-report to Sentry as a warning to keep visibility without breaking webhook flow
 			try {
 				Sentry.captureMessage(
@@ -356,7 +391,9 @@ export async function markPaymentSessionCompleted(
 						extra: {
 							bookingId: fallback.bookingId,
 							stripeSessionId,
-							hadAmount: typeof fallback.amount === 'number'
+							hadAmount: typeof fallback.amount === 'number',
+							stripeIdMatchCount,
+							existingSample
 						}
 					}
 				)

@@ -557,6 +557,57 @@ export async function deleteBill(
 }
 
 /**
+ * Updates Stripe receipt metadata on a bill
+ * - Persists stripe_charge_id and/or stripe_receipt_url
+ */
+export async function updateBillReceiptMetadata(
+	billId: string,
+	payload: {
+		stripe_charge_id?: string | null
+		stripe_receipt_url?: string | null
+	},
+	supabaseClient?: SupabaseClient
+): Promise<Bill> {
+	const client = supabaseClient || supabase
+	const updateData: any = {}
+	if (typeof payload.stripe_charge_id !== 'undefined') {
+		updateData.stripe_charge_id = payload.stripe_charge_id
+	}
+	if (typeof payload.stripe_receipt_url !== 'undefined') {
+		updateData.stripe_receipt_url = payload.stripe_receipt_url
+	}
+
+	const { data, error } = await client
+		.from('bills')
+		.update(updateData)
+		.eq('id', billId)
+		.select()
+		.single()
+
+	if (error) throw error
+	return data
+}
+
+/**
+ * Marks that the payment receipt email was sent for a bill
+ */
+export async function markBillReceiptEmailSent(
+	billId: string,
+	supabaseClient?: SupabaseClient
+): Promise<Bill> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('bills')
+		.update({ stripe_receipt_email_sent_at: new Date().toISOString() })
+		.eq('id', billId)
+		.select()
+		.single()
+
+	if (error) throw error
+	return data
+}
+
+/**
  * Utility function to check if a bill is overdue
  *
  * @param bill - The bill object to check

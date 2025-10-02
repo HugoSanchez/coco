@@ -4,6 +4,7 @@ import ConsultationBillEmail from './consultation-bill'
 import RefundNotificationEmail from './refund-notification'
 import CancellationNotificationEmail from './cancellation-notification'
 import CancellationRefundNotificationEmail from './cancellation-refund-notification'
+import PaymentReceiptEmail from './payment-receipt'
 
 /**
  * Get Resend client instance
@@ -307,6 +308,56 @@ export async function sendCancellationRefundNotificationEmail({
 		return { success: true, emailId: result.data?.id }
 	} catch (error) {
 		console.error('Cancellation+Refund email failed:', error)
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : 'Unknown error'
+		}
+	}
+}
+
+/**
+ * Send payment receipt email (links to Stripe-hosted receipt)
+ */
+export async function sendPaymentReceiptEmail({
+	to,
+	clientName,
+	amount,
+	currency = 'EUR',
+	practitionerName,
+	consultationDate,
+	receiptUrl
+}: {
+	to: string
+	clientName: string
+	amount: number
+	currency?: string
+	practitionerName?: string
+	consultationDate?: string
+	receiptUrl: string
+}) {
+	try {
+		const resend = getResendClient()
+		const html = await render(
+			PaymentReceiptEmail({
+				clientName,
+				amount,
+				currency,
+				practitionerName,
+				consultationDate,
+				receiptUrl
+			})
+		)
+		const result = await resend.emails.send({
+			from: EMAIL_CONFIG.from,
+			replyTo: EMAIL_CONFIG.replyTo,
+			to: [to],
+			subject: 'Pago confirmado',
+			html
+		})
+		if (result.error) throw new Error(result.error.message)
+		return { success: true, emailId: result.data?.id }
+	} catch (error) {
+		console.error('Payment receipt email failed:', error)
 		return {
 			success: false,
 			error: error instanceof Error ? error.message : 'Unknown error'
