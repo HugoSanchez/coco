@@ -412,12 +412,27 @@ export class PaymentOrchestrationService {
 
 			if (completedSession && completedSession.stripe_payment_intent_id) {
 				// This was a Stripe payment - process refund through Stripe
+				// Resolve practitioner's connected account (if any) for direct charges
+				let practitionerStripeAccountId: string | undefined
+				try {
+					const bookingRow = await getBookingById(
+						bookingId,
+						supabaseClient
+					)
+					if (bookingRow) {
+						const acc = await getStripeAccountForPayments(
+							bookingRow.user_id,
+							supabaseClient
+						)
+						practitionerStripeAccountId = acc?.stripe_account_id
+					}
+				} catch (_) {}
 				const refundResult = await stripeService.processRefund(
 					completedSession.stripe_payment_intent_id,
 					reason,
 					bookingId,
-					// Direct charges: refund on the connected account
-					stripeAccount.stripe_account_id
+					// Direct charges: refund on the connected account (fallback handled inside service)
+					practitionerStripeAccountId
 				)
 
 				if (!refundResult.success) {
