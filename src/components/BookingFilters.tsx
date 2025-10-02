@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { Input } from '@/components/ui/input'
 import { Calendar } from '@/components/ui/calendar'
 import {
@@ -32,11 +33,15 @@ export interface BookingFiltersState {
 interface BookingFiltersProps {
 	filters: BookingFiltersState
 	onFiltersChange: (filters: BookingFiltersState) => void
+	onExport?: () => void | Promise<void>
+	exporting?: boolean
 }
 
 export function BookingFilters({
 	filters,
-	onFiltersChange
+	onFiltersChange,
+	onExport,
+	exporting
 }: BookingFiltersProps) {
 	const [startDateOpen, setStartDateOpen] = useState(false)
 	const [endDateOpen, setEndDateOpen] = useState(false)
@@ -217,6 +222,28 @@ export function BookingFilters({
 						<SelectItem value="canceled">Cancelada</SelectItem>
 					</SelectContent>
 				</Select>
+			</div>
+
+			{/* Export Button */}
+			<div className="pt-4">
+				<Button
+					className="w-full"
+					disabled={!!exporting}
+					onClick={async () => {
+						if (onExport) {
+							await onExport()
+						}
+					}}
+				>
+					{exporting ? (
+						<>
+							<Spinner size="sm" color="light" className="mr-2" />
+							Preparando...
+						</>
+					) : (
+						'Exportar CSV'
+					)}
+				</Button>
 			</div>
 
 			{/* Clear Filters Button */}

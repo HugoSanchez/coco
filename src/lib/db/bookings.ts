@@ -139,6 +139,33 @@ export interface BookingFilterOptions {
 }
 
 /**
+ * Export row shape used by the bookings+billing CSV/JSON export
+ */
+export interface BookingExportRow {
+	booking_id: string
+	client_first_name: string | null
+	client_last_name: string | null
+	client_email: string | null
+	booking_start_time_iso: string
+	booking_end_time_iso: string
+	booking_status: 'pending' | 'scheduled' | 'completed' | 'canceled'
+	payment_status:
+		| 'not_applicable'
+		| 'pending'
+		| 'paid'
+		| 'disputed'
+		| 'canceled'
+		| 'refunded'
+	amount: number
+	currency: string
+	paid_at_iso: string | null
+	refund_amount: number
+	receipt_url: string | null
+	service_name: string
+	timezone: 'UTC'
+}
+
+/**
  * Retrieves all bookings for a specific user, ordered by start time (newest first)
  * Includes related client information
  *
@@ -665,6 +692,117 @@ export async function getBookingsWithBills(
 		hasMore,
 		total: undefined // Can be added later if needed for UI
 	}
+}
+
+/**
+ * Retrieves lightweight booking data joined with bill/payment fields for export.
+ * - Applies the same filter semantics used in the dashboard filters
+ * - Returns raw ISO timestamps and numeric amounts for downstream formatting
+ */
+export async function getBookingsForExport(
+	userId: string,
+	filters: BookingFilterOptions = {},
+	supabaseClient?: SupabaseClient
+): Promise<BookingExportRow[]> {
+	const client = supabaseClient || supabase
+	const { customerSearch, statusFilter, startDate, endDate } = filters
+
+	let query = client
+		.from('bookings')
+		.select(
+			`
+			id,
+			start_time,
+			end_time,
+			status,
+			client:clients(id, name, last_name, email, full_name_search),
+			bill:bills(
+				id,
+				amount,
+				currency,
+				status,
+				paid_at,
+				refunded_amount,
+				stripe_receipt_url
+			)
+		`
+		)
+		.eq('user_id', userId)
+
+	// Apply filters mirroring dashboard behavior
+	if (customerSearch) {
+		query = query
+			.filter('client.full_name_search', 'ilike', `%${customerSearch}%`)
+			.not('client', 'is', null) as any
+	}
+
+	if (statusFilter && statusFilter !== 'all') {
+		query = query.eq('status', statusFilter)
+	}
+
+	if (startDate) {
+		query = query.gte('start_time', startDate)
+	}
+
+	if (endDate) {
+		query = query.lte('start_time', endDate)
+	}
+
+	const { data, error } = await query.order('created_at', {
+		ascending: false
+	})
+	if (error) throw error
+
+	const rows = (data || []).map((b: any): BookingExportRow => {
+		const bill = Array.isArray(b.bill) ? b.bill[0] : b.bill
+
+		let payment_status: BookingExportRow['payment_status'] =
+			'not_applicable'
+		if (bill) {
+			switch (bill.status) {
+				case 'pending':
+					payment_status = 'pending'
+					break
+				case 'sent':
+					payment_status = 'pending'
+					break
+				case 'paid':
+					payment_status = 'paid'
+					break
+				case 'disputed':
+					payment_status = 'disputed'
+					break
+				case 'canceled':
+					payment_status = 'canceled'
+					break
+				case 'refunded':
+					payment_status = 'refunded'
+					break
+				default:
+					payment_status = 'not_applicable'
+			}
+		}
+
+		return {
+			booking_id: b.id,
+			client_first_name: b.client?.name ?? null,
+			client_last_name: b.client?.last_name ?? null,
+			client_email: b.client?.email ?? null,
+			booking_start_time_iso: b.start_time,
+			booking_end_time_iso: b.end_time,
+			booking_status: (b.status as any) || 'pending',
+			payment_status,
+			amount: bill?.amount ?? 0,
+			currency: bill?.currency ?? 'EUR',
+			paid_at_iso: bill?.paid_at ?? null,
+			refund_amount: bill?.refunded_amount ?? 0,
+			receipt_url: bill?.stripe_receipt_url ?? null,
+			service_name: 'consulta',
+			timezone: 'UTC'
+		}
+	})
+
+	return rows
 }
 
 /**

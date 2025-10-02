@@ -149,6 +149,7 @@ export default function Dashboard() {
 		startDate: '',
 		endDate: ''
 	})
+	const [exporting, setExporting] = useState(false)
 	const [dashboardStats, setDashboardStats] = useState<DashboardStatsState>({
 		data: null,
 		loading: false,
@@ -156,6 +157,48 @@ export default function Dashboard() {
 	})
 
 	const { toast } = useToast()
+
+	const exportWithCurrentFilters = async () => {
+		if (!user) return
+		try {
+			setExporting(true)
+			const params = new URLSearchParams({
+				statusFilter: filters.statusFilter,
+				format: 'csv'
+			})
+			if (filters.customerSearch)
+				params.set('customerSearch', filters.customerSearch)
+			if (filters.startDate) params.set('startDate', filters.startDate)
+			if (filters.endDate) params.set('endDate', filters.endDate)
+
+			const res = await fetch(`/api/exports/bookings-bills?${params}`)
+			if (!res.ok) {
+				throw new Error((await res.text()) || 'Export failed')
+			}
+			const url = window.URL.createObjectURL(await res.blob())
+			const a = Object.assign(document.createElement('a'), {
+				href: url,
+				download: 'citas-y-facturas.csv'
+			})
+			document.body.appendChild(a)
+			a.click()
+			a.remove()
+			window.URL.revokeObjectURL(url)
+			toast({
+				title: 'Export descargado',
+				description: 'Tu archivo CSV ha sido descargado.'
+			})
+		} catch (e) {
+			toast({
+				title: 'Error en exportación',
+				description:
+					e instanceof Error ? e.message : 'No se pudo exportar',
+				variant: 'destructive'
+			})
+		} finally {
+			setExporting(false)
+		}
+	}
 	const router = useRouter()
 
 	// Minimal guard: only redirect if we definitively know both are false
@@ -1089,6 +1132,8 @@ export default function Dashboard() {
 				<BookingFilters
 					filters={filters}
 					onFiltersChange={setFilters}
+					onExport={exportWithCurrentFilters}
+					exporting={exporting}
 				/>
 			</SideSheetHeadless>
 

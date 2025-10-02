@@ -91,6 +91,32 @@ export function getUrl(path: string): string {
 }
 
 /**
+ * Converts an array of objects into an RFC4180-compliant CSV string.
+ * - Ensures proper quoting for commas, quotes, and newlines
+ * - Preserves header order as provided
+ */
+export function toCsv(
+	headers: string[],
+	rows: Array<Record<string, any>>
+): string {
+	const escape = (value: any): string => {
+		if (value === null || typeof value === 'undefined') return ''
+		const str = String(value)
+		// Quote if contains comma, quote, or newline
+		if (/[",\n\r]/.test(str)) {
+			return '"' + str.replace(/"/g, '""') + '"'
+		}
+		return str
+	}
+
+	const headerLine = headers.map(escape).join(',')
+	const lines = rows.map((row) =>
+		headers.map((h) => escape(row[h])).join(',')
+	)
+	return [headerLine, ...lines].join('\r\n') + '\r\n'
+}
+
+/**
  * Computes when a payment email should be sent based on a lead-time policy.
  * - leadHours: null or 0 => immediate (now)
  * - leadHours: -1 => after consultation (endIso)
