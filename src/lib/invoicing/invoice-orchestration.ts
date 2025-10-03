@@ -24,6 +24,7 @@ import {
 } from '@/lib/db/invoices'
 import { addInvoiceItem } from '@/lib/db/invoice-items'
 import { linkPaymentSessionToInvoice } from '@/lib/db/payment-sessions'
+import { generateAndStoreInvoicePdf } from '@/lib/invoicing/pdf-service'
 
 export interface CreateInvoiceForBookingInput {
 	userId: string
@@ -68,6 +69,15 @@ export async function createInvoiceForBooking(input: CreateInvoiceForBookingInpu
 
 	if (input.issueNow) {
 		const issued = await issueInvoice(invoice.id, input.userId, new Date(), supabase)
+		// Fire-and-forget PDF generation (do not block issuance)
+		try {
+			await generateAndStoreInvoicePdf(issued.id)
+		} catch (e) {
+			console.warn('[invoicing] pdf generation failed after issuance', {
+				invoiceId: issued.id,
+				error: e instanceof Error ? e.message : String(e)
+			})
+		}
 		return issued
 	}
 
@@ -127,6 +137,15 @@ export async function finalizeInvoiceForBillPayment(
 	}
 	if (params.stripeSessionId) {
 		await linkPaymentSessionToInvoice(params.stripeSessionId, invoice.id, supabase)
+	}
+	// Generate and store PDF after issuance/payment
+	try {
+		await generateAndStoreInvoicePdf(invoice.id)
+	} catch (e) {
+		console.warn('[invoicing] pdf generation failed on finalize', {
+			invoiceId: invoice.id,
+			error: e instanceof Error ? e.message : String(e)
+		})
 	}
 	console.log('[invoicing] finalize done', {
 		invoiceId: invoice.id,

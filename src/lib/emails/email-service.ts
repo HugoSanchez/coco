@@ -73,7 +73,7 @@ export async function sendConsultationBillEmail({
 		// Determine subject based on billing trigger
 		const subject =
 			billingTrigger === 'before_consultation'
-				? `Confirma tu consulta con ${practitionerName} - Pago Requerido`
+				? `Confirma tu consulta con ${practitionerName}`
 				: `Factura de consulta con ${practitionerName}`
 
 		// Send email via Resend
@@ -97,17 +97,11 @@ export async function sendConsultationBillEmail({
 			message: 'Email sent successfully'
 		}
 	} catch (error) {
-		console.error(
-			'Error sending consultation bill:',
-			error instanceof Error ? error.message : 'Unknown error'
-		)
+		console.error('Error sending consultation bill:', error instanceof Error ? error.message : 'Unknown error')
 
 		return {
 			success: false,
-			error:
-				error instanceof Error
-					? error.message
-					: 'Unknown error occurred',
+			error: error instanceof Error ? error.message : 'Unknown error occurred',
 			message: 'Failed to send email'
 		}
 	}
@@ -131,9 +125,7 @@ export async function sendBulkConsultationBills(
 		paymentUrl?: string
 	}>
 ) {
-	console.log(
-		`📧 [EMAIL] Starting bulk send for ${bills.length} consultation bills`
-	)
+	console.log(`📧 [EMAIL] Starting bulk send for ${bills.length} consultation bills`)
 
 	const results = []
 	const errors = []

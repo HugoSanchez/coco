@@ -17,7 +17,7 @@
 
 import { createBooking, CreateBookingPayload, Booking, deleteBooking } from '@/lib/db/bookings'
 import { getClientBillingSettings, getUserDefaultBillingSettings } from '@/lib/db/billing-settings'
-import { getClientById } from '@/lib/db/clients'
+import { getClientById, getClientFullName } from '@/lib/db/clients'
 import { createBill, CreateBillPayload, Bill, updateBillStatus, markBillAsPaid, deleteBill } from '@/lib/db/bills'
 import { sendConsultationBillEmail } from '@/lib/emails/email-service'
 import { getProfileById } from '@/lib/db/profiles'
@@ -126,7 +126,7 @@ async function createBillForBooking(
 		booking_id: booking.id,
 		user_id: booking.user_id,
 		client_id: clientId,
-		client_name: client.name,
+		client_name: (client as any).full_name_search || getClientFullName(client as any),
 		client_email: client.email,
 		amount: billing.amount,
 		currency: billing.currency,
@@ -149,7 +149,7 @@ async function createBillForBooking(
 				{
 					userId: booking.user_id,
 					clientId,
-					clientName: client.name,
+					clientName: (client as any).full_name_search || getClientFullName(client as any),
 					clientEmail: client.email,
 					bookingId: booking.id,
 					description: 'Consulta',

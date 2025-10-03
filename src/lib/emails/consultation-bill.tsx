@@ -1,16 +1,4 @@
-import {
-	Body,
-	Container,
-	Head,
-	Heading,
-	Html,
-	Preview,
-	Section,
-	Text,
-	Hr,
-	Row,
-	Column
-} from '@react-email/components'
+import { Body, Container, Head, Heading, Html, Preview, Section, Text, Hr, Row, Column } from '@react-email/components'
 import { formatInTimeZone } from 'date-fns-tz'
 import { es } from 'date-fns/locale'
 
@@ -55,12 +43,9 @@ function formatDateWithTimeToSpanish(dateString: string): string {
 	try {
 		// Format the date in Madrid time zone (practitioner's time zone)
 		return (
-			formatInTimeZone(
-				new Date(dateString),
-				'Europe/Madrid',
-				"d 'de' MMMM 'de' yyyy 'a las' HH:mm",
-				{ locale: es }
-			) + 'h'
+			formatInTimeZone(new Date(dateString), 'Europe/Madrid', "d 'de' MMMM 'de' yyyy 'a las' HH:mm", {
+				locale: es
+			}) + 'h'
 		)
 	} catch (error) {
 		// Fallback to original string if parsing fails
@@ -101,9 +86,7 @@ export default function ConsultationBillEmail({
 		<Html>
 			<Head />
 			<Preview>
-				{billingTrigger === 'after_consultation'
-					? 'Consulta pendiente de pago'
-					: 'Confirmar Consulta - Pago Requerido'}
+				{billingTrigger === 'after_consultation' ? 'Consulta pendiente de pago' : 'Pago requerido'}
 			</Preview>
 			<Body style={main}>
 				<Container style={container}>
@@ -112,31 +95,22 @@ export default function ConsultationBillEmail({
 
 					{/* Greeting + Button (kept in same section for consistent spacing) */}
 					<Section style={sectionTightNoGap}>
-						<Text style={greeting}>
-							{`Hola ${clientName.trim()},`}
-						</Text>
+						<Text style={greeting}>{`Hola ${clientName.trim()},`}</Text>
 						{billingTrigger === 'after_consultation' ? (
 							<>
 								<Text style={text}>
 									{`${practitionerName} ha registrado tu consulta del ${formatDateWithTimeToSpanish(consultationDate)}.`}
 								</Text>
 								<Text style={textTight}>
-									Puedes abonar la consulta a través del
-									enlace que te proporcionamos a continuación.
-									Si tienes cualquier duda, por favor ponte en
-									contacto con {practitionerName}.
+									Puedes abonar la consulta a través del enlace que te proporcionamos a continuación.
+									Si tienes cualquier duda, por favor ponte en contacto con {practitionerName}.
 								</Text>
 							</>
 						) : (
 							<>
 								<Text style={text}>
-									Este email es para comunicarte que tu
-									próxima consulta con {practitionerName} está
-									programada para el{' '}
-									{formatDateWithTimeToSpanish(
-										consultationDate
-									)}
-									.
+									Este email es para comunicarte que tu próxima consulta con {practitionerName} está
+									programada para el {formatDateWithTimeToSpanish(consultationDate)}.
 								</Text>
 
 								<Text style={textTight}>
@@ -168,18 +142,15 @@ export default function ConsultationBillEmail({
 					{/* Greetings Section */}
 					<Section style={section}>
 						<Text style={signatureLine}>Atentamente,</Text>
-						<Text style={signatureLine}>
-							{practitionerName} y el equipo de Coco.
-						</Text>
+						<Text style={signatureLine}>{practitionerName} y el equipo de Coco.</Text>
 					</Section>
 
 					{/* Footer */}
 					<Section style={footer}>
 						<Text style={footerText}>
-							Coco es una plataforma de reservas para
-							profesionales de la salud. Si no eres{' '}
-							{clientName.trim()}, o no has concertado una cita
-							con {practitionerName} por favor ignora este email.
+							Coco es una plataforma de reservas para profesionales de la salud. Si no eres{' '}
+							{clientName.trim()}, o no has concertado una cita con {practitionerName} por favor ignora
+							este email.
 						</Text>
 					</Section>
 				</Container>
@@ -191,8 +162,7 @@ export default function ConsultationBillEmail({
 // Email Styles
 const main = {
 	backgroundColor: '#ffffff',
-	fontFamily:
-		'-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Ubuntu,sans-serif'
+	fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Ubuntu,sans-serif'
 }
 
 const container = {

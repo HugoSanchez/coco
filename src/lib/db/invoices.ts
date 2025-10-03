@@ -123,6 +123,22 @@ export async function updateStripeReceiptUrl(
 }
 
 /**
+ * setInvoicePdfInfo
+ * ----------------------------------------------
+ * Persists the storage key and SHA-256 hash for the generated PDF.
+ */
+export async function setInvoicePdfInfo(
+	invoiceId: string,
+	storagePath: string,
+	sha256: string,
+	supabase?: SupabaseClient
+): Promise<void> {
+	const db = getClient(supabase)
+	const { error } = await db.from('invoices').update({ pdf_url: storagePath, pdf_sha256: sha256 }).eq('id', invoiceId)
+	if (error) throw error
+}
+
+/**
  * computeInvoiceTotals
  * ----------------------------------------------
  * Sums `invoice_items` for an invoice and persists the header totals.
