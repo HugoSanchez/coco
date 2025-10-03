@@ -30,10 +30,16 @@ import { sendPaymentReceiptEmail } from '@/lib/emails/email-service'
 // Initialize Stripe client
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
-// Validate webhook secret is configured
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
-if (!webhookSecret) {
-	throw new Error('STRIPE_WEBHOOK_SECRET environment variable is required')
+// Support multiple webhook secrets (platform + connected accounts)
+const platformWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+const connectWebhookSecret = process.env.STRIPE_CONNECT_WEBHOOK_SECRET
+const webhookSecrets = [platformWebhookSecret, connectWebhookSecret].filter(
+	Boolean
+) as string[]
+if (webhookSecrets.length === 0) {
+	throw new Error(
+		'At least one of STRIPE_WEBHOOK_SECRET or STRIPE_CONNECT_WEBHOOK_SECRET must be set'
+	)
 }
 
 export async function POST(request: NextRequest) {
@@ -68,17 +74,30 @@ export async function POST(request: NextRequest) {
 			)
 		}
 
-		// Verify webhook signature
-		let event: Stripe.Event
-		try {
-			event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
-		} catch (err: any) {
-			console.error('Webhook signature verification failed:', err.message)
-			Sentry.captureException(err, {
+		// Verify webhook signature against any configured secret
+		let event: Stripe.Event | null = null
+		let matchedIsConnectSecret: boolean | null = null
+		let lastError: any = null
+		for (const secret of webhookSecrets) {
+			try {
+				event = stripe.webhooks.constructEvent(body, sig, secret)
+				matchedIsConnectSecret = secret === connectWebhookSecret
+				break
+			} catch (err: any) {
+				lastError = err
+				continue
+			}
+		}
+		if (!event) {
+			console.error(
+				'Webhook signature verification failed for all secrets:',
+				lastError?.message
+			)
+			Sentry.captureException(lastError, {
 				tags: {
 					component: 'webhook',
 					kind: 'stripe-payments',
-					stage: 'verify'
+					stage: 'verify_all_secrets'
 				}
 			})
 			return NextResponse.json(
@@ -123,66 +142,72 @@ export async function POST(request: NextRequest) {
 			///////////////////////////////////////////////////////////
 			///// 4. Capture and store Stripe receipt metadata
 			///////////////////////////////////////////////////////////
-			try {
-				const paymentIntent = await stripe.paymentIntents.retrieve(
-					session.payment_intent as string,
-					{ expand: ['latest_charge'] },
-					connectedAccountId
-						? { stripeAccount: connectedAccountId }
-						: undefined
-				)
-				const charge = (paymentIntent as any)?.latest_charge as
-					| Stripe.Charge
-					| undefined
-				const receiptUrl = charge?.receipt_url as string | undefined
-				const chargeId = charge?.id as string | undefined
-
-				if (bill && (receiptUrl || chargeId)) {
-					await updateBillReceiptMetadata(
-						bill.id,
-						{
-							stripe_charge_id: chargeId ?? null,
-							stripe_receipt_url: receiptUrl ?? null
-						},
-						supabase
+			// Only fetch/store/send receipt details for CONNECT events
+			if (matchedIsConnectSecret) {
+				try {
+					const paymentIntent = await stripe.paymentIntents.retrieve(
+						session.payment_intent as string,
+						{ expand: ['latest_charge'] },
+						connectedAccountId
+							? { stripeAccount: connectedAccountId }
+							: undefined
 					)
-				}
+					const charge = (paymentIntent as any)?.latest_charge as
+						| Stripe.Charge
+						| undefined
+					const receiptUrl = charge?.receipt_url as string | undefined
+					const chargeId = charge?.id as string | undefined
 
-				const clientEmail =
-					session.customer_email ||
-					((session as any).customer_details?.email as
-						| string
-						| undefined) ||
-					(session.metadata?.client_email as string | undefined)
-				if (bill && clientEmail && receiptUrl) {
-					const amount =
-						typeof session.amount_total === 'number'
-							? session.amount_total / 100
-							: (paymentIntent.amount_received ?? 0) / 100
-					const sendResult = await sendPaymentReceiptEmail({
-						to: clientEmail,
-						clientName: session.metadata?.client_name || 'Paciente',
-						amount,
-						currency: session.currency?.toUpperCase() || 'EUR',
-						practitionerName:
-							session.metadata?.practitioner_name ||
-							'Tu profesional',
-						consultationDate: session.metadata?.start_time,
-						receiptUrl
-					})
-					if (sendResult.success) {
-						await markBillReceiptEmailSent(bill.id, supabase)
+					if (bill && (receiptUrl || chargeId)) {
+						await updateBillReceiptMetadata(
+							bill.id,
+							{
+								stripe_charge_id: chargeId ?? null,
+								stripe_receipt_url: receiptUrl ?? null
+							},
+							supabase
+						)
 					}
+
+					const clientEmail =
+						session.customer_email ||
+						((session as any).customer_details?.email as
+							| string
+							| undefined) ||
+						(session.metadata?.client_email as string | undefined)
+					if (bill && clientEmail && receiptUrl) {
+						const amount =
+							typeof session.amount_total === 'number'
+								? session.amount_total / 100
+								: (paymentIntent.amount_received ?? 0) / 100
+						const sendResult = await sendPaymentReceiptEmail({
+							to: clientEmail,
+							clientName:
+								session.metadata?.client_name || 'Paciente',
+							amount,
+							currency: session.currency?.toUpperCase() || 'EUR',
+							practitionerName:
+								session.metadata?.practitioner_name ||
+								'Tu profesional',
+							consultationDate: session.metadata?.start_time,
+							receiptUrl
+						})
+						if (sendResult.success) {
+							await markBillReceiptEmailSent(bill.id, supabase)
+						}
+					}
+				} catch (receiptError) {
+					Sentry.captureException(receiptError, {
+						tags: {
+							component: 'webhook',
+							kind: 'stripe-payments',
+							stage: 'receipt'
+						},
+						extra: { bookingId }
+					})
 				}
-			} catch (receiptError) {
-				Sentry.captureException(receiptError, {
-					tags: {
-						component: 'webhook',
-						kind: 'stripe-payments',
-						stage: 'receipt'
-					},
-					extra: { bookingId }
-				})
+			} else {
+				// Platform legacy flows: skip receipt retrieval/email (as requested)
 			}
 
 			// 6. Capture analytics: successful payment
