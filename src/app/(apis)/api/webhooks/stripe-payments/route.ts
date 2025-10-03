@@ -1,21 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { markPaymentSessionCompleted } from '@/lib/db/payment-sessions'
 import { updateBookingStatus } from '@/lib/db/bookings'
-import {
-	getBillForBookingAndMarkAsPaid,
-	updateBillReceiptMetadata,
-	markBillReceiptEmailSent
-} from '@/lib/db/bills'
-import {
-	getCalendarEventsForBooking,
-	updateCalendarEventType
-} from '@/lib/db/calendar-events'
+import { getBillForBookingAndMarkAsPaid, updateBillReceiptMetadata, markBillReceiptEmailSent } from '@/lib/db/bills'
+import { getCalendarEventsForBooking, updateCalendarEventType } from '@/lib/db/calendar-events'
 import { updatePendingToConfirmed } from '@/lib/calendar/calendar'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 import * as Sentry from '@sentry/nextjs'
 import { captureEvent } from '@/lib/posthog/server'
 import { sendPaymentReceiptEmail } from '@/lib/emails/email-service'
+import { finalizeInvoiceForBillPayment } from '@/lib/invoicing/invoice-orchestration'
 
 /**
  * Stripe webhook handler
@@ -33,13 +27,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 // Support multiple webhook secrets (platform + connected accounts)
 const platformWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET
 const connectWebhookSecret = process.env.STRIPE_CONNECT_WEBHOOK_SECRET
-const webhookSecrets = [platformWebhookSecret, connectWebhookSecret].filter(
-	Boolean
-) as string[]
+const webhookSecrets = [platformWebhookSecret, connectWebhookSecret].filter(Boolean) as string[]
 if (webhookSecrets.length === 0) {
-	throw new Error(
-		'At least one of STRIPE_WEBHOOK_SECRET or STRIPE_CONNECT_WEBHOOK_SECRET must be set'
-	)
+	throw new Error('At least one of STRIPE_WEBHOOK_SECRET or STRIPE_CONNECT_WEBHOOK_SECRET must be set')
 }
 
 export async function POST(request: NextRequest) {
@@ -48,10 +38,7 @@ export async function POST(request: NextRequest) {
 		///////////////////////////////////////////////////////////
 		///// 1. Create service role client for bypassing RLS
 		///////////////////////////////////////////////////////////
-		const supabase = createClient(
-			process.env.NEXT_PUBLIC_SUPABASE_URL!,
-			process.env.SUPABASE_SERVICE_ROLE_KEY!
-		)
+		const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 		///////////////////////////////////////////////////////////
 		///// 2. Verify webhook signature
@@ -61,17 +48,11 @@ export async function POST(request: NextRequest) {
 
 		if (!sig) {
 			console.error('Missing Stripe signature')
-			Sentry.captureMessage(
-				'webhooks:stripe-payments missing signature',
-				{
-					level: 'warning',
-					tags: { component: 'webhook', kind: 'stripe-payments' }
-				}
-			)
-			return NextResponse.json(
-				{ error: 'Missing signature' },
-				{ status: 400 }
-			)
+			Sentry.captureMessage('webhooks:stripe-payments missing signature', {
+				level: 'warning',
+				tags: { component: 'webhook', kind: 'stripe-payments' }
+			})
+			return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
 		}
 
 		// Verify webhook signature against any configured secret
@@ -89,10 +70,7 @@ export async function POST(request: NextRequest) {
 			}
 		}
 		if (!event) {
-			console.error(
-				'Webhook signature verification failed for all secrets:',
-				lastError?.message
-			)
+			console.error('Webhook signature verification failed for all secrets:', lastError?.message)
 			Sentry.captureException(lastError, {
 				tags: {
 					component: 'webhook',
@@ -100,10 +78,7 @@ export async function POST(request: NextRequest) {
 					stage: 'verify_all_secrets'
 				}
 			})
-			return NextResponse.json(
-				{ error: 'Webhook signature verification failed' },
-				{ status: 400 }
-			)
+			return NextResponse.json({ error: 'Webhook signature verification failed' }, { status: 400 })
 		}
 
 		///////////////////////////////////////////////////////////
@@ -112,32 +87,20 @@ export async function POST(request: NextRequest) {
 		if (event.type === 'checkout.session.completed') {
 			// 1. Get session object to get metadata
 			const session = event.data.object as Stripe.Checkout.Session
-			const connectedAccountId = (event as any).account as
-				| string
-				| undefined
+			const connectedAccountId = (event as any).account as string | undefined
 			// 2. Get booking ID from metadata
 			const bookingId = session.metadata?.booking_id
 			if (!bookingId) return NextResponse.json({ received: true })
 			// 3. Update payment session status
-			await markPaymentSessionCompleted(
-				session.id,
-				session.payment_intent as string,
-				supabase,
-				{
-					bookingId,
-					amount:
-						typeof session.amount_total === 'number'
-							? session.amount_total / 100
-							: null
-				}
-			)
+			await markPaymentSessionCompleted(session.id, session.payment_intent as string, supabase, {
+				bookingId,
+				amount: typeof session.amount_total === 'number' ? session.amount_total / 100 : null
+			})
 			// 4. Update booking status to 'scheduled' (payment received) - using service role client
 			await updateBookingStatus(bookingId, 'scheduled', supabase)
 			// 5. Update bill status to 'paid' - using service role client
-			const bill = await getBillForBookingAndMarkAsPaid(
-				bookingId,
-				supabase
-			)
+			const bill = await getBillForBookingAndMarkAsPaid(bookingId, supabase)
+			console.log('[webhook] bill marked paid', { bookingId, billId: bill?.id })
 
 			///////////////////////////////////////////////////////////
 			///// 4. Capture and store Stripe receipt metadata
@@ -148,13 +111,9 @@ export async function POST(request: NextRequest) {
 					const paymentIntent = await stripe.paymentIntents.retrieve(
 						session.payment_intent as string,
 						{ expand: ['latest_charge'] },
-						connectedAccountId
-							? { stripeAccount: connectedAccountId }
-							: undefined
+						connectedAccountId ? { stripeAccount: connectedAccountId } : undefined
 					)
-					const charge = (paymentIntent as any)?.latest_charge as
-						| Stripe.Charge
-						| undefined
+					const charge = (paymentIntent as any)?.latest_charge as Stripe.Charge | undefined
 					const receiptUrl = charge?.receipt_url as string | undefined
 					const chargeId = charge?.id as string | undefined
 
@@ -167,13 +126,15 @@ export async function POST(request: NextRequest) {
 							},
 							supabase
 						)
+						console.log('[webhook] bill receipt stored', {
+							billId: bill.id,
+							hasReceiptUrl: Boolean(receiptUrl)
+						})
 					}
 
 					const clientEmail =
 						session.customer_email ||
-						((session as any).customer_details?.email as
-							| string
-							| undefined) ||
+						((session as any).customer_details?.email as string | undefined) ||
 						(session.metadata?.client_email as string | undefined)
 					if (bill && clientEmail && receiptUrl) {
 						const amount =
@@ -182,18 +143,16 @@ export async function POST(request: NextRequest) {
 								: (paymentIntent.amount_received ?? 0) / 100
 						const sendResult = await sendPaymentReceiptEmail({
 							to: clientEmail,
-							clientName:
-								session.metadata?.client_name || 'Paciente',
+							clientName: session.metadata?.client_name || 'Paciente',
 							amount,
 							currency: session.currency?.toUpperCase() || 'EUR',
-							practitionerName:
-								session.metadata?.practitioner_name ||
-								'Tu profesional',
+							practitionerName: session.metadata?.practitioner_name || 'Tu profesional',
 							consultationDate: session.metadata?.start_time,
 							receiptUrl
 						})
 						if (sendResult.success) {
 							await markBillReceiptEmailSent(bill.id, supabase)
+							console.log('[webhook] receipt email sent', { billId: bill.id })
 						}
 					}
 				} catch (receiptError) {
@@ -210,7 +169,48 @@ export async function POST(request: NextRequest) {
 				// Platform legacy flows: skip receipt retrieval/email (as requested)
 			}
 
-			// 6. Capture analytics: successful payment
+			// 6. Dual-write path: issue & mark invoice as paid (if enabled)
+			if (process.env.ENABLE_INVOICES_DUAL_WRITE === 'true') {
+				try {
+					const paymentIntentId = session.payment_intent as string
+					const requestOpts = connectedAccountId ? { stripeAccount: connectedAccountId } : undefined
+					const pi: any = await stripe.paymentIntents.retrieve(
+						paymentIntentId,
+						{ expand: ['latest_charge'] },
+						requestOpts
+					)
+					const charge = pi?.latest_charge as Stripe.Charge | undefined
+					const receiptUrl = charge?.receipt_url || null
+
+					if (bill?.id) {
+						await finalizeInvoiceForBillPayment(
+							{
+								legacyBillId: bill.id,
+								userId: session.metadata?.practitioner_user_id || 'unknown',
+								paidAt: new Date(),
+								receiptUrl,
+								stripeSessionId: session.id
+							},
+							supabase as any
+						)
+						console.log('[webhook] invoice finalized', {
+							billId: bill.id,
+							hasReceiptUrl: Boolean(receiptUrl)
+						})
+					}
+				} catch (e) {
+					Sentry.captureException(e, {
+						tags: {
+							component: 'webhook',
+							kind: 'stripe-payments',
+							stage: 'invoice_finalize'
+						},
+						extra: { bookingId }
+					})
+				}
+			}
+
+			// 7. Capture analytics: successful payment
 			try {
 				await captureEvent({
 					userId: session.metadata?.practitioner_user_id || 'unknown',
@@ -220,10 +220,7 @@ export async function POST(request: NextRequest) {
 						booking_id: bookingId,
 						stripe_session_id: session.id,
 						payment_intent_id: session.payment_intent,
-						amount:
-							typeof session.amount_total === 'number'
-								? session.amount_total / 100
-								: undefined,
+						amount: typeof session.amount_total === 'number' ? session.amount_total / 100 : undefined,
 						currency: session.currency?.toUpperCase()
 					}
 				})
@@ -238,8 +235,7 @@ export async function POST(request: NextRequest) {
 				const clientEmail = session.customer_email
 				const practitionerName = session.metadata?.practitioner_name
 				const practitionerEmail = session.metadata?.practitioner_email
-				const practitionerUserId =
-					session.metadata?.practitioner_user_id
+				const practitionerUserId = session.metadata?.practitioner_user_id
 				const startTime = session.metadata?.start_time
 				const endTime = session.metadata?.end_time
 
@@ -253,41 +249,30 @@ export async function POST(request: NextRequest) {
 					!startTime ||
 					!endTime
 				) {
-					Sentry.captureMessage(
-						'webhooks:stripe-payments missing metadata',
-						{
-							level: 'warning',
-							tags: {
-								component: 'webhook',
-								kind: 'stripe-payments'
-							},
-							extra: { bookingId }
-						}
-					)
+					Sentry.captureMessage('webhooks:stripe-payments missing metadata', {
+						level: 'warning',
+						tags: {
+							component: 'webhook',
+							kind: 'stripe-payments'
+						},
+						extra: { bookingId }
+					})
 					return NextResponse.json({ received: true })
 				}
 
 				// Find the existing pending calendar event for this booking
-				const existingEvents = await getCalendarEventsForBooking(
-					bookingId,
-					supabase
-				)
-				const pendingEvent = existingEvents.find(
-					(event) => event.event_type === 'pending'
-				)
+				const existingEvents = await getCalendarEventsForBooking(bookingId, supabase)
+				const pendingEvent = existingEvents.find((event) => event.event_type === 'pending')
 
 				if (!pendingEvent) {
-					Sentry.captureMessage(
-						'webhooks:stripe-payments no_pending_event',
-						{
-							level: 'warning',
-							tags: {
-								component: 'webhook',
-								kind: 'stripe-payments'
-							},
-							extra: { bookingId }
-						}
-					)
+					Sentry.captureMessage('webhooks:stripe-payments no_pending_event', {
+						level: 'warning',
+						tags: {
+							component: 'webhook',
+							kind: 'stripe-payments'
+						},
+						extra: { bookingId }
+					})
 					return NextResponse.json({ received: true })
 				}
 
@@ -301,20 +286,14 @@ export async function POST(request: NextRequest) {
 						practitionerEmail,
 						bookingId,
 						mode: (session.metadata?.mode as any) || undefined,
-						locationText:
-							(session.metadata?.location_text as any) ||
-							undefined
+						locationText: (session.metadata?.location_text as any) || undefined
 					},
 					supabase
 				)
 
 				if (calendarResult.success && calendarResult.googleEventId) {
 					// Update the calendar event record in database to confirmed status
-					await updateCalendarEventType(
-						pendingEvent.id,
-						'confirmed',
-						supabase
-					)
+					await updateCalendarEventType(pendingEvent.id, 'confirmed', supabase)
 
 					// Update the Google Meet link and status separately if needed
 					if (calendarResult.googleMeetLink) {
@@ -327,10 +306,7 @@ export async function POST(request: NextRequest) {
 							.eq('id', pendingEvent.id)
 
 						if (updateError) {
-							console.error(
-								`Failed to update Meet link for event ${pendingEvent.id}:`,
-								updateError
-							)
+							console.error(`Failed to update Meet link for event ${pendingEvent.id}:`, updateError)
 							Sentry.captureException(updateError, {
 								tags: {
 									component: 'webhook',
@@ -346,28 +322,19 @@ export async function POST(request: NextRequest) {
 						`Calendar event updated from pending to confirmed for booking ${bookingId}: ${calendarResult.googleEventId}`
 					)
 				} else {
-					console.error(
-						`Failed to update calendar event for booking ${bookingId}:`,
-						calendarResult.error
-					)
-					Sentry.captureMessage(
-						'webhooks:stripe-payments calendar_update_failed',
-						{
-							level: 'warning',
-							tags: {
-								component: 'webhook',
-								kind: 'stripe-payments'
-							},
-							extra: { bookingId }
-						}
-					)
+					console.error(`Failed to update calendar event for booking ${bookingId}:`, calendarResult.error)
+					Sentry.captureMessage('webhooks:stripe-payments calendar_update_failed', {
+						level: 'warning',
+						tags: {
+							component: 'webhook',
+							kind: 'stripe-payments'
+						},
+						extra: { bookingId }
+					})
 				}
 			} catch (calendarError) {
 				// Don't fail the webhook if calendar update fails
-				console.error(
-					`Calendar update error for booking ${bookingId}:`,
-					calendarError
-				)
+				console.error(`Calendar update error for booking ${bookingId}:`, calendarError)
 				Sentry.captureException(calendarError, {
 					tags: {
 						component: 'webhook',
@@ -378,16 +345,13 @@ export async function POST(request: NextRequest) {
 				})
 			}
 		}
-		// 7. Return success response
+		// 8. Return success response
 		return NextResponse.json({ received: true })
 	} catch (error) {
 		console.error('Webhook error:', error)
 		Sentry.captureException(error, {
 			tags: { component: 'webhook', kind: 'stripe-payments' }
 		})
-		return NextResponse.json(
-			{ error: 'Webhook handler failed' },
-			{ status: 500 }
-		)
+		return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 })
 	}
 }

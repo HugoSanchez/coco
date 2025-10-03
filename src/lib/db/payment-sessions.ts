@@ -116,11 +116,7 @@ export async function createPaymentSession(
 		completed_at: payload.completed_at || null
 	}
 
-	const { data, error } = await client
-		.from('payment_sessions')
-		.insert([paymentSessionData])
-		.select()
-		.single()
+	const { data, error } = await client.from('payment_sessions').insert([paymentSessionData]).select().single()
 
 	if (error) throw error
 	return data
@@ -133,14 +129,8 @@ export async function createPaymentSession(
  * @returns Promise<PaymentSession | null> - The payment session object or null if not found
  * @throws Error if database operation fails
  */
-export async function getPaymentSessionById(
-	paymentSessionId: string
-): Promise<PaymentSession | null> {
-	const { data, error } = await supabase
-		.from('payment_sessions')
-		.select('*')
-		.eq('id', paymentSessionId)
-		.single()
+export async function getPaymentSessionById(paymentSessionId: string): Promise<PaymentSession | null> {
+	const { data, error } = await supabase.from('payment_sessions').select('*').eq('id', paymentSessionId).single()
 
 	if (error) {
 		if (error.code === 'PGRST116') return null // Not found
@@ -157,9 +147,7 @@ export async function getPaymentSessionById(
  * @returns Promise<PaymentSession | null> - The payment session object or null if not found
  * @throws Error if database operation fails
  */
-export async function getPaymentSessionByStripeSessionId(
-	stripeSessionId: string
-): Promise<PaymentSession | null> {
+export async function getPaymentSessionByStripeSessionId(stripeSessionId: string): Promise<PaymentSession | null> {
 	const { data, error } = await supabase
 		.from('payment_sessions')
 		.select('*')
@@ -205,9 +193,7 @@ export async function getPaymentSessionsForBooking(
  * @returns Promise<PaymentSessionWithBooking[]> - Array of payment sessions with booking data
  * @throws Error if database operation fails
  */
-export async function getPaymentSessionsForUser(
-	userId: string
-): Promise<PaymentSessionWithBooking[]> {
+export async function getPaymentSessionsForUser(userId: string): Promise<PaymentSessionWithBooking[]> {
 	const { data, error } = await supabase
 		.from('payment_sessions')
 		.select(
@@ -313,6 +299,25 @@ export async function updatePaymentSessionByStripeSessionId(
 }
 
 /**
+ * linkPaymentSessionToInvoice
+ * ----------------------------------------------
+ * Associates a payment_session (looked up by Stripe session id) with an invoice.
+ * Idempotent – running it again simply overwrites the same invoice_id.
+ */
+export async function linkPaymentSessionToInvoice(
+	stripeSessionId: string,
+	invoiceId: string,
+	supabaseClient?: SupabaseClient
+): Promise<void> {
+	const client = supabaseClient || supabase
+	const { error } = await client
+		.from('payment_sessions')
+		.update({ invoice_id: invoiceId })
+		.eq('stripe_session_id', stripeSessionId)
+	if (error) throw error
+}
+
+/**
  * Marks a payment session as completed
  * Helper function that sets status to 'completed' and completed_at timestamp
  *
@@ -355,9 +360,7 @@ export async function markPaymentSessionCompleted(
 			try {
 				const { data: existingForBooking } = await client
 					.from('payment_sessions')
-					.select(
-						'id,status,stripe_session_id,created_at,completed_at'
-					)
+					.select('id,status,stripe_session_id,created_at,completed_at')
 					.eq('booking_id', fallback.bookingId)
 					.order('created_at', { ascending: false })
 					.limit(5)
@@ -380,27 +383,23 @@ export async function markPaymentSessionCompleted(
 
 			// Soft-report to Sentry as a warning to keep visibility without breaking webhook flow
 			try {
-				Sentry.captureMessage(
-					'payments:mark_session_completed_fallback_upsert',
-					{
-						level: 'warning',
-						tags: {
-							component: 'payment-sessions',
-							stage: 'fallback_upsert'
-						},
-						extra: {
-							bookingId: fallback.bookingId,
-							stripeSessionId,
-							hadAmount: typeof fallback.amount === 'number',
-							stripeIdMatchCount,
-							existingSample
-						}
+				Sentry.captureMessage('payments:mark_session_completed_fallback_upsert', {
+					level: 'warning',
+					tags: {
+						component: 'payment-sessions',
+						stage: 'fallback_upsert'
+					},
+					extra: {
+						bookingId: fallback.bookingId,
+						stripeSessionId,
+						hadAmount: typeof fallback.amount === 'number',
+						stripeIdMatchCount,
+						existingSample
 					}
-				)
+				})
 			} catch (_) {}
 
-			const amountValue =
-				typeof fallback.amount === 'number' ? fallback.amount : 0
+			const amountValue = typeof fallback.amount === 'number' ? fallback.amount : 0
 
 			const { data, error: upsertError } = await client
 				.from('payment_sessions')
@@ -436,9 +435,7 @@ export async function markPaymentSessionCompleted(
  * @returns Promise<PaymentSession> - The updated payment session object
  * @throws Error if update fails or payment session not found
  */
-export async function markPaymentSessionFailed(
-	stripeSessionId: string
-): Promise<PaymentSession> {
+export async function markPaymentSessionFailed(stripeSessionId: string): Promise<PaymentSession> {
 	return updatePaymentSessionByStripeSessionId(stripeSessionId, {
 		status: 'failed'
 	})
@@ -452,13 +449,8 @@ export async function markPaymentSessionFailed(
  * @returns Promise<void>
  * @throws Error if deletion fails or payment session not found
  */
-export async function deletePaymentSession(
-	paymentSessionId: string
-): Promise<void> {
-	const { error } = await supabase
-		.from('payment_sessions')
-		.delete()
-		.eq('id', paymentSessionId)
+export async function deletePaymentSession(paymentSessionId: string): Promise<void> {
+	const { error } = await supabase.from('payment_sessions').delete().eq('id', paymentSessionId)
 
 	if (error) throw error
 }
@@ -472,10 +464,7 @@ export async function deletePaymentSession(
  * @returns Promise<PaymentSession[]> - Array of payment sessions with the specified status
  * @throws Error if database operation fails
  */
-export async function getPaymentSessionsByStatus(
-	status: string,
-	userId?: string
-): Promise<PaymentSession[]> {
+export async function getPaymentSessionsByStatus(status: string, userId?: string): Promise<PaymentSession[]> {
 	let query = supabase
 		.from('payment_sessions')
 		.select('*')

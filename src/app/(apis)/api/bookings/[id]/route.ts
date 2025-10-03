@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
+import { getBookingById } from '@/lib/db/bookings'
+import { getClientById } from '@/lib/db/clients'
+import { getProfileById } from '@/lib/db/profiles'
+import { getBillsForBooking } from '@/lib/db/bills'
 
 /**
  * GET /api/bookings/[id]
@@ -13,75 +17,22 @@ import { createClient } from '@supabase/supabase-js'
  * - Practitioner name for confirmation
  * - Basic booking information for display
  */
-export async function GET(
-	request: NextRequest,
-	{ params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
 	try {
 		const bookingId = params.id
 
 		if (!bookingId) {
-			return NextResponse.json(
-				{ error: 'Booking ID is required' },
-				{ status: 400 }
-			)
+			return NextResponse.json({ error: 'Booking ID is required' }, { status: 400 })
 		}
 
-		// Use service role client to bypass RLS since client is not authenticated
-		const supabase = createClient(
-			process.env.NEXT_PUBLIC_SUPABASE_URL!,
-			process.env.SUPABASE_SERVICE_ROLE_KEY!
-		)
-
-		// First, let's try a simple query without joins to see if the booking exists
-		const { data: simpleBooking, error: simpleError } = await supabase
-			.from('bookings')
-			.select('*')
-			.eq('id', bookingId)
-			.single()
-
-		// If simple booking doesn't work, return early with debug info
-		if (simpleError || !simpleBooking) {
-			console.log('Simple booking query failed')
-			return NextResponse.json({
-				debug: true,
-				bookingId,
-				simpleError: simpleError?.message,
-				simpleBooking
-			})
+		const supabase = createClient()
+		const booking = await getBookingById(bookingId, supabase)
+		if (!booking) {
+			return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
 		}
-
-		// Get booking information
-		const booking = simpleBooking
-
-		// Get client information
-		const { data: client } = await supabase
-			.from('clients')
-			.select('name, last_name, email')
-			.eq('id', booking.client_id)
-			.single()
-
-		// Get practitioner information
-		const { data: practitioner } = await supabase
-			.from('profiles')
-			.select('name, email')
-			.eq('id', booking.user_id)
-			.single()
-
-		// Get bill information
-		const { data: bills } = await supabase
-			.from('bills')
-			.select(
-				'id, amount, currency, status, email_scheduled_at, sent_at, paid_at, created_at, stripe_receipt_url'
-			)
-			.eq('booking_id', booking.id)
-
-		// Debug: verify receipt URL presence on server
-		console.log('[GET /api/bookings/:id] receipt debug', {
-			bookingId: booking.id,
-			firstBill: bills?.[0],
-			stripe_receipt_url: bills?.[0]?.stripe_receipt_url
-		})
+		const client = booking.client_id ? await getClientById(booking.client_id, supabase) : null
+		const practitioner = await getProfileById(booking.user_id, supabase)
+		const bills = await getBillsForBooking(booking.id, supabase)
 
 		// Format the response for display
 		const response = {
@@ -104,8 +55,7 @@ export async function GET(
 		return NextResponse.json(
 			{
 				error: 'Failed to fetch booking details',
-				details:
-					error instanceof Error ? error.message : 'Unknown error'
+				details: error instanceof Error ? error.message : 'Unknown error'
 			},
 			{ status: 500 }
 		)

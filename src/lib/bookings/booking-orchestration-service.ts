@@ -15,25 +15,10 @@
  * Based on billing type, calls the appropriate creation function.
  */
 
-import {
-	createBooking,
-	CreateBookingPayload,
-	Booking,
-	deleteBooking
-} from '@/lib/db/bookings'
-import {
-	getClientBillingSettings,
-	getUserDefaultBillingSettings
-} from '@/lib/db/billing-settings'
+import { createBooking, CreateBookingPayload, Booking, deleteBooking } from '@/lib/db/bookings'
+import { getClientBillingSettings, getUserDefaultBillingSettings } from '@/lib/db/billing-settings'
 import { getClientById } from '@/lib/db/clients'
-import {
-	createBill,
-	CreateBillPayload,
-	Bill,
-	updateBillStatus,
-	markBillAsPaid,
-	deleteBill
-} from '@/lib/db/bills'
+import { createBill, CreateBillPayload, Bill, updateBillStatus, markBillAsPaid, deleteBill } from '@/lib/db/bills'
 import { sendConsultationBillEmail } from '@/lib/emails/email-service'
 import { getProfileById } from '@/lib/db/profiles'
 import { getBookingById } from '@/lib/db/bookings'
@@ -48,6 +33,7 @@ import { createCalendarEvent } from '@/lib/db/calendar-events'
 import { computeEmailScheduledAt } from '@/lib/utils'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import * as Sentry from '@sentry/nextjs'
+import { createInvoiceForBooking } from '@/lib/invoicing/invoice-orchestration'
 
 /**
  * Interface for creating a booking
@@ -83,17 +69,9 @@ export interface CreateBookingResult {
  * Returns the full billing settings record including ID for proper referential integrity
  * Throws error if no billing settings exist (users must have billing settings configured)
  */
-async function getAppropriateBillingSettings(
-	userId: string,
-	clientId: string,
-	supabaseClient?: SupabaseClient
-) {
+async function getAppropriateBillingSettings(userId: string, clientId: string, supabaseClient?: SupabaseClient) {
 	// Check if client has specific billing settings
-	const clientBilling = await getClientBillingSettings(
-		userId,
-		clientId,
-		supabaseClient
-	)
+	const clientBilling = await getClientBillingSettings(userId, clientId, supabaseClient)
 
 	if (clientBilling) {
 		return {
@@ -101,18 +79,13 @@ async function getAppropriateBillingSettings(
 			type: clientBilling.billing_type,
 			amount: clientBilling.billing_amount || 0,
 			currency: clientBilling.currency,
-			first_consultation_amount:
-				clientBilling.first_consultation_amount ?? null,
-			payment_email_lead_hours:
-				clientBilling.payment_email_lead_hours ?? null
+			first_consultation_amount: clientBilling.first_consultation_amount ?? null,
+			payment_email_lead_hours: clientBilling.payment_email_lead_hours ?? null
 		}
 	}
 
 	// Fall back to user default billing settings
-	const userDefaultSettings = await getUserDefaultBillingSettings(
-		userId,
-		supabaseClient
-	)
+	const userDefaultSettings = await getUserDefaultBillingSettings(userId, supabaseClient)
 
 	if (userDefaultSettings) {
 		return {
@@ -120,11 +93,9 @@ async function getAppropriateBillingSettings(
 			type: userDefaultSettings.billing_type,
 			amount: userDefaultSettings.billing_amount || 0,
 			currency: userDefaultSettings.currency,
-			first_consultation_amount:
-				userDefaultSettings.first_consultation_amount ?? null,
+			first_consultation_amount: userDefaultSettings.first_consultation_amount ?? null,
 			// New: lead time for scheduling payment email
-			payment_email_lead_hours:
-				userDefaultSettings.payment_email_lead_hours ?? null
+			payment_email_lead_hours: userDefaultSettings.payment_email_lead_hours ?? null
 		}
 	}
 
@@ -169,7 +140,41 @@ async function createBillForBooking(
 		type: billing.type
 	})
 
-	return await createBill(billPayload, supabaseClient)
+	const bill = await createBill(billPayload, supabaseClient)
+
+	// Dual write: create a matching invoice + 1 item for this booking (feature-flagged)
+	if (process.env.ENABLE_INVOICES_DUAL_WRITE === 'true') {
+		try {
+			await createInvoiceForBooking(
+				{
+					userId: booking.user_id,
+					clientId,
+					clientName: client.name,
+					clientEmail: client.email,
+					bookingId: booking.id,
+					description: 'Consulta',
+					amount: billing.amount,
+					currency: billing.currency,
+					// If your current flow marks bill as sent immediately for some paths,
+					// you can toggle issueNow accordingly in those call sites.
+					issueNow: false,
+					legacyBillId: bill.id
+				},
+				supabaseClient
+			)
+		} catch (e) {
+			Sentry.captureException(e, {
+				tags: {
+					component: 'booking-orchestrator',
+					stage: 'dual_write_invoice'
+				},
+				extra: { bookingId: booking.id, billId: bill.id }
+			})
+			// Do not fail the legacy path if invoice creation fails
+		}
+	}
+
+	return bill
 }
 
 /**
@@ -193,33 +198,21 @@ async function createPastBooking(
 			status: 'completed',
 			consultation_type: request.consultationType,
 			mode: request.mode || 'online',
-			location_text:
-				request.mode === 'in_person'
-					? request.locationText || null
-					: null
+			location_text: request.mode === 'in_person' ? request.locationText || null : null
 		},
 		supabaseClient
 	)
 
 	// Create bill (pending) for historical booking
-	const bill = await createBillForBooking(
-		booking,
-		billing,
-		request.clientId,
-		supabaseClient
-	)
+	const bill = await createBillForBooking(booking, billing, request.clientId, supabaseClient)
 
 	// Create internal confirmed calendar event (no invites/notifications)
 	try {
 		const client = await getClientById(request.clientId, supabaseClient)
-		const practitioner = await getProfileById(
-			request.userId,
-			supabaseClient
-		)
+		const practitioner = await getProfileById(request.userId, supabaseClient)
 
 		if (!client) throw new Error(`Client not found: ${request.clientId}`)
-		if (!practitioner)
-			throw new Error(`Practitioner profile not found: ${request.userId}`)
+		if (!practitioner) throw new Error(`Practitioner profile not found: ${request.userId}`)
 
 		const eventResult = await createInternalConfirmedCalendarEvent(
 			{
@@ -248,10 +241,7 @@ async function createPastBooking(
 			)
 		}
 	} catch (calendarError) {
-		console.error(
-			`Internal confirmed calendar creation error for booking ${booking.id}:`,
-			calendarError
-		)
+		console.error(`Internal confirmed calendar creation error for booking ${booking.id}:`, calendarError)
 		Sentry.captureException(calendarError, {
 			tags: {
 				component: 'booking-orchestrator',
@@ -264,13 +254,9 @@ async function createPastBooking(
 	// Send post-consultation email with payment link
 	try {
 		const client = await getClientById(request.clientId, supabaseClient)
-		const practitioner = await getProfileById(
-			request.userId,
-			supabaseClient
-		)
+		const practitioner = await getProfileById(request.userId, supabaseClient)
 		if (client && practitioner) {
-			const baseUrl =
-				process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+			const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 			const paymentGatewayUrl = `${baseUrl}/api/payments/${booking.id}`
 			const emailResult = await sendConsultationBillEmail({
 				to: client.email,
@@ -280,8 +266,7 @@ async function createPastBooking(
 				billingTrigger: 'after_consultation',
 				practitionerName: practitioner.name || 'Your Practitioner',
 				practitionerEmail: practitioner.email,
-				practitionerImageUrl:
-					practitioner.profile_picture_url || undefined,
+				practitionerImageUrl: practitioner.profile_picture_url || undefined,
 				paymentUrl: paymentGatewayUrl
 			})
 			if (emailResult.success) {
@@ -329,11 +314,9 @@ export async function sendBillPaymentEmail(
 
 		if (!booking) return { success: false, error: 'Booking not found' }
 		if (!client) return { success: false, error: 'Client not found' }
-		if (!practitioner)
-			return { success: false, error: 'Practitioner not found' }
+		if (!practitioner) return { success: false, error: 'Practitioner not found' }
 
-		const baseUrl =
-			process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+		const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 		const paymentGatewayUrl = `${baseUrl}/api/payments/${bill.booking_id}`
 
 		const emailResult = await sendConsultationBillEmail({
@@ -406,37 +389,22 @@ async function createInAdvanceBooking(
 				status: 'scheduled',
 				consultation_type: request.consultationType,
 				mode: request.mode || 'online',
-				location_text:
-					request.mode === 'in_person'
-						? request.locationText || null
-						: null
+				location_text: request.mode === 'in_person' ? request.locationText || null : null
 			},
 			supabaseClient
 		)
 
 		// Create bill (0 EUR) and mark it as paid
-		const bill = await createBillForBooking(
-			booking,
-			billing,
-			request.clientId,
-			supabaseClient
-		)
+		const bill = await createBillForBooking(booking, billing, request.clientId, supabaseClient)
 		await markBillAsPaid(bill.id, supabaseClient)
 
 		// Create confirmed calendar event directly
 		try {
 			const client = await getClientById(request.clientId, supabaseClient)
-			const practitioner = await getProfileById(
-				request.userId,
-				supabaseClient
-			)
+			const practitioner = await getProfileById(request.userId, supabaseClient)
 
-			if (!client)
-				throw new Error(`Client not found: ${request.clientId}`)
-			if (!practitioner)
-				throw new Error(
-					`Practitioner profile not found: ${request.userId}`
-				)
+			if (!client) throw new Error(`Client not found: ${request.clientId}`)
+			if (!practitioner) throw new Error(`Practitioner profile not found: ${request.userId}`)
 
 			const eventResult = await createCalendarEventWithInvite(
 				{
@@ -450,10 +418,7 @@ async function createInAdvanceBooking(
 					bookingNotes: request.notes,
 					bookingId: booking.id as any,
 					mode: request.mode,
-					locationText:
-						request.mode === 'in_person'
-							? request.locationText || null
-							: null
+					locationText: request.mode === 'in_person' ? request.locationText || null : null
 				},
 				supabaseClient
 			)
@@ -470,10 +435,7 @@ async function createInAdvanceBooking(
 					supabaseClient
 				)
 			} else {
-				console.error(
-					`Failed to create confirmed calendar event for booking ${booking.id}:`,
-					eventResult.error
-				)
+				console.error(`Failed to create confirmed calendar event for booking ${booking.id}:`, eventResult.error)
 				Sentry.captureException(eventResult.error, {
 					tags: {
 						component: 'booking-orchestrator',
@@ -483,10 +445,7 @@ async function createInAdvanceBooking(
 				})
 			}
 		} catch (calendarError) {
-			console.error(
-				`Confirmed calendar creation error for booking ${booking.id}:`,
-				calendarError
-			)
+			console.error(`Confirmed calendar creation error for booking ${booking.id}:`, calendarError)
 			Sentry.captureException(calendarError, {
 				tags: {
 					component: 'booking-orchestrator',
@@ -511,8 +470,7 @@ async function createInAdvanceBooking(
 		status: 'pending', // Pending until payment
 		consultation_type: request.consultationType,
 		mode: request.mode || 'online',
-		location_text:
-			request.mode === 'in_person' ? request.locationText || null : null
+		location_text: request.mode === 'in_person' ? request.locationText || null : null
 	}
 
 	const booking = await createBooking(bookingPayload, supabaseClient)
@@ -535,10 +493,7 @@ async function createInAdvanceBooking(
 	// This prevents double-booking while payment is being processed
 	try {
 		const client = await getClientById(request.clientId, supabaseClient)
-		const practitioner = await getProfileById(
-			request.userId,
-			supabaseClient
-		)
+		const practitioner = await getProfileById(request.userId, supabaseClient)
 
 		if (!client) {
 			throw new Error(`Client not found: ${request.clientId}`)
@@ -548,12 +503,7 @@ async function createInAdvanceBooking(
 			throw new Error(`Practitioner profile not found: ${request.userId}`)
 		}
 
-		console.log(
-			'🗓️ [Booking] Starting calendar event creation for user:',
-			request.userId,
-			'client:',
-			client.name
-		)
+		console.log('🗓️ [Booking] Starting calendar event creation for user:', request.userId, 'client:', client.name)
 
 		let pendingEventResult
 		try {
@@ -567,10 +517,7 @@ async function createInAdvanceBooking(
 					// Tag the Google event for idempotent reconciliation later
 					bookingId: booking.id,
 					mode: request.mode,
-					locationText:
-						request.mode === 'in_person'
-							? request.locationText || null
-							: null
+					locationText: request.mode === 'in_person' ? request.locationText || null : null
 				},
 				supabaseClient
 			)
@@ -581,23 +528,12 @@ async function createInAdvanceBooking(
 				pendingEventResult.googleEventId
 			)
 		} catch (error) {
-			console.error(
-				'❌ [Booking] Calendar event creation failed for user:',
-				request.userId,
-				'Error:',
-				error
-			)
+			console.error('❌ [Booking] Calendar event creation failed for user:', request.userId, 'Error:', error)
 
 			// Provide specific guidance for common errors
 			let calendarWarning: string | undefined
-			if (
-				error instanceof Error &&
-				error.message.includes('Calendar access expired')
-			) {
-				console.log(
-					'💡 [Booking] User needs to reconnect Google Calendar:',
-					request.userId
-				)
+			if (error instanceof Error && error.message.includes('Calendar access expired')) {
+				console.log('💡 [Booking] User needs to reconnect Google Calendar:', request.userId)
 				calendarWarning =
 					'Your Google Calendar connection has expired. Please reconnect it in your settings to enable automatic calendar events.'
 			}
@@ -619,9 +555,7 @@ async function createInAdvanceBooking(
 				supabaseClient
 			)
 
-			console.log(
-				`Pending calendar event created for booking ${booking.id}: ${pendingEventResult.googleEventId}`
-			)
+			console.log(`Pending calendar event created for booking ${booking.id}: ${pendingEventResult.googleEventId}`)
 		} else {
 			console.error(
 				`Failed to create pending calendar event for booking ${booking.id}:`,
@@ -630,10 +564,7 @@ async function createInAdvanceBooking(
 		}
 	} catch (calendarError) {
 		// Don't fail the booking creation if calendar event fails
-		console.error(
-			`Pending calendar creation error for booking ${booking.id}:`,
-			calendarError
-		)
+		console.error(`Pending calendar creation error for booking ${booking.id}:`, calendarError)
 		Sentry.captureException(calendarError, {
 			tags: {
 				component: 'booking-orchestrator',
@@ -648,8 +579,7 @@ async function createInAdvanceBooking(
 
 	if (requiresPayment) {
 		// Only send the email immediately if the scheduled time has arrived
-		const dueNow =
-			!emailScheduledAt || new Date(emailScheduledAt) <= new Date()
+		const dueNow = !emailScheduledAt || new Date(emailScheduledAt) <= new Date()
 		if (!dueNow) {
 			return {
 				booking,
@@ -661,24 +591,18 @@ async function createInAdvanceBooking(
 		try {
 			// Get client and practitioner info for payment session
 			const client = await getClientById(request.clientId, supabaseClient)
-			const practitioner = await getProfileById(
-				request.userId,
-				supabaseClient
-			)
+			const practitioner = await getProfileById(request.userId, supabaseClient)
 
 			if (!client) {
 				throw new Error(`Client not found: ${request.clientId}`)
 			}
 
 			if (!practitioner) {
-				throw new Error(
-					`Practitioner profile not found: ${request.userId}`
-				)
+				throw new Error(`Practitioner profile not found: ${request.userId}`)
 			}
 
 			// Generate payment gateway URL (no need to create checkout session upfront)
-			const baseUrl =
-				process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+			const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 			const paymentGatewayUrl = `${baseUrl}/api/payments/${booking.id}`
 
 			// Send consultation bill email with payment gateway link
@@ -690,8 +614,7 @@ async function createInAdvanceBooking(
 				billingTrigger: 'before_consultation',
 				practitionerName: practitioner.name || 'Your Practitioner',
 				practitionerEmail: practitioner.email,
-				practitionerImageUrl:
-					practitioner.profile_picture_url || undefined,
+				practitionerImageUrl: practitioner.profile_picture_url || undefined,
 				paymentUrl: paymentGatewayUrl
 			})
 
@@ -716,10 +639,7 @@ async function createInAdvanceBooking(
 					)
 				} catch (trackingError) {
 					// Log tracking failure but don't break the flow
-					console.error(
-						'Failed to track successful email:',
-						trackingError
-					)
+					console.error('Failed to track successful email:', trackingError)
 					Sentry.captureException(trackingError, {
 						tags: {
 							component: 'booking-orchestrator',
@@ -748,17 +668,13 @@ async function createInAdvanceBooking(
 							recipient_email: client.email,
 							recipient_name: client.name,
 							status: 'failed',
-							error_message:
-								emailResult.error || 'Email sending failed'
+							error_message: emailResult.error || 'Email sending failed'
 						},
 						supabaseClient
 					)
 				} catch (trackingError) {
 					// Log tracking failure but don't break the flow
-					console.error(
-						'Failed to track failed email:',
-						trackingError
-					)
+					console.error('Failed to track failed email:', trackingError)
 					Sentry.captureException(trackingError, {
 						tags: {
 							component: 'booking-orchestrator',
@@ -769,9 +685,7 @@ async function createInAdvanceBooking(
 				}
 
 				// Email failed - throw error to trigger cleanup
-				const emailError = new Error(
-					`EMAIL_SEND_FAILED: Unable to send payment email to ${client.email}`
-				)
+				const emailError = new Error(`EMAIL_SEND_FAILED: Unable to send payment email to ${client.email}`)
 				emailError.name = 'EmailSendError'
 				throw emailError
 			}
@@ -796,10 +710,7 @@ async function createInAdvanceBooking(
 				await deleteBooking(booking.id, supabaseClient)
 				await deleteBill(bill.id, supabaseClient)
 			} catch (cleanupError) {
-				console.error(
-					`Cleanup failed for booking ${booking.id}:`,
-					cleanupError
-				)
+				console.error(`Cleanup failed for booking ${booking.id}:`, cleanupError)
 				Sentry.captureException(cleanupError, {
 					tags: {
 						component: 'booking-orchestrator',
@@ -838,19 +749,13 @@ async function createRightAfterBooking(
 		end_time: request.endTime,
 		status: request.status || 'scheduled', // Confirmed immediately
 		mode: request.mode || 'online',
-		location_text:
-			request.mode === 'in_person' ? request.locationText || null : null
+		location_text: request.mode === 'in_person' ? request.locationText || null : null
 	}
 
 	const booking = await createBooking(bookingPayload, supabaseClient)
 
 	// Create bill for this booking
-	const bill = await createBillForBooking(
-		booking,
-		billing,
-		request.clientId,
-		supabaseClient
-	)
+	const bill = await createBillForBooking(booking, billing, request.clientId, supabaseClient)
 
 	// No immediate payment required
 	return {
@@ -875,19 +780,13 @@ async function createMonthlyBooking(
 		end_time: request.endTime,
 		status: request.status || 'scheduled', // Confirmed immediately
 		mode: request.mode || 'online',
-		location_text:
-			request.mode === 'in_person' ? request.locationText || null : null
+		location_text: request.mode === 'in_person' ? request.locationText || null : null
 	}
 
 	const booking = await createBooking(bookingPayload, supabaseClient)
 
 	// Create bill for this booking
-	const bill = await createBillForBooking(
-		booking,
-		billing,
-		request.clientId,
-		supabaseClient
-	)
+	const bill = await createBillForBooking(booking, billing, request.clientId, supabaseClient)
 
 	// No immediate payment required
 	return {
@@ -915,21 +814,13 @@ export async function createBookingSimple(
 	try {
 		// Get billing settings (client-specific or user default)
 		// This returns the current active billing configuration
-		const billing = await getAppropriateBillingSettings(
-			request.userId,
-			request.clientId,
-			supabaseClient
-		)
+		const billing = await getAppropriateBillingSettings(request.userId, request.clientId, supabaseClient)
 
 		// If a custom price override was provided, apply it for this booking only
 		let resolvedBilling = { ...billing }
 		// Apply first consultation pricing if selected and available
-		if (
-			request.consultationType === 'first' &&
-			billing?.first_consultation_amount != null
-		) {
-			resolvedBilling.amount =
-				billing?.first_consultation_amount as number
+		if (request.consultationType === 'first' && billing?.first_consultation_amount != null) {
+			resolvedBilling.amount = billing?.first_consultation_amount as number
 		}
 		if (
 			request.overrideAmount != null &&
@@ -937,33 +828,20 @@ export async function createBookingSimple(
 			!Number.isNaN(request.overrideAmount) &&
 			request.overrideAmount >= 0
 		) {
-			resolvedBilling.amount =
-				Math.round(request.overrideAmount * 100) / 100
+			resolvedBilling.amount = Math.round(request.overrideAmount * 100) / 100
 		}
 
 		// Call appropriate function based on billing type
 		// Each function will COPY the billing data into the booking record
 		switch (resolvedBilling.type) {
 			case 'in-advance':
-				return await createInAdvanceBooking(
-					request,
-					resolvedBilling,
-					supabaseClient
-				)
+				return await createInAdvanceBooking(request, resolvedBilling, supabaseClient)
 
 			case 'right-after':
-				return await createRightAfterBooking(
-					request,
-					resolvedBilling,
-					supabaseClient
-				)
+				return await createRightAfterBooking(request, resolvedBilling, supabaseClient)
 
 			case 'monthly':
-				return await createMonthlyBooking(
-					request,
-					resolvedBilling,
-					supabaseClient
-				)
+				return await createMonthlyBooking(request, resolvedBilling, supabaseClient)
 
 			default:
 				throw new Error(`Unknown billing type: ${billing.type}`)
