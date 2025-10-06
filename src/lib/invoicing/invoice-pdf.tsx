@@ -1,4 +1,5 @@
 import React from 'react'
+import { format } from 'date-fns'
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 
 export interface InvoicePdfProps {
@@ -38,6 +39,7 @@ const styles = StyleSheet.create({
 	th: { flex: 1, fontWeight: 700 },
 	tr: { flexDirection: 'row', borderBottom: '0.5 solid #ccc', paddingVertical: 6 },
 	td: { flex: 1 },
+	tdRight: { flex: 1, textAlign: 'right' },
 	totals: { marginTop: 10, alignSelf: 'flex-start', width: 240 },
 	totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 2 },
 	rectifiesBox: { backgroundColor: '#FFF9C4', padding: 6, borderRadius: 2 },
@@ -62,7 +64,7 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
 		items
 	} = props
 
-	const issuedStr = issuedAt ? new Date(issuedAt).toISOString().slice(0, 10) : ''
+	const issuedStr = issuedAt ? format(new Date(issuedAt), 'dd/MM/yyyy') : ''
 	const displayNumber = series && number != null ? `${series}-${number}` : invoiceId.slice(0, 8)
 	const isCredit = props.kind === 'credit_note'
 
@@ -71,7 +73,7 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
 			<Page size="A4" style={styles.page}>
 				<View style={styles.header}>
 					<Text style={styles.headerTitle}>{isCredit ? 'Factura rectificativa' : 'Factura'}</Text>
-					{issuedStr ? <Text style={styles.headerLine}>Fecha de emisión (UTC): {issuedStr}</Text> : null}
+					{issuedStr ? <Text style={styles.headerLine}>Fecha de emisión: {issuedStr}</Text> : null}
 					<Text style={styles.headerLine}>ID: CAPP-{displayNumber}</Text>
 				</View>
 
@@ -105,7 +107,7 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
 					{items.map((it, idx) => (
 						<View key={idx} style={styles.tr}>
 							<Text style={styles.td}>{it.description}</Text>
-							<Text style={styles.td}>{(it.qty ?? 1).toString()}</Text>
+							<Text style={styles.tdRight}>{(it.qty ?? 1).toString()}</Text>
 							<Text style={styles.td}>
 								{(it.unit_price ?? 0).toFixed(2)} {currency}
 							</Text>

@@ -162,6 +162,24 @@ export async function getPaymentSessionByStripeSessionId(stripeSessionId: string
 }
 
 /**
+ * Retrieves a payment session by Stripe payment_intent ID.
+ * Useful for refund webhooks (refund.created / charge.refunded) where we only have the PI.
+ */
+export async function getPaymentSessionByPaymentIntentId(
+	stripePaymentIntentId: string,
+	supabaseClient?: SupabaseClient
+): Promise<PaymentSession | null> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('payment_sessions')
+		.select('*')
+		.eq('stripe_payment_intent_id', stripePaymentIntentId)
+		.maybeSingle()
+	if (error) throw error
+	return (data as any) || null
+}
+
+/**
  * Retrieves payment sessions for a specific booking
  * A booking may have multiple payment sessions (retries, refunds, etc.)
  *

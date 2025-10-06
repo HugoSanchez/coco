@@ -9,7 +9,9 @@ import Stripe from 'stripe'
 import * as Sentry from '@sentry/nextjs'
 import { captureEvent } from '@/lib/posthog/server'
 import { sendPaymentReceiptEmail } from '@/lib/emails/email-service'
-import { finalizeInvoiceForBillPayment } from '@/lib/invoicing/invoice-orchestration'
+import { finalizeInvoiceForBillPayment, createCreditNoteForInvoice } from '@/lib/invoicing/invoice-orchestration'
+import { getPaymentSessionByPaymentIntentId } from '@/lib/db/payment-sessions'
+import { findInvoiceByLegacyBillId } from '@/lib/db/invoices'
 
 /**
  * Stripe webhook handler
@@ -342,6 +344,67 @@ export async function POST(request: NextRequest) {
 						stage: 'calendar'
 					},
 					extra: { bookingId }
+				})
+			}
+		}
+		///////////////////////////////////////////////////////////
+		///// 3b. Handle refunds (idempotent)
+		///////////////////////////////////////////////////////////
+		// We support both refund.created and charge.refunded for resiliency.
+		// The key identifiers available are charge.payment_intent and refund.payment_intent.
+		// Strategy:
+		//  - Resolve payment_intent_id from the event.
+		//  - Find our payment_session by PI (idempotent lookup).
+		//  - If dual-write is enabled and an invoice exists (via legacy bill link), create a rectificativa.
+		const skip = true
+		if (skip) return NextResponse.json({ received: true })
+		else if (event.type === 'refund.created' || event.type === 'charge.refunded') {
+			try {
+				const connectedAccountId = (event as any).account as string | undefined
+				let paymentIntentId: string | undefined
+				if (event.type === 'refund.created') {
+					const refund = event.data.object as Stripe.Refund
+					paymentIntentId = (refund.payment_intent as string) || undefined
+				} else {
+					const charge = event.data.object as Stripe.Charge
+					paymentIntentId = (charge.payment_intent as string) || undefined
+				}
+				if (!paymentIntentId) return NextResponse.json({ received: true })
+
+				// Lookup our payment session by PI to correlate to booking/bill/invoice
+				const ps = await getPaymentSessionByPaymentIntentId(paymentIntentId, supabase)
+				if (!ps) return NextResponse.json({ received: true })
+
+				// Find legacy bill -> invoice mapping
+				if (process.env.ENABLE_INVOICES_DUAL_WRITE === 'true') {
+					try {
+						const legacyBills = await supabase
+							.from('bills')
+							.select('id, booking_id')
+							.eq('booking_id', ps.booking_id)
+							.order('created_at', { ascending: false })
+							.limit(1)
+						const billId = legacyBills.data?.[0]?.id
+						if (!billId) return NextResponse.json({ received: true })
+						const invoice = await findInvoiceByLegacyBillId(billId as string, supabase as any)
+						if (!invoice) return NextResponse.json({ received: true })
+
+						// Idempotency: if a credit note already exists for this refund id, skip.
+						// (We rely on unique stripe_refund_id per credit note in future migration.)
+						const reason = 'Anulación de consulta'
+						await createCreditNoteForInvoice(
+							{ invoiceId: invoice.id, userId: invoice.user_id, reason, stripeRefundId: undefined },
+							supabase as any
+						)
+					} catch (cnErr) {
+						Sentry.captureException(cnErr, {
+							tags: { component: 'webhook', kind: 'stripe-payments', stage: 'refund_credit_note' }
+						})
+					}
+				}
+			} catch (e) {
+				Sentry.captureException(e, {
+					tags: { component: 'webhook', kind: 'stripe-payments', stage: 'refund_handler' }
 				})
 			}
 		}

@@ -202,10 +202,8 @@ export async function createCreditNoteForInvoice(
 	for (const it of selected as any[]) {
 		const amount = -Math.abs(Number(it.amount || 0))
 		const tax_amount = -Math.abs(Number(it.tax_amount || 0))
-		const concept: string =
-			params.reason && params.reason.trim().length > 0
-				? `${params.reason} - ${it.description}`
-				: `Anulación de consulta - ${it.description}`
+		// Always use Spanish concept for rectificativas
+		const concept: string = 'Anulación de consulta'
 		await supabase!.from('invoice_items').insert({
 			invoice_id: credit.id,
 			booking_id: it.booking_id ?? null,

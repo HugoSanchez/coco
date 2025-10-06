@@ -399,11 +399,20 @@ export class PaymentOrchestrationService {
 					const invoice = await findInvoiceByLegacyBillId(paidBill.id, supabaseClient)
 					if (invoice) {
 						await markInvoiceRefunded(invoice.id, new Date(), reason ?? null, supabaseClient)
-						// Create a rectificativa (credit note) for the refund
-						await createCreditNoteForInvoice(
-							{ invoiceId: invoice.id, userId: invoice.user_id, reason: reason ?? null, stripeRefundId },
-							supabaseClient
-						)
+						// Create a rectificativa immediately from app flow for reliability
+						try {
+							await createCreditNoteForInvoice(
+								{
+									invoiceId: invoice.id,
+									userId: invoice.user_id,
+									reason: reason ?? 'Anulación de consulta',
+									stripeRefundId
+								},
+								supabaseClient
+							)
+						} catch (cnErr) {
+							console.warn('[payments][orch] credit note creation failed', cnErr)
+						}
 					}
 				} catch (e) {
 					console.warn('[payments][orch] invoice refund dual-write failed', e)
