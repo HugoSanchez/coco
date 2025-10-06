@@ -30,6 +30,7 @@ export interface InvoiceRow {
 	user_id: string
 	client_id: string | null
 	status: InvoiceStatus
+	document_kind?: 'invoice' | 'credit_note'
 	currency: string
 	subtotal: number
 	tax_total: number
@@ -51,6 +52,9 @@ export interface InvoiceRow {
 	billing_period_end: string | null
 	legacy_bill_id: string | null
 	notes: string | null
+	rectifies_invoice_id?: string | null
+	reason?: string | null
+	stripe_refund_id?: string | null
 	created_at: string
 	updated_at: string
 }
@@ -78,6 +82,11 @@ export async function createDraftInvoice(
 		billingPeriodEnd?: string | null
 		notes?: string | null
 		legacyBillId?: string | null
+		// extensions for credit notes
+		documentKind?: 'invoice' | 'credit_note'
+		rectifiesInvoiceId?: string | null
+		reason?: string | null
+		stripeRefundId?: string | null
 	},
 	supabase?: SupabaseClient
 ): Promise<InvoiceRow> {
@@ -96,7 +105,11 @@ export async function createDraftInvoice(
 				billing_period_start: params.billingPeriodStart ?? null,
 				billing_period_end: params.billingPeriodEnd ?? null,
 				notes: params.notes ?? null,
-				legacy_bill_id: params.legacyBillId ?? null
+				legacy_bill_id: params.legacyBillId ?? null,
+				document_kind: params.documentKind ?? 'invoice',
+				rectifies_invoice_id: params.rectifiesInvoiceId ?? null,
+				reason: params.reason ?? null,
+				stripe_refund_id: params.stripeRefundId ?? null
 			}
 		])
 		.select('*')
@@ -189,6 +202,57 @@ export async function issueInvoice(
 
 	// lock counter row by updating within a transaction-like sequence
 	// Supabase JS doesn't expose explicit BEGIN; we rely on a single UPDATE ... returning to get next_number
+	const { data: counterRows, error: counterErr } = await db
+		.from('invoice_counters')
+		.select('next_number')
+		.eq('user_id', userId)
+		.eq('series', series)
+		.single()
+	if (counterErr) throw counterErr
+	const nextNumber = (counterRows as any).next_number as number
+
+	const { error: bumpErr } = await db
+		.from('invoice_counters')
+		.update({ next_number: nextNumber + 1 })
+		.eq('user_id', userId)
+		.eq('series', series)
+	if (bumpErr) throw bumpErr
+
+	const { data: updated, error: updErr } = await db
+		.from('invoices')
+		.update({
+			status: 'issued',
+			issued_at: issuedAt.toISOString(),
+			series,
+			number: nextNumber,
+			year,
+			month
+		})
+		.eq('id', invoiceId)
+		.select('*')
+		.single()
+
+	if (updErr) throw updErr
+	return updated as unknown as InvoiceRow
+}
+
+/**
+ * issueCreditNote
+ * ----------------------------------------------
+ * Issues a credit note with series `R-YYYY-MM` and assigns sequential number.
+ */
+export async function issueCreditNote(
+	invoiceId: string,
+	userId: string,
+	issuedAt: Date = new Date(),
+	supabase?: SupabaseClient
+): Promise<InvoiceRow> {
+	const db = getClient(supabase)
+	const series = `R-${issuedAt.getUTCFullYear()}-${String(issuedAt.getUTCMonth() + 1).padStart(2, '0')}`
+	const year = issuedAt.getUTCFullYear()
+	const month = issuedAt.getUTCMonth() + 1
+
+	await db.rpc('ensure_invoice_counter', { u: userId, s: series })
 	const { data: counterRows, error: counterErr } = await db
 		.from('invoice_counters')
 		.select('next_number')

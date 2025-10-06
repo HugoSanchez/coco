@@ -20,6 +20,7 @@ import {
 } from '@/lib/db/payment-sessions'
 import { getStripeAccountForPayments } from '@/lib/db/stripe-accounts'
 import { findInvoiceByLegacyBillId, markInvoiceRefunded } from '@/lib/db/invoices'
+import { createCreditNoteForInvoice } from '@/lib/invoicing/invoice-orchestration'
 import { getBillsForBooking, updateBillStatus, markBillAsRefunded } from '@/lib/db/bills'
 import { getProfileById } from '@/lib/db/profiles'
 import { getBookingById } from '@/lib/db/bookings'
@@ -398,6 +399,11 @@ export class PaymentOrchestrationService {
 					const invoice = await findInvoiceByLegacyBillId(paidBill.id, supabaseClient)
 					if (invoice) {
 						await markInvoiceRefunded(invoice.id, new Date(), reason ?? null, supabaseClient)
+						// Create a rectificativa (credit note) for the refund
+						await createCreditNoteForInvoice(
+							{ invoiceId: invoice.id, userId: invoice.user_id, reason: reason ?? null, stripeRefundId },
+							supabaseClient
+						)
 					}
 				} catch (e) {
 					console.warn('[payments][orch] invoice refund dual-write failed', e)

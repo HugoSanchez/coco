@@ -20,10 +20,12 @@ import {
 	issueInvoice,
 	markInvoicePaid,
 	updateStripeReceiptUrl,
-	findInvoiceByLegacyBillId
+	findInvoiceByLegacyBillId,
+	issueCreditNote
 } from '@/lib/db/invoices'
-import { addInvoiceItem } from '@/lib/db/invoice-items'
+import { addInvoiceItem, listInvoiceItems } from '@/lib/db/invoice-items'
 import { linkPaymentSessionToInvoice } from '@/lib/db/payment-sessions'
+import { getInvoiceById } from '@/lib/db/invoices'
 import { generateAndStoreInvoicePdf } from '@/lib/invoicing/pdf-service'
 
 export interface CreateInvoiceForBookingInput {
@@ -151,4 +153,74 @@ export async function finalizeInvoiceForBillPayment(
 		invoiceId: invoice.id,
 		hadReceiptUrl: Boolean(params.receiptUrl)
 	})
+}
+
+/**
+ * createCreditNoteForInvoice
+ * ----------------------------------------------
+ * Creates and issues a "Factura rectificativa" that references a prior invoice.
+ * If items are omitted, credits all lines; otherwise credits only specified items.
+ */
+export async function createCreditNoteForInvoice(
+	params: {
+		invoiceId: string
+		userId: string
+		reason?: string | null
+		stripeRefundId?: string | null
+		items?: Array<{ itemId: string }>
+	},
+	supabase?: SupabaseClient
+): Promise<string> {
+	// Load original invoice and items
+	const original = await getInvoiceById(params.invoiceId, supabase)
+	if (!original) throw new Error('Original invoice not found')
+
+	// Draft credit note header
+	const credit = await createDraftInvoice(
+		{
+			userId: params.userId,
+			clientId: original.client_id,
+			currency: original.currency,
+			clientName: original.client_name_snapshot,
+			clientEmail: original.client_email_snapshot,
+			documentKind: 'credit_note',
+			rectifiesInvoiceId: original.id,
+			reason: params.reason ?? null,
+			stripeRefundId: params.stripeRefundId ?? null
+		},
+		supabase
+	)
+
+	// Build lines
+	const allItems = await listInvoiceItems(original.id, supabase)
+	const itemMap = new Map(allItems.map((it: any) => [it.id, it]))
+	const selected =
+		params.items && params.items.length > 0
+			? params.items.map((i) => itemMap.get(i.itemId)).filter(Boolean)
+			: allItems
+
+	for (const it of selected as any[]) {
+		const amount = -Math.abs(Number(it.amount || 0))
+		const tax_amount = -Math.abs(Number(it.tax_amount || 0))
+		const concept: string =
+			params.reason && params.reason.trim().length > 0
+				? `${params.reason} - ${it.description}`
+				: `Anulación de consulta - ${it.description}`
+		await supabase!.from('invoice_items').insert({
+			invoice_id: credit.id,
+			booking_id: it.booking_id ?? null,
+			description: concept,
+			qty: it.qty,
+			unit_price: it.unit_price,
+			amount,
+			tax_rate_percent: it.tax_rate_percent,
+			tax_amount,
+			rectifies_item_id: it.id
+		})
+	}
+
+	await computeInvoiceTotals(credit.id, supabase)
+	const issued = await issueCreditNote(credit.id, params.userId, new Date(), supabase)
+	await generateAndStoreInvoicePdf(issued.id)
+	return issued.id
 }

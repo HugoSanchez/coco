@@ -24,6 +24,12 @@ export async function generateAndStoreInvoicePdf(invoiceId: string): Promise<{ s
 	const practitionerName = practitionerProfile?.name || ''
 
 	// Prepare React-PDF document props
+	const rectifies = invoice.rectifies_invoice_id ? await getInvoiceById(invoice.rectifies_invoice_id, supabase) : null
+	const rectifiesDisplay =
+		rectifies?.series && rectifies?.number != null
+			? `${rectifies.series}-${rectifies.number}`
+			: rectifies?.id?.slice(0, 8) || null
+
 	const pdfElement = (
 		<InvoicePdfDocument
 			practitionerName={practitionerName}
@@ -38,6 +44,8 @@ export async function generateAndStoreInvoicePdf(invoiceId: string): Promise<{ s
 			subtotal={invoice.subtotal}
 			taxTotal={invoice.tax_total}
 			total={invoice.total}
+			kind={(invoice as any).document_kind}
+			rectifiesDisplay={rectifiesDisplay}
 			items={items}
 		/>
 	)

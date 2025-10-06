@@ -14,6 +14,8 @@ export interface InvoicePdfProps {
 	subtotal: number
 	taxTotal: number
 	total: number
+	kind?: 'invoice' | 'credit_note'
+	rectifiesDisplay?: string | null
 	items: Array<{
 		description: string
 		qty?: number | null
@@ -38,6 +40,7 @@ const styles = StyleSheet.create({
 	td: { flex: 1 },
 	totals: { marginTop: 10, alignSelf: 'flex-start', width: 240 },
 	totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 2 },
+	rectifiesBox: { backgroundColor: '#FFF9C4', padding: 6, borderRadius: 2 },
 	legalNote: { marginTop: 14, fontSize: 9, color: '#444' },
 	footerNote: { marginTop: 20, fontSize: 8, color: '#777', textAlign: 'center' }
 })
@@ -61,15 +64,22 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
 
 	const issuedStr = issuedAt ? new Date(issuedAt).toISOString().slice(0, 10) : ''
 	const displayNumber = series && number != null ? `${series}-${number}` : invoiceId.slice(0, 8)
+	const isCredit = props.kind === 'credit_note'
 
 	return (
 		<Document>
 			<Page size="A4" style={styles.page}>
 				<View style={styles.header}>
-					<Text style={styles.headerTitle}>Factura</Text>
+					<Text style={styles.headerTitle}>{isCredit ? 'Factura rectificativa' : 'Factura'}</Text>
+					{issuedStr ? <Text style={styles.headerLine}>Fecha de emisión (UTC): {issuedStr}</Text> : null}
 					<Text style={styles.headerLine}>ID: CAPP-{displayNumber}</Text>
-					{issuedStr ? <Text style={styles.headerLine}>Fecha de emisión: {issuedStr}</Text> : null}
 				</View>
+
+				{isCredit && props.rectifiesDisplay ? (
+					<View style={[styles.section, styles.rectifiesBox]}>
+						<Text>Rectifica la Factura Nº {props.rectifiesDisplay}</Text>
+					</View>
+				) : null}
 
 				<View style={styles.section}>
 					<Text style={styles.label}>Emisor</Text>
