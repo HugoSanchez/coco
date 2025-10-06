@@ -3,20 +3,8 @@
 import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow
-} from '@/components/ui/table'
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/use-toast'
 import {
@@ -41,6 +29,7 @@ import { es } from 'date-fns/locale'
 import { SideSheet } from '@/components/SideSheet'
 import BookingDetailsPanel from '@/components/BookingDetailsPanel'
 import { Info } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 export interface Booking {
 	id: string
@@ -50,13 +39,7 @@ export interface Booking {
 	startTime?: Date // Optional for backward compatibility
 	status: 'pending' | 'scheduled' | 'completed' | 'canceled'
 	billing_status: 'not_generated' | 'pending' | 'sent' | 'canceled'
-	payment_status:
-		| 'not_applicable'
-		| 'pending'
-		| 'paid'
-		| 'disputed'
-		| 'canceled'
-		| 'refunded'
+	payment_status: 'not_applicable' | 'pending' | 'paid' | 'disputed' | 'canceled' | 'refunded'
 	amount: number
 	currency?: string
 }
@@ -177,14 +160,12 @@ function BookingActions({
 			await onResendEmail(booking.id)
 			toast({
 				title: 'Email reenviado',
-				description:
-					'El email de confirmación ha sido enviado exitosamente.'
+				description: 'El email de confirmación ha sido enviado exitosamente.'
 			})
 		} catch (error) {
 			toast({
 				title: 'Error al reenviar email',
-				description:
-					'No se pudo reenviar el email. Inténtalo de nuevo.',
+				description: 'No se pudo reenviar el email. Inténtalo de nuevo.',
 				variant: 'destructive'
 			})
 		} finally {
@@ -213,46 +194,29 @@ function BookingActions({
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
-				<Button
-					variant="ghost"
-					className="h-8 w-8 p-0 hover:bg-gray-100"
-				>
-					{isMobile ? (
-						<MoreVertical className="h-4 w-4" />
-					) : (
-						<MoreHorizontal className="h-4 w-4" />
-					)}
+				<Button variant="ghost" className="h-8 w-8 p-0 hover:bg-gray-100">
+					{isMobile ? <MoreVertical className="h-4 w-4" /> : <MoreHorizontal className="h-4 w-4" />}
 				</Button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent
-				align="end"
-				className="space-y-1 p-2 border border-gray-300 rounded-lg"
-			>
+			<DropdownMenuContent align="end" className="space-y-1 p-2 border border-gray-300 rounded-lg">
 				{booking.payment_status === 'paid' && (
-					<DropdownMenuItem
-						onClick={() => onRefundBooking(booking.id)}
-						className="flex items-center gap-3"
-					>
+					<DropdownMenuItem onClick={() => onRefundBooking(booking.id)} className="flex items-center gap-3">
 						<RotateCcw className="h-3 w-3" />
 						Reembolsar pago
 					</DropdownMenuItem>
 				)}
-				{booking.status !== 'completed' &&
-					booking.status !== 'canceled' && (
-						<DropdownMenuItem
-							onClick={() => onRescheduleBooking(booking.id)}
-							className="flex items-center gap-3"
-						>
-							<Calendar className="h-3 w-3" />
-							Reprogramar cita
-						</DropdownMenuItem>
-					)}
+				{booking.status !== 'completed' && booking.status !== 'canceled' && (
+					<DropdownMenuItem
+						onClick={() => onRescheduleBooking(booking.id)}
+						className="flex items-center gap-3"
+					>
+						<Calendar className="h-3 w-3" />
+						Reprogramar cita
+					</DropdownMenuItem>
+				)}
 				{booking.payment_status === 'pending' && (
 					<>
-						<DropdownMenuItem
-							onClick={handleCopyPaymentLink}
-							className="flex items-center gap-3"
-						>
+						<DropdownMenuItem onClick={handleCopyPaymentLink} className="flex items-center gap-3">
 							<Copy className="h-3 w-3" />
 							Copiar link de pago
 						</DropdownMenuItem>
@@ -261,41 +225,26 @@ function BookingActions({
 							disabled={isResending}
 							className="flex items-center gap-3"
 						>
-							{isResending ? (
-								<Loader className="h-3 w-3 animate-spin" />
-							) : (
-								<Send className="h-3 w-3" />
-							)}
-							{isResending
-								? 'Reenviando...'
-								: 'Reenviar email de pago'}
+							{isResending ? <Loader className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+							{isResending ? 'Reenviando...' : 'Reenviar email de pago'}
 						</DropdownMenuItem>
 					</>
 				)}
 				{booking.payment_status !== 'paid' && (
-					<DropdownMenuItem
-						onClick={() => onMarkAsPaid(booking.id)}
-						className="flex items-center gap-3"
-					>
+					<DropdownMenuItem onClick={() => onMarkAsPaid(booking.id)} className="flex items-center gap-3">
 						<CreditCard className="h-3 w-3" />
 						Marcar cita como pagada
 					</DropdownMenuItem>
 				)}
 				{booking.status === 'pending' && (
-					<DropdownMenuItem
-						onClick={() => onConfirmBooking(booking.id)}
-						className="flex items-center gap-3"
-					>
+					<DropdownMenuItem onClick={() => onConfirmBooking(booking.id)} className="flex items-center gap-3">
 						<UserCheck className="h-3 w-3" />
 						Marcar cita como confirmada
 					</DropdownMenuItem>
 				)}
 
 				{booking.status !== 'canceled' && (
-					<DropdownMenuItem
-						onClick={() => onCancelBooking(booking.id)}
-						className="flex items-center gap-3"
-					>
+					<DropdownMenuItem onClick={() => onCancelBooking(booking.id)} className="flex items-center gap-3">
 						<Ban className="h-3 w-3" />
 						Cancelar cita
 					</DropdownMenuItem>
@@ -334,9 +283,7 @@ function BookingCard({
 				<div className="flex-1 min-w-0">
 					{/* Name, Date, and Amount on same line */}
 					<div className="flex items-center mb-2">
-						<div className="text-sm font-medium text-gray-900 truncate">
-							{booking.customerName}
-						</div>
+						<div className="text-sm font-medium text-gray-900 truncate">{booking.customerName}</div>
 						<div className="text-sm text-gray-600 font-light flex-shrink-0 ml-2">
 							{format(booking.bookingDate, 'dd MMM yyyy', {
 								locale: es
@@ -346,10 +293,7 @@ function BookingCard({
 
 					{/* Status badges on same line */}
 					<div className="flex gap-2">
-						<Badge
-							variant="outline"
-							className={`text-xs ${getStatusColor(booking.status)}`}
-						>
+						<Badge variant="outline" className={`text-xs ${getStatusColor(booking.status)}`}>
 							{getStatusLabel(booking.status)}
 						</Badge>
 						<Badge
@@ -402,7 +346,13 @@ export function BookingsTable({
 	onResendEmail
 }: BookingsTableProps) {
 	const isMobile = window.innerWidth > 768
-	const [detailsOpen, setDetailsOpen] = useState(false)
+	const router = useRouter()
+	const searchParams = useSearchParams()
+	const [detailsOpen, setDetailsOpen] = useState(() => {
+		if (typeof window === 'undefined') return false
+		const sp = new URLSearchParams(window.location.search)
+		return sp.get('panel') === 'booking' && !!sp.get('id')
+	})
 	const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
 	const [details, setDetails] = useState<any>(null)
 
@@ -410,6 +360,12 @@ export function BookingsTable({
 		setSelectedBooking(b)
 		setDetails(null)
 		setDetailsOpen(true)
+		// Reflect open state in URL for persistence across tab switches / reloads
+		try {
+			const path = window.location.pathname
+			const base = `${path}?panel=booking&id=${b.id}`
+			router.replace(base)
+		} catch (_) {}
 		try {
 			const res = await fetch(`/api/bookings/${b.id}`)
 			if (res.ok) {
@@ -418,6 +374,38 @@ export function BookingsTable({
 			}
 		} catch (_) {}
 	}
+
+	// Sync opening from URL (deep-link / back-forward)
+	try {
+		const paramPanel = searchParams.get('panel')
+		const paramId = searchParams.get('id')
+		if (paramPanel === 'booking' && paramId && !detailsOpen) {
+			setDetailsOpen(true)
+			// Fetch if not already loaded or for a different booking
+			if (!selectedBooking || selectedBooking.id !== paramId) {
+				setSelectedBooking({
+					id: paramId,
+					customerName: '',
+					customerEmail: '',
+					bookingDate: new Date(),
+					status: 'pending',
+					billing_status: 'pending',
+					payment_status: 'pending',
+					amount: 0,
+					currency: 'EUR'
+				} as any)
+				;(async () => {
+					try {
+						const res = await fetch(`/api/bookings/${paramId}`)
+						if (res.ok) {
+							const data = await res.json()
+							setDetails(data)
+						}
+					} catch (_) {}
+				})()
+			}
+		}
+	} catch (_) {}
 	if (loading) {
 		return (
 			<div className="flex justify-center items-center py-8">
@@ -427,11 +415,7 @@ export function BookingsTable({
 	}
 
 	if (bookings.length === 0) {
-		return (
-			<div className="text-center py-8 text-gray-500">
-				No hay citas programadas
-			</div>
-		)
+		return <div className="text-center py-8 text-gray-500">No hay citas programadas</div>
 	}
 
 	return (
@@ -459,9 +443,7 @@ export function BookingsTable({
 					<Table>
 						<TableHeader>
 							<TableRow className=" border-b ">
-								<TableHead className="font-medium w-[150px] md:w-[150px]">
-									Paciente
-								</TableHead>
+								<TableHead className="font-medium w-[150px] md:w-[150px]">Paciente</TableHead>
 								<TableHead className="hidden md:table-cell font-semibold w-[140px] text-center">
 									Fecha
 								</TableHead>
@@ -474,9 +456,7 @@ export function BookingsTable({
 								<TableHead className="hidden lg:table-cell font-semibold w-[120px] text-center">
 									Pago
 								</TableHead>
-								<TableHead className="text-right font-semibold w-[120px]">
-									Honorarios
-								</TableHead>
+								<TableHead className="text-right font-semibold w-[120px]">Honorarios</TableHead>
 								<TableHead className="w-[50px]"></TableHead>
 							</TableRow>
 						</TableHeader>
@@ -487,8 +467,7 @@ export function BookingsTable({
 										<div className="flex items-center justify-center h-full">
 											<div className="text-center">
 												<p className="text-sm text-gray-400">
-													Todavía no hay citas
-													programadas.
+													Todavía no hay citas programadas.
 												</p>
 											</div>
 										</div>
@@ -503,42 +482,26 @@ export function BookingsTable({
 									>
 										{/* Client */}
 										<TableCell className="py-2 pr-0">
-											<div className="font-medium">
-												{booking.customerName}
-											</div>
+											<div className="font-medium">{booking.customerName}</div>
 										</TableCell>
 
 										{/* Date */}
 										<TableCell className="hidden md:table-cell text-center py-2">
 											<span className="font-light">
-												{format(
-													booking.bookingDate,
-													'dd MMM yyyy',
-													{ locale: es }
-												)}
+												{format(booking.bookingDate, 'dd MMM yyyy', { locale: es })}
 											</span>
 										</TableCell>
 
 										{/* Time */}
 										<TableCell className="hidden md:table-cell text-center py-2">
 											<span className="font-light">
-												{format(
-													booking.startTime ||
-														booking.bookingDate,
-													'HH:mm'
-												)}
-												h
+												{format(booking.startTime || booking.bookingDate, 'HH:mm')}h
 											</span>
 										</TableCell>
 
 										{/* Booking Status */}
 										<TableCell className="hidden sm:table-cell text-center py-2">
-											<Badge
-												variant="outline"
-												className={getStatusColor(
-													booking.status
-												)}
-											>
+											<Badge variant="outline" className={getStatusColor(booking.status)}>
 												{getStatusLabel(booking.status)}
 											</Badge>
 										</TableCell>
@@ -547,57 +510,38 @@ export function BookingsTable({
 										<TableCell className="hidden lg:table-cell text-center py-2">
 											<Badge
 												variant="outline"
-												className={getPaymentStatusColor(
-													booking.payment_status
-												)}
+												className={getPaymentStatusColor(booking.payment_status)}
 											>
-												{booking.payment_status ===
-												'paid' ? (
+												{booking.payment_status === 'paid' ? (
 													<Check className="h-4 w-4 mr-2 text-teal-500" />
-												) : booking.payment_status ===
-												  'pending' ? (
+												) : booking.payment_status === 'pending' ? (
 													<Loader className="h-3 w-3 mr-2" />
-												) : booking.payment_status ===
-												  'refunded' ? (
+												) : booking.payment_status === 'refunded' ? (
 													<RefreshCcw className="h-3 w-3 mr-2 text-gray-900" />
 												) : (
 													<X className="h-3 w-3 mr-2 text-red-500" />
 												)}
-												{getPaymentStatusLabel(
-													booking.payment_status
-												)}
+												{getPaymentStatusLabel(booking.payment_status)}
 											</Badge>
 										</TableCell>
 
 										{/* Amount */}
 										<TableCell className="text-right font-light py-2">
 											<span className="font-semibold">
-												{booking.amount.toFixed(2)}{' '}
-												{booking.currency || 'EUR'}
+												{booking.amount.toFixed(2)} {booking.currency || 'EUR'}
 											</span>
 										</TableCell>
 
 										{/* Actions */}
-										<TableCell
-											className="text-right py-2"
-											onClick={(e) => e.stopPropagation()}
-										>
+										<TableCell className="text-right py-2" onClick={(e) => e.stopPropagation()}>
 											<BookingActions
 												isMobile={isMobile}
 												booking={booking}
-												onCancelBooking={
-													onCancelBooking
-												}
-												onConfirmBooking={
-													onConfirmBooking
-												}
+												onCancelBooking={onCancelBooking}
+												onConfirmBooking={onConfirmBooking}
 												onMarkAsPaid={onMarkAsPaid}
-												onRefundBooking={
-													onRefundBooking
-												}
-												onRescheduleBooking={
-													onRescheduleBooking
-												}
+												onRefundBooking={onRefundBooking}
+												onRescheduleBooking={onRescheduleBooking}
 												onResendEmail={onResendEmail}
 												onViewDetails={openDetails}
 											/>
@@ -611,13 +555,23 @@ export function BookingsTable({
 			</div>
 			<SideSheet
 				isOpen={detailsOpen}
-				onClose={() => setDetailsOpen(false)}
+				onClose={() => {
+					setDetailsOpen(false)
+					try {
+						router.replace(window.location.pathname)
+					} catch (_) {}
+				}}
 				title="Detalles de la cita"
 				description={undefined}
 			>
 				<BookingDetailsPanel
 					details={details}
-					onClose={() => setDetailsOpen(false)}
+					onClose={() => {
+						setDetailsOpen(false)
+						try {
+							router.replace(window.location.pathname)
+						} catch (_) {}
+					}}
 				/>
 			</SideSheet>
 		</div>

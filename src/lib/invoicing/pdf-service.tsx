@@ -23,6 +23,18 @@ export async function generateAndStoreInvoicePdf(invoiceId: string): Promise<{ s
 	const practitionerProfile = await getProfileById(invoice.user_id, supabase)
 	const practitionerName = practitionerProfile?.name || ''
 
+	// Skip PDF generation if issuer fiscal data is missing (proxy for invoicing setup)
+	const missingFiscal =
+		!practitionerProfile?.tax_id ||
+		!practitionerProfile?.fiscal_address_line1 ||
+		!practitionerProfile?.fiscal_city ||
+		!practitionerProfile?.fiscal_province ||
+		!practitionerProfile?.fiscal_postal_code
+	if (missingFiscal) {
+		// No-op: do not generate PDF, but return a placeholder path info
+		return { storagePath: '' }
+	}
+
 	// Prepare React-PDF document props
 	const rectifies = invoice.rectifies_invoice_id ? await getInvoiceById(invoice.rectifies_invoice_id, supabase) : null
 	const rectifiesDisplay =

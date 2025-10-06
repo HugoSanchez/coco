@@ -4,13 +4,14 @@ import { useState, useEffect, Suspense } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { User, Calendar, CreditCard, Settings } from 'lucide-react'
+import FiscalDataForm from '@/components/FiscalDataForm'
 import { ProfileSetup } from '@/components/ProfileSetup'
 import { CalendarStep } from '@/components/CalendarStep'
 import { BillingPreferencesStep } from '@/components/BillingPreferencesStep'
 import { PaymentsStep } from '@/components/PaymentsStep'
 import { Spinner } from '@/components/ui/spinner'
 
-type SettingsSection = 'profile' | 'calendar' | 'billing' | 'payments'
+type SettingsSection = 'profile' | 'calendar' | 'billing' | 'payments' | 'fiscal'
 
 const settingsMenuItems = [
 	{
@@ -32,6 +33,12 @@ const settingsMenuItems = [
 		description: 'Set up your default billing preferences'
 	},
 	{
+		id: 'fiscal' as SettingsSection,
+		label: 'Datos fiscales',
+		icon: Settings,
+		description: 'Información para emitir facturas'
+	},
+	{
 		id: 'payments' as SettingsSection,
 		label: 'Pasarela de Pago',
 		icon: Settings,
@@ -43,20 +50,14 @@ function SettingsContent() {
 	const { user, stripeOnboardingCompleted, calendarConnected } = useUser()
 	const searchParams = useSearchParams()
 	const router = useRouter()
-	const [activeSection, setActiveSection] = useState<SettingsSection | null>(
-		null
-	) // Start with null to show loading
+	const [activeSection, setActiveSection] = useState<SettingsSection | null>(null) // Start with null to show loading
 	const [isInitialized, setIsInitialized] = useState(false)
 
 	// Minimal guard: send brand-new users to onboarding
 	useEffect(() => {
 		if (!user) return
-		if (stripeOnboardingCompleted === null || calendarConnected === null)
-			return
-		if (
-			stripeOnboardingCompleted === false &&
-			calendarConnected === false
-		) {
+		if (stripeOnboardingCompleted === null || calendarConnected === null) return
+		if (stripeOnboardingCompleted === false && calendarConnected === false) {
 			router.replace('/onboarding')
 		}
 	}, [user, stripeOnboardingCompleted, calendarConnected, router])
@@ -65,10 +66,7 @@ function SettingsContent() {
 	useEffect(() => {
 		// Check for tab parameter in URL and set active section
 		const tabParam = searchParams.get('tab')
-		if (
-			tabParam &&
-			['profile', 'calendar', 'billing', 'payments'].includes(tabParam)
-		) {
+		if (tabParam && ['profile', 'calendar', 'billing', 'payments', 'fiscal'].includes(tabParam)) {
 			setActiveSection(tabParam as SettingsSection)
 			setIsInitialized(true)
 		} else if (!tabParam) {
@@ -182,6 +180,13 @@ function SettingsContent() {
 					</div>
 				)
 
+			case 'fiscal':
+				return (
+					<div className="">
+						<FiscalDataForm onSaved={() => {}} />
+					</div>
+				)
+
 			default:
 				return null
 		}
@@ -202,11 +207,7 @@ function SettingsContent() {
 		<div className="min-h-screen bg-gray-50 pt-16">
 			{/* Mobile tabs header */}
 			<div className="md:hidden px-6 py-4">
-				{window.innerWidth < 768 ? (
-					<h1 className="text-xl font-medium text-gray-900 mb-3">
-						Settings
-					</h1>
-				) : null}
+				{window.innerWidth < 768 ? <h1 className="text-xl font-medium text-gray-900 mb-3">Settings</h1> : null}
 				<div className="flex gap-2 overflow-x-auto scrollbar-hide py-4">
 					{settingsMenuItems.map((item) => {
 						const isActive = activeSection === item.id
@@ -232,9 +233,7 @@ function SettingsContent() {
 				<div className="hidden md:block w-96 min-h-screen bg-gray-50 border-r border-gray-200">
 					<div className="pt-8 px-16">
 						<div className="mb-8">
-							<h1 className="text-xl font-medium text-gray-900 mb-1">
-								Settings
-							</h1>
+							<h1 className="text-xl font-medium text-gray-900 mb-1">Settings</h1>
 						</div>
 
 						<nav className="space-y-1">
@@ -261,9 +260,7 @@ function SettingsContent() {
 
 				{/* Main Content Area */}
 				<div className="flex-1">
-					<div className="px-6 md:px-16 pb-14">
-						{renderSectionContent()}
-					</div>
+					<div className="px-6 md:px-16 pb-14">{renderSectionContent()}</div>
 				</div>
 			</div>
 		</div>

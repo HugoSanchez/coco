@@ -218,6 +218,32 @@ export async function issueInvoice(
 		.eq('series', series)
 	if (bumpErr) throw bumpErr
 
+	// Fetch issuer (practitioner) fiscal data for immutable snapshots
+	let issuerName: string | null = null
+	let issuerTaxId: string | null = null
+	let issuerAddress: any = null
+	try {
+		const { data: profile } = await db
+			.from('profiles')
+			.select(
+				'name, tax_id, fiscal_address_line1, fiscal_address_line2, fiscal_city, fiscal_province, fiscal_postal_code, fiscal_country'
+			)
+			.eq('id', userId)
+			.single()
+		if (profile) {
+			issuerName = (profile as any).name || null
+			issuerTaxId = (profile as any).tax_id || null
+			issuerAddress = {
+				line1: (profile as any).fiscal_address_line1 || null,
+				line2: (profile as any).fiscal_address_line2 || null,
+				city: (profile as any).fiscal_city || null,
+				province: (profile as any).fiscal_province || null,
+				postal_code: (profile as any).fiscal_postal_code || null,
+				country: (profile as any).fiscal_country || 'ES'
+			}
+		}
+	} catch (_) {}
+
 	const { data: updated, error: updErr } = await db
 		.from('invoices')
 		.update({
@@ -226,7 +252,10 @@ export async function issueInvoice(
 			series,
 			number: nextNumber,
 			year,
-			month
+			month,
+			issuer_name_snapshot: issuerName,
+			issuer_tax_id_snapshot: issuerTaxId,
+			issuer_address_snapshot: issuerAddress
 		})
 		.eq('id', invoiceId)
 		.select('*')
@@ -269,6 +298,32 @@ export async function issueCreditNote(
 		.eq('series', series)
 	if (bumpErr) throw bumpErr
 
+	// Fetch issuer (practitioner) fiscal data for immutable snapshots
+	let issuerName: string | null = null
+	let issuerTaxId: string | null = null
+	let issuerAddress: any = null
+	try {
+		const { data: profile } = await db
+			.from('profiles')
+			.select(
+				'name, tax_id, fiscal_address_line1, fiscal_address_line2, fiscal_city, fiscal_province, fiscal_postal_code, fiscal_country'
+			)
+			.eq('id', userId)
+			.single()
+		if (profile) {
+			issuerName = (profile as any).name || null
+			issuerTaxId = (profile as any).tax_id || null
+			issuerAddress = {
+				line1: (profile as any).fiscal_address_line1 || null,
+				line2: (profile as any).fiscal_address_line2 || null,
+				city: (profile as any).fiscal_city || null,
+				province: (profile as any).fiscal_province || null,
+				postal_code: (profile as any).fiscal_postal_code || null,
+				country: (profile as any).fiscal_country || 'ES'
+			}
+		}
+	} catch (_) {}
+
 	const { data: updated, error: updErr } = await db
 		.from('invoices')
 		.update({
@@ -277,7 +332,10 @@ export async function issueCreditNote(
 			series,
 			number: nextNumber,
 			year,
-			month
+			month,
+			issuer_name_snapshot: issuerName,
+			issuer_tax_id_snapshot: issuerTaxId,
+			issuer_address_snapshot: issuerAddress
 		})
 		.eq('id', invoiceId)
 		.select('*')

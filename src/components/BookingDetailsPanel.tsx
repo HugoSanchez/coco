@@ -52,15 +52,15 @@ export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelPro
 	const getStatusColor = (status?: string) => {
 		switch (status) {
 			case 'pending':
-				return 'text-gray-700 border-gray-200 font-normal bg-white py-1 px-3'
+				return 'text-gray-700 border-gray-200 font-normal bg-white py-2 px-4'
 			case 'scheduled':
-				return 'bg-teal-100 border-teal-200 border text-teal-800 font-medium py-1 px-3'
+				return 'bg-teal-100 border-teal-200 border text-teal-800 font-medium py-2 px-4'
 			case 'completed':
-				return 'bg-teal-100 border-0 text-teal-800 font-medium py-1 px-3'
+				return 'bg-teal-100 border-0 text-teal-800 font-medium py-2 px-4'
 			case 'canceled':
-				return 'bg-red-50 text-red-800 border-0 font-medium py-1 px-3'
+				return 'bg-red-100 text-red-800 border-0 font-medium py-2 px-4'
 			default:
-				return 'bg-gray-100 text-gray-700 border-gray-200 py-1 px-3'
+				return 'bg-gray-100 text-gray-700 border-gray-200 py-2 px-4'
 		}
 	}
 
@@ -78,7 +78,7 @@ export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelPro
 			case 'canceled':
 				return 'Cancelado'
 			case 'refunded':
-				return 'Devuelto'
+				return 'Reembolsado'
 			default:
 				return status
 		}
@@ -87,19 +87,19 @@ export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelPro
 	const getPaymentStatusColor = (status: PaymentStatus) => {
 		switch (status) {
 			case 'not_applicable':
-				return 'bg-gray-100 text-gray-500 border-gray-200 py-1 px-3'
+				return 'bg-gray-100 text-gray-500 border-gray-200 py-2 px-4'
 			case 'pending':
-				return 'bg-white text-gray-700 border-gray-200 font-normal py-1 px-3'
+				return 'bg-white text-gray-700 border-gray-200 font-normal py-2 px-4'
 			case 'paid':
-				return 'bg-teal-100 border-teal-200 border text-teal-700 font-medium py-1 px-3'
+				return 'bg-teal-100 border-teal-200 border text-teal-700 font-medium py-2 px-4'
 			case 'disputed':
-				return 'bg-red-100 text-red-700 border-red-200 py-1 px-3'
+				return 'bg-red-100 text-red-700 border-red-200 py-2 px-4'
 			case 'canceled':
-				return 'text-gray-700 border-0 font-medium py-1 px-3'
+				return 'text-gray-700 border-0 font-medium py-2 px-4'
 			case 'refunded':
-				return 'text-gray-700 border-0 font-medium py-1 px-3'
+				return 'text-gray-700 bg-gray-200 border-1 border-gray-200 font-medium py-2 px-4'
 			default:
-				return 'bg-gray-100 text-gray-700 border-gray-200 py-1 px-3'
+				return 'bg-gray-100 text-gray-700 border-gray-200 py-2 px-4'
 		}
 	}
 
@@ -147,7 +147,7 @@ export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelPro
 			{/* Status and Payment badges side-by-side */}
 			<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 				<div className="space-y-1">
-					<label className="text-xs text-gray-500 block">Estado</label>
+					<label className="text-xs text-gray-500 block mb-2">Estado de agenda</label>
 					<div>
 						<Badge
 							variant="outline"
@@ -158,7 +158,7 @@ export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelPro
 					</div>
 				</div>
 				<div className="space-y-1">
-					<label className="text-xs text-gray-500 block">Pago</label>
+					<label className="text-xs text-gray-500 block mb-2">Estado de pago</label>
 					<div>
 						{(() => {
 							const ps = mapBillToPaymentStatus(bill)
@@ -228,46 +228,40 @@ export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelPro
 				</div>
 			</div>
 
-			{/* Receipt */}
-			{bill?.stripe_receipt_url && (
+			{/* Documents: receipt + invoices on one line */}
+			{(bill?.stripe_receipt_url || (Array.isArray(details?.invoices) && details.invoices.length > 0)) && (
 				<div className="space-y-1">
-					<label className="text-xs text-gray-500 block">Recibo</label>
-					<div className="text-sm py-2 ">
-						<a
-							href={bill.stripe_receipt_url}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="text-teal-700 border border-gray-200 bg-gray-100 rounded-md p-2 hover:bg-gray-200"
-						>
-							Ver recibo
-						</a>
-					</div>
-				</div>
-			)}
-
-			{/* Invoices */}
-			{Array.isArray(details?.invoices) && details.invoices.length > 0 && (
-				<div className="space-y-1">
-					<label className="text-xs text-gray-500 block">Facturas</label>
-					<div className="flex flex-wrap gap-2 py-2">
-						{details.invoices.map((inv: any, idx: number) => (
+					<label className="text-xs text-gray-500 block">Facturas y recibos</label>
+					<div className="flex flex-wrap items-center gap-2 py-2">
+						{bill?.stripe_receipt_url && (
 							<a
-								key={`${inv.kind}-${inv.display}-${idx}`}
-								href={inv.url || '#'}
-								target={inv.url ? '_blank' : undefined}
-								rel={inv.url ? 'noopener noreferrer' : undefined}
-								className={`text-sm border rounded-md p-2 ${
-									inv.kind === 'credit_note'
-										? 'text-amber-800 border-amber-200 bg-amber-50'
-										: 'text-teal-700 border-gray-200 bg-gray-100'
-								}`}
-								onClick={(e) => {
-									if (!inv.url) e.preventDefault()
-								}}
+								href={bill.stripe_receipt_url}
+								target="_blank"
+								rel="noopener noreferrer"
+								className="text-sm text-gray-800 font-medium border border-gray-200 bg-gray-200 rounded-md p-2 px-4 hover:bg-gray-200"
 							>
-								{inv.kind === 'credit_note' ? 'Rectificativa' : 'Factura'} {inv.display}
+								Ver recibo
 							</a>
-						))}
+						)}
+						{Array.isArray(details?.invoices) &&
+							details.invoices.map((inv: any, idx: number) => (
+								<a
+									key={`${inv.kind}-${inv.display}-${idx}`}
+									href={inv.url || '#'}
+									target={inv.url ? '_blank' : undefined}
+									rel={inv.url ? 'noopener noreferrer' : undefined}
+									className={`text-sm border rounded-md p-2 ${
+										inv.kind === 'credit_note'
+											? 'text-gray-800 font-medium border-gray-200 border-2 bg-gray-200 px-4'
+											: 'text-gray-800 font-medium border-gray-200 bg-gray-200 px-4'
+									}`}
+									onClick={(e) => {
+										if (!inv.url) e.preventDefault()
+									}}
+								>
+									Ver {inv.kind === 'credit_note' ? 'Rectificativa' : 'Factura'}
+								</a>
+							))}
 					</div>
 				</div>
 			)}

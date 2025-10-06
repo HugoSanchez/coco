@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { getBookingsForExport } from '@/lib/db/bookings'
 import { toCsv } from '@/lib/utils'
 
@@ -31,13 +31,8 @@ export async function GET(request: NextRequest) {
 		const { searchParams } = new URL(request.url)
 		const customerSearch = searchParams.get('customerSearch') || undefined
 		const statusFilter =
-			(searchParams.get('statusFilter') as
-				| 'all'
-				| 'pending'
-				| 'scheduled'
-				| 'completed'
-				| 'canceled'
-				| null) || 'all'
+			(searchParams.get('statusFilter') as 'all' | 'pending' | 'scheduled' | 'completed' | 'canceled' | null) ||
+			'all'
 		const startDate = searchParams.get('startDate') || undefined
 		const endDate = searchParams.get('endDate') || undefined
 
@@ -51,6 +46,24 @@ export async function GET(request: NextRequest) {
 			},
 			supabase
 		)
+
+		// Pre-sign invoice PDF URLs for 1 year (31536000 seconds)
+		const service = createServiceRoleClient()
+		const pdfPaths = rows
+			.flatMap((r) => [r.invoice_pdf_path, ...(r.credit_note_pdf_paths || [])])
+			.filter((p): p is string => typeof p === 'string' && p.length > 0)
+		let signedUrlByPath: Record<string, string> = {}
+		if (pdfPaths.length > 0) {
+			const keys = pdfPaths.map((p) => p.replace(/^invoices\//, ''))
+			const { data: signedList } = await service.storage.from('invoices').createSignedUrls(keys, 31536000)
+			if (signedList && signedList.length === keys.length) {
+				for (let i = 0; i < keys.length; i++) {
+					const origPath = pdfPaths[i]
+					const signed = signedList[i]?.signedUrl || ''
+					signedUrlByPath[origPath] = signed
+				}
+			}
+		}
 
 		const formatParam = (searchParams.get('format') || 'json').toLowerCase()
 
@@ -95,10 +108,18 @@ export async function GET(request: NextRequest) {
 				const end = new Date(r.booking_end_time_iso)
 				const paidAt = r.paid_at_iso ? new Date(r.paid_at_iso) : null
 				const pad = (n: number) => String(n).padStart(2, '0')
-				const ddmmyyyy = (d: Date) =>
-					`${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`
-				const hhmm = (d: Date) =>
-					`${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
+				const ddmmyyyy = (d: Date) => `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`
+				const hhmm = (d: Date) => `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
+
+				const creditNumbers = (r.credit_note_numbers || []).join(' | ')
+				const creditLinks = (r.credit_note_pdf_paths || [])
+					.map((p) => (p ? signedUrlByPath[p] || '' : ''))
+					.filter((u) => u)
+					.join(' | ')
+
+				const importeNeto = (
+					(typeof r.amount === 'number' ? r.amount : 0) - (r.credit_note_total_abs || 0)
+				).toFixed(2)
 
 				return {
 					id_cita: r.booking_id,
@@ -109,18 +130,21 @@ export async function GET(request: NextRequest) {
 					hora_de_la_cita_utc: hhmm(start),
 					estado: toEsBookingStatus(r.booking_status),
 					estado_de_pago: toEsPaymentStatus(r.payment_status),
-					importe: (typeof r.amount === 'number'
-						? r.amount
-						: 0
-					).toFixed(2),
+					importe: (typeof r.amount === 'number' ? r.amount : 0).toFixed(2),
+					importe_neto: importeNeto,
 					moneda: r.currency,
-					pagado_el_utc: paidAt
-						? `${ddmmyyyy(paidAt)} ${hhmm(paidAt)}`
-						: '',
+					pagado_el_utc: paidAt ? `${ddmmyyyy(paidAt)} ${hhmm(paidAt)}` : '',
 					importe_reembolso: (r.refund_amount || 0).toFixed(2),
-					url_recibo: r.receipt_url || '',
 					servicio: r.service_name,
-					zona_horaria: r.timezone
+					zona_horaria: r.timezone,
+					numero_de_factura:
+						r.invoice_series && typeof r.invoice_number === 'number'
+							? `${r.invoice_series}-${r.invoice_number}`
+							: '',
+					url_factura_pdf: r.invoice_pdf_path ? signedUrlByPath[r.invoice_pdf_path] || '' : '',
+					numeros_de_rectificativas: creditNumbers,
+					urls_rectificativas_pdf: creditLinks,
+					total_rectificado_abs: (r.credit_note_total_abs || 0).toFixed(2)
 				}
 			})
 
@@ -134,12 +158,17 @@ export async function GET(request: NextRequest) {
 				'estado',
 				'estado_de_pago',
 				'importe',
+				'importe_neto',
 				'moneda',
 				'pagado_el_utc',
 				'importe_reembolso',
-				'url_recibo',
 				'servicio',
-				'zona_horaria'
+				'zona_horaria',
+				'numero_de_factura',
+				'url_factura_pdf',
+				'numeros_de_rectificativas',
+				'urls_rectificativas_pdf',
+				'total_rectificado_abs'
 			]
 
 			const csv = toCsv(headers, formatted)

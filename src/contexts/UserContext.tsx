@@ -22,14 +22,7 @@
 
 'use client'
 
-import {
-	createContext,
-	useContext,
-	useEffect,
-	useState,
-	useCallback,
-	useRef
-} from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import * as Sentry from '@sentry/nextjs'
 import { useRouter } from 'next/navigation'
@@ -55,6 +48,14 @@ interface UserProfile {
 	description?: string
 	profile_picture_url?: string
 	default_in_person_location_text?: string | null
+	// Fiscal fields used by FiscalDataForm
+	tax_id?: string | null
+	fiscal_address_line1?: string | null
+	fiscal_address_line2?: string | null
+	fiscal_city?: string | null
+	fiscal_province?: string | null
+	fiscal_postal_code?: string | null
+	fiscal_country?: string | null
 }
 
 /**
@@ -114,14 +115,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 	const supabase = createClient()
 
 	// State for stripe status
-	const [stripeOnboardingCompleted, setStripeOnboardingCompleted] = useState<
-		boolean | null
-	>(null)
+	const [stripeOnboardingCompleted, setStripeOnboardingCompleted] = useState<boolean | null>(null)
 
 	// Google Calendar connection status
-	const [calendarConnected, setCalendarConnected] = useState<boolean | null>(
-		null
-	)
+	const [calendarConnected, setCalendarConnected] = useState<boolean | null>(null)
 
 	// Effect: Set up authentication state listener
 	useEffect(() => {
@@ -183,13 +180,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 		// Identify user in PostHog on the client when authenticated
 		try {
 			const allowClientCapture =
-				process.env.NODE_ENV === 'production' ||
-				process.env.NEXT_PUBLIC_POSTHOG_CAPTURE_DEV === 'true'
+				process.env.NODE_ENV === 'production' || process.env.NEXT_PUBLIC_POSTHOG_CAPTURE_DEV === 'true'
 			if (user && allowClientCapture) {
-				posthog.identify(
-					user.id,
-					user.email ? { email: user.email } : undefined
-				)
+				posthog.identify(user.id, user.email ? { email: user.email } : undefined)
 			} else if (!user) {
 				posthog.reset()
 			}
@@ -266,8 +259,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 					return false
 				}
 
-				const isCompleted =
-					data.onboarding_completed && data.payments_enabled
+				const isCompleted = data.onboarding_completed && data.payments_enabled
 				setStripeOnboardingCompleted(isCompleted)
 				console.log('[stripe-status]', {
 					userId: user.id,
