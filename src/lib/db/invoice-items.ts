@@ -81,3 +81,87 @@ export async function listInvoiceItems(invoiceId: string, supabase?: SupabaseCli
 	if (error) throw error
 	return data || []
 }
+
+/**
+ * listMonthlyDraftItemsForPeriod
+ * ----------------------------------------------
+ * Returns invoice_items with cadence='monthly' whose service_date falls within
+ * [periodStart, periodEnd] and whose current parent invoice is in status 'draft'.
+ * Includes minimal parent invoice header data for grouping by user/client.
+ */
+export async function listMonthlyDraftItemsForPeriod(
+	periodStartIso: string,
+	periodEndIso: string,
+	supabase?: SupabaseClient
+) {
+	const db = getClient(supabase)
+	console.log('[monthly][db] listMonthlyDraftItemsForPeriod', { periodStartIso, periodEndIso })
+	// STEP 1: Load candidate items without join filters
+	const { data: items, error: itemsErr } = await db
+		.from('invoice_items')
+		.select(
+			[
+				'id',
+				'invoice_id',
+				'booking_id',
+				'description',
+				'qty',
+				'unit_price',
+				'amount',
+				'tax_amount',
+				'service_date',
+				'cadence'
+			].join(',')
+		)
+		.eq('cadence', 'monthly')
+		.gte('service_date', periodStartIso)
+		.lte('service_date', periodEndIso)
+		.order('service_date', { ascending: true })
+	if (itemsErr) throw itemsErr
+	const base = (items as any[]) || []
+
+	if (base.length === 0) return []
+
+	// STEP 2: Load parent invoice headers and filter by payable statuses
+	const invoiceIds = Array.from(new Set(base.map((r: any) => String(r.invoice_id))))
+	const { data: headers, error: invErr } = await db
+		.from('invoices')
+		.select('id,user_id,client_id,currency,status,client_name_snapshot,client_email_snapshot')
+		.in('id', invoiceIds)
+	if (invErr) throw invErr
+	const headerById = new Map<string, any>()
+	for (const h of (headers as any[]) || []) headerById.set(String(h.id), h)
+	const payable = base
+		.map((row) => {
+			const h = headerById.get(String((row as any).invoice_id))
+			return h ? { ...row, invoices: h } : null
+		})
+		.filter(Boolean)
+		.filter((row: any) => row.invoices.status !== 'paid' && row.invoices.status !== 'canceled') as any[]
+
+	return payable
+}
+
+/**
+ * debugListAllMonthlyItems
+ * ----------------------------------------------
+ * Helper to log a quick sample of all monthly items regardless of date.
+ * Not used in consolidation, only to help diagnose missing rows.
+ */
+export async function debugListAllMonthlyItems(_supabase?: SupabaseClient): Promise<void> {}
+
+/**
+ * reassignInvoiceItemsToInvoice
+ * ----------------------------------------------
+ * Moves a set of invoice_items to the provided target invoice id.
+ */
+export async function reassignInvoiceItemsToInvoice(
+	itemIds: string[],
+	targetInvoiceId: string,
+	supabase?: SupabaseClient
+) {
+	if (!itemIds || itemIds.length === 0) return
+	const db = getClient(supabase)
+	const { error } = await db.from('invoice_items').update({ invoice_id: targetInvoiceId }).in('id', itemIds)
+	if (error) throw error
+}

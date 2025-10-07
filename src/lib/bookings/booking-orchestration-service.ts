@@ -70,23 +70,35 @@ export interface CreateBookingResult {
  * Throws error if no billing settings exist (users must have billing settings configured)
  */
 async function getAppropriateBillingSettings(userId: string, clientId: string, supabaseClient?: SupabaseClient) {
-	// Check if client has specific billing settings
+	// Fetch client-specific and user default settings
 	const clientBilling = await getClientBillingSettings(userId, clientId, supabaseClient)
+	const userDefaultSettings = await getUserDefaultBillingSettings(userId, supabaseClient)
 
+	// If client has specific settings, prefer them — but gracefully fall back
+	// to user defaults when the client amount is null/undefined.
 	if (clientBilling) {
+		const resolvedAmount =
+			clientBilling.billing_amount != null
+				? clientBilling.billing_amount
+				: (userDefaultSettings?.billing_amount ?? 0)
+		const resolvedCurrency = clientBilling.currency || userDefaultSettings?.currency || 'EUR'
+		const resolvedLeadHours =
+			clientBilling.payment_email_lead_hours != null
+				? clientBilling.payment_email_lead_hours
+				: (userDefaultSettings?.payment_email_lead_hours ?? null)
+
 		return {
 			id: clientBilling.id,
 			type: clientBilling.billing_type,
-			amount: clientBilling.billing_amount || 0,
-			currency: clientBilling.currency,
-			first_consultation_amount: clientBilling.first_consultation_amount ?? null,
-			payment_email_lead_hours: clientBilling.payment_email_lead_hours ?? null
+			amount: resolvedAmount,
+			currency: resolvedCurrency,
+			first_consultation_amount:
+				clientBilling.first_consultation_amount ?? userDefaultSettings?.first_consultation_amount ?? null,
+			payment_email_lead_hours: resolvedLeadHours
 		}
 	}
 
-	// Fall back to user default billing settings
-	const userDefaultSettings = await getUserDefaultBillingSettings(userId, supabaseClient)
-
+	// Fall back to user default billing settings when no client-specific settings exist
 	if (userDefaultSettings) {
 		return {
 			id: userDefaultSettings.id,
@@ -94,7 +106,6 @@ async function getAppropriateBillingSettings(userId: string, clientId: string, s
 			amount: userDefaultSettings.billing_amount || 0,
 			currency: userDefaultSettings.currency,
 			first_consultation_amount: userDefaultSettings.first_consultation_amount ?? null,
-			// New: lead time for scheduling payment email
 			payment_email_lead_hours: userDefaultSettings.payment_email_lead_hours ?? null
 		}
 	}

@@ -50,7 +50,8 @@ export type PaymentSessionUpdate = TablesUpdate<'payment_sessions'>
  * @property completed_at - Timestamp when payment was completed (optional)
  */
 export interface CreatePaymentSessionPayload {
-	booking_id: string
+	booking_id?: string
+	invoice_id?: string
 	stripe_session_id: string
 	amount: number
 	status?: string
@@ -94,6 +95,24 @@ export interface PaymentSessionWithBooking extends PaymentSession {
 }
 
 /**
+ * Retrieves payment sessions for a specific invoice
+ */
+export async function getPaymentSessionsForInvoice(
+	invoiceId: string,
+	supabaseClient?: SupabaseClient
+): Promise<PaymentSession[]> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('payment_sessions')
+		.select('*')
+		.eq('invoice_id', invoiceId)
+		.order('created_at', { ascending: false })
+
+	if (error) throw error
+	return data || []
+}
+
+/**
  * Creates a new payment session in the database
  * Typically called when a Stripe checkout session is created
  *
@@ -108,7 +127,8 @@ export async function createPaymentSession(
 ): Promise<PaymentSession> {
 	const client = supabaseClient || supabase
 	const paymentSessionData = {
-		booking_id: payload.booking_id,
+		booking_id: payload.booking_id || null,
+		invoice_id: payload.invoice_id || null,
 		stripe_session_id: payload.stripe_session_id,
 		amount: payload.amount,
 		status: payload.status || 'pending',

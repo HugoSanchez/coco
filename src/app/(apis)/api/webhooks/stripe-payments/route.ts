@@ -90,19 +90,24 @@ export async function POST(request: NextRequest) {
 			// 1. Get session object to get metadata
 			const session = event.data.object as Stripe.Checkout.Session
 			const connectedAccountId = (event as any).account as string | undefined
-			// 2. Get booking ID from metadata
-			const bookingId = session.metadata?.booking_id
-			if (!bookingId) return NextResponse.json({ received: true })
-			// 3. Update payment session status
-			await markPaymentSessionCompleted(session.id, session.payment_intent as string, supabase, {
-				bookingId,
-				amount: typeof session.amount_total === 'number' ? session.amount_total / 100 : null
-			})
-			// 4. Update booking status to 'scheduled' (payment received) - using service role client
-			await updateBookingStatus(bookingId, 'scheduled', supabase)
-			// 5. Update bill status to 'paid' - using service role client
-			const bill = await getBillForBookingAndMarkAsPaid(bookingId, supabase)
-			console.log('[webhook] bill marked paid', { bookingId, billId: bill?.id })
+			// 2. Route by metadata: booking vs invoice
+			const invoiceId = session.metadata?.invoice_id as string | undefined
+			const bookingId = session.metadata?.booking_id as string | undefined
+			if (!bookingId && !invoiceId) return NextResponse.json({ received: true })
+			// 3. Update payment session status (booking path)
+			if (bookingId) {
+				await markPaymentSessionCompleted(session.id, session.payment_intent as string, supabase, {
+					bookingId,
+					amount: typeof session.amount_total === 'number' ? session.amount_total / 100 : null
+				})
+			}
+			// Booking branch: update booking/bill
+			let bill: any = null
+			if (bookingId) {
+				await updateBookingStatus(bookingId, 'scheduled', supabase)
+				bill = await getBillForBookingAndMarkAsPaid(bookingId, supabase)
+				console.log('[webhook] bill marked paid', { bookingId, billId: bill?.id })
+			}
 
 			///////////////////////////////////////////////////////////
 			///// 4. Capture and store Stripe receipt metadata
@@ -119,7 +124,7 @@ export async function POST(request: NextRequest) {
 					const receiptUrl = charge?.receipt_url as string | undefined
 					const chargeId = charge?.id as string | undefined
 
-					if (bill && (receiptUrl || chargeId)) {
+					if (bookingId && bill && (receiptUrl || chargeId)) {
 						await updateBillReceiptMetadata(
 							bill.id,
 							{
@@ -138,7 +143,7 @@ export async function POST(request: NextRequest) {
 						session.customer_email ||
 						((session as any).customer_details?.email as string | undefined) ||
 						(session.metadata?.client_email as string | undefined)
-					if (bill && clientEmail && receiptUrl) {
+					if (bookingId && bill && clientEmail && receiptUrl) {
 						const amount =
 							typeof session.amount_total === 'number'
 								? session.amount_total / 100
@@ -172,7 +177,7 @@ export async function POST(request: NextRequest) {
 			}
 
 			// 6. Dual-write path: issue & mark invoice as paid (if enabled)
-			if (process.env.ENABLE_INVOICES_DUAL_WRITE === 'true') {
+			if (process.env.ENABLE_INVOICES_DUAL_WRITE === 'true' && bookingId) {
 				try {
 					const paymentIntentId = session.payment_intent as string
 					const requestOpts = connectedAccountId ? { stripeAccount: connectedAccountId } : undefined
@@ -208,6 +213,57 @@ export async function POST(request: NextRequest) {
 							stage: 'invoice_finalize'
 						},
 						extra: { bookingId }
+					})
+				}
+			}
+
+			// Invoice branch: issue-if-draft and mark paid
+			if (invoiceId) {
+				try {
+					const { getInvoiceById, issueInvoice } = await import('@/lib/db/invoices')
+					const { onPaymentCompletedForInvoice } = await import('@/lib/invoicing/invoice-orchestration')
+					const { listInvoiceItems } = await import('@/lib/db/invoice-items')
+					const { getBillForBookingAndMarkAsPaid } = await import('@/lib/db/bills')
+					const invoice = await getInvoiceById(invoiceId, supabase as any)
+					if (invoice) {
+						if (invoice.status === 'draft') {
+							await issueInvoice(invoice.id, invoice.user_id, new Date(), supabase as any)
+						}
+						let receiptUrl: string | null = null
+						if (matchedIsConnectSecret) {
+							try {
+								const paymentIntent = await stripe.paymentIntents.retrieve(
+									session.payment_intent as string,
+									{ expand: ['latest_charge'] },
+									connectedAccountId ? { stripeAccount: connectedAccountId } : undefined
+								)
+								const charge = (paymentIntent as any)?.latest_charge as Stripe.Charge | undefined
+								receiptUrl = (charge?.receipt_url as string | undefined) || null
+							} catch (_) {}
+						}
+						await onPaymentCompletedForInvoice(
+							invoice.id,
+							{ paidAt: new Date(), receiptUrl },
+							supabase as any
+						)
+
+						// Dual path: mark related legacy bills as paid so dashboards remain consistent
+						try {
+							const items = await listInvoiceItems(invoice.id, supabase as any)
+							const bookingIds = Array.from(
+								new Set((items as any[]).map((it: any) => it.booking_id).filter(Boolean))
+							) as string[]
+							for (const bId of bookingIds) {
+								try {
+									await getBillForBookingAndMarkAsPaid(bId, supabase as any)
+								} catch (_) {}
+							}
+						} catch (_) {}
+					}
+				} catch (e) {
+					Sentry.captureException(e, {
+						tags: { component: 'webhook', kind: 'stripe-payments', stage: 'invoice_flow' },
+						extra: { invoiceId }
 					})
 				}
 			}

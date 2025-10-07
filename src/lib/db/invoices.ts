@@ -410,6 +410,79 @@ export async function getInvoiceById(invoiceId: string, supabase?: SupabaseClien
 }
 
 /**
+ * findOrCreateMonthlyInvoice
+ * ----------------------------------------------
+ * Looks for a draft invoice for a given (user, client, period). If not found,
+ * creates a new draft invoice with client snapshots and currency.
+ */
+export async function findOrCreateMonthlyInvoice(
+	params: {
+		userId: string
+		clientId: string | null
+		clientName: string
+		clientEmail: string
+		currency?: string
+		periodStart: string
+		periodEnd: string
+	},
+	supabase?: SupabaseClient
+): Promise<InvoiceRow> {
+	const db = getClient(supabase)
+	const { data: existing, error: findErr } = await db
+		.from('invoices')
+		.select('*')
+		.eq('user_id', params.userId)
+		.eq('client_id', params.clientId)
+		.eq('billing_period_start', params.periodStart)
+		.eq('billing_period_end', params.periodEnd)
+		.in('status', ['draft', 'issued'])
+		.limit(1)
+	if (findErr) throw findErr
+	const first = (existing || [])[0] as unknown as InvoiceRow | undefined
+	if (first) return first
+
+	const created = await createDraftInvoice(
+		{
+			userId: params.userId,
+			clientId: params.clientId,
+			currency: params.currency || 'EUR',
+			clientName: params.clientName,
+			clientEmail: params.clientEmail,
+			dueDate: null,
+			billingPeriodStart: params.periodStart,
+			billingPeriodEnd: params.periodEnd
+		},
+		db as any
+	)
+	return created
+}
+
+/**
+ * deleteEmptyDraftInvoices
+ * ----------------------------------------------
+ * Deletes draft invoices that currently have zero items.
+ */
+export async function deleteEmptyDraftInvoices(invoiceIds: string[], supabase?: SupabaseClient): Promise<number> {
+	if (!invoiceIds || invoiceIds.length === 0) return 0
+	const db = getClient(supabase)
+	// Find invoices with no items
+	const { data: counts, error: countErr } = await db
+		.from('invoice_items')
+		.select('invoice_id, count:id', { count: 'exact', head: false })
+		.in('invoice_id', invoiceIds)
+	if (countErr) throw countErr
+	const idsWithCounts = new Map<string, number>()
+	for (const row of counts as any[]) {
+		idsWithCounts.set(row.invoice_id, Number(row.count))
+	}
+	const emptyIds = invoiceIds.filter((id) => !idsWithCounts.get(id))
+	if (emptyIds.length === 0) return 0
+	const { error: delErr } = await db.from('invoices').delete().in('id', emptyIds).eq('status', 'draft')
+	if (delErr) throw delErr
+	return emptyIds.length
+}
+
+/**
  * findInvoiceByLegacyBillId
  * ----------------------------------------------
  * Convenience lookup used during dual-write period to correlate legacy bill

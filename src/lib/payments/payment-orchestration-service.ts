@@ -312,8 +312,36 @@ export class PaymentOrchestrationService {
 				lineItems: aggregated
 			})
 
-			// For now, we do not persist invoice-based payment_sessions until schema fully supports it
-			// Webhook path will use metadata.invoice_id to finalize invoice status
+			// Track or update a payment_session for this invoice (idempotent-ish)
+			try {
+				const { getPaymentSessionsForInvoice, createPaymentSession, updatePaymentSession } = await import(
+					'@/lib/db/payment-sessions'
+				)
+				const existing = await getPaymentSessionsForInvoice(invoice.id, serviceClient)
+				if (existing && existing.length > 0) {
+					await updatePaymentSession(
+						existing[0].id,
+						{
+							stripe_session_id: sessionId,
+							amount: invoice.total,
+							status: 'pending',
+							stripe_payment_intent_id: null,
+							completed_at: null
+						},
+						serviceClient
+					)
+				} else {
+					await createPaymentSession(
+						{
+							invoice_id: invoice.id,
+							stripe_session_id: sessionId,
+							amount: invoice.total,
+							status: 'pending'
+						},
+						serviceClient
+					)
+				}
+			} catch (_) {}
 
 			return { success: true, checkoutUrl }
 		} catch (error) {
