@@ -84,7 +84,7 @@ const ToastClose = React.forwardRef<
 		)}
 		toast-close=""
 		onClick={(event) => {
-			event.preventDefault()
+			// event.preventDefault()
 			event.stopPropagation()
 			onClick?.(event)
 		}}
