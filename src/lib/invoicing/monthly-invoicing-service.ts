@@ -1,5 +1,12 @@
-import { listMonthlyDraftItemsForPeriod, reassignInvoiceItemsToInvoice } from '@/lib/db/invoice-items'
-import { findOrCreateMonthlyInvoice, computeInvoiceTotals, deleteEmptyDraftInvoices } from '@/lib/db/invoices'
+import {
+	listMonthlyDraftItemsForPeriod,
+	reassignInvoiceItemsToInvoice
+} from '@/lib/db/invoice-items'
+import {
+	findOrCreateMonthlyInvoice,
+	computeInvoiceTotals,
+	deleteEmptyDraftInvoices
+} from '@/lib/db/invoices'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { sendMonthlyBillEmail } from '@/lib/emails/email-service'
 import { getProfileById } from '@/lib/db/profiles'
@@ -36,7 +43,10 @@ export interface MonthlyCronResult {
  * -----------------------------------------------------------
  * Given a YYYY-MM label, returns the UTC start/end ISO strings for the full month.
  */
-export function computeUtcPeriodFromLabel(label: string): { start: string; end: string } {
+export function computeUtcPeriodFromLabel(label: string): {
+	start: string
+	end: string
+} {
 	const [y, m] = label.split('-').map((v) => parseInt(v, 10))
 	const start = new Date(Date.UTC(y, m - 1, 1, 0, 0, 0))
 	const end = new Date(Date.UTC(y, m, 0, 23, 59, 59))
@@ -99,7 +109,11 @@ export async function runMonthlyConsolidation(params: {
 	let invoicesReused = 0
 	let itemsMoved = 0
 	let draftsDeleted = 0
-	const errors: Array<{ userId: string; clientId: string | null; error: string }> = []
+	const errors: Array<{
+		userId: string
+		clientId: string | null
+		error: string
+	}> = []
 
 	// 2) Process each group
 	for (const [key, groupRows] of Array.from(groups.entries())) {
@@ -141,7 +155,10 @@ export async function runMonthlyConsolidation(params: {
 				new Set<string>(groupRows.map((r: any) => String(r.invoice_id)))
 			)
 			if (!params.dryRun) {
-				draftsDeleted += await deleteEmptyDraftInvoices(sourceInvoiceIds, db)
+				draftsDeleted += await deleteEmptyDraftInvoices(
+					sourceInvoiceIds,
+					db
+				)
 			}
 
 			// 2d) Email the client with consolidated invoice payment link (keep draft)
@@ -149,7 +166,8 @@ export async function runMonthlyConsolidation(params: {
 				try {
 					// Practitioner context for subject/body
 					const practitioner = await getProfileById(userId, db)
-					const practitionerName = practitioner?.name || 'Tu profesional'
+					const practitionerName =
+						practitioner?.name || 'Tu profesional'
 					const paymentLink = `${process.env.NEXT_PUBLIC_BASE_URL}/api/payments/invoices/${monthly.id}`
 					const monthLabel = spanishMonthLabelFromPeriodStart(start)
 
@@ -171,7 +189,11 @@ export async function runMonthlyConsolidation(params: {
 				}
 			}
 		} catch (e) {
-			errors.push({ userId, clientId, error: e instanceof Error ? e.message : String(e) })
+			errors.push({
+				userId,
+				clientId,
+				error: e instanceof Error ? e.message : String(e)
+			})
 		}
 	}
 
