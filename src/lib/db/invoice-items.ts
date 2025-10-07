@@ -25,6 +25,10 @@ export interface NewInvoiceItem {
 	qty?: number
 	unitPrice: number
 	taxRatePercent?: number
+	// Scheduling/invoicing enhancements
+	cadence?: 'per_booking' | 'monthly'
+	serviceDate?: string | null
+	scheduledSendAt?: string | null
 }
 
 /**
@@ -32,14 +36,10 @@ export interface NewInvoiceItem {
  * ----------------------------------------------
  * Inserts a single line with simple arithmetic for amount and tax_amount.
  */
-export async function addInvoiceItem(
-	params: NewInvoiceItem,
-	supabase?: SupabaseClient
-) {
+export async function addInvoiceItem(params: NewInvoiceItem, supabase?: SupabaseClient) {
 	const db = getClient(supabase)
 	const qty = typeof params.qty === 'number' ? params.qty : 1
-	const taxRate =
-		typeof params.taxRatePercent === 'number' ? params.taxRatePercent : 0
+	const taxRate = typeof params.taxRatePercent === 'number' ? params.taxRatePercent : 0
 	const amount = Math.round(qty * params.unitPrice * 100) / 100
 	const tax_amount = Math.round(((amount * taxRate) / 100) * 100) / 100
 
@@ -54,7 +54,10 @@ export async function addInvoiceItem(
 				unit_price: params.unitPrice,
 				amount,
 				tax_rate_percent: taxRate,
-				tax_amount
+				tax_amount,
+				cadence: params.cadence ?? 'per_booking',
+				service_date: params.serviceDate ?? null,
+				scheduled_send_at: params.scheduledSendAt ?? null
 			}
 		])
 		.select('*')
@@ -68,10 +71,7 @@ export async function addInvoiceItem(
  * ----------------------------------------------
  * Returns all lines for an invoice, oldest first.
  */
-export async function listInvoiceItems(
-	invoiceId: string,
-	supabase?: SupabaseClient
-) {
+export async function listInvoiceItems(invoiceId: string, supabase?: SupabaseClient) {
 	const db = getClient(supabase)
 	const { data, error } = await db
 		.from('invoice_items')

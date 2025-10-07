@@ -158,7 +158,18 @@ async function createBillForBooking(
 					// If your current flow marks bill as sent immediately for some paths,
 					// you can toggle issueNow accordingly in those call sites.
 					issueNow: false,
-					legacyBillId: bill.id
+					legacyBillId: bill.id,
+					// Scheduling fields for invoice_items
+					cadence: (billing.type === 'monthly' ? 'monthly' : 'per_booking') as 'per_booking' | 'monthly',
+					serviceDate: booking.start_time,
+					scheduledSendAt:
+						billing.type === 'monthly'
+							? null
+							: computeEmailScheduledAt(
+									billing.payment_email_lead_hours,
+									booking.start_time,
+									booking.end_time
+								)
 				},
 				supabaseClient
 			)

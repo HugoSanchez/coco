@@ -221,6 +221,111 @@ export class PaymentOrchestrationService {
 	}
 
 	/**
+	 * Creates a Stripe checkout for an invoice (monthly or multi-booking)
+	 */
+	async orchestrateInvoiceCheckout({
+		invoiceId,
+		supabaseClient
+	}: {
+		invoiceId: string
+		supabaseClient?: SupabaseClient
+	}): Promise<{ success: boolean; checkoutUrl?: string; error?: string }> {
+		try {
+			const serviceClient = createServiceRoleClient()
+
+			// Load invoice and items
+			const { getInvoiceById } = await import('@/lib/db/invoices')
+			const { listInvoiceItems } = await import('@/lib/db/invoice-items')
+			const { getProfileById } = await import('@/lib/db/profiles')
+			const { getStripeAccountForPayments } = await import('@/lib/db/stripe-accounts')
+
+			const invoice = await getInvoiceById(invoiceId, serviceClient)
+			if (!invoice) return { success: false, error: 'Invoice not found' }
+
+			// Allowed statuses: if draft, we still allow payment, but prefer issued (numbers assigned)
+			// Block if canceled or paid
+			if (invoice.status === 'paid' || invoice.status === 'canceled') {
+				return { success: false, error: `Invoice not payable (status=${invoice.status})` }
+			}
+
+			// Resolve practitioner stripe account
+			const stripeAccount = await getStripeAccountForPayments(invoice.user_id, serviceClient)
+			if (!stripeAccount || !stripeAccount.onboarding_completed || !stripeAccount.payments_enabled) {
+				return { success: false, error: 'Stripe account not ready for payments' }
+			}
+
+			// Load items to compose line items text
+			const items = await listInvoiceItems(invoice.id, serviceClient)
+			if (!items || items.length === 0) {
+				return { success: false, error: 'Invoice has no items' }
+			}
+
+			// Build human-friendly product lines. For monthly cadence, aggregate as “Consulta … xN”
+			// If items have service_date, include date in DD/MM/YYYY
+			const formatDate = (iso?: string | null) => {
+				if (!iso) return null
+				try {
+					const d = new Date(iso)
+					const dd = String(d.getUTCDate()).padStart(2, '0')
+					const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
+					const yyyy = d.getUTCFullYear()
+					return `${dd}/${mm}/${yyyy}`
+				} catch {
+					return null
+				}
+			}
+
+			// Group per unique description, capture a readable name
+			type LineAgg = { name: string; description?: string | null; unitAmountEur: number; quantity: number }
+			const aggregated: LineAgg[] = []
+			for (const it of items as any[]) {
+				const dateText = formatDate(it.service_date)
+				const baseName = 'Consulta'
+				const name = dateText ? `${baseName} del día ${dateText}` : baseName
+				const unitAmount = Number(it.amount || 0) + Number(it.tax_amount || 0)
+				const existing = aggregated.find(
+					(a) => a.name === name && Math.abs(a.unitAmountEur - unitAmount) < 0.0001
+				)
+				if (existing) {
+					existing.quantity += 1
+				} else {
+					aggregated.push({ name, unitAmountEur: unitAmount, quantity: 1, description: null })
+				}
+			}
+
+			// Practitioner profile for metadata
+			const practitioner = await getProfileById(invoice.user_id, serviceClient)
+			const practitionerName = practitioner?.name || 'Your Practitioner'
+			const practitionerEmail = practitioner?.email || ''
+
+			const { sessionId, checkoutUrl } = await stripeService.createInvoiceCheckout({
+				practitionerStripeAccountId: stripeAccount.stripe_account_id,
+				clientEmail: invoice.client_email_snapshot,
+				clientName: invoice.client_name_snapshot,
+				practitionerName,
+				practitionerEmail,
+				practitionerUserId: invoice.user_id,
+				invoiceId: invoice.id,
+				currency: invoice.currency || 'EUR',
+				billingPeriodStart: invoice.billing_period_start,
+				billingPeriodEnd: invoice.billing_period_end,
+				lineItems: aggregated
+			})
+
+			// For now, we do not persist invoice-based payment_sessions until schema fully supports it
+			// Webhook path will use metadata.invoice_id to finalize invoice status
+
+			return { success: true, checkoutUrl }
+		} catch (error) {
+			Sentry.captureException(error, {
+				tags: { component: 'payments-orchestrator', method: 'orchestrateInvoiceCheckout' },
+				extra: { invoiceId }
+			})
+			return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+		}
+	}
+
+	/**
 	 * Cancels payment for a booking by invalidating payment sessions and bills
 	 *
 	 * This function handles the complete cancellation flow for pending payments:

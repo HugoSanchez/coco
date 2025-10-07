@@ -40,6 +40,10 @@ export interface CreateInvoiceForBookingInput {
 	issueNow?: boolean
 	dueDate?: string | null
 	legacyBillId?: string | null
+	// Scheduling additions
+	cadence?: 'per_booking' | 'monthly'
+	serviceDate?: string | null
+	scheduledSendAt?: string | null
 }
 
 export async function createInvoiceForBooking(input: CreateInvoiceForBookingInput, supabase?: SupabaseClient) {
@@ -62,7 +66,10 @@ export async function createInvoiceForBooking(input: CreateInvoiceForBookingInpu
 			bookingId: input.bookingId,
 			description: input.description,
 			unitPrice: input.amount,
-			qty: 1
+			qty: 1,
+			cadence: input.cadence ?? 'per_booking',
+			serviceDate: input.serviceDate ?? null,
+			scheduledSendAt: input.scheduledSendAt ?? null
 		},
 		supabase
 	)
