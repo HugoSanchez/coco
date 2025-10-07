@@ -1,7 +1,7 @@
 import { listMonthlyDraftItemsForPeriod, reassignInvoiceItemsToInvoice } from '@/lib/db/invoice-items'
 import { findOrCreateMonthlyInvoice, computeInvoiceTotals, deleteEmptyDraftInvoices } from '@/lib/db/invoices'
 import { createServiceRoleClient } from '@/lib/supabase/server'
-import { sendConsultationBillEmail } from '@/lib/emails/email-service'
+import { sendMonthlyBillEmail } from '@/lib/emails/email-service'
 import { getProfileById } from '@/lib/db/profiles'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -41,6 +41,25 @@ export function computeUtcPeriodFromLabel(label: string): { start: string; end: 
 	const start = new Date(Date.UTC(y, m - 1, 1, 0, 0, 0))
 	const end = new Date(Date.UTC(y, m, 0, 23, 59, 59))
 	return { start: start.toISOString(), end: end.toISOString() }
+}
+
+function spanishMonthLabelFromPeriodStart(periodStartIso: string) {
+	const date = new Date(periodStartIso)
+	const monthNames = [
+		'Enero',
+		'Febrero',
+		'Marzo',
+		'Abril',
+		'Mayo',
+		'Junio',
+		'Julio',
+		'Agosto',
+		'Septiembre',
+		'Octubre',
+		'Noviembre',
+		'Diciembre'
+	]
+	return `${monthNames[date.getUTCMonth()]} ${date.getUTCFullYear()}`
 }
 
 /**
@@ -132,16 +151,15 @@ export async function runMonthlyConsolidation(params: {
 					const practitioner = await getProfileById(userId, db)
 					const practitionerName = practitioner?.name || 'Tu profesional'
 					const paymentLink = `${process.env.NEXT_PUBLIC_BASE_URL}/api/payments/invoices/${monthly.id}`
+					const monthLabel = spanishMonthLabelFromPeriodStart(start)
 
-					// Use consultation bill email as a reference; send a simple message pointing to pay link
-					await sendConsultationBillEmail({
+					await sendMonthlyBillEmail({
 						to: clientEmail,
 						clientName: clientName,
-						consultationDate: start,
 						amount: monthly.total,
-						billingTrigger: 'after_consultation',
+						currency,
+						monthLabel,
 						practitionerName,
-						practitionerEmail: practitioner?.email || undefined,
 						paymentUrl: paymentLink
 					})
 				} catch (emailErr) {

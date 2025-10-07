@@ -1,6 +1,7 @@
 import { Resend } from 'resend'
 import { render } from '@react-email/render'
 import ConsultationBillEmail from './consultation-bill'
+import MonthlyBillEmail from './monthly-bill'
 import RefundNotificationEmail from './refund-notification'
 import CancellationNotificationEmail from './cancellation-notification'
 import CancellationRefundNotificationEmail from './cancellation-refund-notification'
@@ -104,6 +105,55 @@ export async function sendConsultationBillEmail({
 			error: error instanceof Error ? error.message : 'Unknown error occurred',
 			message: 'Failed to send email'
 		}
+	}
+}
+
+/**
+ * Send monthly consolidated invoice email to client
+ */
+export async function sendMonthlyBillEmail({
+	to,
+	clientName,
+	amount,
+	currency = 'EUR',
+	monthLabel,
+	practitionerName,
+	paymentUrl
+}: {
+	to: string
+	clientName: string
+	amount: number
+	currency?: string
+	monthLabel: string
+	practitionerName?: string
+	paymentUrl?: string
+}) {
+	try {
+		const html = await render(
+			MonthlyBillEmail({
+				clientName,
+				monthLabel,
+				amount,
+				currency,
+				practitionerName,
+				paymentUrl
+			})
+		)
+
+		const subject = `Factura del mes de ${monthLabel}`
+		const resend = getResendClient()
+		const result = await resend.emails.send({
+			from: EMAIL_CONFIG.from,
+			replyTo: EMAIL_CONFIG.replyTo,
+			to: [to],
+			subject,
+			html
+		})
+		if (result.error) throw new Error(result.error.message)
+		return { success: true, emailId: result.data?.id }
+	} catch (error) {
+		console.error('Monthly bill email failed:', error)
+		return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
 	}
 }
 
@@ -327,6 +377,72 @@ export async function sendPaymentReceiptEmail({
 	consultationDate?: string
 	receiptUrl: string
 }) {
+	return sendReceiptEmail({
+		mode: 'booking',
+		to,
+		clientName,
+		practitionerName,
+		amount,
+		currency,
+		receiptUrl,
+		consultationDate
+	})
+}
+
+/**
+ * Send invoice (monthly or generic invoice) receipt email
+ */
+export async function sendInvoiceReceiptEmail({
+	to,
+	clientName,
+	practitionerName,
+	amount,
+	currency = 'EUR',
+	monthLabel,
+	receiptUrl
+}: {
+	to: string
+	clientName: string
+	practitionerName?: string
+	amount: number
+	currency?: string
+	monthLabel?: string
+	receiptUrl: string
+}) {
+	return sendReceiptEmail({
+		mode: 'monthly',
+		to,
+		clientName,
+		practitionerName,
+		amount,
+		currency,
+		receiptUrl,
+		monthLabel
+	})
+}
+
+// Unified receipt sender for both booking and monthly invoices
+export async function sendReceiptEmail({
+	mode,
+	to,
+	clientName,
+	practitionerName,
+	amount,
+	currency = 'EUR',
+	receiptUrl,
+	monthLabel,
+	consultationDate
+}: {
+	mode: 'monthly' | 'booking'
+	to: string
+	clientName: string
+	practitionerName?: string
+	amount: number
+	currency?: string
+	receiptUrl: string
+	monthLabel?: string
+	consultationDate?: string
+}) {
 	try {
 		const resend = getResendClient()
 		const html = await render(
@@ -335,25 +451,30 @@ export async function sendPaymentReceiptEmail({
 				amount,
 				currency,
 				practitionerName,
+				receiptUrl,
 				consultationDate,
-				receiptUrl
+				isMonthly: mode === 'monthly',
+				monthLabel
 			})
 		)
+		const subject =
+			mode === 'monthly'
+				? monthLabel
+					? `Pago confirmado - ${monthLabel}`
+					: 'Pago confirmado'
+				: 'Pago confirmado'
 		const result = await resend.emails.send({
 			from: EMAIL_CONFIG.from,
 			replyTo: EMAIL_CONFIG.replyTo,
 			to: [to],
-			subject: 'Pago confirmado',
+			subject,
 			html
 		})
 		if (result.error) throw new Error(result.error.message)
 		return { success: true, emailId: result.data?.id }
 	} catch (error) {
-		console.error('Payment receipt email failed:', error)
-		return {
-			success: false,
-			error: error instanceof Error ? error.message : 'Unknown error'
-		}
+		console.error('Receipt email failed:', error)
+		return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
 	}
 }
 

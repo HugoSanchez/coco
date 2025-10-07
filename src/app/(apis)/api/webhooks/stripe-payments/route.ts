@@ -8,7 +8,7 @@ import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 import * as Sentry from '@sentry/nextjs'
 import { captureEvent } from '@/lib/posthog/server'
-import { sendPaymentReceiptEmail } from '@/lib/emails/email-service'
+import { sendReceiptEmail } from '@/lib/emails/email-service'
 import { finalizeInvoiceForBillPayment, createCreditNoteForInvoice } from '@/lib/invoicing/invoice-orchestration'
 import { getPaymentSessionByPaymentIntentId } from '@/lib/db/payment-sessions'
 import { findInvoiceByLegacyBillId } from '@/lib/db/invoices'
@@ -148,7 +148,8 @@ export async function POST(request: NextRequest) {
 							typeof session.amount_total === 'number'
 								? session.amount_total / 100
 								: (paymentIntent.amount_received ?? 0) / 100
-						const sendResult = await sendPaymentReceiptEmail({
+						const sendResult = await sendReceiptEmail({
+							mode: 'booking',
 							to: clientEmail,
 							clientName: session.metadata?.client_name || 'Paciente',
 							amount,
@@ -247,6 +248,31 @@ export async function POST(request: NextRequest) {
 							supabase as any
 						)
 
+						// Send monthly receipt email via unified helper
+						try {
+							const { getProfileById } = await import('@/lib/db/profiles')
+							const practitioner = await getProfileById(invoice.user_id, supabase as any)
+							const monthSource =
+								invoice.billing_period_start || invoice.issued_at || new Date().toISOString()
+							const monthLabel = new Date(monthSource).toLocaleDateString('es-ES', {
+								month: 'long',
+								year: 'numeric'
+							})
+							await sendReceiptEmail({
+								mode: 'monthly',
+								to: invoice.client_email_snapshot,
+								clientName: invoice.client_name_snapshot,
+								practitionerName: practitioner?.name || undefined,
+								amount:
+									typeof session.amount_total === 'number'
+										? session.amount_total / 100
+										: invoice.total,
+								currency: session.currency?.toUpperCase() || invoice.currency || 'EUR',
+								receiptUrl: (receiptUrl as string) || invoice.stripe_receipt_url || '',
+								monthLabel
+							})
+						} catch (_) {}
+
 						// Dual path: mark related legacy bills as paid so dashboards remain consistent
 						try {
 							const items = await listInvoiceItems(invoice.id, supabase as any)
@@ -319,7 +345,7 @@ export async function POST(request: NextRequest) {
 				}
 
 				// Find the existing pending calendar event for this booking
-				const existingEvents = await getCalendarEventsForBooking(bookingId, supabase)
+				const existingEvents = await getCalendarEventsForBooking(bookingId as string, supabase)
 				const pendingEvent = existingEvents.find((event) => event.event_type === 'pending')
 
 				if (!pendingEvent) {
