@@ -3,13 +3,7 @@
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import confetti from 'canvas-confetti'
-import {
-	Card,
-	CardContent,
-	CardHeader,
-	CardTitle,
-	CardDescription
-} from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Check } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
 
@@ -19,13 +13,16 @@ export const dynamic = 'force-dynamic'
 function BookingConfirmationContent() {
 	const searchParams = useSearchParams()
 	const bookingId = searchParams.get('booking_id')
+	const invoiceId = searchParams.get('invoice_id')
 	const [loading, setLoading] = useState(true)
 	const [bookingDetails, setBookingDetails] = useState<any>(null)
+	const [invoiceSummary, setInvoiceSummary] = useState<any>(null)
 	const [error, setError] = useState<string | null>(null)
 
 	useEffect(() => {
 		if (bookingId) fetchBookingDetails()
-	}, [bookingId])
+		else if (invoiceId) fetchInvoiceSummary()
+	}, [bookingId, invoiceId])
 
 	const fetchBookingDetails = async () => {
 		try {
@@ -36,6 +33,19 @@ function BookingConfirmationContent() {
 			confetti({ particleCount: 20 })
 		} catch (err) {
 			setError('No se pudieron cargar los detalles de la cita')
+			setLoading(false)
+		}
+	}
+
+	const fetchInvoiceSummary = async () => {
+		try {
+			const response = await fetch(`/api/invoices/${invoiceId}/summary`)
+			const data = await response.json()
+			setInvoiceSummary(data)
+			setLoading(false)
+			confetti({ particleCount: 20 })
+		} catch (err) {
+			setError('No se pudo cargar la información del pago')
 			setLoading(false)
 		}
 	}
@@ -61,24 +71,52 @@ function BookingConfirmationContent() {
 		)
 	}
 
+	if (invoiceId && invoiceSummary) {
+		const isMonthly = invoiceSummary.type === 'monthly'
+		return (
+			<div className="min-h-screen flex items-center justify-center lg:max-w-3xl mx-auto px-4">
+				<div className="flex flex-col items-center justify-center">
+					<CardHeader className="text-center gap-4">
+						<Check className="h-12 w-12 text-accent mx-auto" />
+						<h1 className="text-4xl font-black text-primary">Pago confirmado</h1>
+						{isMonthly ? null : (
+							<p className="text-lg text-gray-600">
+								Enhorabuena, tu cita con {invoiceSummary.practitionerName} para el{' '}
+								<span className="font-bold text-primary">
+									{new Date(invoiceSummary.consultationDate).toLocaleDateString('es-ES', {
+										weekday: 'long',
+										year: 'numeric',
+										month: 'long',
+										day: 'numeric',
+										hour: '2-digit',
+										minute: '2-digit'
+									})}
+									{'h '}
+								</span>
+								está confirmada.
+							</p>
+						)}
+					</CardHeader>
+					<p className="text-gray-600 text-sm text-normal">Puedes cerrar esta página.</p>
+				</div>
+			</div>
+		)
+	}
+
 	return (
-		<div className="min-h-screen flex items-center lg:max-w-3xl mx-auto px-4">
-			<div className="flex flex-col items-center justify-center mb-20">
+		<div className="min-h-screen flex items-center justify-center lg:max-w-3xl mx-auto px-4">
+			<div className="flex flex-col items-center justify-center">
 				<CardHeader className="text-center gap-4">
 					<Check className="h-12 w-12 text-accent mx-auto" />
 					<h1 className="text-4xl font-black text-primary">
-						{new Date(bookingDetails.consultationDate) < new Date()
-							? 'Pago recibido'
-							: '¡Cita confirmada!'}
+						{new Date(bookingDetails.consultationDate) < new Date() ? 'Pago recibido' : '¡Cita confirmada!'}
 					</h1>
 
 					{new Date(bookingDetails.consultationDate) < new Date() ? (
 						<p className="text-lg text-gray-600">
 							Hemos registrado el pago de tu consulta del{' '}
 							<span className="font-bold text-primary">
-								{new Date(
-									bookingDetails.consultationDate
-								).toLocaleDateString('es-ES', {
+								{new Date(bookingDetails.consultationDate).toLocaleDateString('es-ES', {
 									weekday: 'long',
 									year: 'numeric',
 									month: 'long',
@@ -92,12 +130,9 @@ function BookingConfirmationContent() {
 						</p>
 					) : (
 						<p className="text-lg text-gray-600">
-							Enhorabuena, tu cita con{' '}
-							{bookingDetails.practitionerName} para el{' '}
+							Enhorabuena, tu cita con {bookingDetails.practitionerName} para el{' '}
 							<span className="font-bold text-primary">
-								{new Date(
-									bookingDetails.consultationDate
-								).toLocaleDateString('es-ES', {
+								{new Date(bookingDetails.consultationDate).toLocaleDateString('es-ES', {
 									weekday: 'long',
 									year: 'numeric',
 									month: 'long',
@@ -107,14 +142,11 @@ function BookingConfirmationContent() {
 								})}
 								{'h '}
 							</span>
-							está confirmada. En breves recibirás un email con
-							los detalles.
+							está confirmada. En breves recibirás un email con los detalles.
 						</p>
 					)}
 				</CardHeader>
-				<p className="text-gray-600 text-sm text-normal">
-					Puedes cerrar esta página.
-				</p>
+				<p className="text-gray-600 text-sm text-normal">Puedes cerrar esta página.</p>
 			</div>
 		</div>
 	)

@@ -260,7 +260,7 @@ export class PaymentOrchestrationService {
 				return { success: false, error: 'Invoice has no items' }
 			}
 
-			// Build human-friendly product lines. For monthly cadence, aggregate as “Consulta … xN”
+			// Build human-friendly product lines (no aggregation). One line per appointment.
 			// If items have service_date, include date in DD/MM/YYYY
 			const formatDate = (iso?: string | null) => {
 				if (!iso) return null
@@ -275,23 +275,14 @@ export class PaymentOrchestrationService {
 				}
 			}
 
-			// Group per unique description, capture a readable name
-			type LineAgg = { name: string; description?: string | null; unitAmountEur: number; quantity: number }
-			const aggregated: LineAgg[] = []
-			for (const it of items as any[]) {
+			type Line = { name: string; description?: string | null; unitAmountEur: number; quantity: number }
+			const lineItems: Line[] = (items as any[]).map((it: any) => {
 				const dateText = formatDate(it.service_date)
 				const baseName = 'Consulta'
 				const name = dateText ? `${baseName} del día ${dateText}` : baseName
 				const unitAmount = Number(it.amount || 0) + Number(it.tax_amount || 0)
-				const existing = aggregated.find(
-					(a) => a.name === name && Math.abs(a.unitAmountEur - unitAmount) < 0.0001
-				)
-				if (existing) {
-					existing.quantity += 1
-				} else {
-					aggregated.push({ name, unitAmountEur: unitAmount, quantity: 1, description: null })
-				}
-			}
+				return { name, unitAmountEur: unitAmount, quantity: 1, description: null }
+			})
 
 			// Practitioner profile for metadata
 			const practitioner = await getProfileById(invoice.user_id, serviceClient)
@@ -309,7 +300,7 @@ export class PaymentOrchestrationService {
 				currency: invoice.currency || 'EUR',
 				billingPeriodStart: invoice.billing_period_start,
 				billingPeriodEnd: invoice.billing_period_end,
-				lineItems: aggregated
+				lineItems
 			})
 
 			// Track or update a payment_session for this invoice (idempotent-ish)
