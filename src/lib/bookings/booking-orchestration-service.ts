@@ -33,7 +33,6 @@ import { createCalendarEvent } from '@/lib/db/calendar-events'
 import { computeEmailScheduledAt } from '@/lib/utils'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import * as Sentry from '@sentry/nextjs'
-import { createInvoiceForBooking } from '@/lib/invoicing/invoice-orchestration'
 
 /**
  * Interface for creating a booking
@@ -152,49 +151,6 @@ async function createBillForBooking(
 	})
 
 	const bill = await createBill(billPayload, supabaseClient)
-
-	// Dual write: create a matching invoice + 1 item for this booking (feature-flagged)
-	if (process.env.ENABLE_INVOICES_DUAL_WRITE === 'true') {
-		try {
-			await createInvoiceForBooking(
-				{
-					userId: booking.user_id,
-					clientId,
-					clientName: (client as any).full_name_search || getClientFullName(client as any),
-					clientEmail: client.email,
-					bookingId: booking.id,
-					description: 'Consulta',
-					amount: billing.amount,
-					currency: billing.currency,
-					// If your current flow marks bill as sent immediately for some paths,
-					// you can toggle issueNow accordingly in those call sites.
-					issueNow: false,
-					legacyBillId: bill.id,
-					// Scheduling fields for invoice_items
-					cadence: (billing.type === 'monthly' ? 'monthly' : 'per_booking') as 'per_booking' | 'monthly',
-					serviceDate: booking.start_time,
-					scheduledSendAt:
-						billing.type === 'monthly'
-							? null
-							: computeEmailScheduledAt(
-									billing.payment_email_lead_hours,
-									booking.start_time,
-									booking.end_time
-								)
-				},
-				supabaseClient
-			)
-		} catch (e) {
-			Sentry.captureException(e, {
-				tags: {
-					component: 'booking-orchestrator',
-					stage: 'dual_write_invoice'
-				},
-				extra: { bookingId: booking.id, billId: bill.id }
-			})
-			// Do not fail the legacy path if invoice creation fails
-		}
-	}
 
 	return bill
 }
