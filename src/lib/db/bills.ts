@@ -60,7 +60,7 @@ export interface CreateBillPayload {
 	currency?: string
 	client_name: string
 	client_email: string
-	billing_type: 'in-advance' | 'right-after' | 'monthly'
+	billing_type: 'per_booking' | 'monthly'
 	email_scheduled_at?: string | null
 	notes?: string
 }
@@ -91,10 +91,7 @@ export interface BillWithBooking extends Bill {
  * @returns Promise<Bill> - The created bill object with generated ID
  * @throws Error if insertion fails or validation errors occur
  */
-export async function createBill(
-	payload: CreateBillPayload,
-	supabaseClient?: SupabaseClient
-): Promise<Bill> {
+export async function createBill(payload: CreateBillPayload, supabaseClient?: SupabaseClient): Promise<Bill> {
 	const billData = {
 		booking_id: payload.booking_id,
 		user_id: payload.user_id,
@@ -112,11 +109,7 @@ export async function createBill(
 	// Use provided client or fall back to default
 	const client = supabaseClient || supabase
 
-	const { data, error } = await client
-		.from('bills')
-		.insert([billData])
-		.select()
-		.single()
+	const { data, error } = await client.from('bills').insert([billData]).select().single()
 
 	if (error) throw error
 	return data
@@ -130,17 +123,10 @@ export async function createBill(
  * @returns Promise<Bill | null> - The bill object or null if not found
  * @throws Error if database operation fails
  */
-export async function getBillById(
-	billId: string,
-	supabaseClient?: SupabaseClient
-): Promise<Bill | null> {
+export async function getBillById(billId: string, supabaseClient?: SupabaseClient): Promise<Bill | null> {
 	const client = supabaseClient || supabase
 
-	const { data, error } = await client
-		.from('bills')
-		.select('*')
-		.eq('id', billId)
-		.single()
+	const { data, error } = await client.from('bills').select('*').eq('id', billId).single()
 
 	if (error) {
 		if (error.code === 'PGRST116') return null // Not found
@@ -157,10 +143,7 @@ export async function getBillById(
  * @returns Promise<Bill[]> - Array of bills for the booking
  * @throws Error if database operation fails
  */
-export async function getBillsForBooking(
-	bookingId: string,
-	supabaseClient?: SupabaseClient
-): Promise<Bill[]> {
+export async function getBillsForBooking(bookingId: string, supabaseClient?: SupabaseClient): Promise<Bill[]> {
 	const client = supabaseClient || supabase
 
 	const { data, error } = await client
@@ -184,13 +167,9 @@ export async function getBillsForBooking(
  */
 export async function getBillsForUser(
 	userId: string,
-	status?: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled' | 'refunded'
+	status?: 'scheduled' | 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled' | 'refunded'
 ): Promise<Bill[]> {
-	let query = supabase
-		.from('bills')
-		.select('*')
-		.eq('user_id', userId)
-		.order('created_at', { ascending: false })
+	let query = supabase.from('bills').select('*').eq('user_id', userId).order('created_at', { ascending: false })
 
 	if (status) {
 		query = query.eq('status', status)
@@ -213,13 +192,9 @@ export async function getBillsForUser(
  */
 export async function getBillsForClient(
 	clientId: string,
-	status?: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled' | 'refunded'
+	status?: 'scheduled' | 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled' | 'refunded'
 ): Promise<Bill[]> {
-	let query = supabase
-		.from('bills')
-		.select('*')
-		.eq('client_id', clientId)
-		.order('created_at', { ascending: false })
+	let query = supabase.from('bills').select('*').eq('client_id', clientId).order('created_at', { ascending: false })
 
 	if (status) {
 		query = query.eq('status', status)
@@ -242,7 +217,7 @@ export async function getBillsForClient(
  */
 export async function getBillsWithBookings(
 	userId: string,
-	status?: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled' | 'refunded'
+	status?: 'scheduled' | 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled' | 'refunded'
 ): Promise<BillWithBooking[]> {
 	let query = supabase
 		.from('bills')
@@ -307,14 +282,10 @@ export async function getOverdueBills(userId?: string): Promise<Bill[]> {
  * @throws Error if database operation fails
  */
 export async function getBillsByStatus(
-	status: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled' | 'refunded',
+	status: 'scheduled' | 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled' | 'refunded',
 	userId?: string
 ): Promise<Bill[]> {
-	let query = supabase
-		.from('bills')
-		.select('*')
-		.eq('status', status)
-		.order('created_at', { ascending: false })
+	let query = supabase.from('bills').select('*').eq('status', status).order('created_at', { ascending: false })
 
 	if (userId) {
 		query = query.eq('user_id', userId)
@@ -337,7 +308,7 @@ export async function getBillsByStatus(
  */
 export async function updateBillStatus(
 	billId: string,
-	status: 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled' | 'refunded',
+	status: 'scheduled' | 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled' | 'refunded',
 	supabaseClient?: SupabaseClient
 ): Promise<Bill> {
 	const updateData: any = { status }
@@ -352,12 +323,7 @@ export async function updateBillStatus(
 	// Use provided client or fall back to default
 	const client = supabaseClient || supabase
 
-	const { data, error } = await client
-		.from('bills')
-		.update(updateData)
-		.eq('id', billId)
-		.select()
-		.single()
+	const { data, error } = await client.from('bills').update(updateData).eq('id', billId).select().single()
 
 	if (error) throw error
 	return data
@@ -394,10 +360,7 @@ export async function markBillAsSent(billId: string): Promise<Bill> {
  * @returns Promise<Bill> - The updated bill object
  * @throws Error if update fails or bill not found
  */
-export async function markBillAsPaid(
-	billId: string,
-	supabaseClient?: SupabaseClient
-): Promise<Bill> {
+export async function markBillAsPaid(billId: string, supabaseClient?: SupabaseClient): Promise<Bill> {
 	const client = supabaseClient || supabase
 
 	const { data, error } = await client
@@ -465,21 +428,13 @@ export async function markBillAsRefunded(
  * @returns Promise<Bill> - The updated bill object
  * @throws Error if update fails or bill not found
  */
-export async function markBillAsDisputed(
-	billId: string,
-	notes?: string
-): Promise<Bill> {
+export async function markBillAsDisputed(billId: string, notes?: string): Promise<Bill> {
 	const updateData: any = { status: 'disputed' }
 	if (notes) {
 		updateData.notes = notes
 	}
 
-	const { data, error } = await supabase
-		.from('bills')
-		.update(updateData)
-		.eq('id', billId)
-		.select()
-		.single()
+	const { data, error } = await supabase.from('bills').update(updateData).eq('id', billId).select().single()
 
 	if (error) throw error
 	return data
@@ -494,21 +449,13 @@ export async function markBillAsDisputed(
  * @returns Promise<Bill> - The updated bill object
  * @throws Error if update fails or bill not found
  */
-export async function cancelBill(
-	billId: string,
-	notes?: string
-): Promise<Bill> {
+export async function cancelBill(billId: string, notes?: string): Promise<Bill> {
 	const updateData: any = { status: 'canceled' }
 	if (notes) {
 		updateData.notes = notes
 	}
 
-	const { data, error } = await supabase
-		.from('bills')
-		.update(updateData)
-		.eq('id', billId)
-		.select()
-		.single()
+	const { data, error } = await supabase.from('bills').update(updateData).eq('id', billId).select().single()
 
 	if (error) throw error
 	return data
@@ -522,16 +469,8 @@ export async function cancelBill(
  * @returns Promise<Bill> - The updated bill object
  * @throws Error if update fails or bill not found
  */
-export async function updateBillNotes(
-	billId: string,
-	notes: string
-): Promise<Bill> {
-	const { data, error } = await supabase
-		.from('bills')
-		.update({ notes })
-		.eq('id', billId)
-		.select()
-		.single()
+export async function updateBillNotes(billId: string, notes: string): Promise<Bill> {
+	const { data, error } = await supabase.from('bills').update({ notes }).eq('id', billId).select().single()
 
 	if (error) throw error
 	return data
@@ -545,10 +484,7 @@ export async function updateBillNotes(
  * @returns Promise<void>
  * @throws Error if deletion fails or bill not found
  */
-export async function deleteBill(
-	billId: string,
-	supabaseClient?: SupabaseClient
-): Promise<void> {
+export async function deleteBill(billId: string, supabaseClient?: SupabaseClient): Promise<void> {
 	const client = supabaseClient || supabase
 
 	const { error } = await client.from('bills').delete().eq('id', billId)
@@ -577,12 +513,7 @@ export async function updateBillReceiptMetadata(
 		updateData.stripe_receipt_url = payload.stripe_receipt_url
 	}
 
-	const { data, error } = await client
-		.from('bills')
-		.update(updateData)
-		.eq('id', billId)
-		.select()
-		.single()
+	const { data, error } = await client.from('bills').update(updateData).eq('id', billId).select().single()
 
 	if (error) throw error
 	return data
@@ -591,10 +522,7 @@ export async function updateBillReceiptMetadata(
 /**
  * Marks that the payment receipt email was sent for a bill
  */
-export async function markBillReceiptEmailSent(
-	billId: string,
-	supabaseClient?: SupabaseClient
-): Promise<Bill> {
+export async function markBillReceiptEmailSent(billId: string, supabaseClient?: SupabaseClient): Promise<Bill> {
 	const client = supabaseClient || supabase
 	const { data, error } = await client
 		.from('bills')
@@ -692,14 +620,8 @@ export async function claimDueBillsForEmail(
 /**
  * Releases the send lock for a bill so it can be retried in a later run.
  */
-export async function releaseBillEmailLock(
-	billId: string,
-	supabaseClient?: SupabaseClient
-): Promise<void> {
+export async function releaseBillEmailLock(billId: string, supabaseClient?: SupabaseClient): Promise<void> {
 	const client = supabaseClient || supabase
-	const { error } = await client
-		.from('bills')
-		.update({ email_send_locked_at: null })
-		.eq('id', billId)
+	const { error } = await client.from('bills').update({ email_send_locked_at: null }).eq('id', billId)
 	if (error) throw error
 }
