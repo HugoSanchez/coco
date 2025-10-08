@@ -39,13 +39,7 @@ import {
 	getBillingPreferences
 } from '@/lib/db/billing-settings'
 import { hasAnyNonCanceledBookings } from '@/lib/db/bookings'
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface BookingFormProps {
 	onSuccess?: () => void // Called when booking is successfully created
@@ -60,11 +54,7 @@ interface Client {
 	email: string // Client's email address
 }
 
-export function BookingForm({
-	onSuccess,
-	onCancel,
-	clients
-}: BookingFormProps) {
+export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) {
 	// Step management state
 	const [currentStep, setCurrentStep] = useState(1) // Tracks which step user is on (1, 2, or 3)
 	const [loading, setLoading] = useState(false) // Loading state for booking creation
@@ -76,9 +66,7 @@ export function BookingForm({
 		end: string
 	} | null>(null) // Time slot selected in step 2
 	const [selectedClient, setSelectedClient] = useState<string>('') // Client ID selected in step 3
-	const [clientOptions, setClientOptions] = useState<DbClient[]>(
-		clients as any
-	)
+	const [clientOptions, setClientOptions] = useState<DbClient[]>(clients as any)
 	const [clientMode, setClientMode] = useState<'select' | 'create'>('select')
 	const [notes, setNotes] = useState('') // Optional notes for the booking
 	const [customPrice, setCustomPrice] = useState('') // Optional custom price (EUR)
@@ -94,28 +82,19 @@ export function BookingForm({
 	>([])
 	const [loadingBookings, setLoadingBookings] = useState(false) // Loading state for fetching day bookings
 	const [isPriceDirty, setIsPriceDirty] = useState(false)
-	const [priceSource, setPriceSource] = useState<
-		'default' | 'client' | 'custom' | 'first' | null
-	>(null)
-	const [resolvedClientPrice, setResolvedClientPrice] = useState<
-		number | null
-	>(null)
-	const [resolvedDefaultPrice, setResolvedDefaultPrice] = useState<
-		number | null
-	>(null)
-	const [firstConsultationAmount, setFirstConsultationAmount] =
-		useState<string>('')
-	const [consultationType, setConsultationType] = useState<
-		'first' | 'followup'
-	>('followup')
-	const [showConsultationType, setShowConsultationType] =
-		useState<boolean>(false)
+	const [priceSource, setPriceSource] = useState<'default' | 'client' | 'custom' | 'first' | null>(null)
+	const [resolvedClientPrice, setResolvedClientPrice] = useState<number | null>(null)
+	const [resolvedDefaultPrice, setResolvedDefaultPrice] = useState<number | null>(null)
+	const [firstConsultationAmount, setFirstConsultationAmount] = useState<string>('')
+	const [consultationType, setConsultationType] = useState<'first' | 'followup'>('followup')
+	const [showConsultationType, setShowConsultationType] = useState<boolean>(false)
 
 	// New: appointment mode and location fields
 	const [mode, setMode] = useState<'online' | 'in_person'>('online')
 	const [locationText, setLocationText] = useState<string>('')
 	const [savingDefault, setSavingDefault] = useState<boolean>(false)
 	const [savedDefault, setSavedDefault] = useState<boolean>(false)
+	const [resolvedLeadHours, setResolvedLeadHours] = useState<number | null>(null)
 
 	// Context and utilities
 	const { user, profile, refreshProfile } = useUser() // Current user and profile data
@@ -133,11 +112,7 @@ export function BookingForm({
 
 	// Re-fetch existing bookings when returning to step 2 if date is already selected
 	useEffect(() => {
-		if (
-			currentStep === 2 &&
-			selectedDate &&
-			existingBookings.length === 0
-		) {
+		if (currentStep === 2 && selectedDate && existingBookings.length === 0) {
 			fetchExistingBookings(selectedDate)
 		}
 	}, [currentStep, selectedDate])
@@ -189,26 +164,28 @@ export function BookingForm({
 
 			if (selectedClient) {
 				// Full resolution when a client is selected
-				const [clientSettings, userDefault, prefs, hasPrev] =
-					await Promise.all([
-						getClientBillingSettings(user.id, selectedClient),
-						getUserDefaultBillingSettings(user.id),
-						getBillingPreferences(user.id),
-						hasAnyNonCanceledBookings(user.id, selectedClient)
-					])
+				const [clientSettings, userDefault, prefs, hasPrev] = await Promise.all([
+					getClientBillingSettings(user.id, selectedClient),
+					getUserDefaultBillingSettings(user.id),
+					getBillingPreferences(user.id),
+					hasAnyNonCanceledBookings(user.id, selectedClient)
+				])
 
-				const firstAmount = prefs?.firstConsultationAmount
-					? Number(prefs.firstConsultationAmount)
-					: null
+				const firstAmount = prefs?.firstConsultationAmount ? Number(prefs.firstConsultationAmount) : null
 				const clientAmount =
-					clientSettings?.billing_amount != null
-						? Number(clientSettings.billing_amount)
-						: null
+					clientSettings?.billing_amount != null ? Number(clientSettings.billing_amount) : null
 				const defaultAmount = Number(userDefault?.billing_amount || 0)
 
 				// Persist resolved amounts for later interactions (e.g., switching to follow-up)
 				setResolvedClientPrice(clientAmount)
 				setResolvedDefaultPrice(defaultAmount)
+
+				// Resolve email lead hours preference (client overrides user default)
+				const leadRaw =
+					clientSettings?.payment_email_lead_hours ?? userDefault?.payment_email_lead_hours ?? null
+				const normalizedLead =
+					leadRaw == null || Number.isNaN(Number(leadRaw)) ? null : Math.trunc(Number(leadRaw))
+				setResolvedLeadHours(normalizedLead)
 
 				const {
 					showSelect,
@@ -226,9 +203,7 @@ export function BookingForm({
 				setConsultationType(type as 'first' | 'followup')
 				if (!isPriceDirty) {
 					setCustomPrice(String(price))
-					setPriceSource(
-						source as 'default' | 'first' | 'client' | 'custom'
-					)
+					setPriceSource(source as 'default' | 'first' | 'client' | 'custom')
 				}
 			} else {
 				// No client selected: show user's default price
@@ -236,6 +211,10 @@ export function BookingForm({
 				const defaultAmount = Number(userDefault?.billing_amount || 0)
 				setResolvedClientPrice(null)
 				setResolvedDefaultPrice(defaultAmount)
+				const leadRaw = userDefault?.payment_email_lead_hours ?? null
+				const normalizedLead =
+					leadRaw == null || Number.isNaN(Number(leadRaw)) ? null : Math.trunc(Number(leadRaw))
+				setResolvedLeadHours(normalizedLead)
 				setShowConsultationType(false)
 				setConsultationType('followup')
 				if (!isPriceDirty) {
@@ -250,12 +229,7 @@ export function BookingForm({
 
 	// When first price arrives while 'first' is selected, apply it once (if user hasn't edited)
 	useEffect(() => {
-		if (
-			currentStep === 3 &&
-			consultationType === 'first' &&
-			firstConsultationAmount &&
-			!isPriceDirty
-		) {
+		if (currentStep === 3 && consultationType === 'first' && firstConsultationAmount && !isPriceDirty) {
 			setCustomPrice(String(Number(firstConsultationAmount)))
 			setIsPriceDirty(false)
 			setPriceSource('first')
@@ -273,24 +247,13 @@ export function BookingForm({
 	}, [mode, locationText, profile?.default_in_person_location_text])
 
 	// ===== Helpers for default in-person address =====
-	const isAddressEqualToDefault = useCallback(
-		(address: string, defaultAddress?: string | null) => {
-			return address.trim() === (defaultAddress || '').trim()
-		},
-		[]
-	)
+	const isAddressEqualToDefault = useCallback((address: string, defaultAddress?: string | null) => {
+		return address.trim() === (defaultAddress || '').trim()
+	}, [])
 
 	const isDefaultAddress = useMemo(
-		() =>
-			isAddressEqualToDefault(
-				locationText,
-				profile?.default_in_person_location_text
-			),
-		[
-			isAddressEqualToDefault,
-			locationText,
-			profile?.default_in_person_location_text
-		]
+		() => isAddressEqualToDefault(locationText, profile?.default_in_person_location_text),
+		[isAddressEqualToDefault, locationText, profile?.default_in_person_location_text]
 	)
 
 	const handleSaveAddressAsDefault = useCallback(async () => {
@@ -328,28 +291,8 @@ export function BookingForm({
 		try {
 			// Get start and end of the selected day in UTC
 			// The date parameter is already a Date object representing the selected day
-			const startOfDay = new Date(
-				Date.UTC(
-					date.getFullYear(),
-					date.getMonth(),
-					date.getDate(),
-					0,
-					0,
-					0,
-					0
-				)
-			)
-			const endOfDay = new Date(
-				Date.UTC(
-					date.getFullYear(),
-					date.getMonth(),
-					date.getDate(),
-					23,
-					59,
-					59,
-					999
-				)
-			)
+			const startOfDay = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0))
+			const endOfDay = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999))
 
 			// Call our API endpoint to get combined events
 			const response = await fetch(
@@ -462,60 +405,68 @@ export function BookingForm({
 		setLoading(true)
 
 		try {
-			// Optional: validate and prepare custom price override
-			let overrideAmount: number | undefined
+			// Resolve final amount (>= 0, 0 allowed)
+			let finalAmount: number
 			if (isPriceDirty && customPrice.trim() !== '') {
-				// Normalize decimal separator and parse
 				const normalized = customPrice.replace(',', '.')
 				const parsed = parseFloat(normalized)
 				if (Number.isNaN(parsed) || parsed < 0) {
 					setLoading(false)
 					return toast({
 						title: 'Precio inválido',
-						description:
-							'El precio personalizado debe ser un número mayor o igual a 0.',
+						description: 'El precio debe ser un número mayor o igual a 0.',
 						variant: 'destructive',
 						color: 'error'
 					})
 				}
-				// Round to 2 decimals safely
-				overrideAmount = Math.round(parsed * 100) / 100
+				finalAmount = Math.round(parsed * 100) / 100
+			} else {
+				const normalized = customPrice.replace(',', '.')
+				const parsed = parseFloat(normalized)
+				if (Number.isNaN(parsed) || parsed < 0) {
+					setLoading(false)
+					return toast({
+						title: 'Precio inválido',
+						description: 'El precio debe ser un número mayor o igual a 0.',
+						variant: 'destructive',
+						color: 'error'
+					})
+				}
+				finalAmount = Math.round(parsed * 100) / 100
 			}
 
-			// Call our new server-side booking API
-			// This handles all the complex billing logic server-side:
-			// - Authentication and proper environment variable access
-			// - Billing settings resolution (client-specific or user default)
-			// - Booking creation with appropriate billing configuration
-			// - Payment link generation and email sending
-			// - Returns result with payment info if needed
-			const response = await fetch('/api/bookings/create', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
+			// Build payload for unified API contract
+			const payload = {
+				booking: {
 					clientId: selectedClient,
 					startTime: selectedSlot!.start,
 					endTime: selectedSlot!.end,
 					notes,
-					// Only send override if user modified the suggested value
-					overrideAmount,
 					consultationType,
 					mode,
-					locationText:
-						mode === 'in_person' ? locationText || null : null,
-					saveLocationAsDefault: false
-				})
+					locationText: mode === 'in_person' ? locationText || null : null
+				},
+				billing: {
+					type: 'per_booking',
+					amount: finalAmount,
+					currency: 'EUR',
+					paymentEmailLeadHours:
+						resolvedLeadHours != null && !Number.isNaN(Number(resolvedLeadHours))
+							? Number(resolvedLeadHours)
+							: null
+				}
+			}
+
+			// Send request to create booking
+			const response = await fetch('/api/bookings/create', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload)
 			})
 
 			if (!response.ok) {
 				const errorData = await response.json()
-				throw new Error(
-					errorData.details ||
-						errorData.error ||
-						'Failed to create booking'
-				)
+				throw new Error(errorData.details || errorData.error || 'Failed to create booking')
 			}
 
 			const result = await response.json()
@@ -543,8 +494,7 @@ export function BookingForm({
 
 			if (isEmailError) {
 				title = 'Error al enviar email de confirmación'
-				description =
-					'Por favor revisa que la dirección de email sea correcta.'
+				description = 'Por favor revisa que la dirección de email sea correcta.'
 			}
 
 			toast({
@@ -629,9 +579,7 @@ export function BookingForm({
 					{clientMode === 'create' ? (
 						<div className="space-y-2">
 							<div className="flex items-center justify-between">
-								<Label className="text-md font-normal text-gray-700">
-									Paciente
-								</Label>
+								<Label className="text-md font-normal text-gray-700">Paciente</Label>
 								<button
 									type="button"
 									onClick={() => setClientMode('select')}
@@ -646,12 +594,8 @@ export function BookingForm({
 										setClientMode('select')
 										if (created) {
 											setClientOptions((prev) => {
-												const exists = prev.some(
-													(c) => c.id === created.id
-												)
-												return exists
-													? prev
-													: [created as any, ...prev]
+												const exists = prev.some((c) => c.id === created.id)
+												return exists ? prev : [created as any, ...prev]
 											})
 											setSelectedClient(created.id)
 										}
@@ -666,9 +610,7 @@ export function BookingForm({
 							{/* Client Selection Dropdown */}
 							<div className="space-y-2">
 								<div className="flex items-center justify-between">
-									<Label className="text-md font-normal text-gray-700">
-										Paciente
-									</Label>
+									<Label className="text-md font-normal text-gray-700">Paciente</Label>
 									<button
 										type="button"
 										onClick={() => setClientMode('create')}
@@ -680,9 +622,7 @@ export function BookingForm({
 								<ClientSearchSelect
 									clients={clientOptions as any}
 									value={selectedClient}
-									onValueChange={(val) =>
-										setSelectedClient(val)
-									}
+									onValueChange={(val) => setSelectedClient(val)}
 									placeholder="Buscar paciente..."
 								/>
 							</div>
@@ -690,9 +630,7 @@ export function BookingForm({
 							{/* Consultation Type - only if first price exists */}
 							{showConsultationType && (
 								<div className="space-y-2">
-									<Label className="text-md font-normal text-gray-700">
-										Tipo de consulta
-									</Label>
+									<Label className="text-md font-normal text-gray-700">Tipo de consulta</Label>
 									<Select
 										value={consultationType}
 										onValueChange={(val) => {
@@ -700,39 +638,17 @@ export function BookingForm({
 											if (val === 'first') {
 												setPriceSource('first')
 												if (firstConsultationAmount) {
-													setCustomPrice(
-														String(
-															Number(
-																firstConsultationAmount
-															)
-														)
-													)
+													setCustomPrice(String(Number(firstConsultationAmount)))
 													setIsPriceDirty(false)
 												}
 											} else {
 												if (!isPriceDirty) {
-													if (
-														resolvedClientPrice !=
-														null
-													) {
-														setCustomPrice(
-															String(
-																resolvedClientPrice
-															)
-														)
+													if (resolvedClientPrice != null) {
+														setCustomPrice(String(resolvedClientPrice))
 														setPriceSource('client')
-													} else if (
-														resolvedDefaultPrice !=
-														null
-													) {
-														setCustomPrice(
-															String(
-																resolvedDefaultPrice
-															)
-														)
-														setPriceSource(
-															'default'
-														)
+													} else if (resolvedDefaultPrice != null) {
+														setCustomPrice(String(resolvedDefaultPrice))
+														setPriceSource('default')
 													}
 												}
 											}
@@ -742,12 +658,8 @@ export function BookingForm({
 											<SelectValue placeholder="Selecciona tipo de consulta" />
 										</SelectTrigger>
 										<SelectContent>
-											<SelectItem value="first">
-												Primera consulta
-											</SelectItem>
-											<SelectItem value="followup">
-												Consulta de seguimiento
-											</SelectItem>
+											<SelectItem value="first">Primera consulta</SelectItem>
+											<SelectItem value="followup">Consulta de seguimiento</SelectItem>
 										</SelectContent>
 									</Select>
 								</div>
@@ -755,9 +667,7 @@ export function BookingForm({
 
 							{/* Price Field (always visible) */}
 							<div className="space-y-2">
-								<Label className="text-md font-normal text-gray-700">
-									Precio
-								</Label>
+								<Label className="text-md font-normal text-gray-700">Precio</Label>
 								<div className="relative">
 									<span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
 										€
@@ -773,24 +683,14 @@ export function BookingForm({
 											setCustomPrice(val)
 
 											// Compare against known client/default amounts to decide source dynamically
-											const normalized = val.replace(
-												',',
-												'.'
-											)
-											const parsed =
-												parseFloat(normalized)
-											const approxEq = (
-												a: number,
-												b: number
-											) => Math.abs(a - b) < 0.005
+											const normalized = val.replace(',', '.')
+											const parsed = parseFloat(normalized)
+											const approxEq = (a: number, b: number) => Math.abs(a - b) < 0.005
 
 											if (
 												!Number.isNaN(parsed) &&
 												resolvedClientPrice != null &&
-												approxEq(
-													parsed,
-													resolvedClientPrice
-												)
+												approxEq(parsed, resolvedClientPrice)
 											) {
 												setIsPriceDirty(false)
 												setPriceSource('client')
@@ -800,10 +700,7 @@ export function BookingForm({
 											if (
 												!Number.isNaN(parsed) &&
 												resolvedDefaultPrice != null &&
-												approxEq(
-													parsed,
-													resolvedDefaultPrice
-												)
+												approxEq(parsed, resolvedDefaultPrice)
 											) {
 												setIsPriceDirty(false)
 												setPriceSource('default')
@@ -831,23 +728,14 @@ export function BookingForm({
 
 							{/* Mode select: Online or Presencial - Step 3 */}
 							<div className="space-y-2">
-								<Label className="text-md font-normal text-gray-700">
-									Formato de cita
-								</Label>
-								<Select
-									value={mode}
-									onValueChange={(val) => setMode(val as any)}
-								>
+								<Label className="text-md font-normal text-gray-700">Formato de cita</Label>
+								<Select value={mode} onValueChange={(val) => setMode(val as any)}>
 									<SelectTrigger className="h-12">
 										<SelectValue placeholder="Selecciona modalidad" />
 									</SelectTrigger>
 									<SelectContent>
-										<SelectItem value="online">
-											Online
-										</SelectItem>
-										<SelectItem value="in_person">
-											Presencial
-										</SelectItem>
+										<SelectItem value="online">Online</SelectItem>
+										<SelectItem value="in_person">Presencial</SelectItem>
 									</SelectContent>
 								</Select>
 							</div>
@@ -856,18 +744,13 @@ export function BookingForm({
 							{mode === 'in_person' && (
 								<div className="space-y-2">
 									<Label className="text-md font-normal text-gray-700">
-										Dirección{' '}
-										<span className="text-xs text-gray-500 font-normal">
-											(opcional)
-										</span>
+										Dirección <span className="text-xs text-gray-500 font-normal">(opcional)</span>
 									</Label>
 									<div className="relative">
 										<Input
 											placeholder="Introduce la dirección (calle, ciudad)"
 											value={locationText}
-											onChange={(e) =>
-												setLocationText(e.target.value)
-											}
+											onChange={(e) => setLocationText(e.target.value)}
 											className="h-12 pr-20"
 										/>
 										<div className="absolute inset-y-0 right-2 flex items-center">
@@ -884,15 +767,11 @@ export function BookingForm({
 											) : (
 												<button
 													type="button"
-													onClick={
-														handleSaveAddressAsDefault
-													}
+													onClick={handleSaveAddressAsDefault}
 													className="text-teal-600 hover:text-teal-700 text-sm font-medium"
 													disabled={savingDefault}
 												>
-													{savingDefault
-														? 'Guardando...'
-														: 'Guardar'}
+													{savingDefault ? 'Guardando...' : 'Guardar'}
 												</button>
 											)}
 										</div>
@@ -903,22 +782,10 @@ export function BookingForm({
 							{/* Booking Summary */}
 							<div>
 								<h3 className="text-sm mt-10">
-									{format(
-										selectedDate!,
-										"EEEE, d 'de' MMMM 'de' yyyy",
-										{ locale: es }
-									)
+									{format(selectedDate!, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })
 										.replace(/^./, (c) => c.toUpperCase())
-										.replace(
-											/ de ([a-z])/,
-											(match, p1) =>
-												` de ${p1.toUpperCase()}`
-										)}{' '}
-									a las{' '}
-									{format(
-										new Date(selectedSlot.start),
-										'HH:mm'
-									)}
+										.replace(/ de ([a-z])/, (match, p1) => ` de ${p1.toUpperCase()}`)}{' '}
+									a las {format(new Date(selectedSlot.start), 'HH:mm')}
 									{'h'}
 								</h3>
 							</div>

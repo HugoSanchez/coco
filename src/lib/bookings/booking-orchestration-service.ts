@@ -16,19 +16,13 @@
  */
 
 import { createBooking, Booking, deleteBooking } from '@/lib/db/bookings'
-import { getClientById, getClientFullName } from '@/lib/db/clients'
+import { getClientById } from '@/lib/db/clients'
 import { createBill, CreateBillPayload, Bill, updateBillStatus, markBillAsPaid, deleteBill } from '@/lib/db/bills'
 import { sendConsultationBillEmail } from '@/lib/emails/email-service'
 import { getProfileById } from '@/lib/db/profiles'
 import { getBookingById } from '@/lib/db/bookings'
-
 import { createEmailCommunication } from '@/lib/db/email-communications'
-import {
-	createPendingCalendarEvent,
-	createCalendarEventWithInvite,
-	createInternalConfirmedCalendarEvent
-} from '@/lib/calendar/calendar'
-import { createCalendarEvent } from '@/lib/db/calendar-events'
+import { createBookingCalendarEvent } from '@/lib/calendar/calendar-orchestration'
 import { computeEmailScheduledAt } from '@/lib/utils'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import * as Sentry from '@sentry/nextjs'
@@ -87,249 +81,6 @@ export interface CreateBookingResult {
 }
 
 /**
- * Creates a bill for a booking
- * Inmediately after creating a booking, a bill is created for the booking
- * This function handles that.
- */
-async function createBillForBooking(
-	booking: Booking,
-	billing: any,
-	clientId: string,
-	supabaseClient?: SupabaseClient
-): Promise<Bill> {
-	////////////////////////////////////////////////////////////////////////////////////////////////////////
-	////// Step 1: Load client snapshot used for immutable bill fields
-	////////////////////////////////////////////////////////////////////////////////////////////////////////
-	const client = await getClientById(clientId, supabaseClient)
-	if (!client) {
-		throw new Error(`Client not found: ${clientId}`)
-	}
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////
-	////// Step 2: Normalize billing type and build bill payload
-	////////////////////////////////////////////////////////////////////////////////////////////////////////
-	const normalizedBillingType: 'per_booking' | 'monthly' = billing.type === 'monthly' ? 'monthly' : 'per_booking'
-
-	const billPayload: CreateBillPayload = {
-		booking_id: booking.id,
-		user_id: booking.user_id,
-		client_id: clientId,
-		client_name: (client as any).full_name_search || getClientFullName(client as any),
-		client_email: client.email,
-		amount: billing.amount,
-		currency: billing.currency,
-		billing_type: normalizedBillingType,
-		email_scheduled_at: billing.email_scheduled_at || null
-	}
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////
-	////// Step 3: Persist bill and return
-	////////////////////////////////////////////////////////////////////////////////////////////////////////
-	const bill = await createBill(billPayload, supabaseClient)
-
-	return bill
-}
-
-/**
- * Calendar event helper (single place to create Google events + DB rows)
- *
- * Rules (preserves existing behavior):
- * - Past paid consult (status 'completed'): create INTERNAL confirmed event (no invitations)
- * - Zero-amount per-booking: create CONFIRMED with invite
- * - Pending per-booking: create PENDING event
- * - Monthly: no calendar event here (monthly flow never created one before)
- */
-async function createCalendarEventForBooking(options: {
-	variant: 'internal_confirmed' | 'confirmed' | 'pending'
-	request: CreateBookingRequest
-	bookingId: string
-	supabaseClient?: SupabaseClient
-}) {
-	// STEP 0) Resolve inputs and load entities required to create events
-	const { variant, request, bookingId, supabaseClient } = options
-	try {
-		// Load client/practitioner to populate event payloads
-		const client = await getClientById(request.clientId, supabaseClient)
-		const practitioner = await getProfileById(request.userId, supabaseClient)
-		if (!client || !practitioner) return
-
-		if (variant === 'internal_confirmed') {
-			// STEP 1A) Past, paid consult => create INTERNAL confirmed event (no invitations)
-			const eventResult = await createInternalConfirmedCalendarEvent(
-				{
-					userId: request.userId,
-					clientName: client.name,
-					practitionerName: practitioner.name || 'Your Practitioner',
-					practitionerEmail: practitioner.email,
-					startTime: request.startTime,
-					endTime: request.endTime,
-					bookingNotes: request.notes,
-					bookingId: bookingId as any
-				},
-				supabaseClient
-			)
-			if (eventResult.success && eventResult.googleEventId) {
-				// Persist the created Google event in our DB for reference
-				await createCalendarEvent(
-					{
-						booking_id: bookingId,
-						user_id: request.userId,
-						google_event_id: eventResult.googleEventId,
-						event_type: 'confirmed',
-						event_status: 'created'
-					},
-					supabaseClient
-				)
-			}
-			return
-		}
-
-		if (variant === 'confirmed') {
-			// STEP 1B) Zero-amount confirm now => create CONFIRMED event with invites
-			const eventResult = await createCalendarEventWithInvite(
-				{
-					userId: request.userId,
-					clientName: client.name,
-					clientEmail: client.email,
-					practitionerName: practitioner.name || 'Your Practitioner',
-					practitionerEmail: practitioner.email,
-					startTime: request.startTime,
-					endTime: request.endTime,
-					bookingNotes: request.notes,
-					bookingId: bookingId as any,
-					mode: request.mode,
-					locationText: request.mode === 'in_person' ? request.locationText || null : null
-				},
-				supabaseClient
-			)
-			if (eventResult.success && eventResult.googleEventId) {
-				// Store the confirmed event reference
-				await createCalendarEvent(
-					{
-						booking_id: bookingId,
-						user_id: request.userId,
-						google_event_id: eventResult.googleEventId,
-						event_type: 'confirmed',
-						event_status: 'created'
-					},
-					supabaseClient
-				)
-			}
-			return
-		}
-
-		// STEP 1C) Payment pending => create PENDING event to reserve the slot
-		const eventResult = await createPendingCalendarEvent(
-			{
-				userId: request.userId,
-				clientName: client.name,
-				practitionerEmail: practitioner.email,
-				startTime: request.startTime,
-				endTime: request.endTime,
-				bookingId: bookingId,
-				mode: request.mode,
-				locationText: request.mode === 'in_person' ? request.locationText || null : null
-			},
-			supabaseClient
-		)
-		if (eventResult.success && eventResult.googleEventId) {
-			// Persist the pending event reference
-			await createCalendarEvent(
-				{
-					booking_id: bookingId,
-					user_id: request.userId,
-					google_event_id: eventResult.googleEventId,
-					event_type: 'pending',
-					event_status: 'created'
-				},
-				supabaseClient
-			)
-		}
-	} catch (error) {
-		// STEP E) Event creation is best-effort; never block booking creation
-		Sentry.captureException(error, {
-			tags: { component: 'booking-orchestrator', stage: 'calendar_helper' },
-			extra: { bookingId }
-		})
-	}
-}
-
-/**
- * Sends the consultation bill email for a given bill (before consultation flow).
- * - Builds the payment URL
- * - Sends the email
- * - Marks bill as 'sent' upon success and records email communication
- */
-export async function sendBillPaymentEmail(
-	bill: Bill,
-	supabaseClient?: SupabaseClient
-): Promise<{ success: boolean; paymentUrl?: string; error?: string }> {
-	try {
-		////////////////////////////////////////////////////////////////////////////////////////////////////////
-		////// Step 1: Guardrails and load required entities
-		////////////////////////////////////////////////////////////////////////////////////////////////////////
-		if (!bill.booking_id) return { success: false, error: 'Bill missing booking_id' }
-		const booking = await getBookingById(bill.booking_id, supabaseClient)
-		const client = await getClientById(bill.client_id!, supabaseClient)
-		const practitioner = await getProfileById(bill.user_id, supabaseClient)
-
-		if (!booking) return { success: false, error: 'Booking not found' }
-		if (!client) return { success: false, error: 'Client not found' }
-		if (!practitioner) return { success: false, error: 'Practitioner not found' }
-
-		////////////////////////////////////////////////////////////////////////////////////////////////////////
-		////// Step 2: Compose payment URL and send email
-		////////////////////////////////////////////////////////////////////////////////////////////////////////
-		const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-		const paymentGatewayUrl = `${baseUrl}/api/payments/${bill.booking_id}`
-		const emailResult = await sendConsultationBillEmail({
-			to: client.email,
-			clientName: client.name,
-			consultationDate: booking.start_time,
-			amount: bill.amount,
-			billingTrigger: 'before_consultation',
-			practitionerName: practitioner.name || 'Your Practitioner',
-			practitionerEmail: practitioner.email,
-			practitionerImageUrl: practitioner.profile_picture_url || undefined,
-			paymentUrl: paymentGatewayUrl
-		})
-
-		if (emailResult.success) {
-			////////////////////////////////////////////////////////////////////////////////////////////////////////
-			////// Step 3: Mark bill as 'sent' and record the communication
-			////////////////////////////////////////////////////////////////////////////////////////////////////////
-			await updateBillStatus(bill.id, 'sent', supabaseClient)
-			try {
-				await createEmailCommunication(
-					{
-						user_id: bill.user_id,
-						client_id: bill.client_id!,
-						bill_id: bill.id,
-						booking_id: bill.booking_id,
-						email_type: 'consultation_bill',
-						recipient_email: client.email,
-						recipient_name: client.name,
-						status: 'sent'
-					},
-					supabaseClient
-				)
-			} catch (_) {}
-			return { success: true, paymentUrl: paymentGatewayUrl }
-		}
-
-		////////////////////////////////////////////////////////////////////////////////////////////////////////
-		////// Step 4: Propagate failure
-		////////////////////////////////////////////////////////////////////////////////////////////////////////
-		return { success: false, error: emailResult.error || 'Email sending failed' }
-	} catch (error) {
-		return {
-			success: false,
-			error: error instanceof Error ? error.message : 'Unknown error'
-		}
-	}
-}
-
-/**
  * Unified booking creation
  *
  * One function handles both per-booking and monthly flows:
@@ -344,6 +95,20 @@ export async function orchestrateBookingCreation(
 	billing: any,
 	supabaseClient?: SupabaseClient
 ): Promise<CreateBookingResult> {
+	////////////////////////////////////////////////////////////////////////////////////////////////////////
+	////// Pre-validate inputs (time window + billing payload)
+	////////////////////////////////////////////////////////////////////////////////////////////////////////
+	validateBookingTimes(request.startTime, request.endTime)
+	validateBillingInput(billing)
+	////////////////////////////////////////////////////////////////////////////////////////////////////////
+	////// Step 0: Load client and practitioner once (shared context)
+	////////////////////////////////////////////////////////////////////////////////////////////////////////
+	const [client, practitioner] = await Promise.all([
+		getClientById(request.clientId, supabaseClient),
+		getProfileById(request.userId, supabaseClient)
+	])
+	if (!client) throw new Error(`Client not found: ${request.clientId}`)
+	if (!practitioner) throw new Error(`Practitioner profile not found: ${request.userId}`)
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////// Step 1: Normalize billing type and derive simple flags
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -381,7 +146,7 @@ export async function orchestrateBookingCreation(
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	const emailScheduledAt =
 		normalizedType === 'per_booking' && amount > 0
-			? computeEmailScheduledAt(billing.payment_email_lead_hours, request.startTime, request.endTime)
+			? computeEmailScheduledAt(billing.paymentEmailLeadHours, request.startTime, request.endTime)
 			: null
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -390,7 +155,7 @@ export async function orchestrateBookingCreation(
 	const bill = await createBillForBooking(
 		booking,
 		{ ...billing, type: normalizedType, email_scheduled_at: emailScheduledAt },
-		request.clientId,
+		client,
 		supabaseClient
 	)
 
@@ -403,6 +168,8 @@ export async function orchestrateBookingCreation(
 				variant: 'confirmed',
 				request,
 				bookingId: booking.id,
+				client,
+				practitioner,
 				supabaseClient
 			})
 		} else if (isPast) {
@@ -410,10 +177,19 @@ export async function orchestrateBookingCreation(
 				variant: 'internal_confirmed',
 				request,
 				bookingId: booking.id,
+				client,
+				practitioner,
 				supabaseClient
 			})
 		} else {
-			await createCalendarEventForBooking({ variant: 'pending', request, bookingId: booking.id, supabaseClient })
+			await createCalendarEventForBooking({
+				variant: 'pending',
+				request,
+				bookingId: booking.id,
+				client,
+				practitioner,
+				supabaseClient
+			})
 		}
 	}
 
@@ -446,8 +222,7 @@ export async function orchestrateBookingCreation(
 	////// Step 10: Send payment email now and update bill state to 'sent'
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	try {
-		const client = await getClientById(request.clientId, supabaseClient)
-		const practitioner = await getProfileById(request.userId, supabaseClient)
+		// Reuse loaded snapshots instead of refetching
 		if (!client || !practitioner) throw new Error('Missing client or practitioner')
 
 		const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
@@ -514,6 +289,143 @@ export async function orchestrateBookingCreation(
 			await deleteBill(bill.id, supabaseClient)
 		} catch (_) {}
 		throw error
+	}
+}
+
+/**
+ * Creates a bill for a booking
+ * Inmediately after creating a booking, a bill is created for the booking
+ * This function handles that.
+ */
+async function createBillForBooking(
+	booking: Booking,
+	billing: any,
+	client: any,
+	supabaseClient?: SupabaseClient
+): Promise<Bill> {
+	////////////////////////////////////////////////////////////////////////////////////////////////////////
+	////// Step 1: Normalize billing type and build bill payload from provided client snapshot
+	////////////////////////////////////////////////////////////////////////////////////////////////////////
+	const normalizedBillingType: 'per_booking' | 'monthly' = billing.type === 'monthly' ? 'monthly' : 'per_booking'
+
+	const clientDisplayName =
+		(client as any).full_name_search ||
+		[String((client as any).name || ''), String((client as any).last_name || '')].filter(Boolean).join(' ').trim()
+
+	const billPayload: CreateBillPayload = {
+		booking_id: booking.id,
+		user_id: booking.user_id,
+		client_id: (client as any).id,
+		client_name: clientDisplayName,
+		client_email: (client as any).email,
+		amount: billing.amount,
+		currency: billing.currency,
+		billing_type: normalizedBillingType,
+		email_scheduled_at: billing.email_scheduled_at || null
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////
+	////// Step 2: Persist bill and return
+	////////////////////////////////////////////////////////////////////////////////////////////////////////
+	const bill = await createBill(billPayload, supabaseClient)
+	return bill
+}
+
+/**
+ * Calendar event helper (single place to create Google events + DB rows)
+ *
+ * Rules (preserves existing behavior):
+ * - Past paid consult (status 'completed'): create INTERNAL confirmed event (no invitations)
+ * - Zero-amount per-booking: create CONFIRMED with invite
+ * - Pending per-booking: create PENDING event
+ * - Monthly: no calendar event here (monthly flow never created one before)
+ */
+async function createCalendarEventForBooking(options: {
+	variant: 'internal_confirmed' | 'confirmed' | 'pending'
+	request: CreateBookingRequest
+	bookingId: string
+	client: any
+	practitioner: any
+	supabaseClient?: SupabaseClient
+}) {
+	const { variant, request, bookingId, client, practitioner, supabaseClient } = options
+	await createBookingCalendarEvent({ variant, request, bookingId, client, practitioner, supabaseClient })
+}
+
+/**
+ * This function is used by the CRON job to send scheduled bills (per-booking only).
+ * Sends the consultation bill email for a given bill.
+ * - Builds the payment URL
+ * - Sends the email
+ * - Marks bill as 'sent' upon success and records email communication
+ */
+export async function sendBillPaymentEmail(
+	bill: Bill,
+	supabaseClient?: SupabaseClient
+): Promise<{ success: boolean; paymentUrl?: string; error?: string }> {
+	try {
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		////// Step 1: Guardrails and load required entities
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		if (!bill.booking_id) return { success: false, error: 'Bill missing booking_id' }
+		// Load required entities
+		const booking = await getBookingById(bill.booking_id, supabaseClient)
+		const client = await getClientById(bill.client_id!, supabaseClient)
+		const practitioner = await getProfileById(bill.user_id, supabaseClient)
+
+		if (!booking) return { success: false, error: 'Booking not found' }
+		if (!client) return { success: false, error: 'Client not found' }
+		if (!practitioner) return { success: false, error: 'Practitioner not found' }
+
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		////// Step 2: Compose payment URL and send email
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+		const paymentGatewayUrl = `${baseUrl}/api/payments/${bill.booking_id}`
+		const emailResult = await sendConsultationBillEmail({
+			to: client.email,
+			clientName: client.name,
+			consultationDate: booking.start_time,
+			amount: bill.amount,
+			billingTrigger: 'before_consultation',
+			practitionerName: practitioner.name || 'Your Practitioner',
+			practitionerEmail: practitioner.email,
+			practitionerImageUrl: practitioner.profile_picture_url || undefined,
+			paymentUrl: paymentGatewayUrl
+		})
+
+		if (emailResult.success) {
+			////////////////////////////////////////////////////////////////////////////////////////////////////////
+			////// Step 3: Mark bill as 'sent' and record the communication
+			////////////////////////////////////////////////////////////////////////////////////////////////////////
+			await updateBillStatus(bill.id, 'sent', supabaseClient)
+			try {
+				await createEmailCommunication(
+					{
+						user_id: bill.user_id,
+						client_id: bill.client_id!,
+						bill_id: bill.id,
+						booking_id: bill.booking_id,
+						email_type: 'consultation_bill',
+						recipient_email: client.email,
+						recipient_name: client.name,
+						status: 'sent'
+					},
+					supabaseClient
+				)
+			} catch (_) {}
+			return { success: true, paymentUrl: paymentGatewayUrl }
+		}
+
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		////// Step 4: Propagate failure
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		return { success: false, error: emailResult.error || 'Email sending failed' }
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : 'Unknown error'
+		}
 	}
 }
 
