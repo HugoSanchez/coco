@@ -233,9 +233,8 @@ export class PaymentOrchestrationService {
 		try {
 			const serviceClient = createServiceRoleClient()
 
-			// Load invoice and items
+			// Load invoice
 			const { getInvoiceById } = await import('@/lib/db/invoices')
-			const { listInvoiceItems } = await import('@/lib/db/invoice-items')
 			const { getProfileById } = await import('@/lib/db/profiles')
 			const { getStripeAccountForPayments } = await import('@/lib/db/stripe-accounts')
 
@@ -254,35 +253,11 @@ export class PaymentOrchestrationService {
 				return { success: false, error: 'Stripe account not ready for payments' }
 			}
 
-			// Load items to compose line items text
-			const items = await listInvoiceItems(invoice.id, serviceClient)
-			if (!items || items.length === 0) {
-				return { success: false, error: 'Invoice has no items' }
-			}
-
-			// Build human-friendly product lines (no aggregation). One line per appointment.
-			// If items have service_date, include date in DD/MM/YYYY
-			const formatDate = (iso?: string | null) => {
-				if (!iso) return null
-				try {
-					const d = new Date(iso)
-					const dd = String(d.getUTCDate()).padStart(2, '0')
-					const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
-					const yyyy = d.getUTCFullYear()
-					return `${dd}/${mm}/${yyyy}`
-				} catch {
-					return null
-				}
-			}
-
+			// Build a single line item derived from invoice totals
 			type Line = { name: string; description?: string | null; unitAmountEur: number; quantity: number }
-			const lineItems: Line[] = (items as any[]).map((it: any) => {
-				const dateText = formatDate(it.service_date)
-				const baseName = 'Consulta'
-				const name = dateText ? `${baseName} del día ${dateText}` : baseName
-				const unitAmount = Number(it.amount || 0) + Number(it.tax_amount || 0)
-				return { name, unitAmountEur: unitAmount, quantity: 1, description: null }
-			})
+			const lineItems: Line[] = [
+				{ name: 'Consulta(s)', unitAmountEur: Number(invoice.total || 0), quantity: 1, description: null }
+			]
 
 			// Practitioner profile for metadata
 			const practitioner = await getProfileById(invoice.user_id, serviceClient)
@@ -518,7 +493,7 @@ export class PaymentOrchestrationService {
 			await markBillAsRefunded(paidBill.id, stripeRefundId, reason, supabaseClient)
 
 			// STEP 5: Dual-write: update related invoice to 'refunded'
-			if (process.env.ENABLE_INVOICES_DUAL_WRITE === 'true') {
+			{
 				try {
 					const invoice = await findInvoiceByLegacyBillId(paidBill.id, supabaseClient)
 					if (invoice) {

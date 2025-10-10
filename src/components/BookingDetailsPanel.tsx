@@ -261,7 +261,7 @@ export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelPro
 							Ver recibo
 						</a>
 					)}
-					{invoiceLink ? (
+					{invoiceLink && (
 						<a
 							key={`invoice-${invoiceLink.display}`}
 							href={invoiceLink.url}
@@ -271,9 +271,14 @@ export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelPro
 						>
 							Ver factura
 						</a>
-					) : (
+					)}
+					{!details?.documents?.receiptUrl && !invoiceLink && (
 						<span className="text-sm text-gray-700">
-							{isMonthly ? 'Se facturará de forma mensual' : 'Se mostrarán una vez efectuado el pago'}
+							{isMonthly
+								? 'Se facturará de forma mensual'
+								: mapBillToPaymentStatus(bill) === 'paid'
+									? 'No disponible'
+									: 'Se mostrarán una vez efectuado el pago'}
 						</span>
 					)}
 				</div>

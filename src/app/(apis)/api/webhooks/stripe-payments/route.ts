@@ -2,20 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { markPaymentSessionCompleted } from '@/lib/db/payment-sessions'
 import { updateBookingStatus } from '@/lib/db/bookings'
 import { getBillForBookingAndMarkAsPaid } from '@/lib/db/bills'
-import { getCalendarEventsForBooking, updateCalendarEventType } from '@/lib/db/calendar-events'
-import { updatePendingToConfirmed } from '@/lib/calendar/calendar'
+import { updatePendingCalendarEventToConfirmed } from '@/lib/calendar/calendar-orchestration'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 import * as Sentry from '@sentry/nextjs'
 import { captureEvent } from '@/lib/posthog/server'
 import { sendReceiptEmail } from '@/lib/emails/email-service'
-import {
-	ensureInvoiceForBillOnPayment,
-	finalizeInvoiceOnPayment,
-	createCreditNoteForInvoice
-} from '@/lib/invoicing/invoice-orchestration'
-import { getPaymentSessionByPaymentIntentId } from '@/lib/db/payment-sessions'
-import { findInvoiceByLegacyBillId } from '@/lib/db/invoices'
+import { ensureInvoiceForBillOnPayment, finalizeInvoiceOnPayment } from '@/lib/invoicing/invoice-orchestration'
 
 /**
  * Stripe webhook handler
@@ -39,7 +32,7 @@ if (webhookSecrets.length === 0) {
 }
 
 export async function POST(request: NextRequest) {
-	console.log('Stripe payments webhook received!')
+	// Stripe payments webhook received
 	try {
 		///////////////////////////////////////////////////////////
 		///// 1. Create service role client for bypassing RLS
@@ -91,9 +84,10 @@ export async function POST(request: NextRequest) {
 		///// 3. Handle checkout session completed
 		///////////////////////////////////////////////////////////
 		if (event.type === 'checkout.session.completed') {
-			// 1. Get session object to get metadata
+			// 1. Get session object and receipt URL (once)
 			const session = event.data.object as Stripe.Checkout.Session
 			const connectedAccountId = (event as any).account as string | undefined
+			const receiptUrl = await getReceiptUrl(session, connectedAccountId)
 			// 2. Route by metadata: booking vs invoice
 			const invoiceId = session.metadata?.invoice_id as string | undefined
 			const bookingId = session.metadata?.booking_id as string | undefined
@@ -116,18 +110,9 @@ export async function POST(request: NextRequest) {
 			///////////////////////////////////////////////////////////
 			///// 4. Capture and store Stripe receipt metadata
 			///////////////////////////////////////////////////////////
-			// Only fetch/store/send receipt details for CONNECT events
+			// Only send receipt for CONNECT events (receiptUrl will be null otherwise)
 			if (matchedIsConnectSecret) {
 				try {
-					const paymentIntent = await stripe.paymentIntents.retrieve(
-						session.payment_intent as string,
-						{ expand: ['latest_charge'] },
-						connectedAccountId ? { stripeAccount: connectedAccountId } : undefined
-					)
-					const charge = (paymentIntent as any)?.latest_charge as Stripe.Charge | undefined
-					const receiptUrl = charge?.receipt_url as string | undefined
-					const chargeId = charge?.id as string | undefined
-
 					// Note: We no longer persist receipt metadata on bills to keep schema lean.
 					// Dual-write (if enabled) persists the receipt URL on invoices instead.
 
@@ -136,15 +121,12 @@ export async function POST(request: NextRequest) {
 						((session as any).customer_details?.email as string | undefined) ||
 						(session.metadata?.client_email as string | undefined)
 					if (bookingId && bill && clientEmail && receiptUrl) {
-						const amount =
-							typeof session.amount_total === 'number'
-								? session.amount_total / 100
-								: (paymentIntent.amount_received ?? 0) / 100
+						const amount = typeof session.amount_total === 'number' ? session.amount_total / 100 : undefined
 						const sendResult = await sendReceiptEmail({
 							mode: 'booking',
 							to: clientEmail,
 							clientName: session.metadata?.client_name || 'Paciente',
-							amount,
+							amount: amount ?? 0,
 							currency: session.currency?.toUpperCase() || 'EUR',
 							practitionerName: session.metadata?.practitioner_name || 'Tu profesional',
 							consultationDate: session.metadata?.start_time,
@@ -168,19 +150,9 @@ export async function POST(request: NextRequest) {
 				// Platform legacy flows: skip receipt retrieval/email (as requested)
 			}
 
-			// 6. Per-booking: ensure/create invoice for the paid bill (if enabled)
-			if (process.env.ENABLE_INVOICES_DUAL_WRITE === 'true' && bookingId && bill?.id) {
+			// 6. Per-booking: ensure/create invoice for the paid bill
+			if (bookingId && bill?.id) {
 				try {
-					const paymentIntentId = session.payment_intent as string
-					const requestOpts = connectedAccountId ? { stripeAccount: connectedAccountId } : undefined
-					const pi: any = await stripe.paymentIntents.retrieve(
-						paymentIntentId,
-						{ expand: ['latest_charge'] },
-						requestOpts
-					)
-					const charge = pi?.latest_charge as Stripe.Charge | undefined
-					const receiptUrl = charge?.receipt_url || null
-
 					await ensureInvoiceForBillOnPayment(
 						{
 							billId: bill.id,
@@ -216,20 +188,11 @@ export async function POST(request: NextRequest) {
 			// Invoice branch: issue-if-draft and mark paid
 			if (invoiceId) {
 				try {
-					let receiptUrl: string | null = null
-					if (matchedIsConnectSecret) {
-						try {
-							const paymentIntent = await stripe.paymentIntents.retrieve(
-								session.payment_intent as string,
-								{ expand: ['latest_charge'] },
-								connectedAccountId ? { stripeAccount: connectedAccountId } : undefined
-							)
-							const charge = (paymentIntent as any)?.latest_charge as Stripe.Charge | undefined
-							receiptUrl = (charge?.receipt_url as string | undefined) || null
-						} catch (_) {}
-					}
-
-					await finalizeInvoiceOnPayment(invoiceId, { paidAt: new Date(), receiptUrl }, supabase as any)
+					await finalizeInvoiceOnPayment(
+						invoiceId,
+						{ paidAt: new Date(), receiptUrl: receiptUrl || null },
+						supabase as any
+					)
 
 					// Send monthly receipt email via unified helper
 					try {
@@ -317,76 +280,14 @@ export async function POST(request: NextRequest) {
 					return NextResponse.json({ received: true })
 				}
 
-				// Find the existing pending calendar event for this booking
-				const existingEvents = await getCalendarEventsForBooking(bookingId as string, supabase)
-				const pendingEvent = existingEvents.find((event) => event.event_type === 'pending')
-
-				if (!pendingEvent) {
-					Sentry.captureMessage('webhooks:stripe-payments no_pending_event', {
-						level: 'warning',
-						tags: {
-							component: 'webhook',
-							kind: 'stripe-payments'
-						},
-						extra: { bookingId }
-					})
-					return NextResponse.json({ received: true })
-				}
-
-				// Update the pending event to confirmed with full appointment details
-				const calendarResult = await updatePendingToConfirmed(
-					{
-						googleEventId: pendingEvent.google_event_id,
-						userId: practitionerUserId,
-						clientEmail,
-						practitionerName,
-						practitionerEmail,
-						bookingId
-					},
-					supabase
-				)
-
-				if (calendarResult.success && calendarResult.googleEventId) {
-					// Update the calendar event record in database to confirmed status
-					await updateCalendarEventType(pendingEvent.id, 'confirmed', supabase)
-
-					// Update the Google Meet link and status separately if needed
-					if (calendarResult.googleMeetLink) {
-						const { error: updateError } = await supabase
-							.from('calendar_events')
-							.update({
-								google_meet_link: calendarResult.googleMeetLink,
-								event_status: 'updated'
-							})
-							.eq('id', pendingEvent.id)
-
-						if (updateError) {
-							console.error(`Failed to update Meet link for event ${pendingEvent.id}:`, updateError)
-							Sentry.captureException(updateError, {
-								tags: {
-									component: 'webhook',
-									kind: 'stripe-payments',
-									stage: 'update_meet'
-								},
-								extra: { bookingId, eventId: pendingEvent.id }
-							})
-						}
-					}
-
-					console.log(
-						`Calendar event updated from pending to confirmed for booking ${bookingId}: ${calendarResult.googleEventId}`
-					)
-				} else {
-					console.error(`Failed to update calendar event for booking ${bookingId}:`, calendarResult.error)
-					Sentry.captureMessage('webhooks:stripe-payments calendar_update_failed', {
-						level: 'warning',
-						tags: {
-							component: 'webhook',
-							kind: 'stripe-payments'
-						},
-						extra: { bookingId }
-					})
-				}
+				await updatePendingCalendarEventToConfirmed({
+					bookingId: bookingId as string,
+					practitionerUserId,
+					clientEmail,
+					practitionerName,
+					practitionerEmail,
+					supabaseClient: supabase
+				})
 			} catch (calendarError) {
 				// Don't fail the webhook if calendar update fails
 				console.error(`Calendar update error for booking ${bookingId}:`, calendarError)
@@ -400,67 +301,7 @@ export async function POST(request: NextRequest) {
 				})
 			}
 		}
-		///////////////////////////////////////////////////////////
-		///// 3b. Handle refunds (idempotent)
-		///////////////////////////////////////////////////////////
-		// We support both refund.created and charge.refunded for resiliency.
-		// The key identifiers available are charge.payment_intent and refund.payment_intent.
-		// Strategy:
-		//  - Resolve payment_intent_id from the event.
-		//  - Find our payment_session by PI (idempotent lookup).
-		//  - If dual-write is enabled and an invoice exists (via legacy bill link), create a rectificativa.
-		const skip = true
-		if (skip) return NextResponse.json({ received: true })
-		else if (event.type === 'refund.created' || event.type === 'charge.refunded') {
-			try {
-				const connectedAccountId = (event as any).account as string | undefined
-				let paymentIntentId: string | undefined
-				if (event.type === 'refund.created') {
-					const refund = event.data.object as Stripe.Refund
-					paymentIntentId = (refund.payment_intent as string) || undefined
-				} else {
-					const charge = event.data.object as Stripe.Charge
-					paymentIntentId = (charge.payment_intent as string) || undefined
-				}
-				if (!paymentIntentId) return NextResponse.json({ received: true })
-
-				// Lookup our payment session by PI to correlate to booking/bill/invoice
-				const ps = await getPaymentSessionByPaymentIntentId(paymentIntentId, supabase)
-				if (!ps) return NextResponse.json({ received: true })
-
-				// Find legacy bill -> invoice mapping
-				if (process.env.ENABLE_INVOICES_DUAL_WRITE === 'true') {
-					try {
-						const legacyBills = await supabase
-							.from('bills')
-							.select('id, booking_id')
-							.eq('booking_id', ps.booking_id)
-							.order('created_at', { ascending: false })
-							.limit(1)
-						const billId = legacyBills.data?.[0]?.id
-						if (!billId) return NextResponse.json({ received: true })
-						const invoice = await findInvoiceByLegacyBillId(billId as string, supabase as any)
-						if (!invoice) return NextResponse.json({ received: true })
-
-						// Idempotency: if a credit note already exists for this refund id, skip.
-						// (We rely on unique stripe_refund_id per credit note in future migration.)
-						const reason = 'Anulación de consulta'
-						await createCreditNoteForInvoice(
-							{ invoiceId: invoice.id, userId: invoice.user_id, reason, stripeRefundId: undefined },
-							supabase as any
-						)
-					} catch (cnErr) {
-						Sentry.captureException(cnErr, {
-							tags: { component: 'webhook', kind: 'stripe-payments', stage: 'refund_credit_note' }
-						})
-					}
-				}
-			} catch (e) {
-				Sentry.captureException(e, {
-					tags: { component: 'webhook', kind: 'stripe-payments', stage: 'refund_handler' }
-				})
-			}
-		}
+		// Refund events are currently handled elsewhere; no-op here
 		// 8. Return success response
 		return NextResponse.json({ received: true })
 	} catch (error) {
@@ -469,5 +310,23 @@ export async function POST(request: NextRequest) {
 			tags: { component: 'webhook', kind: 'stripe-payments' }
 		})
 		return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 })
+	}
+}
+
+// Helper: Fetch receipt URL (CONNECT path only). Returns null for platform events.
+async function getReceiptUrl(session: Stripe.Checkout.Session, connectedAccountId?: string): Promise<string | null> {
+	try {
+		if (!connectedAccountId) return null
+		if (!session.payment_intent) return null
+		const paymentIntentId = session.payment_intent as string
+		const pi = await stripe.paymentIntents.retrieve(
+			paymentIntentId,
+			{ expand: ['latest_charge'] },
+			{ stripeAccount: connectedAccountId }
+		)
+		const charge = (pi as any)?.latest_charge as Stripe.Charge | undefined
+		return (charge?.receipt_url as string | undefined) || null
+	} catch (_) {
+		return null
 	}
 }

@@ -4,7 +4,7 @@ import { getBookingById } from '@/lib/db/bookings'
 import { getClientById } from '@/lib/db/clients'
 import { getProfileById } from '@/lib/db/profiles'
 import { getBillsForBooking } from '@/lib/db/bills'
-import { findInvoiceByLegacyBillId, listInvoiceItems, getInvoiceById } from '@/lib/db/invoices'
+import { findInvoiceByLegacyBillId, getInvoiceById } from '@/lib/db/invoices'
 
 /**
  * GET /api/bookings/[id]
@@ -42,17 +42,20 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 			display: string
 			url: string | null
 		}> = []
-		// Also include invoice header + items if resolvable from the legacy bill id
+		// Also include invoice header if resolvable from the bill link
 		let invoice: any = null
-		let invoiceItems: any[] = []
 		try {
-			if (process.env.ENABLE_INVOICES_DUAL_WRITE === 'true' && bills?.[0]?.id) {
-				const inv = await findInvoiceByLegacyBillId(bills[0].id, service as any)
+			if (bills?.[0]?.id) {
+				// Prefer direct link via bills.invoice_id if present; fallback to legacy link
+				let inv = null
+				if ((bills[0] as any).invoice_id) {
+					inv = await getInvoiceById((bills[0] as any).invoice_id as string, service as any)
+				}
+				if (!inv) {
+					inv = await findInvoiceByLegacyBillId(bills[0].id, service as any)
+				}
 				if (inv) {
 					invoice = inv
-					try {
-						invoiceItems = await listInvoiceItems(inv.id, service as any)
-					} catch (_) {}
 					const display =
 						inv.series && inv.number != null ? `${inv.series}-${inv.number}` : inv.id.slice(0, 8)
 					let url: string | null = null
@@ -119,7 +122,6 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 			bill: bills && bills.length > 0 ? bills[0] : null,
 			invoices: invoiceLinks,
 			invoice,
-			invoice_items: invoiceItems,
 			documents
 		}
 

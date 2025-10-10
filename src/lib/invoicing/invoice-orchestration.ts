@@ -3,7 +3,7 @@
  * ----------------------------------------------
  * Purpose
  *  - High-level, business-oriented operations that combine DB helpers from
- *    invoices.ts and invoice-items.ts into usable workflows.
+ *    invoices.ts into usable workflows (no invoice-items dependency).
  *  - This is where we decide when to issue, how to build an invoice for a
  *    booking, and how to update the invoice on payment completion.
  *
@@ -24,7 +24,6 @@ import {
 	issueCreditNote,
 	findOrCreateMonthlyInvoice
 } from '@/lib/db/invoices'
-import { addInvoiceItem, listInvoiceItems } from '@/lib/db/invoice-items'
 import { linkPaymentSessionToInvoice } from '@/lib/db/payment-sessions'
 import { getInvoiceById } from '@/lib/db/invoices'
 import { generateAndStoreInvoicePdf } from '@/lib/invoicing/pdf-service'
@@ -48,7 +47,7 @@ export async function createCreditNoteForInvoice(
 	},
 	supabase?: SupabaseClient
 ): Promise<string> {
-	// Load original invoice and items
+	// Load original invoice (mirror totals; items deprecated)
 	const original = await getInvoiceById(params.invoiceId, supabase)
 	if (!original) throw new Error('Original invoice not found')
 
@@ -67,34 +66,16 @@ export async function createCreditNoteForInvoice(
 		},
 		supabase
 	)
-
-	// Build lines
-	const allItems = await listInvoiceItems(original.id, supabase)
-	const itemMap = new Map(allItems.map((it: any) => [it.id, it]))
-	const selected =
-		params.items && params.items.length > 0
-			? params.items.map((i) => itemMap.get(i.itemId)).filter(Boolean)
-			: allItems
-
-	for (const it of selected as any[]) {
-		const amount = -Math.abs(Number(it.amount || 0))
-		const tax_amount = -Math.abs(Number(it.tax_amount || 0))
-		// Always use Spanish concept for rectificativas
-		const concept: string = 'Anulación de consulta'
-		await supabase!.from('invoice_items').insert({
-			invoice_id: credit.id,
-			booking_id: it.booking_id ?? null,
-			description: concept,
-			qty: it.qty,
-			unit_price: it.unit_price,
-			amount,
-			tax_rate_percent: it.tax_rate_percent,
-			tax_amount,
-			rectifies_item_id: it.id
+	// Mirror totals as full credit of the original
+	const db = supabase || createServerSupabaseClient()
+	await db
+		.from('invoices')
+		.update({
+			subtotal: -Math.abs(Number(original.subtotal || 0)),
+			tax_total: -Math.abs(Number(original.tax_total || 0)),
+			total: -Math.abs(Number(original.total || 0))
 		})
-	}
-
-	await computeInvoiceTotals(credit.id, supabase)
+		.eq('id', credit.id)
 	const issued = await issueCreditNote(credit.id, params.userId, new Date(), supabase)
 	await generateAndStoreInvoicePdf(issued.id)
 	return issued.id
@@ -128,7 +109,7 @@ export async function ensureInvoiceForBillOnPayment(
 	// 1) Find existing invoice for this legacy bill (if any)
 	let invoice = await findInvoiceByLegacyBillId(params.billId, db)
 
-	// 2) Create draft invoice + one item if not found
+	// 2) Create draft invoice and set totals if not found
 	if (!invoice) {
 		invoice = await createDraftInvoice(
 			{
@@ -142,22 +123,10 @@ export async function ensureInvoiceForBillOnPayment(
 			},
 			db
 		)
-
-		await addInvoiceItem(
-			{
-				invoiceId: invoice.id,
-				bookingId: null,
-				description: 'Consulta',
-				unitPrice: params.snapshot.amount,
-				qty: 1,
-				cadence: 'per_booking',
-				serviceDate: null,
-				scheduledSendAt: null
-			},
-			db
-		)
-
-		await computeInvoiceTotals(invoice.id, db)
+		await db
+			.from('invoices')
+			.update({ subtotal: params.snapshot.amount, tax_total: 0, total: params.snapshot.amount })
+			.eq('id', invoice.id)
 
 		// Link the bill to the invoice for traceability
 		await db.from('bills').update({ invoice_id: invoice.id }).eq('id', params.billId)
@@ -248,29 +217,9 @@ export async function ensureMonthlyDraftAndLinkBills(
 	// 3) Link bills → invoice_id
 	await db.from('bills').update({ invoice_id: invoice.id }).in('id', billIds)
 
-	// 4) Add one line per bill if not already present (idempotent best-effort)
-	for (const b of candidates) {
-		try {
-			const bookingRel: any = Array.isArray(b.booking) ? b.booking[0] : b.booking
-			const serviceDateVal: string | null = (bookingRel?.start_time as string) || null
-			await addInvoiceItem(
-				{
-					invoiceId: invoice.id,
-					bookingId: b.booking_id ?? null,
-					description: 'Consulta',
-					unitPrice: Number(b.amount || 0),
-					qty: 1,
-					cadence: 'monthly',
-					serviceDate: serviceDateVal,
-					scheduledSendAt: null
-				},
-				db as any
-			)
-		} catch (_) {}
-	}
-
-	// 5) Recompute totals (still a draft invoice)
-	await computeInvoiceTotals(invoice.id, db)
+	// 4) Set invoice totals from linked bills (no items)
+	const totalAmount = candidates.reduce((acc: number, row: any) => acc + Number(row.amount || 0), 0)
+	await db.from('invoices').update({ subtotal: totalAmount, tax_total: 0, total: totalAmount }).eq('id', invoice.id)
 
 	return { invoiceId: invoice.id, linkedBillIds: billIds }
 }

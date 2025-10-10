@@ -6,6 +6,8 @@ import {
 } from '@/lib/calendar/calendar'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import * as Sentry from '@sentry/nextjs'
+import { getCalendarEventsForBooking, updateCalendarEventType } from '@/lib/db/calendar-events'
+import { updatePendingToConfirmed } from '@/lib/calendar/calendar'
 
 export type CalendarVariant = 'internal_confirmed' | 'confirmed' | 'pending'
 
@@ -123,6 +125,77 @@ export async function createBookingCalendarEvent(options: {
 	} catch (error) {
 		Sentry.captureException(error, {
 			tags: { component: 'calendar-orchestrator', stage: 'createBookingCalendarEvent' },
+			extra: { bookingId }
+		})
+	}
+}
+
+/**
+ * updatePendingCalendarEventToConfirmed
+ * ------------------------------------------------------------
+ * Purpose
+ *  - Find the pending Google Calendar event for a booking and convert it to a
+ *    confirmed event after a successful payment.
+ * Steps
+ *  1) Load the pending calendar_event row for the booking
+ *  2) Call calendar service to promote the event to confirmed (keeps Meet link)
+ *  3) Update DB record to type 'confirmed' and persist optional Meet link
+ */
+export async function updatePendingCalendarEventToConfirmed(options: {
+	bookingId: string
+	practitionerUserId: string
+	clientEmail: string
+	practitionerName: string
+	practitionerEmail: string
+	mode?: 'online' | 'in_person'
+	locationText?: string | null
+	supabaseClient?: SupabaseClient
+}): Promise<void> {
+	const {
+		bookingId,
+		practitionerUserId,
+		clientEmail,
+		practitionerName,
+		practitionerEmail,
+		mode,
+		locationText,
+		supabaseClient
+	} = options
+
+	try {
+		// 1) Find pending event for booking
+		const existingEvents = await getCalendarEventsForBooking(bookingId, supabaseClient)
+		const pendingEvent = existingEvents.find((event) => event.event_type === 'pending')
+		if (!pendingEvent) return
+
+		// 2) Promote to confirmed in Google Calendar
+		const calendarResult = await updatePendingToConfirmed(
+			{
+				googleEventId: pendingEvent.google_event_id,
+				userId: practitionerUserId,
+				clientEmail,
+				practitionerName,
+				practitionerEmail,
+				bookingId,
+				mode,
+				locationText
+			},
+			supabaseClient
+		)
+
+		// 3) Persist DB changes and optional Meet link
+		if (calendarResult.success && calendarResult.googleEventId) {
+			await updateCalendarEventType(pendingEvent.id, 'confirmed', supabaseClient)
+			if (calendarResult.googleMeetLink) {
+				await (supabaseClient || ({} as any))
+					.from('calendar_events')
+					.update({ google_meet_link: calendarResult.googleMeetLink, event_status: 'updated' })
+					.eq('id', pendingEvent.id)
+			}
+		}
+	} catch (error) {
+		Sentry.captureException(error, {
+			tags: { component: 'calendar-orchestrator', stage: 'updatePendingCalendarEventToConfirmed' },
 			extra: { bookingId }
 		})
 	}

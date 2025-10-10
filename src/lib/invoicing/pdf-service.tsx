@@ -3,7 +3,6 @@ import { renderToStream } from '@react-pdf/renderer'
 import crypto, { type BinaryLike } from 'crypto'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { getInvoiceById, setInvoicePdfInfo } from '@/lib/db/invoices'
-import { listInvoiceItems } from '@/lib/db/invoice-items'
 import InvoicePdfDocument from '@/lib/invoicing/invoice-pdf'
 import { getProfileById } from '@/lib/db/profiles'
 
@@ -16,10 +15,9 @@ import { getProfileById } from '@/lib/db/profiles'
 export async function generateAndStoreInvoicePdf(invoiceId: string): Promise<{ storagePath: string }> {
 	const supabase = createServiceRoleClient()
 
-	// Fetch header and lines
+	// Fetch header
 	const invoice = await getInvoiceById(invoiceId, supabase)
 	if (!invoice) throw new Error('Invoice not found')
-	const items = await listInvoiceItems(invoiceId, supabase)
 	const practitionerProfile = await getProfileById(invoice.user_id, supabase)
 	const practitionerName = practitionerProfile?.name || ''
 
@@ -66,7 +64,16 @@ export async function generateAndStoreInvoicePdf(invoiceId: string): Promise<{ s
 			total={invoice.total}
 			kind={(invoice as any).document_kind}
 			rectifiesDisplay={rectifiesDisplay}
-			items={items}
+			items={[
+				{
+					description: 'Consulta',
+					qty: 1,
+					unit_price: invoice.subtotal,
+					amount: invoice.subtotal,
+					tax_rate_percent: 0,
+					tax_amount: invoice.tax_total
+				}
+			]}
 		/>
 	)
 
