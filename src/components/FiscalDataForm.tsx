@@ -53,7 +53,9 @@ export default function FiscalDataForm({ onSaved }: FiscalDataFormProps) {
 		<form onSubmit={onSubmit} className="space-y-6">
 			<div>
 				<h2 className="text-2xl font-bold">{'Datos fiscales'}</h2>
-				<p className="text-md text-gray-500 my-1">{'Recogemos estos datos para aplicarlos a tus facturas.'}</p>
+				<p className="text-md text-gray-500 my-1">
+					{'Recogemos estos datos para aplicarlos automáticamente a tus facturas.'}
+				</p>
 			</div>
 			<div>
 				<label className="block text-md font-medium text-gray-700 mb-2">DNI / NIF</label>
@@ -79,15 +81,14 @@ export default function FiscalDataForm({ onSaved }: FiscalDataFormProps) {
 			</div>
 			<div>
 				<label className="block text-md font-medium text-gray-700 mb-2">
-					Información adicional{' '}
-					<span className="text-sm text-gray-500 font-normal">(opcional: piso, puerta, etc.)</span>
+					Información adicional <span className="text-sm text-gray-500 font-normal">(opcional)</span>
 				</label>
 				<Input
 					name="fiscal_address_line2"
 					value={form.fiscal_address_line2}
 					onChange={onChange}
 					className="autofill:bg-white transition-none text-gray-700"
-					placeholder="Piso 2ºB"
+					placeholder=""
 				/>
 			</div>
 			<div className="grid grid-cols-1 md:grid-cols-3 gap-4">

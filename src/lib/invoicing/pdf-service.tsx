@@ -46,6 +46,14 @@ export async function generateAndStoreInvoicePdf(invoiceId: string): Promise<{ s
 		<InvoicePdfDocument
 			practitionerName={practitionerName}
 			practitionerEmail={null}
+			practitionerTaxId={practitionerProfile?.tax_id || null}
+			practitionerAddress={{
+				line1: practitionerProfile?.fiscal_address_line1 || null,
+				line2: practitionerProfile?.fiscal_address_line2 || null,
+				postalCode: practitionerProfile?.fiscal_postal_code || null,
+				city: practitionerProfile?.fiscal_city || null,
+				province: practitionerProfile?.fiscal_province || null
+			}}
 			clientName={invoice.client_name_snapshot}
 			clientEmail={invoice.client_email_snapshot}
 			invoiceId={invoice.id}

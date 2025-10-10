@@ -24,6 +24,11 @@ export async function createBookingCalendarEvent(options: {
 	practitioner: any
 	supabaseClient?: SupabaseClient
 }) {
+	console.log('[calendar-orchestrator] createBookingCalendarEvent', {
+		variant: options.variant,
+		mode: options.request?.mode,
+		locationText: options.request?.locationText
+	})
 	const { variant, bookingId, request, client, practitioner, supabaseClient } = options
 	try {
 		if (!client || !practitioner) return

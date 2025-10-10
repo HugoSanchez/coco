@@ -11,10 +11,7 @@ interface BookingDetailsPanelProps {
 	onClose?: () => void
 }
 
-export function BookingDetailsPanel({
-	details,
-	onClose
-}: BookingDetailsPanelProps) {
+export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelProps) {
 	const bill = details?.bill
 
 	useEffect(() => {
@@ -34,19 +31,15 @@ export function BookingDetailsPanel({
 		? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/payments/${details.bookingId}`
 		: undefined
 
-	const capFirst = (s?: string | null) =>
-		s ? s.charAt(0).toUpperCase() + s.slice(1) : null
+	const capFirst = (s?: string | null) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : null)
 
 	// Documents helpers
 	const invoiceLink = Array.isArray(details?.invoices)
-		? details.invoices.find(
-				(inv: any) => inv?.kind === 'invoice' && !!inv?.url
-			)
+		? details.invoices.find((inv: any) => inv?.kind === 'invoice' && !!inv?.url)
 		: null
 	const isMonthly =
 		bill?.billing_type === 'monthly' ||
-		(Array.isArray(details?.invoice_items) &&
-			details.invoice_items.some((it: any) => it?.cadence === 'monthly'))
+		(Array.isArray(details?.invoice_items) && details.invoice_items.some((it: any) => it?.cadence === 'monthly'))
 
 	// Helpers to match table styles
 	const getStatusLabel = (status?: string) => {
@@ -79,13 +72,7 @@ export function BookingDetailsPanel({
 		}
 	}
 
-	type PaymentStatus =
-		| 'not_applicable'
-		| 'pending'
-		| 'paid'
-		| 'disputed'
-		| 'canceled'
-		| 'refunded'
+	type PaymentStatus = 'not_applicable' | 'pending' | 'paid' | 'disputed' | 'canceled' | 'refunded'
 	const getPaymentStatusLabel = (status: PaymentStatus) => {
 		switch (status) {
 			case 'not_applicable':
@@ -153,34 +140,19 @@ export function BookingDetailsPanel({
 		<div className="space-y-6 py-10">
 			{/* Patient */}
 			<div className="">
-				<label className="text-xs text-gray-500 block mb-2">
-					Paciente
-				</label>
+				<label className="text-xs text-gray-500 block mb-2">Paciente</label>
 				<div className="text-base font-medium text-gray-900">
 					{details?.clientName}
-					{details?.clientLastName
-						? ` ${details.clientLastName}`
-						: ''}
+					{details?.clientLastName ? ` ${details.clientLastName}` : ''}
 				</div>
-				{details?.clientEmail && (
-					<div className="text-sm text-gray-700">
-						{details.clientEmail}
-					</div>
-				)}
+				{details?.clientEmail && <div className="text-sm text-gray-700">{details.clientEmail}</div>}
 			</div>
 
 			{/* Time */}
 			<div className="space-y-1">
-				<label className="text-xs text-gray-500 block">
-					Fecha y hora
-				</label>
+				<label className="text-xs text-gray-500 block">Fecha y hora</label>
 				<div className="text-base font-medium">
-					{capFirst(
-						fmt(
-							details?.consultationDate,
-							"EEEE, d 'de' MMMM 'de' yyyy, HH:mm"
-						)
-					)}
+					{capFirst(fmt(details?.consultationDate, "EEEE, d 'de' MMMM 'de' yyyy, HH:mm"))}
 					{'h '}
 				</div>
 			</div>
@@ -188,9 +160,7 @@ export function BookingDetailsPanel({
 			{/* Status and Payment badges side-by-side */}
 			<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 				<div className="space-y-1">
-					<label className="text-xs text-gray-500 block mb-2">
-						Estado de agenda
-					</label>
+					<label className="text-xs text-gray-500 block mb-2">Estado de agenda</label>
 					<div>
 						<Badge
 							variant="outline"
@@ -201,9 +171,7 @@ export function BookingDetailsPanel({
 					</div>
 				</div>
 				<div className="space-y-1">
-					<label className="text-xs text-gray-500 block mb-2">
-						Estado de pago
-					</label>
+					<label className="text-xs text-gray-500 block mb-2">Estado de pago</label>
 					<div>
 						{(() => {
 							const ps = mapBillToPaymentStatus(bill)
@@ -212,9 +180,7 @@ export function BookingDetailsPanel({
 									variant="outline"
 									className={`inline-flex items-center gap-1 text-xs ${getPaymentStatusColor(ps)}`}
 								>
-									{ps === 'paid' && (
-										<Check className="h-4 w-4 mr-1 text-teal-500" />
-									)}
+									{ps === 'paid' && <Check className="h-4 w-4 mr-1 text-teal-500" />}
 									{getPaymentStatusLabel(ps)}
 								</Badge>
 							)
@@ -229,13 +195,10 @@ export function BookingDetailsPanel({
 				<div className="text-base font-medium">
 					{bill ? (
 						<>
-							{Number(bill.amount).toFixed(2)}{' '}
-							{bill.currency || 'EUR'}
+							{Number(bill.amount).toFixed(2)} {bill.currency || 'EUR'}
 						</>
 					) : (
-						<span className="text-gray-500">
-							Sin información de pago
-						</span>
+						<span className="text-gray-500">Sin información de pago</span>
 					)}
 				</div>
 			</div>
@@ -258,16 +221,14 @@ export function BookingDetailsPanel({
 					{bill?.sent_at ? (
 						<div className="flex items-start">
 							<span className="text-gray-600 text-sm">
-								Email de confirmación y pago enviado
-								correctamente el {fmt(bill.sent_at)}
+								Email de confirmación y pago enviado correctamente el {fmt(bill.sent_at)}
 								{'h'}.
 							</span>
 						</div>
 					) : bill?.email_scheduled_at ? (
 						<div className="flex items-start">
 							<span>
-								Email de confirmación y pago programado para{' '}
-								{fmt(bill.email_scheduled_at)}
+								Email de confirmación y pago programado para {fmt(bill.email_scheduled_at)}
 								{'h'}.
 							</span>
 						</div>
@@ -278,9 +239,8 @@ export function BookingDetailsPanel({
 					) : (
 						<div className="flex items-start text-red-700">
 							<span>
-								Ha habido un error con el email de confirmación,
-								por favor, asegúrate de que el email del
-								paciente es correcto.
+								Ha habido un error con el email de confirmación, por favor, asegúrate de que el email
+								del paciente es correcto.
 							</span>
 						</div>
 					)}
@@ -289,13 +249,11 @@ export function BookingDetailsPanel({
 
 			{/* Documents: receipt + invoices; show placeholder text when none */}
 			<div className="space-y-1">
-				<label className="text-xs text-gray-500 block">
-					Facturas y recibos
-				</label>
+				<label className="text-xs text-gray-500 block">Facturas y recibos</label>
 				<div className="flex flex-wrap items-center gap-2 py-2">
-					{bill?.stripe_receipt_url && (
+					{details?.documents?.receiptUrl && (
 						<a
-							href={bill.stripe_receipt_url}
+							href={details.documents.receiptUrl}
 							target="_blank"
 							rel="noopener noreferrer"
 							className="text-sm text-gray-800 font-medium border border-gray-200 bg-gray-200 rounded-md p-2 px-4 hover:bg-gray-200"
@@ -315,9 +273,7 @@ export function BookingDetailsPanel({
 						</a>
 					) : (
 						<span className="text-sm text-gray-700">
-							{isMonthly
-								? 'Se facturará de forma mensual'
-								: 'Se mostrarán una vez efectuado el pago'}
+							{isMonthly ? 'Se facturará de forma mensual' : 'Se mostrarán una vez efectuado el pago'}
 						</span>
 					)}
 				</div>

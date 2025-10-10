@@ -14,7 +14,7 @@
 
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ClientSearchSelect } from '@/components/ClientSearchSelect'
@@ -95,6 +95,9 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 	const [savingDefault, setSavingDefault] = useState<boolean>(false)
 	const [savedDefault, setSavedDefault] = useState<boolean>(false)
 	const [resolvedLeadHours, setResolvedLeadHours] = useState<number | null>(null)
+
+	// Track if user has manually edited the address to avoid auto-refilling defaults
+	const hasEditedLocationRef = useRef(false)
 
 	// Context and utilities
 	const { user, profile, refreshProfile } = useUser() // Current user and profile data
@@ -237,14 +240,14 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [firstConsultationAmount])
 
-	// Prefill default location when switching to in-person
+	// Prefill default location only when switching to in-person and before user edits
 	useEffect(() => {
-		if (mode === 'in_person') {
-			const def = profile?.default_in_person_location_text || ''
-			if (!locationText) setLocationText(def)
-		}
+		if (mode !== 'in_person') return
+		if (hasEditedLocationRef.current) return
+		const def = profile?.default_in_person_location_text || ''
+		if (!locationText && def) setLocationText(def)
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [mode, locationText, profile?.default_in_person_location_text])
+	}, [mode, profile?.default_in_person_location_text])
 
 	// ===== Helpers for default in-person address =====
 	const isAddressEqualToDefault = useCallback((address: string, defaultAddress?: string | null) => {
@@ -555,10 +558,9 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 								/>
 							</div>
 
-							{/* Continue button - only show when time is selected */}
-							{/* User must manually continue to review their selection */}
-							{selectedSlot && !loadingBookings && (
-								<div className="pt-4">
+							{/* Navigation buttons */}
+							<div className="pt-4 flex flex-col gap-3">
+								{selectedSlot && !loadingBookings && (
 									<Button
 										variant="default"
 										onClick={handleContinueToClient}
@@ -566,8 +568,12 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 									>
 										Continuar
 									</Button>
-								</div>
-							)}
+								)}
+
+								<Button variant="ghost" onClick={handleBack} className="w-full">
+									Atrás
+								</Button>
+							</div>
 						</>
 					)}
 				</div>
@@ -746,12 +752,15 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 									<Label className="text-md font-normal text-gray-700">
 										Dirección <span className="text-xs text-gray-500 font-normal">(opcional)</span>
 									</Label>
-									<div className="relative">
+									<div className="relative flex flex-row">
 										<Input
 											placeholder="Introduce la dirección (calle, ciudad)"
 											value={locationText}
-											onChange={(e) => setLocationText(e.target.value)}
-											className="h-12 pr-20"
+											onChange={(e) => {
+												hasEditedLocationRef.current = true
+												setLocationText(e.target.value)
+											}}
+											className="h-12 w-full pr-24"
 										/>
 										<div className="absolute inset-y-0 right-2 flex items-center">
 											{savedDefault ? (
@@ -762,7 +771,7 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 											) : isDefaultAddress ? (
 												<div className="flex items-center text-teal-600 text-sm">
 													<Check className="h-4 w-4 mr-1" />
-													Predeterminada
+													Guardada
 												</div>
 											) : (
 												<button

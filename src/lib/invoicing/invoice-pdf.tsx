@@ -5,6 +5,14 @@ import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 export interface InvoicePdfProps {
 	practitionerName: string
 	practitionerEmail?: string | null
+	practitionerTaxId?: string | null
+	practitionerAddress?: {
+		line1?: string | null
+		line2?: string | null
+		postalCode?: string | null
+		city?: string | null
+		province?: string | null
+	} | null
 	clientName: string
 	clientEmail?: string | null
 	invoiceId: string
@@ -34,7 +42,8 @@ const styles = StyleSheet.create({
 	headerLine: { marginBottom: 3 },
 	row: { display: 'flex', flexDirection: 'row', justifyContent: 'space-between' },
 	section: { marginBottom: 12 },
-	label: { fontWeight: 700 },
+	label: { fontWeight: 700, marginBottom: 4 },
+	infoLine: { marginBottom: 3 },
 	tableHeader: { flexDirection: 'row', borderBottom: '1 solid #000', paddingBottom: 6, marginTop: 8 },
 	th: { flex: 1, fontWeight: 700 },
 	tr: { flexDirection: 'row', borderBottom: '0.5 solid #ccc', paddingVertical: 6 },
@@ -51,6 +60,8 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
 	const {
 		practitionerName,
 		practitionerEmail,
+		practitionerTaxId,
+		practitionerAddress,
 		clientName,
 		clientEmail,
 		invoiceId,
@@ -85,14 +96,34 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
 
 				<View style={styles.section}>
 					<Text style={styles.label}>Emisor</Text>
-					<Text>{(practitionerName || '').toUpperCase()}</Text>
-					{practitionerEmail ? <Text>{practitionerEmail}</Text> : null}
+					<Text style={styles.infoLine}>{(practitionerName || '').toUpperCase()}</Text>
+					{practitionerEmail ? <Text style={styles.infoLine}>{practitionerEmail}</Text> : null}
+					{practitionerTaxId ? <Text style={styles.infoLine}>NIF: {practitionerTaxId}</Text> : null}
+					{practitionerAddress ? (
+						<>
+							{practitionerAddress.line1 ? (
+								<Text style={styles.infoLine}>{practitionerAddress.line1}</Text>
+							) : null}
+							{practitionerAddress.line2 ? (
+								<Text style={styles.infoLine}>{practitionerAddress.line2}</Text>
+							) : null}
+							{practitionerAddress.postalCode ||
+							practitionerAddress.city ||
+							practitionerAddress.province ? (
+								<Text style={styles.infoLine}>
+									{practitionerAddress.postalCode || ''}
+									{practitionerAddress.city ? ` ${practitionerAddress.city}` : ''}
+									{practitionerAddress.province ? `, ${practitionerAddress.province}` : ''}
+								</Text>
+							) : null}
+						</>
+					) : null}
 				</View>
 
 				<View style={styles.section}>
 					<Text style={styles.label}>Cliente</Text>
-					<Text>{clientName}</Text>
-					{clientEmail ? <Text>{clientEmail}</Text> : null}
+					<Text style={styles.infoLine}>{clientName}</Text>
+					{clientEmail ? <Text style={styles.infoLine}>{clientEmail}</Text> : null}
 				</View>
 
 				<View style={styles.section}>

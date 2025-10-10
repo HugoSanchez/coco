@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { updateBookingStatus, getBookingById } from '@/lib/db/bookings'
-import {
-	getCalendarEventsForBooking,
-	updateCalendarEventType
-} from '@/lib/db/calendar-events'
+import { getCalendarEventsForBooking, updateCalendarEventType } from '@/lib/db/calendar-events'
 import { updatePendingToConfirmed } from '@/lib/calendar/calendar'
 import { getProfileById } from '@/lib/db/profiles'
 import { getClientById } from '@/lib/db/clients'
@@ -21,10 +18,7 @@ import * as Sentry from '@sentry/nextjs'
  * This endpoint confirms the booking and updates the calendar, but does NOT mark
  * the associated bill as paid. Payment status should be handled separately.
  */
-export async function POST(
-	request: NextRequest,
-	{ params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
 	try {
 		const supabase = createClient()
 
@@ -40,10 +34,7 @@ export async function POST(
 				tags: { component: 'api:bookings' },
 				extra: { bookingId: params.id }
 			})
-			return NextResponse.json(
-				{ error: 'Authentication required' },
-				{ status: 401 }
-			)
+			return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
 		}
 
 		const bookingId = params.id
@@ -57,10 +48,7 @@ export async function POST(
 				tags: { component: 'api:bookings' },
 				extra: { bookingId }
 			})
-			return NextResponse.json(
-				{ error: 'Booking not found' },
-				{ status: 404 }
-			)
+			return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
 		}
 
 		// Verify user owns this booking
@@ -80,10 +68,7 @@ export async function POST(
 				tags: { component: 'api:bookings' },
 				extra: { bookingId }
 			})
-			return NextResponse.json(
-				{ error: 'Booking is already confirmed' },
-				{ status: 400 }
-			)
+			return NextResponse.json({ error: 'Booking is already confirmed' }, { status: 400 })
 		}
 
 		// Only allow confirmation of pending bookings
@@ -93,10 +78,7 @@ export async function POST(
 				tags: { component: 'api:bookings' },
 				extra: { bookingId, status: booking.status }
 			})
-			return NextResponse.json(
-				{ error: 'Only pending bookings can be confirmed' },
-				{ status: 400 }
-			)
+			return NextResponse.json({ error: 'Only pending bookings can be confirmed' }, { status: 400 })
 		}
 
 		// 2. Update booking status to 'scheduled' (confirmed)
@@ -119,13 +101,8 @@ export async function POST(
 			}
 
 			// Find the existing pending calendar event for this booking
-			const existingEvents = await getCalendarEventsForBooking(
-				bookingId,
-				supabase
-			)
-			const pendingEvent = existingEvents.find(
-				(event) => event.event_type === 'pending'
-			)
+			const existingEvents = await getCalendarEventsForBooking(bookingId, supabase)
+			const pendingEvent = existingEvents.find((event) => event.event_type === 'pending')
 
 			if (pendingEvent) {
 				// Update the pending event to confirmed with full appointment details
@@ -136,20 +113,14 @@ export async function POST(
 						clientEmail: client.email,
 						practitionerName: practitioner.name || 'Practitioner',
 						practitionerEmail: practitioner.email,
-						bookingId,
-						mode: (booking as any).mode,
-						locationText: (booking as any).location_text || null
+						bookingId
 					},
 					supabase
 				)
 
 				if (calendarResult.success && calendarResult.googleEventId) {
 					// Update the calendar event record in database to confirmed status
-					await updateCalendarEventType(
-						pendingEvent.id,
-						'confirmed',
-						supabase
-					)
+					await updateCalendarEventType(pendingEvent.id, 'confirmed', supabase)
 
 					// Update the Google Meet link if provided
 					if (calendarResult.googleMeetLink) {
@@ -162,10 +133,7 @@ export async function POST(
 							.eq('id', pendingEvent.id)
 
 						if (updateError) {
-							console.error(
-								`Failed to update Meet link for event ${pendingEvent.id}:`,
-								updateError
-							)
+							console.error(`Failed to update Meet link for event ${pendingEvent.id}:`, updateError)
 						}
 					}
 
@@ -173,18 +141,12 @@ export async function POST(
 						`Calendar event updated from pending to confirmed for booking ${bookingId}: ${calendarResult.googleEventId}`
 					)
 				} else {
-					Sentry.captureMessage(
-						'bookings:confirm calendar_update_failed',
-						{
-							level: 'warning',
-							tags: { component: 'api:bookings' },
-							extra: { bookingId }
-						}
-					)
-					console.error(
-						`Failed to update calendar event for booking ${bookingId}:`,
-						calendarResult.error
-					)
+					Sentry.captureMessage('bookings:confirm calendar_update_failed', {
+						level: 'warning',
+						tags: { component: 'api:bookings' },
+						extra: { bookingId }
+					})
+					console.error(`Failed to update calendar event for booking ${bookingId}:`, calendarResult.error)
 					// Don't fail the confirmation if calendar update fails
 				}
 			} else {
@@ -193,17 +155,12 @@ export async function POST(
 					tags: { component: 'api:bookings' },
 					extra: { bookingId }
 				})
-				console.warn(
-					`No pending calendar event found for booking ${bookingId}`
-				)
+				console.warn(`No pending calendar event found for booking ${bookingId}`)
 				// This might happen if the booking was created without calendar integration
 				// Don't fail the confirmation
 			}
 		} catch (calendarError) {
-			console.error(
-				`Calendar update error for booking ${bookingId}:`,
-				calendarError
-			)
+			console.error(`Calendar update error for booking ${bookingId}:`, calendarError)
 			Sentry.captureException(calendarError, {
 				tags: {
 					component: 'api:bookings',
@@ -232,8 +189,7 @@ export async function POST(
 		return NextResponse.json(
 			{
 				error: 'Failed to confirm booking',
-				details:
-					error instanceof Error ? error.message : 'Unknown error'
+				details: error instanceof Error ? error.message : 'Unknown error'
 			},
 			{ status: 500 }
 		)

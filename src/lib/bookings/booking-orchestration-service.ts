@@ -348,6 +348,11 @@ async function createCalendarEventForBooking(options: {
 	practitioner: any
 	supabaseClient?: SupabaseClient
 }) {
+	console.log('[orchestrate] createCalendarEventForBooking', {
+		variant: options.variant,
+		mode: options.request?.mode,
+		locationText: options.request?.locationText
+	})
 	const { variant, request, bookingId, client, practitioner, supabaseClient } = options
 	await createBookingCalendarEvent({ variant, request, bookingId, client, practitioner, supabaseClient })
 }

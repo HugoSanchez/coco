@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { markPaymentSessionCompleted } from '@/lib/db/payment-sessions'
 import { updateBookingStatus } from '@/lib/db/bookings'
-import { getBillForBookingAndMarkAsPaid, updateBillReceiptMetadata, markBillReceiptEmailSent } from '@/lib/db/bills'
+import { getBillForBookingAndMarkAsPaid } from '@/lib/db/bills'
 import { getCalendarEventsForBooking, updateCalendarEventType } from '@/lib/db/calendar-events'
 import { updatePendingToConfirmed } from '@/lib/calendar/calendar'
 import { createClient } from '@supabase/supabase-js'
@@ -9,7 +9,11 @@ import Stripe from 'stripe'
 import * as Sentry from '@sentry/nextjs'
 import { captureEvent } from '@/lib/posthog/server'
 import { sendReceiptEmail } from '@/lib/emails/email-service'
-import { finalizeInvoiceForBillPayment, createCreditNoteForInvoice } from '@/lib/invoicing/invoice-orchestration'
+import {
+	ensureInvoiceForBillOnPayment,
+	finalizeInvoiceOnPayment,
+	createCreditNoteForInvoice
+} from '@/lib/invoicing/invoice-orchestration'
 import { getPaymentSessionByPaymentIntentId } from '@/lib/db/payment-sessions'
 import { findInvoiceByLegacyBillId } from '@/lib/db/invoices'
 
@@ -124,20 +128,8 @@ export async function POST(request: NextRequest) {
 					const receiptUrl = charge?.receipt_url as string | undefined
 					const chargeId = charge?.id as string | undefined
 
-					if (bookingId && bill && (receiptUrl || chargeId)) {
-						await updateBillReceiptMetadata(
-							bill.id,
-							{
-								stripe_charge_id: chargeId ?? null,
-								stripe_receipt_url: receiptUrl ?? null
-							},
-							supabase
-						)
-						console.log('[webhook] bill receipt stored', {
-							billId: bill.id,
-							hasReceiptUrl: Boolean(receiptUrl)
-						})
-					}
+					// Note: We no longer persist receipt metadata on bills to keep schema lean.
+					// Dual-write (if enabled) persists the receipt URL on invoices instead.
 
 					const clientEmail =
 						session.customer_email ||
@@ -159,7 +151,6 @@ export async function POST(request: NextRequest) {
 							receiptUrl
 						})
 						if (sendResult.success) {
-							await markBillReceiptEmailSent(bill.id, supabase)
 							console.log('[webhook] receipt email sent', { billId: bill.id })
 						}
 					}
@@ -177,8 +168,8 @@ export async function POST(request: NextRequest) {
 				// Platform legacy flows: skip receipt retrieval/email (as requested)
 			}
 
-			// 6. Dual-write path: issue & mark invoice as paid (if enabled)
-			if (process.env.ENABLE_INVOICES_DUAL_WRITE === 'true' && bookingId) {
+			// 6. Per-booking: ensure/create invoice for the paid bill (if enabled)
+			if (process.env.ENABLE_INVOICES_DUAL_WRITE === 'true' && bookingId && bill?.id) {
 				try {
 					const paymentIntentId = session.payment_intent as string
 					const requestOpts = connectedAccountId ? { stripeAccount: connectedAccountId } : undefined
@@ -190,22 +181,26 @@ export async function POST(request: NextRequest) {
 					const charge = pi?.latest_charge as Stripe.Charge | undefined
 					const receiptUrl = charge?.receipt_url || null
 
-					if (bill?.id) {
-						await finalizeInvoiceForBillPayment(
-							{
-								legacyBillId: bill.id,
-								userId: session.metadata?.practitioner_user_id || 'unknown',
-								paidAt: new Date(),
-								receiptUrl,
-								stripeSessionId: session.id
-							},
-							supabase as any
-						)
-						console.log('[webhook] invoice finalized', {
+					await ensureInvoiceForBillOnPayment(
+						{
 							billId: bill.id,
-							hasReceiptUrl: Boolean(receiptUrl)
-						})
-					}
+							userId: session.metadata?.practitioner_user_id || 'unknown',
+							snapshot: {
+								clientId: bill.client_id ?? null,
+								clientName: bill.client_name,
+								clientEmail: bill.client_email,
+								amount: bill.amount,
+								currency: bill.currency
+							},
+							receiptUrl,
+							stripeSessionId: session.id
+						},
+						supabase as any
+					)
+					console.log('[webhook] per-booking invoice ensured+finalized', {
+						billId: bill.id,
+						hasReceiptUrl: Boolean(receiptUrl)
+					})
 				} catch (e) {
 					Sentry.captureException(e, {
 						tags: {
@@ -221,36 +216,27 @@ export async function POST(request: NextRequest) {
 			// Invoice branch: issue-if-draft and mark paid
 			if (invoiceId) {
 				try {
-					const { getInvoiceById, issueInvoice } = await import('@/lib/db/invoices')
-					const { onPaymentCompletedForInvoice } = await import('@/lib/invoicing/invoice-orchestration')
-					const { listInvoiceItems } = await import('@/lib/db/invoice-items')
-					const { getBillForBookingAndMarkAsPaid } = await import('@/lib/db/bills')
-					const invoice = await getInvoiceById(invoiceId, supabase as any)
-					if (invoice) {
-						if (invoice.status === 'draft') {
-							await issueInvoice(invoice.id, invoice.user_id, new Date(), supabase as any)
-						}
-						let receiptUrl: string | null = null
-						if (matchedIsConnectSecret) {
-							try {
-								const paymentIntent = await stripe.paymentIntents.retrieve(
-									session.payment_intent as string,
-									{ expand: ['latest_charge'] },
-									connectedAccountId ? { stripeAccount: connectedAccountId } : undefined
-								)
-								const charge = (paymentIntent as any)?.latest_charge as Stripe.Charge | undefined
-								receiptUrl = (charge?.receipt_url as string | undefined) || null
-							} catch (_) {}
-						}
-						await onPaymentCompletedForInvoice(
-							invoice.id,
-							{ paidAt: new Date(), receiptUrl },
-							supabase as any
-						)
-
-						// Send monthly receipt email via unified helper
+					let receiptUrl: string | null = null
+					if (matchedIsConnectSecret) {
 						try {
-							const { getProfileById } = await import('@/lib/db/profiles')
+							const paymentIntent = await stripe.paymentIntents.retrieve(
+								session.payment_intent as string,
+								{ expand: ['latest_charge'] },
+								connectedAccountId ? { stripeAccount: connectedAccountId } : undefined
+							)
+							const charge = (paymentIntent as any)?.latest_charge as Stripe.Charge | undefined
+							receiptUrl = (charge?.receipt_url as string | undefined) || null
+						} catch (_) {}
+					}
+
+					await finalizeInvoiceOnPayment(invoiceId, { paidAt: new Date(), receiptUrl }, supabase as any)
+
+					// Send monthly receipt email via unified helper
+					try {
+						const { getInvoiceById } = await import('@/lib/db/invoices')
+						const { getProfileById } = await import('@/lib/db/profiles')
+						const invoice = await getInvoiceById(invoiceId, supabase as any)
+						if (invoice) {
 							const practitioner = await getProfileById(invoice.user_id, supabase as any)
 							const monthSource =
 								invoice.billing_period_start || invoice.issued_at || new Date().toISOString()
@@ -271,21 +257,8 @@ export async function POST(request: NextRequest) {
 								receiptUrl: (receiptUrl as string) || invoice.stripe_receipt_url || '',
 								monthLabel
 							})
-						} catch (_) {}
-
-						// Dual path: mark related legacy bills as paid so dashboards remain consistent
-						try {
-							const items = await listInvoiceItems(invoice.id, supabase as any)
-							const bookingIds = Array.from(
-								new Set((items as any[]).map((it: any) => it.booking_id).filter(Boolean))
-							) as string[]
-							for (const bId of bookingIds) {
-								try {
-									await getBillForBookingAndMarkAsPaid(bId, supabase as any)
-								} catch (_) {}
-							}
-						} catch (_) {}
-					}
+						}
+					} catch (_) {}
 				} catch (e) {
 					Sentry.captureException(e, {
 						tags: { component: 'webhook', kind: 'stripe-payments', stage: 'invoice_flow' },
@@ -368,9 +341,7 @@ export async function POST(request: NextRequest) {
 						clientEmail,
 						practitionerName,
 						practitionerEmail,
-						bookingId,
-						mode: (session.metadata?.mode as any) || undefined,
-						locationText: (session.metadata?.location_text as any) || undefined
+						bookingId
 					},
 					supabase
 				)
