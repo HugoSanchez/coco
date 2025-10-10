@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -14,9 +14,7 @@ import {
 	Check,
 	Loader,
 	RefreshCcw,
-	Mail,
 	Calendar,
-	Clock,
 	CreditCard,
 	RotateCcw,
 	Send,
@@ -28,7 +26,6 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { SideSheet } from '@/components/SideSheet'
 import BookingDetailsPanel from '@/components/BookingDetailsPanel'
-import { Info } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 export interface Booking {
@@ -345,7 +342,13 @@ export function BookingsTable({
 	onRescheduleBooking,
 	onResendEmail
 }: BookingsTableProps) {
-	const isMobile = window.innerWidth > 768
+	const [isMobile, setIsMobile] = useState(false)
+	useEffect(() => {
+		const onResize = () => setIsMobile(window.innerWidth < 768)
+		onResize()
+		window.addEventListener('resize', onResize)
+		return () => window.removeEventListener('resize', onResize)
+	}, [])
 	const router = useRouter()
 	const searchParams = useSearchParams()
 	const [detailsOpen, setDetailsOpen] = useState(() => {
@@ -376,36 +379,38 @@ export function BookingsTable({
 	}
 
 	// Sync opening from URL (deep-link / back-forward)
-	try {
-		const paramPanel = searchParams.get('panel')
-		const paramId = searchParams.get('id')
-		if (paramPanel === 'booking' && paramId && !detailsOpen) {
-			setDetailsOpen(true)
-			// Fetch if not already loaded or for a different booking
-			if (!selectedBooking || selectedBooking.id !== paramId) {
-				setSelectedBooking({
-					id: paramId,
-					customerName: '',
-					customerEmail: '',
-					bookingDate: new Date(),
-					status: 'pending',
-					billing_status: 'pending',
-					payment_status: 'pending',
-					amount: 0,
-					currency: 'EUR'
-				} as any)
-				;(async () => {
-					try {
-						const res = await fetch(`/api/bookings/${paramId}`)
-						if (res.ok) {
-							const data = await res.json()
-							setDetails(data)
-						}
-					} catch (_) {}
-				})()
+	useEffect(() => {
+		try {
+			const paramPanel = searchParams.get('panel')
+			const paramId = searchParams.get('id')
+			if (paramPanel === 'booking' && paramId) {
+				setDetailsOpen(true)
+				if (!selectedBooking || selectedBooking.id !== paramId) {
+					setSelectedBooking({
+						id: paramId,
+						customerName: '',
+						customerEmail: '',
+						bookingDate: new Date(),
+						status: 'pending',
+						billing_status: 'pending',
+						payment_status: 'pending',
+						amount: 0,
+						currency: 'EUR'
+					} as any)
+					;(async () => {
+						try {
+							const res = await fetch(`/api/bookings/${paramId}`)
+							if (res.ok) {
+								const data = await res.json()
+								setDetails(data)
+							}
+						} catch (_) {}
+					})()
+				}
 			}
-		}
-	} catch (_) {}
+		} catch (_) {}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [searchParams])
 	if (loading) {
 		return (
 			<div className="flex justify-center items-center py-8">

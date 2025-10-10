@@ -9,15 +9,19 @@ import * as Sentry from '@sentry/nextjs'
 import { captureEvent } from '@/lib/posthog/server'
 import { sendReceiptEmail } from '@/lib/emails/email-service'
 import { ensureInvoiceForBillOnPayment, finalizeInvoiceOnPayment } from '@/lib/invoicing/invoice-orchestration'
+import { getInvoiceById } from '@/lib/db/invoices'
+import { getProfileById } from '@/lib/db/profiles'
 
 /**
  * Stripe webhook handler
  *
- * This function is used to handle Stripe webhooks.
- * It is used to update the payment session status, booking status, and bill status.
- *
- * @param request - The request object
- * @returns The response object
+ * Responsibilities
+ *  - Verify webhook signature (supports platform + connect)
+ *  - Parse checkout.session.completed events
+ *  - For booking payments: mark session, mark bill paid, send receipt (connect), ensure invoice
+ *  - For invoice payments: finalize invoice (issue if draft, mark paid, store receipt)
+ *  - Capture analytics event
+ *  - Promote pending calendar event to confirmed
  */
 
 // Initialize Stripe client
@@ -34,23 +38,21 @@ if (webhookSecrets.length === 0) {
 export async function POST(request: NextRequest) {
 	// Stripe payments webhook received
 	try {
+		// STEP 0: Initialize logger (shared Sentry tags)
+		const logger = createSentryLogger({ component: 'webhook', kind: 'stripe-payments' })
 		///////////////////////////////////////////////////////////
-		///// 1. Create service role client for bypassing RLS
+		///// STEP 1: Create service role client (bypass RLS)
 		///////////////////////////////////////////////////////////
 		const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 		///////////////////////////////////////////////////////////
-		///// 2. Verify webhook signature
+		///// STEP 2: Verify webhook signature
 		///////////////////////////////////////////////////////////
 		const body = await request.text()
 		const sig = request.headers.get('stripe-signature')
 
 		if (!sig) {
-			console.error('Missing Stripe signature')
-			Sentry.captureMessage('webhooks:stripe-payments missing signature', {
-				level: 'warning',
-				tags: { component: 'webhook', kind: 'stripe-payments' }
-			})
+			logger.logWarn('missing_signature', 'webhooks:stripe-payments missing signature')
 			return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
 		}
 
@@ -69,37 +71,30 @@ export async function POST(request: NextRequest) {
 			}
 		}
 		if (!event) {
-			console.error('Webhook signature verification failed for all secrets:', lastError?.message)
-			Sentry.captureException(lastError, {
-				tags: {
-					component: 'webhook',
-					kind: 'stripe-payments',
-					stage: 'verify_all_secrets'
-				}
-			})
+			logger.logError('verify_all_secrets', lastError)
 			return NextResponse.json({ error: 'Webhook signature verification failed' }, { status: 400 })
 		}
 
 		///////////////////////////////////////////////////////////
-		///// 3. Handle checkout session completed
+		///// STEP 3: Handle checkout.session.completed
 		///////////////////////////////////////////////////////////
 		if (event.type === 'checkout.session.completed') {
-			// 1. Get session object and receipt URL (once)
+			// 3.1 Get session object and resolve receipt URL (CONNECT only)
 			const session = event.data.object as Stripe.Checkout.Session
 			const connectedAccountId = (event as any).account as string | undefined
 			const receiptUrl = await getReceiptUrl(session, connectedAccountId)
-			// 2. Route by metadata: booking vs invoice
+			// 3.2 Route by metadata: booking vs invoice
 			const invoiceId = session.metadata?.invoice_id as string | undefined
 			const bookingId = session.metadata?.booking_id as string | undefined
 			if (!bookingId && !invoiceId) return NextResponse.json({ received: true })
-			// 3. Update payment session status (booking path)
+			// 3.3 Update payment session status (booking path)
 			if (bookingId) {
 				await markPaymentSessionCompleted(session.id, session.payment_intent as string, supabase, {
 					bookingId,
 					amount: typeof session.amount_total === 'number' ? session.amount_total / 100 : null
 				})
 			}
-			// Booking branch: update booking/bill
+			// 3.4 Booking branch: mark booking and bill as paid
 			let bill: any = null
 			if (bookingId) {
 				await updateBookingStatus(bookingId, 'scheduled', supabase)
@@ -108,9 +103,8 @@ export async function POST(request: NextRequest) {
 			}
 
 			///////////////////////////////////////////////////////////
-			///// 4. Capture and store Stripe receipt metadata
+			///// STEP 4: Send receipt email (CONNECT events only)
 			///////////////////////////////////////////////////////////
-			// Only send receipt for CONNECT events (receiptUrl will be null otherwise)
 			if (matchedIsConnectSecret) {
 				try {
 					// Note: We no longer persist receipt metadata on bills to keep schema lean.
@@ -137,20 +131,13 @@ export async function POST(request: NextRequest) {
 						}
 					}
 				} catch (receiptError) {
-					Sentry.captureException(receiptError, {
-						tags: {
-							component: 'webhook',
-							kind: 'stripe-payments',
-							stage: 'receipt'
-						},
-						extra: { bookingId }
-					})
+					logger.logError('receipt', receiptError, { bookingId })
 				}
-			} else {
-				// Platform legacy flows: skip receipt retrieval/email (as requested)
 			}
 
-			// 6. Per-booking: ensure/create invoice for the paid bill
+			///////////////////////////////////////////////////////////
+			///// STEP 5: Ensure/finalize invoice (per-booking path)
+			///////////////////////////////////////////////////////////
 			if (bookingId && bill?.id) {
 				try {
 					await ensureInvoiceForBillOnPayment(
@@ -174,18 +161,13 @@ export async function POST(request: NextRequest) {
 						hasReceiptUrl: Boolean(receiptUrl)
 					})
 				} catch (e) {
-					Sentry.captureException(e, {
-						tags: {
-							component: 'webhook',
-							kind: 'stripe-payments',
-							stage: 'invoice_finalize'
-						},
-						extra: { bookingId }
-					})
+					logger.logError('invoice_finalize', e, { bookingId })
 				}
 			}
 
-			// Invoice branch: issue-if-draft and mark paid
+			///////////////////////////////////////////////////////////
+			///// STEP 6: Finalize invoice (invoice path)
+			///////////////////////////////////////////////////////////
 			if (invoiceId) {
 				try {
 					await finalizeInvoiceOnPayment(
@@ -196,8 +178,6 @@ export async function POST(request: NextRequest) {
 
 					// Send monthly receipt email via unified helper
 					try {
-						const { getInvoiceById } = await import('@/lib/db/invoices')
-						const { getProfileById } = await import('@/lib/db/profiles')
 						const invoice = await getInvoiceById(invoiceId, supabase as any)
 						if (invoice) {
 							const practitioner = await getProfileById(invoice.user_id, supabase as any)
@@ -223,31 +203,26 @@ export async function POST(request: NextRequest) {
 						}
 					} catch (_) {}
 				} catch (e) {
-					Sentry.captureException(e, {
-						tags: { component: 'webhook', kind: 'stripe-payments', stage: 'invoice_flow' },
-						extra: { invoiceId }
-					})
+					logger.logError('invoice_flow', e, { invoiceId })
 				}
 			}
 
-			// 7. Capture analytics: successful payment
+			///////////////////////////////////////////////////////////
+			///// STEP 7: Capture analytics (best-effort)
+			///////////////////////////////////////////////////////////
 			try {
 				await captureEvent({
 					userId: session.metadata?.practitioner_user_id || 'unknown',
 					event: 'payment_succeeded',
 					userEmail: session.metadata?.practitioner_email,
 					properties: {
-						booking_id: bookingId,
-						stripe_session_id: session.id,
-						payment_intent_id: session.payment_intent,
-						amount: typeof session.amount_total === 'number' ? session.amount_total / 100 : undefined,
-						currency: session.currency?.toUpperCase()
+						amount: typeof session.amount_total === 'number' ? session.amount_total / 100 : undefined
 					}
 				})
 			} catch (_) {}
 
 			///////////////////////////////////////////////////////////
-			///// 5. Update pending calendar event to confirmed
+			///// STEP 8: Promote pending calendar event to confirmed
 			///////////////////////////////////////////////////////////
 			try {
 				// Extract all needed data from session metadata (no database calls needed!)
@@ -269,14 +244,7 @@ export async function POST(request: NextRequest) {
 					!startTime ||
 					!endTime
 				) {
-					Sentry.captureMessage('webhooks:stripe-payments missing metadata', {
-						level: 'warning',
-						tags: {
-							component: 'webhook',
-							kind: 'stripe-payments'
-						},
-						extra: { bookingId }
-					})
+					logger.logWarn('missing_metadata', 'webhooks:stripe-payments missing metadata', { bookingId })
 					return NextResponse.json({ received: true })
 				}
 
@@ -290,25 +258,16 @@ export async function POST(request: NextRequest) {
 				})
 			} catch (calendarError) {
 				// Don't fail the webhook if calendar update fails
-				console.error(`Calendar update error for booking ${bookingId}:`, calendarError)
-				Sentry.captureException(calendarError, {
-					tags: {
-						component: 'webhook',
-						kind: 'stripe-payments',
-						stage: 'calendar'
-					},
-					extra: { bookingId }
-				})
+				logger.logError('calendar', calendarError, { bookingId })
 			}
 		}
-		// Refund events are currently handled elsewhere; no-op here
-		// 8. Return success response
+		///////////////////////////////////////////////////////////
+		///// STEP 9: Success response
+		///////////////////////////////////////////////////////////
 		return NextResponse.json({ received: true })
 	} catch (error) {
-		console.error('Webhook error:', error)
-		Sentry.captureException(error, {
-			tags: { component: 'webhook', kind: 'stripe-payments' }
-		})
+		const logger = createSentryLogger({ component: 'webhook', kind: 'stripe-payments' })
+		logger.logError('handler', error)
 		return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 })
 	}
 }
@@ -328,5 +287,31 @@ async function getReceiptUrl(session: Stripe.Checkout.Session, connectedAccountI
 		return (charge?.receipt_url as string | undefined) || null
 	} catch (_) {
 		return null
+	}
+}
+
+// Sentry helper with base tags
+function createSentryLogger(baseTags: Record<string, string>) {
+	return {
+		logError(name: string, error: any, extra?: any) {
+			try {
+				console.error(`[stripe-webhook:${name}]`, error)
+			} catch (_) {}
+			Sentry.captureException(error, { tags: { ...baseTags, name }, extra })
+		},
+		logWarn(name: string, message?: string, extra?: any) {
+			const msg = message || name
+			try {
+				console.warn(`[stripe-webhook:${name}] ${msg}`)
+			} catch (_) {}
+			Sentry.captureMessage(msg, { level: 'warning', tags: { ...baseTags, name }, extra })
+		},
+		logInfo(name: string, message?: string, extra?: any) {
+			const msg = message || name
+			try {
+				console.log(`[stripe-webhook:${name}] ${msg}`)
+			} catch (_) {}
+			Sentry.captureMessage(msg, { level: 'info', tags: { ...baseTags, name }, extra })
+		}
 	}
 }
