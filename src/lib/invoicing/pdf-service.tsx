@@ -69,17 +69,6 @@ export async function generateAndStoreInvoicePdf(invoiceId: string): Promise<{ s
 	}> = []
 	try {
 		const bills = await getBillsForInvoice(invoice.id, supabase)
-		console.log('[pdf] bills for invoice', {
-			invoiceId: invoice.id,
-			bills: (bills || []).map((b: any) => ({
-				id: b.id,
-				amount: Number(b.amount || 0),
-				start:
-					Array.isArray(b?.booking) && b.booking[0]?.start_time
-						? b.booking[0]?.start_time
-						: b?.booking?.start_time || null
-			}))
-		})
 		items = bills.map((b: any) => {
 			const iso = Array.isArray(b?.booking) ? b.booking[0]?.start_time : b?.booking?.start_time
 			const when = iso ? new Date(iso) : null

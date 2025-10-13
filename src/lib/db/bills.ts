@@ -675,7 +675,7 @@ export async function claimDueBillsForEmail(
 		.update({ email_send_locked_at: nowIso })
 		.lte('email_scheduled_at', nowIso)
 		.is('sent_at', null)
-		.eq('status', 'pending')
+		.in('status', ['scheduled', 'pending'] as any)
 		.is('email_send_locked_at', null)
 		.select('*')
 		.limit(limit)

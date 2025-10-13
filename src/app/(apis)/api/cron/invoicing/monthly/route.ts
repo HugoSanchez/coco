@@ -11,7 +11,7 @@ import { runMonthlyConsolidation, computeUtcPeriodFromLabel } from '@/lib/invoic
  *   a payment link for the consolidated invoice.
  *
  * AUTHZ
- * - Protected by header X-CRON-KEY matching process.env.CRON_SECRET.
+ * - Protected by Authorization: Bearer <CRON_SECRET>.
  *
  * USAGE
  * - GET /api/cron/invoicing/monthly?period=YYYY-MM&dryRun=true
@@ -22,8 +22,9 @@ export async function GET(request: NextRequest) {
 		// ------------------------------------------------------------
 		// 1) Guard: cron secret header
 		// ------------------------------------------------------------
-		const secret = request.headers.get('x-cron-key') || request.headers.get('X-CRON-KEY')
-		if (!secret || secret !== process.env.CRON_SECRET) {
+		const auth = process.env.CRON_SECRET
+		const header = request.headers.get('authorization')
+		if (!auth || !header?.startsWith('Bearer ') || header.split(' ')[1] !== auth) {
 			return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 		}
 

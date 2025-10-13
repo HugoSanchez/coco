@@ -84,8 +84,7 @@ export async function runMonthlyConsolidation(params: {
 	const db = params.supabase ?? createServiceRoleClient()
 	const { start, end } = computeUtcPeriodFromLabel(params.periodLabel)
 
-	// Debug: high-level inputs
-	console.log('[monthly-cron] start', { periodLabel: params.periodLabel, start, end, dryRun: !!params.dryRun })
+	// Debug removed: start
 
 	// 1) Collect candidate monthly bills not yet linked to an invoice
 	const { data: bills } = await db
@@ -94,7 +93,7 @@ export async function runMonthlyConsolidation(params: {
 		.eq('billing_type', 'monthly')
 		.is('invoice_id', null)
 
-	console.log('[monthly-cron] fetched candidate monthly bills', { count: (bills || []).length })
+	// Debug removed: fetched candidate bills count
 
 	// Group by (user_id, client_id)
 	type GroupKey = string
@@ -104,7 +103,7 @@ export async function runMonthlyConsolidation(params: {
 		if (!groups.has(key)) groups.set(key, [])
 		groups.get(key)!.push(row)
 	}
-	console.log('[monthly-cron] group summary', { groups: groups.size })
+	// Debug removed: group summary
 
 	let invoicesCreated = 0
 	let invoicesReused = 0
@@ -120,23 +119,19 @@ export async function runMonthlyConsolidation(params: {
 		const [userId, clientIdStr] = key.split('::')
 		const clientId = clientIdStr === 'null' ? null : clientIdStr
 		try {
-			console.log('[monthly-cron] processing group', {
-				userId,
-				clientId,
-				groupRows: groupRows.length
-			})
+			// Debug removed: processing group summary
 			// 2a) Ensure/obtain draft invoice for period and link bills
 			const { invoiceId, linkedBillIds } = await ensureMonthlyDraftAndLinkBills(
 				{ userId, clientId, periodStart: start, periodEnd: end },
 				db
 			)
 			billsLinked += linkedBillIds.length
-			console.log('[monthly-cron] linked bills', { invoiceId, linked: linkedBillIds.length })
+			// Debug removed: linked bills count
 
 			// Only send when we actually linked at least one bill in this run.
 			// This prevents multiple emails for the same client when nothing changed.
 			if (linkedBillIds.length === 0) {
-				console.log('[monthly-cron] skip email (no new links this run)', { invoiceId })
+				// Debug removed: skip email (no new links this run)
 				continue
 			}
 
@@ -165,7 +160,7 @@ export async function runMonthlyConsolidation(params: {
 					const monthLabel = spanishMonthLabelFromPeriodStart(start)
 
 					if (!emailTo) {
-						console.log('[monthly-cron] skip email (no recipient)', { invoiceId })
+						// Debug removed: skip email (no recipient)
 					} else {
 						await sendMonthlyBillEmail({
 							to: emailTo,
@@ -183,7 +178,7 @@ export async function runMonthlyConsolidation(params: {
 								.update({ status: 'sent', sent_at: new Date().toISOString() })
 								.eq('invoice_id', invoiceId)
 						} catch (_) {}
-						console.log('[monthly-cron] email sent', { invoiceId, to: emailTo })
+						// Debug removed: email sent
 					}
 				} catch (emailErr) {
 					errors.push({
@@ -191,17 +186,10 @@ export async function runMonthlyConsolidation(params: {
 						clientId,
 						error: `email_failed: ${emailErr instanceof Error ? emailErr.message : String(emailErr)}`
 					})
-					console.log('[monthly-cron] email failed', {
-						invoiceId,
-						error: emailErr instanceof Error ? emailErr.message : String(emailErr)
-					})
+					// Debug removed: email failed
 				}
 			} else {
-				console.log('[monthly-cron] skip email', {
-					invoiceId,
-					dryRun: !!params.dryRun,
-					hasInvoice: !!invoice
-				})
+				// Debug removed: skip email (dry run)
 			}
 		} catch (e) {
 			errors.push({
@@ -209,11 +197,7 @@ export async function runMonthlyConsolidation(params: {
 				clientId,
 				error: e instanceof Error ? e.message : String(e)
 			})
-			console.log('[monthly-cron] group failed', {
-				userId,
-				clientId,
-				error: e instanceof Error ? e.message : String(e)
-			})
+			// Debug removed: group failed
 		}
 	}
 

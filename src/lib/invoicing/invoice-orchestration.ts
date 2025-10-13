@@ -250,15 +250,6 @@ export async function ensureMonthlyDraftAndLinkBills(
 
 	// 2) Fetch monthly bills not yet linked to any invoice within the period
 	const billsToLinkRaw = await getUnlinkedMonthlyBillsForUserClient(params.userId, params.clientId, db)
-	console.log('[monthly-cron] raw monthly bills for group', {
-		userId: params.userId,
-		clientId: params.clientId,
-		count: (billsToLinkRaw || []).length,
-		sampleStartTimes: (billsToLinkRaw || [])
-			.map((r: any) => (Array.isArray(r?.booking) ? r.booking[0]?.start_time : r?.booking?.start_time))
-			.filter(Boolean)
-			.slice(0, 5)
-	})
 
 	const candidates = (billsToLinkRaw || []).filter((row: any) => {
 		const st = Array.isArray(row?.booking)
@@ -268,40 +259,10 @@ export async function ensureMonthlyDraftAndLinkBills(
 		return st >= params.periodStart && st < params.periodEnd
 	})
 	// Debug: show the bills we intend to link (id, amount, date)
-	try {
-		const preview = candidates.map((r: any) => ({
-			id: r.id,
-			amount: Number(r.amount || 0),
-			start:
-				Array.isArray(r?.booking) && r.booking[0]?.start_time
-					? r.booking[0]?.start_time
-					: r?.booking?.start_time || null
-		}))
-		console.log('[monthly-cron] selected candidates for invoice', {
-			userId: params.userId,
-			clientId: params.clientId,
-			periodStart: params.periodStart,
-			periodEnd: params.periodEnd,
-			invoiceId: invoice.id,
-			candidates: preview
-		})
-	} catch (_) {}
+	// Debug removed: selected candidates for invoice
 
 	// Minimal debug to understand zero-link scenarios
-	if ((billsToLinkRaw || []).length > 0 && candidates.length === 0) {
-		try {
-			console.log('[monthly-cron] ensureMonthlyDraftAndLinkBills: no candidates after period filter', {
-				userId: params.userId,
-				clientId: params.clientId,
-				periodStart: params.periodStart,
-				periodEnd: params.periodEnd,
-				sampleStartTimes: (billsToLinkRaw as any[])
-					.map((r: any) => (Array.isArray(r?.booking) ? r.booking[0]?.start_time : r?.booking?.start_time))
-					.filter(Boolean)
-					.slice(0, 5)
-			})
-		} catch (_) {}
-	}
+	// Debug removed: zero-candidate period filter notice
 
 	const billIds = candidates.map((b: any) => b.id)
 	if (billIds.length === 0) {
@@ -315,21 +276,14 @@ export async function ensureMonthlyDraftAndLinkBills(
 		const toUnlink = currentIds.filter((id: string) => !billIds.includes(id))
 		if (toUnlink.length > 0) {
 			await db.from('bills').update({ invoice_id: null }).in('id', toUnlink)
-			console.log('[monthly-cron] unlinked stale bills from invoice', { invoiceId: invoice.id, toUnlink })
 		}
 	} catch (_) {}
 
 	await linkBillsToInvoice(billIds, invoice.id, db)
-	console.log('[monthly-cron] linked invoice_id on bills', { invoiceId: invoice.id, billIds })
 
 	// 4) Set invoice totals from desired candidates only
 	const totalAmount = candidates.reduce((acc: number, row: any) => acc + Number(row.amount || 0), 0)
 	await db.from('invoices').update({ subtotal: totalAmount, tax_total: 0, total: totalAmount }).eq('id', invoice.id)
-	console.log('[monthly-cron] invoice totals set from candidates', {
-		invoiceId: invoice.id,
-		subtotal: totalAmount,
-		total: totalAmount
-	})
 
 	return { invoiceId: invoice.id, linkedBillIds: billIds }
 }
