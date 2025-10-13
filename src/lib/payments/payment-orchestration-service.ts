@@ -20,7 +20,7 @@ import {
 } from '@/lib/db/payment-sessions'
 import { getStripeAccountForPayments } from '@/lib/db/stripe-accounts'
 import { findInvoiceByLegacyBillId, markInvoiceRefunded } from '@/lib/db/invoices'
-import { createCreditNoteForInvoice } from '@/lib/invoicing/invoice-orchestration'
+import { createCreditNoteForInvoice, createCreditNoteForRefund } from '@/lib/invoicing/invoice-orchestration'
 import { getBillsForBooking, updateBillStatus, markBillAsRefunded } from '@/lib/db/bills'
 import { getProfileById } from '@/lib/db/profiles'
 import { getBookingById } from '@/lib/db/bookings'
@@ -435,9 +435,16 @@ export class PaymentOrchestrationService {
 		error?: string
 	}> {
 		try {
-			// STEP 1: Find the paid bill for this booking
+			// STEP 1: Find the paid bill for this booking (guard against already refunded)
 			// ===========================================
 			const bills = await getBillsForBooking(bookingId, supabaseClient)
+			const alreadyRefunded = bills.find((b) => b.status === 'refunded')
+			if (alreadyRefunded) {
+				return {
+					success: false,
+					error: 'Bill already refunded'
+				}
+			}
 			const paidBill = bills.find((bill) => bill.status === 'paid')
 
 			if (!paidBill) {
@@ -492,18 +499,20 @@ export class PaymentOrchestrationService {
 			// ======================================
 			await markBillAsRefunded(paidBill.id, stripeRefundId, reason, supabaseClient)
 
-			// STEP 5: Dual-write: update related invoice to 'refunded'
+			// STEP 5: Update related invoice + create rectificativa
 			{
 				try {
 					const invoice = await findInvoiceByLegacyBillId(paidBill.id, supabaseClient)
 					if (invoice) {
 						await markInvoiceRefunded(invoice.id, new Date(), reason ?? null, supabaseClient)
-						// Create a rectificativa immediately from app flow for reliability
+						// Create a rectificativa: per-booking usually equals full amount; monthly = partial
 						try {
-							await createCreditNoteForInvoice(
+							const refundAmount = Number(paidBill.amount || 0)
+							await createCreditNoteForRefund(
 								{
 									invoiceId: invoice.id,
 									userId: invoice.user_id,
+									amount: refundAmount,
 									reason: reason ?? 'Anulación de consulta',
 									stripeRefundId
 								},

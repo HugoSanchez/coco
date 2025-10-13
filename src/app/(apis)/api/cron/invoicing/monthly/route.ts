@@ -6,8 +6,9 @@ import { runMonthlyConsolidation, computeUtcPeriodFromLabel } from '@/lib/invoic
  * Monthly Invoicing Cron Endpoint
  * ------------------------------------------------------------
  * PURPOSE
- * - Consolidate monthly-cadence invoice items into a single invoice per
- *   (user, client, month), delete empty drafts, and email clients.
+ * - Aggregate monthly-cadence bills into one draft invoice per (user, client, month),
+ *   link those bills to the invoice, set invoice totals from linked bills, and email clients
+ *   a payment link for the consolidated invoice.
  *
  * AUTHZ
  * - Protected by header X-CRON-KEY matching process.env.CRON_SECRET.

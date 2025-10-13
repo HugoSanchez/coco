@@ -159,6 +159,13 @@ export async function orchestrateBookingCreation(
 		supabaseClient
 	)
 
+	// Monthly bills should start in 'scheduled' (email goes via monthly cron)
+	if (normalizedType === 'monthly') {
+		try {
+			await updateBillStatus(bill.id, 'scheduled', supabaseClient)
+		} catch (_) {}
+	}
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////// Step 6: Calendar events (single helper, preserves earlier behavior by variant)
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -202,9 +209,19 @@ export async function orchestrateBookingCreation(
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
-	////// Step 8: Monthly flow — no email here; monthly cron aggregates and emails the invoice
+	////// Step 8: Monthly flow — no payment email; create calendar invite if future; cron emails invoice
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	if (normalizedType === 'monthly') {
+		if (!isPast) {
+			await createCalendarEventForBooking({
+				variant: 'confirmed',
+				request,
+				bookingId: booking.id,
+				client,
+				practitioner,
+				supabaseClient
+			})
+		}
 		return { booking, bill, requiresPayment: false }
 	}
 

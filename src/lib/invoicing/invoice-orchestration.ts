@@ -82,6 +82,50 @@ export async function createCreditNoteForInvoice(
 }
 
 /**
+ * createCreditNoteForRefund
+ * ----------------------------------------------
+ * Creates and issues a partial "Factura rectificativa" crediting a specific amount.
+ * - Does NOT depend on invoice items; totals are set directly.
+ */
+export async function createCreditNoteForRefund(
+	params: {
+		invoiceId: string
+		userId: string
+		amount: number
+		reason?: string | null
+		stripeRefundId?: string | null
+	},
+	supabase?: SupabaseClient
+): Promise<string> {
+	const db = supabase || createServerSupabaseClient()
+
+	// Create draft credit note header referencing the original invoice
+	const credit = await createDraftInvoice(
+		{
+			userId: params.userId,
+			clientId: null, // keep header minimal; snapshots not strictly necessary here
+			currency: 'EUR',
+			clientName: '',
+			clientEmail: '',
+			documentKind: 'credit_note',
+			rectifiesInvoiceId: params.invoiceId,
+			reason: params.reason ?? null,
+			stripeRefundId: params.stripeRefundId ?? null
+		},
+		db
+	)
+
+	// Set totals equal to negative refunded amount
+	const creditAbs = Math.abs(Number(params.amount || 0))
+	await db.from('invoices').update({ subtotal: -creditAbs, tax_total: 0, total: -creditAbs }).eq('id', credit.id)
+
+	// Issue and generate PDF
+	const issued = await issueCreditNote(credit.id, params.userId, new Date(), db)
+	await generateAndStoreInvoicePdf(issued.id)
+	return issued.id
+}
+
+/**
  * ensureInvoiceForBillOnPayment
  * ----------------------------------------------
  * Per-booking success path: when a bill is paid, ensure an invoice exists,

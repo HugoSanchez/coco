@@ -37,6 +37,9 @@ export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelPro
 	const invoiceLink = Array.isArray(details?.invoices)
 		? details.invoices.find((inv: any) => inv?.kind === 'invoice' && !!inv?.url)
 		: null
+	const creditNoteLink = Array.isArray(details?.invoices)
+		? details.invoices.find((inv: any) => inv?.kind === 'credit_note' && !!inv?.url)
+		: null
 	const isMonthly =
 		bill?.billing_type === 'monthly' ||
 		(Array.isArray(details?.invoice_items) && details.invoice_items.some((it: any) => it?.cadence === 'monthly'))
@@ -272,7 +275,18 @@ export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelPro
 							Ver factura
 						</a>
 					)}
-					{!details?.documents?.receiptUrl && !invoiceLink && (
+					{creditNoteLink && (
+						<a
+							key={`credit-${creditNoteLink.display}`}
+							href={creditNoteLink.url}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="text-sm text-gray-800 font-medium border border-gray-200 bg-gray-200 rounded-md p-2 px-4 hover:bg-gray-200"
+						>
+							Ver rectificativa
+						</a>
+					)}
+					{!details?.documents?.receiptUrl && !invoiceLink && !creditNoteLink && (
 						<span className="text-sm text-gray-700">
 							{isMonthly
 								? 'Se facturará de forma mensual'

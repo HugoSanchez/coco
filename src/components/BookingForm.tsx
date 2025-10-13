@@ -96,6 +96,10 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 	const [savedDefault, setSavedDefault] = useState<boolean>(false)
 	const [resolvedLeadHours, setResolvedLeadHours] = useState<number | null>(null)
 
+	// Billing timing selection (per-booking lead hours or monthly)
+	const [billingTimingSelection, setBillingTimingSelection] = useState<string>('0') // '0' | '24' | '72' | '168' | '-1' | 'monthly'
+	const [isBillingTimingDirty, setIsBillingTimingDirty] = useState<boolean>(false)
+
 	// Track if user has manually edited the address to avoid auto-refilling defaults
 	const hasEditedLocationRef = useRef(false)
 
@@ -190,6 +194,22 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 					leadRaw == null || Number.isNaN(Number(leadRaw)) ? null : Math.trunc(Number(leadRaw))
 				setResolvedLeadHours(normalizedLead)
 
+				// Resolve default billing timing selection (monthly vs per booking lead hours)
+				const effectiveBillingType = (clientSettings?.billing_type ||
+					userDefault?.billing_type ||
+					'in-advance') as 'in-advance' | 'right-after' | 'monthly'
+				if (!isBillingTimingDirty) {
+					if (effectiveBillingType === 'monthly') {
+						setBillingTimingSelection('monthly')
+					} else {
+						const sel =
+							normalizedLead == null || Number.isNaN(Number(normalizedLead))
+								? '0'
+								: String(normalizedLead)
+						setBillingTimingSelection(sel)
+					}
+				}
+
 				const {
 					showSelect,
 					consultationType: type,
@@ -218,6 +238,17 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 				const normalizedLead =
 					leadRaw == null || Number.isNaN(Number(leadRaw)) ? null : Math.trunc(Number(leadRaw))
 				setResolvedLeadHours(normalizedLead)
+				if (!isBillingTimingDirty) {
+					if ((userDefault?.billing_type as any) === 'monthly') {
+						setBillingTimingSelection('monthly')
+					} else {
+						const sel =
+							normalizedLead == null || Number.isNaN(Number(normalizedLead))
+								? '0'
+								: String(normalizedLead)
+						setBillingTimingSelection(sel)
+					}
+				}
 				setShowConsultationType(false)
 				setConsultationType('followup')
 				if (!isPriceDirty) {
@@ -450,13 +481,15 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 					locationText: mode === 'in_person' ? locationText || null : null
 				},
 				billing: {
-					type: 'per_booking',
+					type: billingTimingSelection === 'monthly' ? 'monthly' : 'per_booking',
 					amount: finalAmount,
 					currency: 'EUR',
 					paymentEmailLeadHours:
-						resolvedLeadHours != null && !Number.isNaN(Number(resolvedLeadHours))
-							? Number(resolvedLeadHours)
-							: null
+						billingTimingSelection === 'monthly'
+							? null
+							: Number.isNaN(Number(billingTimingSelection))
+								? 0
+								: Number(billingTimingSelection)
 				}
 			}
 
@@ -787,6 +820,34 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 									</div>
 								</div>
 							)}
+
+							{/* Billing type/timing selector */}
+							<div className="space-y-2">
+								<Label className="text-md font-normal text-gray-700">Tipo de facturación</Label>
+								{(() => {
+									const timingValue = billingTimingSelection
+									return (
+										<Select
+											value={timingValue}
+											onValueChange={(value) => {
+												setIsBillingTimingDirty(true)
+												setBillingTimingSelection(value)
+											}}
+										>
+											<SelectTrigger className="h-12">
+												<SelectValue placeholder="Selecciona el tipo de facturación" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="0">Inmediata</SelectItem>
+												<SelectItem value="24">24 horas antes</SelectItem>
+												<SelectItem value="168">1 semana antes</SelectItem>
+												<SelectItem value="-1">Después de la consulta</SelectItem>
+												<SelectItem value="monthly">Mensual</SelectItem>
+											</SelectContent>
+										</Select>
+									)
+								})()}
+							</div>
 
 							{/* Booking Summary */}
 							<div>

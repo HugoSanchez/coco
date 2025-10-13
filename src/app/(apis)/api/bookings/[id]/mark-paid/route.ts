@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getBookingById } from '@/lib/db/bookings'
 import { getBillForBookingAndMarkAsPaid } from '@/lib/db/bills'
+import { ensureInvoiceForBillOnPayment } from '@/lib/invoicing/invoice-orchestration'
 import * as Sentry from '@sentry/nextjs'
 
 /**
@@ -16,10 +17,7 @@ import * as Sentry from '@sentry/nextjs'
  * - Booking status (pending/scheduled/completed)
  * - Calendar events or invitations
  */
-export async function POST(
-	request: NextRequest,
-	{ params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
 	try {
 		const supabase = createClient()
 
@@ -35,10 +33,7 @@ export async function POST(
 				tags: { component: 'api:bookings' },
 				extra: { bookingId: params.id }
 			})
-			return NextResponse.json(
-				{ error: 'Authentication required' },
-				{ status: 401 }
-			)
+			return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
 		}
 
 		const bookingId = params.id
@@ -52,10 +47,7 @@ export async function POST(
 				tags: { component: 'api:bookings' },
 				extra: { bookingId }
 			})
-			return NextResponse.json(
-				{ error: 'Booking not found' },
-				{ status: 404 }
-			)
+			return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
 		}
 
 		// Verify user owns this booking
@@ -68,52 +60,62 @@ export async function POST(
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 		}
 
-		// 2. Mark associated bill as paid
+		// 2. Mark associated bill as paid and retrieve it
+		let paidBill: any = null
 		try {
-			await getBillForBookingAndMarkAsPaid(bookingId, supabase)
+			paidBill = await getBillForBookingAndMarkAsPaid(bookingId, supabase)
 		} catch (billError) {
-			console.error(
-				`Error marking bill as paid for booking ${bookingId}:`,
-				billError
-			)
+			console.error(`Error marking bill as paid for booking ${bookingId}:`, billError)
 			Sentry.captureException(billError, {
 				tags: { component: 'api:bookings', method: 'mark-paid' },
 				extra: { bookingId }
 			})
 
 			// Check if it's because no bill exists
-			if (
-				billError instanceof Error &&
-				billError.message.includes('not found')
-			) {
-				return NextResponse.json(
-					{ error: 'No bill found for this booking' },
-					{ status: 404 }
-				)
+			if (billError instanceof Error && billError.message.includes('not found')) {
+				return NextResponse.json({ error: 'No bill found for this booking' }, { status: 404 })
 			}
 
 			// Check if bill is already paid
-			if (
-				billError instanceof Error &&
-				billError.message.includes('already paid')
-			) {
-				return NextResponse.json(
-					{ error: 'Bill is already marked as paid' },
-					{ status: 400 }
-				)
+			if (billError instanceof Error && billError.message.includes('already paid')) {
+				return NextResponse.json({ error: 'Bill is already marked as paid' }, { status: 400 })
 			}
 
 			// Other bill errors
 			return NextResponse.json(
 				{
 					error: 'Failed to mark as paid',
-					details:
-						billError instanceof Error
-							? billError.message
-							: 'Unknown error'
+					details: billError instanceof Error ? billError.message : 'Unknown error'
 				},
 				{ status: 500 }
 			)
+		}
+
+		// 3. Ensure invoice exists/finalized for this paid bill (manual payments)
+		try {
+			if (paidBill && paidBill.id) {
+				await ensureInvoiceForBillOnPayment(
+					{
+						billId: paidBill.id,
+						userId: booking.user_id,
+						snapshot: {
+							clientId: paidBill.client_id ?? null,
+							clientName: paidBill.client_name || 'Paciente',
+							clientEmail: paidBill.client_email || '',
+							amount: Number(paidBill.amount || 0),
+							currency: paidBill.currency || 'EUR'
+						},
+						receiptUrl: null,
+						stripeSessionId: null
+					},
+					supabase
+				)
+			}
+		} catch (invErr) {
+			Sentry.captureException(invErr, {
+				tags: { component: 'api:bookings', method: 'mark-paid', stage: 'ensure_invoice' },
+				extra: { bookingId, billId: paidBill?.id }
+			})
 		}
 
 		return NextResponse.json({
@@ -132,8 +134,7 @@ export async function POST(
 		return NextResponse.json(
 			{
 				error: 'Failed to mark as paid',
-				details:
-					error instanceof Error ? error.message : 'Unknown error'
+				details: error instanceof Error ? error.message : 'Unknown error'
 			},
 			{ status: 500 }
 		)
