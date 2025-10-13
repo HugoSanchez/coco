@@ -25,6 +25,8 @@ import {
 	findOrCreateMonthlyInvoice
 } from '@/lib/db/invoices'
 import { linkPaymentSessionToInvoice } from '@/lib/db/payment-sessions'
+import { getUnlinkedMonthlyBillsForUserClient, linkBillsToInvoice } from '@/lib/db/bills'
+import { getClientById } from '@/lib/db/clients'
 import { getInvoiceById } from '@/lib/db/invoices'
 import { generateAndStoreInvoicePdf } from '@/lib/invoicing/pdf-service'
 import { createClient as createServerSupabaseClient } from '@/lib/supabase/server'
@@ -220,12 +222,25 @@ export async function ensureMonthlyDraftAndLinkBills(
 	const db = supabase || createServerSupabaseClient()
 
 	// 1) Ensure/obtain draft invoice for period
+	// Resolve client snapshots for email sending (monthly email requires a recipient)
+	let clientNameSnap = ''
+	let clientEmailSnap = ''
+	if (params.clientId) {
+		try {
+			const clientRow = await getClientById(params.clientId, db)
+			if (clientRow) {
+				clientNameSnap = ((clientRow as any).full_name_search || clientRow.name || '').trim()
+				clientEmailSnap = (clientRow as any).email || ''
+			}
+		} catch (_) {}
+	}
+
 	let invoice = await findOrCreateMonthlyInvoice(
 		{
 			userId: params.userId,
 			clientId: params.clientId,
-			clientName: '', // snapshots already exist on invoice creation; handled in helper
-			clientEmail: '',
+			clientName: clientNameSnap,
+			clientEmail: clientEmailSnap,
 			currency: params.currency || 'EUR',
 			periodStart: params.periodStart,
 			periodEnd: params.periodEnd
@@ -234,16 +249,16 @@ export async function ensureMonthlyDraftAndLinkBills(
 	)
 
 	// 2) Fetch monthly bills not yet linked to any invoice within the period
-	const { data: billsToLinkRaw } = await db
-		.from('bills')
-		.select(
-			`id, booking_id, amount, billing_type, invoice_id,
-			 booking:bookings(start_time), user_id, client_id`
-		)
-		.eq('user_id', params.userId)
-		.eq('client_id', params.clientId)
-		.eq('billing_type', 'monthly')
-		.is('invoice_id', null)
+	const billsToLinkRaw = await getUnlinkedMonthlyBillsForUserClient(params.userId, params.clientId, db)
+	console.log('[monthly-cron] raw monthly bills for group', {
+		userId: params.userId,
+		clientId: params.clientId,
+		count: (billsToLinkRaw || []).length,
+		sampleStartTimes: (billsToLinkRaw || [])
+			.map((r: any) => (Array.isArray(r?.booking) ? r.booking[0]?.start_time : r?.booking?.start_time))
+			.filter(Boolean)
+			.slice(0, 5)
+	})
 
 	const candidates = (billsToLinkRaw || []).filter((row: any) => {
 		const st = Array.isArray(row?.booking)
@@ -252,18 +267,69 @@ export async function ensureMonthlyDraftAndLinkBills(
 		if (!st) return false
 		return st >= params.periodStart && st < params.periodEnd
 	})
+	// Debug: show the bills we intend to link (id, amount, date)
+	try {
+		const preview = candidates.map((r: any) => ({
+			id: r.id,
+			amount: Number(r.amount || 0),
+			start:
+				Array.isArray(r?.booking) && r.booking[0]?.start_time
+					? r.booking[0]?.start_time
+					: r?.booking?.start_time || null
+		}))
+		console.log('[monthly-cron] selected candidates for invoice', {
+			userId: params.userId,
+			clientId: params.clientId,
+			periodStart: params.periodStart,
+			periodEnd: params.periodEnd,
+			invoiceId: invoice.id,
+			candidates: preview
+		})
+	} catch (_) {}
+
+	// Minimal debug to understand zero-link scenarios
+	if ((billsToLinkRaw || []).length > 0 && candidates.length === 0) {
+		try {
+			console.log('[monthly-cron] ensureMonthlyDraftAndLinkBills: no candidates after period filter', {
+				userId: params.userId,
+				clientId: params.clientId,
+				periodStart: params.periodStart,
+				periodEnd: params.periodEnd,
+				sampleStartTimes: (billsToLinkRaw as any[])
+					.map((r: any) => (Array.isArray(r?.booking) ? r.booking[0]?.start_time : r?.booking?.start_time))
+					.filter(Boolean)
+					.slice(0, 5)
+			})
+		} catch (_) {}
+	}
 
 	const billIds = candidates.map((b: any) => b.id)
 	if (billIds.length === 0) {
 		return { invoiceId: invoice.id, linkedBillIds: [] }
 	}
 
-	// 3) Link bills → invoice_id
-	await db.from('bills').update({ invoice_id: invoice.id }).in('id', billIds)
+	// 3) Replace existing links atomically: unlink stale bills and link the desired set
+	try {
+		const { data: alreadyLinked } = await db.from('bills').select('id').eq('invoice_id', invoice.id)
+		const currentIds = (alreadyLinked || []).map((r: any) => r.id)
+		const toUnlink = currentIds.filter((id: string) => !billIds.includes(id))
+		if (toUnlink.length > 0) {
+			await db.from('bills').update({ invoice_id: null }).in('id', toUnlink)
+			console.log('[monthly-cron] unlinked stale bills from invoice', { invoiceId: invoice.id, toUnlink })
+		}
+	} catch (_) {}
 
-	// 4) Set invoice totals from linked bills (no items)
+	await linkBillsToInvoice(billIds, invoice.id, db)
+	console.log('[monthly-cron] linked invoice_id on bills', { invoiceId: invoice.id, billIds })
+
+	// 4) Set invoice totals from desired candidates only
 	const totalAmount = candidates.reduce((acc: number, row: any) => acc + Number(row.amount || 0), 0)
 	await db.from('invoices').update({ subtotal: totalAmount, tax_total: 0, total: totalAmount }).eq('id', invoice.id)
+	console.log('[monthly-cron] invoice totals set from candidates', {
+		invoiceId: invoice.id,
+		subtotal: totalAmount,
+		total: totalAmount
+	})
 
 	return { invoiceId: invoice.id, linkedBillIds: billIds }
 }

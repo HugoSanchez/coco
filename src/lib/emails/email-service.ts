@@ -460,7 +460,7 @@ export async function sendReceiptEmail({
 		const subject =
 			mode === 'monthly'
 				? monthLabel
-					? `Pago confirmado - ${monthLabel}`
+					? `Pago confirmado - ${monthLabel.replace(/^[a-z]/, (c) => c.toUpperCase())}`
 					: 'Pago confirmado'
 				: 'Pago confirmado'
 		const result = await resend.emails.send({

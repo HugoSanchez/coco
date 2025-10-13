@@ -49,6 +49,12 @@ const styles = StyleSheet.create({
 	tr: { flexDirection: 'row', borderBottom: '0.5 solid #ccc', paddingVertical: 6 },
 	td: { flex: 1 },
 	tdRight: { flex: 1, textAlign: 'right' },
+	// Narrow, right-aligned column for quantity to avoid visual merging with the amount column
+	qtyCol: { width: 40, textAlign: 'center' },
+	// Fixed widths for numeric columns to ensure perfect alignment with headers
+	amountCol: { width: 120, textAlign: 'center' },
+	ivaPctCol: { width: 80, textAlign: 'center' },
+	ivaCol: { width: 100, textAlign: 'center' },
 	totals: { marginTop: 10, alignSelf: 'flex-start', width: 240 },
 	totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 2 },
 	rectifiesBox: { backgroundColor: '#FFF9C4', padding: 6, borderRadius: 2 },
@@ -94,7 +100,7 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
 					</View>
 				) : null}
 
-				<View style={styles.section}>
+				<View style={[styles.section, { maxWidth: 340 }]}>
 					<Text style={styles.label}>Emisor</Text>
 					<Text style={styles.infoLine}>{(practitionerName || '').toUpperCase()}</Text>
 					{practitionerEmail ? <Text style={styles.infoLine}>{practitionerEmail}</Text> : null}
@@ -129,24 +135,24 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
 				<View style={styles.section}>
 					<View style={styles.tableHeader}>
 						<Text style={styles.th}>Concepto</Text>
-						<Text style={styles.th}>Cantidad</Text>
-						<Text style={styles.th}>Precio</Text>
-						<Text style={styles.th}>Importe</Text>
-						<Text style={styles.th}>IVA %</Text>
-						<Text style={styles.th}>IVA</Text>
+						<Text style={[styles.th, { width: 40, textAlign: 'right' }]}>Cantidad</Text>
+						<Text style={[styles.th, { width: 100, textAlign: 'right' }]}>Importe</Text>
+						<Text style={[styles.th, { width: 80, textAlign: 'right' }]}>IVA %</Text>
+						<Text style={[styles.th, { width: 100, textAlign: 'right' }]}>IVA</Text>
 					</View>
 					{items.map((it, idx) => (
 						<View key={idx} style={styles.tr}>
 							<Text style={styles.td}>{it.description}</Text>
-							<Text style={styles.tdRight}>{(it.qty ?? 1).toString()}</Text>
-							<Text style={styles.td}>
-								{(it.unit_price ?? 0).toFixed(2)} {currency}
+							<Text style={[styles.qtyCol, { width: 40, textAlign: 'center' }]}>
+								{(it.qty ?? 1).toString()}
 							</Text>
-							<Text style={styles.td}>
+							<Text style={[styles.amountCol, { width: 120, textAlign: 'center' }]}>
 								{(it.amount ?? 0).toFixed(2)} {currency}
 							</Text>
-							<Text style={styles.td}>{(it.tax_rate_percent ?? 0).toFixed(2)}%</Text>
-							<Text style={styles.td}>
+							<Text style={[styles.ivaPctCol, { width: 80, textAlign: 'right' }]}>
+								{(it.tax_rate_percent ?? 0).toFixed(2)}%
+							</Text>
+							<Text style={[styles.ivaCol, { width: 100, textAlign: 'right' }]}>
 								{(it.tax_amount ?? 0).toFixed(2)} {currency}
 							</Text>
 						</View>

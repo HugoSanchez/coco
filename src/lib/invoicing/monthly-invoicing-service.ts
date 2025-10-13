@@ -2,6 +2,7 @@ import { getInvoiceById } from '@/lib/db/invoices'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { sendMonthlyBillEmail } from '@/lib/emails/email-service'
 import { getProfileById } from '@/lib/db/profiles'
+import { getClientById } from '@/lib/db/clients'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ensureMonthlyDraftAndLinkBills } from '@/lib/invoicing/invoice-orchestration'
 
@@ -83,12 +84,17 @@ export async function runMonthlyConsolidation(params: {
 	const db = params.supabase ?? createServiceRoleClient()
 	const { start, end } = computeUtcPeriodFromLabel(params.periodLabel)
 
+	// Debug: high-level inputs
+	console.log('[monthly-cron] start', { periodLabel: params.periodLabel, start, end, dryRun: !!params.dryRun })
+
 	// 1) Collect candidate monthly bills not yet linked to an invoice
 	const { data: bills } = await db
 		.from('bills')
 		.select(`id, user_id, client_id, amount, currency, billing_type, invoice_id, booking:bookings(start_time)`) // embed start_time for period filter
 		.eq('billing_type', 'monthly')
 		.is('invoice_id', null)
+
+	console.log('[monthly-cron] fetched candidate monthly bills', { count: (bills || []).length })
 
 	// Group by (user_id, client_id)
 	type GroupKey = string
@@ -98,6 +104,7 @@ export async function runMonthlyConsolidation(params: {
 		if (!groups.has(key)) groups.set(key, [])
 		groups.get(key)!.push(row)
 	}
+	console.log('[monthly-cron] group summary', { groups: groups.size })
 
 	let invoicesCreated = 0
 	let invoicesReused = 0
@@ -113,43 +120,96 @@ export async function runMonthlyConsolidation(params: {
 		const [userId, clientIdStr] = key.split('::')
 		const clientId = clientIdStr === 'null' ? null : clientIdStr
 		try {
+			console.log('[monthly-cron] processing group', {
+				userId,
+				clientId,
+				groupRows: groupRows.length
+			})
 			// 2a) Ensure/obtain draft invoice for period and link bills
 			const { invoiceId, linkedBillIds } = await ensureMonthlyDraftAndLinkBills(
 				{ userId, clientId, periodStart: start, periodEnd: end },
 				db
 			)
 			billsLinked += linkedBillIds.length
+			console.log('[monthly-cron] linked bills', { invoiceId, linked: linkedBillIds.length })
 
-			// 2b) Load invoice for email snapshots
+			// Only send when we actually linked at least one bill in this run.
+			// This prevents multiple emails for the same client when nothing changed.
+			if (linkedBillIds.length === 0) {
+				console.log('[monthly-cron] skip email (no new links this run)', { invoiceId })
+				continue
+			}
+
+			// 2b) Load invoice (we'll prefer fresh client data for email)
 			const invoice = await getInvoiceById(invoiceId, db)
 
 			// 2c) Email the client with consolidated invoice payment link (keep draft)
-			if (!params.dryRun && invoice?.client_email_snapshot) {
+			if (!params.dryRun && invoice) {
 				try {
+					// Prefer fresh client data when available
+					let emailTo = invoice.client_email_snapshot
+					let clientDisplayName = invoice.client_name_snapshot
+					if (invoice.client_id) {
+						const fresh = await getClientById(invoice.client_id, db)
+						if (fresh) {
+							emailTo = (fresh as any).email || emailTo
+							clientDisplayName =
+								[fresh.name || '', (fresh as any).last_name || ''].filter(Boolean).join(' ').trim() ||
+								clientDisplayName
+						}
+					}
+
 					const practitioner = await getProfileById(userId, db)
 					const practitionerName = practitioner?.name || 'Tu profesional'
 					const paymentLink = `${process.env.NEXT_PUBLIC_BASE_URL}/api/payments/invoices/${invoiceId}`
 					const monthLabel = spanishMonthLabelFromPeriodStart(start)
 
-					await sendMonthlyBillEmail({
-						to: invoice.client_email_snapshot,
-						clientName: invoice.client_name_snapshot,
-						amount: invoice.total,
-						currency: invoice.currency || 'EUR',
-						monthLabel,
-						practitionerName,
-						paymentUrl: paymentLink
-					})
+					if (!emailTo) {
+						console.log('[monthly-cron] skip email (no recipient)', { invoiceId })
+					} else {
+						await sendMonthlyBillEmail({
+							to: emailTo,
+							clientName: clientDisplayName,
+							amount: invoice.total,
+							currency: invoice.currency || 'EUR',
+							monthLabel,
+							practitionerName,
+							paymentUrl: paymentLink
+						})
+						// Mark all linked bills as 'sent' so UI reflects that emails went out
+						try {
+							await db
+								.from('bills')
+								.update({ status: 'sent', sent_at: new Date().toISOString() })
+								.eq('invoice_id', invoiceId)
+						} catch (_) {}
+						console.log('[monthly-cron] email sent', { invoiceId, to: emailTo })
+					}
 				} catch (emailErr) {
 					errors.push({
 						userId,
 						clientId,
 						error: `email_failed: ${emailErr instanceof Error ? emailErr.message : String(emailErr)}`
 					})
+					console.log('[monthly-cron] email failed', {
+						invoiceId,
+						error: emailErr instanceof Error ? emailErr.message : String(emailErr)
+					})
 				}
+			} else {
+				console.log('[monthly-cron] skip email', {
+					invoiceId,
+					dryRun: !!params.dryRun,
+					hasInvoice: !!invoice
+				})
 			}
 		} catch (e) {
 			errors.push({
+				userId,
+				clientId,
+				error: e instanceof Error ? e.message : String(e)
+			})
+			console.log('[monthly-cron] group failed', {
 				userId,
 				clientId,
 				error: e instanceof Error ? e.message : String(e)

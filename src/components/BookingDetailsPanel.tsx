@@ -116,17 +116,17 @@ export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelPro
 
 	const mapBillToPaymentStatus = (bill?: any): PaymentStatus => {
 		if (!bill) return 'not_applicable'
-		// Monthly billing: do not mark as pending until monthly email goes out
-		if (bill.billing_type === 'monthly') {
-			// Without a send marker, treat as not applicable for per-booking payment
-			return 'not_applicable'
-		}
 		const statusStr = (bill.status || '').toString()
+		// Always honor terminal/payment states first (including monthly)
 		if (statusStr === 'paid') return 'paid'
 		if (statusStr === 'refunded') return 'refunded'
 		if (statusStr === 'canceled') return 'canceled'
 		if (statusStr === 'disputed') return 'disputed'
-		// Only show pending after email was sent
+		// Monthly billing: do not mark as pending until the monthly email goes out
+		if (bill.billing_type === 'monthly') {
+			return bill.sent_at ? 'pending' : 'not_applicable'
+		}
+		// Per-booking: pending only after email was sent
 		if (bill.sent_at) return 'pending'
 		return 'not_applicable'
 	}

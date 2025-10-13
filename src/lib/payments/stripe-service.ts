@@ -66,8 +66,8 @@ export class StripeService {
 		lineItems
 	}: {
 		practitionerStripeAccountId: string
-		clientEmail: string
-		clientName: string
+		clientEmail?: string
+		clientName?: string
 		practitionerName: string
 		practitionerEmail: string
 		practitionerUserId: string
@@ -101,10 +101,10 @@ export class StripeService {
 						},
 						quantity: li.quantity
 					})),
-					customer_email: clientEmail,
+					customer_email: clientEmail && clientEmail.trim() ? clientEmail.trim() : undefined,
 					metadata: {
 						invoice_id: invoiceId,
-						client_name: clientName,
+						client_name: clientName || '',
 						practitioner_name: practitionerName,
 						practitioner_email: practitionerEmail,
 						practitioner_user_id: practitionerUserId,

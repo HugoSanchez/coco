@@ -16,7 +16,8 @@ import {
 	createPaymentSession,
 	getPaymentSessionsForBooking,
 	updatePaymentSessionStatus,
-	updatePaymentSession
+	updatePaymentSession,
+	getPaymentSessionsForInvoice
 } from '@/lib/db/payment-sessions'
 import { getStripeAccountForPayments } from '@/lib/db/stripe-accounts'
 import { findInvoiceByLegacyBillId, markInvoiceRefunded } from '@/lib/db/invoices'
@@ -27,6 +28,8 @@ import { getBookingById } from '@/lib/db/bookings'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import * as Sentry from '@sentry/nextjs'
+import { formatInTimeZone } from 'date-fns-tz'
+import { es } from 'date-fns/locale'
 
 export class PaymentOrchestrationService {
 	/**
@@ -253,11 +256,31 @@ export class PaymentOrchestrationService {
 				return { success: false, error: 'Stripe account not ready for payments' }
 			}
 
-			// Build a single line item derived from invoice totals
+			// Build line items from linked bills (bills are our invoice items)
 			type Line = { name: string; description?: string | null; unitAmountEur: number; quantity: number }
-			const lineItems: Line[] = [
-				{ name: 'Consulta(s)', unitAmountEur: Number(invoice.total || 0), quantity: 1, description: null }
-			]
+			let lineItems: Line[] = []
+			try {
+				const { getBillsForInvoice } = await import('@/lib/db/bills')
+				const bills = await getBillsForInvoice(invoice.id, serviceClient)
+				lineItems = bills.map((b: any) => {
+					const iso = Array.isArray(b?.booking) ? b.booking[0]?.start_time : b?.booking?.start_time
+					const when = iso ? new Date(iso) : null
+					const dateStr = when
+						? formatInTimeZone(when, 'Europe/Madrid', "d 'de' MMM yyyy, HH:mm'h'", { locale: es })
+						: null
+					return {
+						name: 'Consulta',
+						description: dateStr,
+						unitAmountEur: Number(b.amount || 0),
+						quantity: 1
+					}
+				})
+			} catch (_) {
+				// Fallback to one consolidated line if retrieval fails
+				lineItems = [
+					{ name: 'Consulta(s)', unitAmountEur: Number(invoice.total || 0), quantity: 1, description: null }
+				]
+			}
 
 			// Practitioner profile for metadata
 			const practitioner = await getProfileById(invoice.user_id, serviceClient)
@@ -280,9 +303,6 @@ export class PaymentOrchestrationService {
 
 			// Track or update a payment_session for this invoice (idempotent-ish)
 			try {
-				const { getPaymentSessionsForInvoice, createPaymentSession, updatePaymentSession } = await import(
-					'@/lib/db/payment-sessions'
-				)
 				const existing = await getPaymentSessionsForInvoice(invoice.id, serviceClient)
 				if (existing && existing.length > 0) {
 					await updatePaymentSession(

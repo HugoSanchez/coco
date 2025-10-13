@@ -103,7 +103,7 @@ const signatureLine = {
 	fontWeight: '400'
 }
 
-const buttonContainer = { textAlign: 'left' as const, margin: '24px 0 8px' }
+const buttonContainer = { textAlign: 'left' as const, margin: '24px 0 24px' }
 
 const payButton = {
 	display: 'inline-block',

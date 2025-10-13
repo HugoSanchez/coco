@@ -92,6 +92,15 @@ export interface BillWithBooking extends Bill {
  * @throws Error if insertion fails or validation errors occur
  */
 export async function createBill(payload: CreateBillPayload, supabaseClient?: SupabaseClient): Promise<Bill> {
+	// Decide initial status:
+	// - monthly => scheduled
+	// - per-booking with future email_scheduled_at => scheduled
+	// - otherwise => pending
+	const nowIso = new Date().toISOString()
+	const shouldStartScheduled =
+		payload.billing_type === 'monthly' ||
+		(!!payload.email_scheduled_at && payload.email_scheduled_at > nowIso && (payload.amount || 0) > 0)
+
 	const billData = {
 		booking_id: payload.booking_id,
 		user_id: payload.user_id,
@@ -103,7 +112,7 @@ export async function createBill(payload: CreateBillPayload, supabaseClient?: Su
 		billing_type: payload.billing_type,
 		email_scheduled_at: payload.email_scheduled_at || null,
 		notes: payload.notes || null,
-		status: 'pending' as const
+		status: (shouldStartScheduled ? 'scheduled' : 'pending') as 'scheduled' | 'pending'
 	}
 
 	// Use provided client or fall back to default
@@ -204,6 +213,65 @@ export async function getBillsForClient(
 
 	if (error) throw error
 	return data || []
+}
+
+/**
+ * Helper used by monthly orchestration:
+ * Returns monthly bills for a given (user, client) that are not yet linked to an invoice.
+ * Embeds the booking start_time to allow period filtering by the caller.
+ */
+export async function getUnlinkedMonthlyBillsForUserClient(
+	userId: string,
+	clientId: string | null,
+	supabaseClient?: SupabaseClient
+): Promise<
+	Array<{ id: string; amount: number; user_id: string; client_id: string | null; booking?: { start_time: string } }>
+> {
+	const client = supabaseClient || supabase
+	let query = client
+		.from('bills')
+		.select(`id, amount, user_id, client_id, invoice_id, billing_type, booking:bookings(start_time)`)
+		.eq('user_id', userId)
+		.eq('billing_type', 'monthly')
+		.is('invoice_id', null) as any
+
+	query = clientId == null ? query.is('client_id', null) : query.eq('client_id', clientId)
+
+	const { data, error } = await query
+
+	if (error) throw error
+	return (data as any[]) || []
+}
+
+/**
+ * Links a set of bills to an invoice (sets invoice_id on those bills).
+ */
+export async function linkBillsToInvoice(
+	billIds: string[],
+	invoiceId: string,
+	supabaseClient?: SupabaseClient
+): Promise<void> {
+	if (!billIds || billIds.length === 0) return
+	const client = supabaseClient || supabase
+	const { error } = await client.from('bills').update({ invoice_id: invoiceId }).in('id', billIds)
+	if (error) throw error
+}
+
+/**
+ * Returns bills linked to a specific invoice, including booking start_time for display purposes.
+ */
+export async function getBillsForInvoice(
+	invoiceId: string,
+	supabaseClient?: SupabaseClient
+): Promise<Array<{ id: string; amount: number; currency?: string | null; booking?: { start_time: string } }>> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('bills')
+		.select(`id, amount, currency, booking:bookings(start_time)`)
+		.eq('invoice_id', invoiceId)
+
+	if (error) throw error
+	return (data as any[]) || []
 }
 
 /**

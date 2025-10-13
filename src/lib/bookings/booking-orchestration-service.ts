@@ -159,12 +159,7 @@ export async function orchestrateBookingCreation(
 		supabaseClient
 	)
 
-	// Monthly bills should start in 'scheduled' (email goes via monthly cron)
-	if (normalizedType === 'monthly') {
-		try {
-			await updateBillStatus(bill.id, 'scheduled', supabaseClient)
-		} catch (_) {}
-	}
+	// Monthly bills now start in 'scheduled' at creation time. No extra update needed.
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////// Step 6: Calendar events (single helper, preserves earlier behavior by variant)

@@ -32,14 +32,17 @@ export function StatusBadge({
 			return (
 				<Badge
 					variant="outline"
-					className={`${sizeClasses[size]} bg-teal-100 border-0 text-teal-800 font-medium`}
+					className={`${sizeClasses[size]} px-3 bg-teal-100 border-0 text-teal-800 font-medium`}
 				>
 					Confirmada
 				</Badge>
 			)
 		case 'canceled':
 			return (
-				<Badge variant="outline" className={`${sizeClasses[size]} bg-red-50 text-red-800 border-0 font-medium`}>
+				<Badge
+					variant="outline"
+					className={`${sizeClasses[size]} px-3 bg-red-50 text-red-800 border-0 font-medium`}
+				>
 					Cancelada
 				</Badge>
 			)
@@ -61,9 +64,9 @@ export function PaymentBadge({ status, size = 'sm' }: { status: DisplayPaymentSt
 			return (
 				<Badge
 					variant="outline"
-					className={`${base} bg-white text-gray-700 border-gray-400 border-dashed font-normal rounded-full`}
+					className={`${base} bg-white text-gray-700 border-gray-300 border-dashed font-normal rounded-full`}
 				>
-					<Clock className="h-3 w-3 mr-2" />
+					<Clock className="h-3 w-3 mr-2 text-gray-500" />
 					Programado
 				</Badge>
 			)
@@ -73,7 +76,7 @@ export function PaymentBadge({ status, size = 'sm' }: { status: DisplayPaymentSt
 					variant="outline"
 					className={`${base} px-3 text-gray-700 border-gray-300 font-normal rounded-full`}
 				>
-					<Loader className="h-3 w-3 mr-2 text-gray-500" />
+					<Loader className="h-3 w-3 mr-2 text-gray-600" />
 					Pendiente
 				</Badge>
 			)
