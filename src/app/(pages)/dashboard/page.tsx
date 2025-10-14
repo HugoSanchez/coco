@@ -7,26 +7,11 @@ import { useRouter } from 'next/navigation'
 import { ClientList } from '@/components/ClientList'
 import { BookingsTable, Booking } from '@/components/BookingsTable'
 import { SideSheetHeadless } from '@/components/SideSheetHeadless'
-import {
-	BookingFilters,
-	BookingFiltersState
-} from '@/components/BookingFilters'
-import {
-	FilterX,
-	DollarSign,
-	Users,
-	Plus,
-	CalendarCheck,
-	TriangleAlert
-} from 'lucide-react'
+import { BookingFilters, BookingFiltersState } from '@/components/BookingFilters'
+import { FilterX, DollarSign, Users, Plus, CalendarCheck, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle
-} from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatCard } from '@/components/StatCard'
 import { getClientsForUser, Client, getClientFullName } from '@/lib/db/clients'
 import { getBookingsWithBills, BookingWithBills } from '@/lib/db/bookings'
@@ -40,6 +25,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { getCurrentMonthNameCapitalized } from '@/lib/utils'
 import { CancelConfirmationModal } from '@/components/CancelConfirmationModal'
+import { X } from 'lucide-react'
 
 /**
  * Interface for dashboard statistics API response
@@ -84,18 +70,9 @@ interface DashboardStatsState {
 // Transform database booking with bills to component booking format
 const transformBooking = (dbBooking: BookingWithBills): Booking => {
 	// Ensure status is one of the expected values
-	const validStatuses = [
-		'pending',
-		'scheduled',
-		'completed',
-		'canceled'
-	] as const
+	const validStatuses = ['pending', 'scheduled', 'completed', 'canceled'] as const
 	const status = validStatuses.includes(dbBooking.status as any)
-		? (dbBooking.status as
-				| 'pending'
-				| 'scheduled'
-				| 'completed'
-				| 'canceled')
+		? (dbBooking.status as 'pending' | 'scheduled' | 'completed' | 'canceled')
 		: 'pending'
 
 	return {
@@ -113,13 +90,7 @@ const transformBooking = (dbBooking: BookingWithBills): Booking => {
 }
 
 export default function Dashboard() {
-	const {
-		user,
-		profile,
-		loading,
-		stripeOnboardingCompleted,
-		calendarConnected
-	} = useUser()
+	const { user, profile, loading, stripeOnboardingCompleted, calendarConnected } = useUser()
 	const [clients, setClients] = useState<Client[]>([])
 	const [loadingClients, setLoadingClients] = useState(true)
 	const [bookings, setBookings] = useState<Booking[]>([])
@@ -130,25 +101,23 @@ export default function Dashboard() {
 	const [isFilterOpen, setIsFilterOpen] = useState(false)
 	const [isNewBookingOpen, setIsNewBookingOpen] = useState(false)
 	const [showStripeConfigModal, setShowStripeConfigModal] = useState(false)
-	const [refundingBookingId, setRefundingBookingId] = useState<string | null>(
-		null
-	)
-	const [markingAsPaidBookingId, setMarkingAsPaidBookingId] = useState<
-		string | null
-	>(null)
-	const [cancelingBookingId, setCancelingBookingId] = useState<string | null>(
-		null
-	)
+	const [refundingBookingId, setRefundingBookingId] = useState<string | null>(null)
+	const [markingAsPaidBookingId, setMarkingAsPaidBookingId] = useState<string | null>(null)
+	const [cancelingBookingId, setCancelingBookingId] = useState<string | null>(null)
 	const [isRescheduleOpen, setIsRescheduleOpen] = useState(false)
-	const [reschedulingBookingId, setReschedulingBookingId] = useState<
-		string | null
-	>(null)
+	const [reschedulingBookingId, setReschedulingBookingId] = useState<string | null>(null)
 	const [filters, setFilters] = useState<BookingFiltersState>({
 		customerSearch: '',
 		statusFilter: 'all',
 		startDate: '',
 		endDate: ''
 	})
+	const activeFilterCount =
+		(filters.customerSearch ? 1 : 0) +
+		(filters.statusFilter !== 'all' ? 1 : 0) +
+		(filters.startDate ? 1 : 0) +
+		(filters.endDate ? 1 : 0)
+	const hasActiveFilters = activeFilterCount > 0
 	const [exporting, setExporting] = useState(false)
 	const [dashboardStats, setDashboardStats] = useState<DashboardStatsState>({
 		data: null,
@@ -166,8 +135,7 @@ export default function Dashboard() {
 				statusFilter: filters.statusFilter,
 				format: 'csv'
 			})
-			if (filters.customerSearch)
-				params.set('customerSearch', filters.customerSearch)
+			if (filters.customerSearch) params.set('customerSearch', filters.customerSearch)
 			if (filters.startDate) params.set('startDate', filters.startDate)
 			if (filters.endDate) params.set('endDate', filters.endDate)
 
@@ -191,8 +159,7 @@ export default function Dashboard() {
 		} catch (e) {
 			toast({
 				title: 'Error en exportación',
-				description:
-					e instanceof Error ? e.message : 'No se pudo exportar',
+				description: e instanceof Error ? e.message : 'No se pudo exportar',
 				variant: 'destructive'
 			})
 		} finally {
@@ -204,21 +171,15 @@ export default function Dashboard() {
 	// Minimal guard: only redirect if we definitively know both are false
 	useEffect(() => {
 		if (!user) return
-		if (stripeOnboardingCompleted === null || calendarConnected === null)
-			return
-		if (
-			stripeOnboardingCompleted === false &&
-			calendarConnected === false
-		) {
+		if (stripeOnboardingCompleted === null || calendarConnected === null) return
+		if (stripeOnboardingCompleted === false && calendarConnected === false) {
 			router.replace('/onboarding')
 		}
 	}, [user, stripeOnboardingCompleted, calendarConnected, router])
 
 	// Simple responsive switch for mobile tabs behavior
 	const [isMobile, setIsMobile] = useState(false)
-	const [mobileTab, setMobileTab] = useState<
-		'bookings' | 'clients' | 'stats'
-	>('bookings')
+	const [mobileTab, setMobileTab] = useState<'bookings' | 'clients' | 'stats'>('bookings')
 
 	useEffect(() => {
 		const onResize = () => setIsMobile(window.innerWidth < 768)
@@ -250,17 +211,13 @@ export default function Dashboard() {
 
 			if (!response.ok) {
 				const errorData = await response.json()
-				throw new Error(
-					errorData.error || 'Failed to fetch dashboard statistics'
-				)
+				throw new Error(errorData.error || 'Failed to fetch dashboard statistics')
 			}
 
 			const result = await response.json()
 
 			if (!result.success) {
-				throw new Error(
-					result.error || 'Failed to fetch dashboard statistics'
-				)
+				throw new Error(result.error || 'Failed to fetch dashboard statistics')
 			}
 
 			setDashboardStats({
@@ -273,10 +230,7 @@ export default function Dashboard() {
 			setDashboardStats({
 				data: null,
 				loading: false,
-				error:
-					error instanceof Error
-						? error.message
-						: 'Failed to load statistics'
+				error: error instanceof Error ? error.message : 'Failed to load statistics'
 			})
 		}
 	}
@@ -312,8 +266,7 @@ export default function Dashboard() {
 						endDate: filters.endDate || undefined
 					}
 				)
-				const transformedBookings =
-					result.bookings.map(transformBooking)
+				const transformedBookings = result.bookings.map(transformBooking)
 				setBookings(transformedBookings)
 				setHasMore(result.hasMore)
 				setOffset(10)
@@ -472,8 +425,7 @@ export default function Dashboard() {
 
 			toast({
 				title: 'Cita marcada como confirmada',
-				description:
-					'Hemos enviado la invitación al paciente por correo.',
+				description: 'Hemos enviado la invitación al paciente por correo.',
 				variant: 'default',
 				color: 'success'
 			})
@@ -497,15 +449,12 @@ export default function Dashboard() {
 			})
 
 			// Call our mark as paid API endpoint
-			const response = await fetch(
-				`/api/bookings/${bookingId}/mark-paid`,
-				{
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					}
+			const response = await fetch(`/api/bookings/${bookingId}/mark-paid`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
 				}
-			)
+			})
 
 			if (!response.ok) {
 				const errorData = await response.json()
@@ -570,22 +519,18 @@ export default function Dashboard() {
 			// Show immediate feedback with spinner
 			toast({
 				title: 'Reenviando email...',
-				description:
-					'Enviando email de confirmación con nuevo enlace de pago.',
+				description: 'Enviando email de confirmación con nuevo enlace de pago.',
 				variant: 'default',
 				color: 'loading'
 			})
 
 			// Call our resend email API endpoint
-			const response = await fetch(
-				`/api/bookings/${bookingId}/resend-email`,
-				{
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					}
+			const response = await fetch(`/api/bookings/${bookingId}/resend-email`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
 				}
-			)
+			})
 
 			if (!response.ok) {
 				const errorData = await response.json()
@@ -605,9 +550,7 @@ export default function Dashboard() {
 			toast({
 				title: 'Error al reenviar email',
 				description:
-					error instanceof Error
-						? error.message
-						: 'No se pudo reenviar el email. Inténtalo de nuevo.',
+					error instanceof Error ? error.message : 'No se pudo reenviar el email. Inténtalo de nuevo.',
 				variant: 'destructive'
 			})
 		}
@@ -719,8 +662,7 @@ export default function Dashboard() {
 						endDate: filters.endDate || undefined
 					}
 				)
-				const transformedBookings =
-					result.bookings.map(transformBooking)
+				const transformedBookings = result.bookings.map(transformBooking)
 				setBookings(transformedBookings)
 				setHasMore(result.hasMore)
 				setOffset(10)
@@ -739,10 +681,7 @@ export default function Dashboard() {
 		// Only refetch if we have active filters (not on initial load)
 		if (
 			user &&
-			(filters.customerSearch ||
-				filters.statusFilter !== 'all' ||
-				filters.startDate ||
-				filters.endDate)
+			(filters.customerSearch || filters.statusFilter !== 'all' || filters.startDate || filters.endDate)
 		) {
 			refetchWithFilters()
 		}
@@ -764,12 +703,8 @@ export default function Dashboard() {
 		<div className="flex min-h-screen w-full flex-col py-24">
 			<header className="flex flex-col md:flex-row items-left md:items-center justify-between px-6 md:px-16 pb-6 gap-4 md:gap-0">
 				<div className="flex flex-col">
-					<h1 className="text-xl md:text-3xl font-bold">
-						Hola {profile?.name},
-					</h1>
-					<h3 className="text-lg md:text-2xl">
-						este es tu dashboard
-					</h3>
+					<h1 className="text-xl md:text-3xl font-bold">Hola {profile?.name},</h1>
+					<h3 className="text-lg md:text-2xl">este es tu dashboard</h3>
 				</div>
 				<div className="flex gap-2">
 					<Button
@@ -796,16 +731,10 @@ export default function Dashboard() {
 						{/* Revenue Card - Real Data */}
 						<StatCard
 							title={`Facturación Mensual`}
-							value={
-								dashboardStats.data?.revenue.formattedCurrent
-							}
-							change={
-								dashboardStats.data?.revenue.percentageChange
-							}
+							value={dashboardStats.data?.revenue.formattedCurrent}
+							change={dashboardStats.data?.revenue.percentageChange}
 							changeLabel="respecto al mes anterior"
-							icon={
-								<DollarSign className="h-4 w-4 text-muted-foreground" />
-							}
+							icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
 							tooltipContent={`Facturación total confirmada para los próximos 30 días. Comparado con los 30 días anteriores.`}
 							loading={dashboardStats.loading}
 							error={dashboardStats.error}
@@ -815,13 +744,9 @@ export default function Dashboard() {
 						<StatCard
 							title={`Total Confirmadas`}
 							value={'+' + dashboardStats.data?.bookings.current}
-							change={
-								dashboardStats.data?.bookings.percentageChange
-							}
+							change={dashboardStats.data?.bookings.percentageChange}
 							changeLabel="respecto al mes anterior"
-							icon={
-								<CalendarCheck className="h-4 w-4 text-muted-foreground" />
-							}
+							icon={<CalendarCheck className="h-4 w-4 text-muted-foreground" />}
 							tooltipContent={`Total de citas confirmadas para los próximos 30 días. Comparado con los 30 días anteriores.`}
 							loading={dashboardStats.loading}
 							error={dashboardStats.error}
@@ -830,18 +755,10 @@ export default function Dashboard() {
 						{/* Pending Bookings Card - Real Data */}
 						<StatCard
 							title={`Pendientes de confirmación`}
-							value={
-								'+' +
-								dashboardStats.data?.pendingBookings.current
-							}
-							change={
-								dashboardStats.data?.pendingBookings
-									.percentageChange
-							}
+							value={'+' + dashboardStats.data?.pendingBookings.current}
+							change={dashboardStats.data?.pendingBookings.percentageChange}
 							changeLabel="respecto al mes anterior"
-							icon={
-								<TriangleAlert className="h-4 w-4 text-muted-foreground" />
-							}
+							icon={<TriangleAlert className="h-4 w-4 text-muted-foreground" />}
 							tooltipContent={`Número de citas pendientes de confirmación para los próximos 30 días. Comparado con los 30 días anteriores.`}
 							loading={dashboardStats.loading}
 							error={dashboardStats.error}
@@ -851,17 +768,10 @@ export default function Dashboard() {
 						{/* Active Clients Card - Real Data */}
 						<StatCard
 							title="Clientes Activos"
-							value={
-								'+' + dashboardStats.data?.activeClients.current
-							}
-							change={
-								dashboardStats.data?.activeClients
-									.percentageChange
-							}
+							value={'+' + dashboardStats.data?.activeClients.current}
+							change={dashboardStats.data?.activeClients.percentageChange}
 							changeLabel="respecto al mes anterior"
-							icon={
-								<Users className="h-4 w-4 text-muted-foreground" />
-							}
+							icon={<Users className="h-4 w-4 text-muted-foreground" />}
 							tooltipContent="Clientes únicos con citas agendadas en los próximos 30 días. Comparado con los 30 días anteriores."
 							loading={dashboardStats.loading}
 							error={dashboardStats.error}
@@ -898,18 +808,10 @@ export default function Dashboard() {
 							<div className="grid gap-4">
 								<StatCard
 									title={`Facturación Mensual`}
-									value={
-										dashboardStats.data?.revenue
-											.formattedCurrent
-									}
-									change={
-										dashboardStats.data?.revenue
-											.percentageChange
-									}
+									value={dashboardStats.data?.revenue.formattedCurrent}
+									change={dashboardStats.data?.revenue.percentageChange}
 									changeLabel="respecto al mes anterior"
-									icon={
-										<DollarSign className="h-4 w-4 text-muted-foreground" />
-									}
+									icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
 									tooltipContent={`Facturación total confirmada para el mes de ${getCurrentMonthNameCapitalized()}`}
 									loading={dashboardStats.loading}
 									error={dashboardStats.error}
@@ -917,18 +819,10 @@ export default function Dashboard() {
 								/>
 								<StatCard
 									title={`Total Confirmadas`}
-									value={
-										'+' +
-										dashboardStats.data?.bookings.current
-									}
-									change={
-										dashboardStats.data?.bookings
-											.percentageChange
-									}
+									value={'+' + dashboardStats.data?.bookings.current}
+									change={dashboardStats.data?.bookings.percentageChange}
 									changeLabel="respecto al mes anterior"
-									icon={
-										<CalendarCheck className="h-4 w-4 text-muted-foreground" />
-									}
+									icon={<CalendarCheck className="h-4 w-4 text-muted-foreground" />}
 									tooltipContent={`Total de citas confirmadas para el mes de ${getCurrentMonthNameCapitalized()}`}
 									loading={dashboardStats.loading}
 									error={dashboardStats.error}
@@ -936,19 +830,10 @@ export default function Dashboard() {
 								/>
 								<StatCard
 									title={`Pendientes de confirmación`}
-									value={
-										'+' +
-										dashboardStats.data?.pendingBookings
-											.current
-									}
-									change={
-										dashboardStats.data?.pendingBookings
-											.percentageChange
-									}
+									value={'+' + dashboardStats.data?.pendingBookings.current}
+									change={dashboardStats.data?.pendingBookings.percentageChange}
 									changeLabel="respecto al mes anterior"
-									icon={
-										<TriangleAlert className="h-4 w-4 text-muted-foreground" />
-									}
+									icon={<TriangleAlert className="h-4 w-4 text-muted-foreground" />}
 									tooltipContent={`Número de citas pendientes de confirmación para ${getCurrentMonthNameCapitalized()}`}
 									loading={dashboardStats.loading}
 									error={dashboardStats.error}
@@ -956,19 +841,10 @@ export default function Dashboard() {
 								/>
 								<StatCard
 									title="Clientes Activos"
-									value={
-										'+' +
-										dashboardStats.data?.activeClients
-											.current
-									}
-									change={
-										dashboardStats.data?.activeClients
-											.percentageChange
-									}
+									value={'+' + dashboardStats.data?.activeClients.current}
+									change={dashboardStats.data?.activeClients.percentageChange}
 									changeLabel="respecto a los 30 días anteriores"
-									icon={
-										<Users className="h-4 w-4 text-muted-foreground" />
-									}
+									icon={<Users className="h-4 w-4 text-muted-foreground" />}
 									tooltipContent="Clientes únicos que han tenido al menos una cita en los últimos 30 días."
 									loading={dashboardStats.loading}
 									error={dashboardStats.error}
@@ -983,19 +859,41 @@ export default function Dashboard() {
 									<div className="grid gap-2">
 										<CardTitle>Listado de citas</CardTitle>
 										<CardDescription>
-											Listado de todas tus citas
-											agendadas, con su estado de
-											facturación y pago.
+											Listado de todas tus citas agendadas, con su estado de facturación y pago.
 										</CardDescription>
 									</div>
-									<Button
-										size="sm"
-										onClick={() => setIsFilterOpen(true)}
-										className="ml-auto gap-1 bg-gray-100 text-gray-800 hover:bg-gray-200"
-									>
-										Filtrar
-										<FilterX className="h-4 w-4 ml-2" />
-									</Button>
+									<div className="ml-auto flex items-center gap-2">
+										<Button
+											size="sm"
+											onClick={() => setIsFilterOpen(true)}
+											className="gap-1 bg-gray-100 text-gray-800 hover:bg-gray-200"
+										>
+											Filtrar
+											<FilterX className="h-4 w-4 ml-2" />
+											{hasActiveFilters && (
+												<Badge className="ml-2 px-1.5 py-0 text-[10px] rounded-full bg-gray-800 text-white">
+													{activeFilterCount}
+												</Badge>
+											)}
+										</Button>
+										{hasActiveFilters && (
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={() =>
+													setFilters({
+														customerSearch: '',
+														statusFilter: 'all',
+														startDate: '',
+														endDate: ''
+													})
+												}
+												className="text-gray-600 hover:bg-transparent"
+											>
+												<X className="h-4 w-4 mr-1" />
+											</Button>
+										)}
+									</div>
 								</CardHeader>
 								<CardContent>
 									<BookingsTable
@@ -1003,13 +901,9 @@ export default function Dashboard() {
 										loading={loadingBookings}
 										onCancelBooking={handleShowCancelDialog}
 										onConfirmBooking={handleConfirmBooking}
-										onMarkAsPaid={
-											handleShowMarkAsPaidDialog
-										}
+										onMarkAsPaid={handleShowMarkAsPaidDialog}
 										onRefundBooking={handleRefundBooking}
-										onRescheduleBooking={
-											handleRescheduleBooking
-										}
+										onRescheduleBooking={handleRescheduleBooking}
 										onResendEmail={handleResendEmail}
 									/>
 									{hasMore && !loadingBookings && (
@@ -1022,10 +916,7 @@ export default function Dashboard() {
 											>
 												{loadingMore ? (
 													<>
-														<Spinner
-															size="sm"
-															className="mr-2"
-														/>
+														<Spinner size="sm" className="mr-2" />
 														Cargando...
 													</>
 												) : (
@@ -1053,26 +944,46 @@ export default function Dashboard() {
 				{/* Desktop bookings + client list layout */}
 				{!isMobile && (
 					<div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
-						<Card
-							className="xl:col-span-2"
-							x-chunk="dashboard-01-chunk-4"
-						>
+						<Card className="xl:col-span-2" x-chunk="dashboard-01-chunk-4">
 							<CardHeader className="flex flex-row items-center">
 								<div className="grid gap-2">
 									<CardTitle>Listado de citas</CardTitle>
 									<CardDescription>
-										Listado de todas tus citas agendadas,
-										con su estado de facturación y pago.
+										Listado de todas tus citas agendadas, con su estado de facturación y pago.
 									</CardDescription>
 								</div>
-								<Button
-									size="sm"
-									onClick={() => setIsFilterOpen(true)}
-									className="ml-auto gap-1 bg-gray-100 text-gray-800 hover:bg-gray-200"
-								>
-									Filtrar
-									<FilterX className="h-4 w-4 ml-2" />
-								</Button>
+								<div className="ml-auto flex items-center">
+									<Button
+										size="sm"
+										onClick={() => setIsFilterOpen(true)}
+										className="gap-1 bg-gray-100 text-gray-800 hover:bg-gray-200"
+									>
+										Filtrar
+										<FilterX className="h-4 w-4 ml-" />
+										{hasActiveFilters && (
+											<Badge className="ml-2 px-1.5 py-0 pr-1 h-5 w-5 text-[10px] rounded-full bg-gray-800 text-white">
+												{activeFilterCount}
+											</Badge>
+										)}
+									</Button>
+									{hasActiveFilters && (
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() =>
+												setFilters({
+													customerSearch: '',
+													statusFilter: 'all',
+													startDate: '',
+													endDate: ''
+												})
+											}
+											className="text-gray-600 hover:bg-transparent"
+										>
+											<X className="h-4 w-4 mr-1" />
+										</Button>
+									)}
+								</div>
 							</CardHeader>
 							<CardContent>
 								<BookingsTable
@@ -1082,9 +993,7 @@ export default function Dashboard() {
 									onConfirmBooking={handleConfirmBooking}
 									onMarkAsPaid={handleShowMarkAsPaidDialog}
 									onRefundBooking={handleRefundBooking}
-									onRescheduleBooking={
-										handleRescheduleBooking
-									}
+									onRescheduleBooking={handleRescheduleBooking}
 									onResendEmail={handleResendEmail}
 								/>
 								{hasMore && !loadingBookings && (
@@ -1097,10 +1006,7 @@ export default function Dashboard() {
 										>
 											{loadingMore ? (
 												<>
-													<Spinner
-														size="sm"
-														className="mr-2"
-													/>
+													<Spinner size="sm" className="mr-2" />
 													Cargando...
 												</>
 											) : (
@@ -1151,20 +1057,13 @@ export default function Dashboard() {
 						// Refresh bookings list
 						if (user) {
 							try {
-								const result = await getBookingsWithBills(
-									user.id,
-									{ limit: 10, offset: 0 }
-								)
-								const transformedBookings =
-									result.bookings.map(transformBooking)
+								const result = await getBookingsWithBills(user.id, { limit: 10, offset: 0 })
+								const transformedBookings = result.bookings.map(transformBooking)
 								setBookings(transformedBookings)
 								setHasMore(result.hasMore)
 								setOffset(10)
 							} catch (error) {
-								console.error(
-									'Error refreshing bookings:',
-									error
-								)
+								console.error('Error refreshing bookings:', error)
 							}
 						}
 					}}
@@ -1186,10 +1085,7 @@ export default function Dashboard() {
 				{reschedulingBookingId && (
 					<RescheduleForm
 						bookingId={reschedulingBookingId}
-						customerName={
-							bookings.find((b) => b.id === reschedulingBookingId)
-								?.customerName || 'Cliente'
-						}
+						customerName={bookings.find((b) => b.id === reschedulingBookingId)?.customerName || 'Cliente'}
 						onSuccess={() => {
 							console.log('Reschedule successful')
 							setIsRescheduleOpen(false)
@@ -1207,9 +1103,7 @@ export default function Dashboard() {
 			{/* Refund Confirmation Modal */}
 			{refundingBookingId &&
 				(() => {
-					const booking = bookings.find(
-						(b) => b.id === refundingBookingId
-					) || {
+					const booking = bookings.find((b) => b.id === refundingBookingId) || {
 						id: refundingBookingId,
 						customerName: 'Cliente',
 						customerEmail: '',
@@ -1224,23 +1118,15 @@ export default function Dashboard() {
 					return (
 						<RefundConfirmationModal
 							isOpen={!!refundingBookingId}
-							onOpenChange={(open) =>
-								!open && setRefundingBookingId(null)
-							}
-							onConfirm={(reason) =>
-								handleRefundConfirm(refundingBookingId, reason)
-							}
+							onOpenChange={(open) => !open && setRefundingBookingId(null)}
+							onConfirm={(reason) => handleRefundConfirm(refundingBookingId, reason)}
 							bookingDetails={{
 								id: booking.id,
 								customerName: booking.customerName,
 								customerEmail: booking.customerEmail,
 								amount: booking.amount,
 								currency: booking.currency || 'EUR',
-								date: format(
-									booking.bookingDate,
-									'dd MMM yyyy',
-									{ locale: es }
-								)
+								date: format(booking.bookingDate, 'dd MMM yyyy', { locale: es })
 							}}
 						/>
 					)
@@ -1249,9 +1135,7 @@ export default function Dashboard() {
 			{/* Mark As Paid Confirmation Modal */}
 			{markingAsPaidBookingId &&
 				(() => {
-					const booking = bookings.find(
-						(b) => b.id === markingAsPaidBookingId
-					) || {
+					const booking = bookings.find((b) => b.id === markingAsPaidBookingId) || {
 						id: markingAsPaidBookingId,
 						customerName: 'Cliente',
 						customerEmail: '',
@@ -1267,9 +1151,7 @@ export default function Dashboard() {
 						<MarkAsPaidConfirmationModal
 							key={markingAsPaidBookingId}
 							isOpen={!!markingAsPaidBookingId}
-							onOpenChange={(open) =>
-								!open && setMarkingAsPaidBookingId(null)
-							}
+							onOpenChange={(open) => !open && setMarkingAsPaidBookingId(null)}
 							onConfirm={() => {
 								handleMarkAsPaid(markingAsPaidBookingId)
 							}}
@@ -1279,11 +1161,7 @@ export default function Dashboard() {
 								customerEmail: booking.customerEmail,
 								amount: booking.amount,
 								currency: booking.currency || 'EUR',
-								date: format(
-									booking.bookingDate,
-									'dd MMM yyyy',
-									{ locale: es }
-								)
+								date: format(booking.bookingDate, 'dd MMM yyyy', { locale: es })
 							}}
 						/>
 					)
@@ -1302,9 +1180,7 @@ export default function Dashboard() {
 			{/* Cancel Confirmation Modal */}
 			{cancelingBookingId &&
 				(() => {
-					const booking = bookings.find(
-						(b) => b.id === cancelingBookingId
-					)
+					const booking = bookings.find((b) => b.id === cancelingBookingId)
 					const isPaid = booking?.payment_status === 'paid'
 					return (
 						<CancelConfirmationModal

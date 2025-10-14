@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import {
-	createBookingSimple,
-	CreateBookingRequest
+	orchestrateBookingCreation,
+	CreateBookingRequestWithBilling,
+	validateBillingInput,
+	validateBookingTimes
 } from '@/lib/bookings/booking-orchestration-service'
 import * as Sentry from '@sentry/nextjs'
 import { captureEvent } from '@/lib/posthog/server'
@@ -18,9 +20,14 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(request: NextRequest) {
 	try {
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		////// Step 0: Initialize server client (auth + DB)
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
 		const supabase = createClient()
 
-		// Step 1: Authenticate the user
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		////// Step 1: Authenticate the user
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
 		const {
 			data: { user },
 			error: authError
@@ -31,59 +38,63 @@ export async function POST(request: NextRequest) {
 				level: 'warning',
 				tags: { component: 'api:bookings' }
 			})
-			return NextResponse.json(
-				{ error: 'Authentication required' },
-				{ status: 401 }
-			)
+			return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
 		}
 
-		// Step 2: Parse and validate request body
-		const {
-			clientId,
-			startTime,
-			endTime,
-			notes,
-			status,
-			overrideAmount,
-			consultationType,
-			mode,
-			locationText
-		} = await request.json()
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		////// Step 2: Parse and validate request body (booking + billing contract)
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		const { booking, billing } = await request.json()
 
-		if (!clientId || !startTime || !endTime) {
+		if (!booking || !billing) {
 			Sentry.captureMessage('bookings:create missing_fields', {
 				level: 'warning',
 				tags: { component: 'api:bookings' }
 			})
 			return NextResponse.json(
 				{
-					error: 'Missing required fields: clientId, startTime, endTime'
+					error: 'Missing required payload: booking and billing'
 				},
 				{ status: 400 }
 			)
 		}
 
-		// Step 3: Create booking request
-		const bookingRequest: CreateBookingRequest = {
-			userId: user.id,
-			clientId,
-			startTime,
-			endTime,
-			notes,
-			status,
-			overrideAmount,
-			consultationType,
-			mode: mode === 'in_person' ? 'in_person' : 'online',
-			locationText:
-				mode === 'in_person' && typeof locationText === 'string'
-					? locationText
-					: null
+		if (!booking.clientId || !booking.startTime || !booking.endTime) {
+			return NextResponse.json({ error: 'Missing required booking fields' }, { status: 400 })
 		}
 
-		// Step 4: Create booking using orchestration service
-		const result = await createBookingSimple(bookingRequest, supabase)
+		try {
+			validateBookingTimes(booking.startTime, booking.endTime)
+			validateBillingInput(billing)
+		} catch (e) {
+			return NextResponse.json({ error: (e as Error).message }, { status: 400 })
+		}
 
-		// Step 4.5: Capture PostHog event (best-effort)
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		////// Step 3: Build orchestrator request (unified contract)
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		const bookingRequest: CreateBookingRequestWithBilling = {
+			userId: user.id,
+			clientId: booking.clientId,
+			startTime: booking.startTime,
+			endTime: booking.endTime,
+			notes: booking.notes,
+			status: booking.status,
+			consultationType: booking.consultationType,
+			mode: booking.mode === 'in_person' ? 'in_person' : 'online',
+			locationText:
+				booking.mode === 'in_person' && typeof booking.locationText === 'string' ? booking.locationText : null,
+			billing
+		}
+
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		////// Step 4: Create booking via orchestrator
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		const result = await orchestrateBookingCreation(bookingRequest, billing, supabase)
+
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		////// Step 5: Capture analytics event (best-effort)
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
 		await captureEvent({
 			userId: user.id,
 			event: 'booking_created',
@@ -98,7 +109,9 @@ export async function POST(request: NextRequest) {
 			}
 		})
 
-		// Step 5: Return success response
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		////// Step 6: Return success response
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
 		return NextResponse.json({
 			success: true,
 			booking: result.booking,
@@ -107,6 +120,9 @@ export async function POST(request: NextRequest) {
 			paymentUrl: result.paymentUrl
 		})
 	} catch (error) {
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		////// Step E: Error handling and response
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
 		console.error('Error creating booking (API):', error)
 		Sentry.captureException(error, {
 			tags: { component: 'api:bookings', method: 'create' },
@@ -114,8 +130,7 @@ export async function POST(request: NextRequest) {
 				request: request.body
 			}
 		})
-		const message =
-			error instanceof Error ? error.message : 'Unknown server error'
+		const message = error instanceof Error ? error.message : 'Unknown server error'
 		return NextResponse.json(
 			{
 				error: 'Failed to create booking',

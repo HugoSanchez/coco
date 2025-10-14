@@ -1,13 +1,4 @@
-import {
-	Body,
-	Container,
-	Head,
-	Heading,
-	Html,
-	Preview,
-	Section,
-	Text
-} from '@react-email/components'
+import { Body, Container, Head, Heading, Html, Preview, Section, Text } from '@react-email/components'
 
 interface PaymentReceiptEmailProps {
 	clientName: string
@@ -16,6 +7,9 @@ interface PaymentReceiptEmailProps {
 	practitionerName?: string
 	consultationDate?: string
 	receiptUrl: string
+	// Monthly invoice variant
+	isMonthly?: boolean
+	monthLabel?: string
 }
 
 export default function PaymentReceiptEmail({
@@ -24,12 +18,15 @@ export default function PaymentReceiptEmail({
 	currency = 'EUR',
 	practitionerName = 'Tu profesional',
 	consultationDate,
-	receiptUrl
+	receiptUrl,
+	isMonthly = false,
+	monthLabel
 }: PaymentReceiptEmailProps) {
+	const firstName = (clientName || '').trim().split(' ')[0] || clientName
 	return (
 		<Html>
 			<Head />
-			<Preview>Aquí tienes tu recibo</Preview>
+			<Preview>{'Aquí tienes tu recibo'}</Preview>
 			<Body style={main}>
 				<Container style={container}>
 					{/* Logo */}
@@ -37,15 +34,19 @@ export default function PaymentReceiptEmail({
 
 					{/* Body + Button in same section for consistent spacing */}
 					<Section style={sectionTight}>
-						<Text style={greeting}>
-							{`Hola ${clientName.trim()},`}
-						</Text>
+						<Text style={greeting}>{`Hola ${firstName},`}</Text>
 
-						<Text style={text}>
-							Este email es para confirmarte que hemos procesado
-							correctamente el pago de tu consulta con{' '}
-							{practitionerName}.
-						</Text>
+						{isMonthly ? (
+							<Text style={text}>
+								Este email es para confirmarte que hemos procesado correctamente tu pago mensual
+								{monthLabel ? ` correspondiente a ${monthLabel}` : ''}.
+							</Text>
+						) : (
+							<Text style={text}>
+								Este email es para confirmarte que hemos procesado correctamente el pago de tu consulta
+								con {practitionerName}.
+							</Text>
+						)}
 
 						<Text style={text}>
 							<strong>{`Encontrarás tu recibo en el
@@ -61,12 +62,8 @@ export default function PaymentReceiptEmail({
 
 					{/* Greetings Section */}
 					<Section style={section}>
-						<Text style={signatureLine}>
-							Gracias por tu confianza,
-						</Text>
-						<Text style={signatureLine}>
-							{practitionerName} y el equipo de Coco.
-						</Text>
+						<Text style={signatureLine}>Gracias por tu confianza,</Text>
+						<Text style={signatureLine}>{practitionerName} y el equipo de Coco.</Text>
 					</Section>
 				</Container>
 			</Body>
@@ -77,8 +74,7 @@ export default function PaymentReceiptEmail({
 // Email Styles
 const main = {
 	backgroundColor: '#ffffff',
-	fontFamily:
-		'-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Ubuntu,sans-serif'
+	fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Ubuntu,sans-serif'
 }
 
 const container = {

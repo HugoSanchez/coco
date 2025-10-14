@@ -85,27 +85,14 @@ export interface BookingWithBills extends Booking {
 		id: string
 		amount: number
 		currency: string
-		status:
-			| 'pending'
-			| 'sent'
-			| 'paid'
-			| 'disputed'
-			| 'canceled'
-			| 'refunded'
+		status: 'scheduled' | 'pending' | 'sent' | 'paid' | 'disputed' | 'canceled' | 'refunded'
 		created_at: string
-		due_date: string | null
 		sent_at: string | null
 		paid_at: string | null
 	} | null
 	// Derived statuses for easy UI consumption
 	billing_status: 'not_generated' | 'pending' | 'sent' | 'canceled'
-	payment_status:
-		| 'not_applicable'
-		| 'pending'
-		| 'paid'
-		| 'disputed'
-		| 'canceled'
-		| 'refunded'
+	payment_status: 'not_applicable' | 'pending' | 'paid' | 'disputed' | 'canceled' | 'refunded'
 }
 
 /**
@@ -149,13 +136,7 @@ export interface BookingExportRow {
 	booking_start_time_iso: string
 	booking_end_time_iso: string
 	booking_status: 'pending' | 'scheduled' | 'completed' | 'canceled'
-	payment_status:
-		| 'not_applicable'
-		| 'pending'
-		| 'paid'
-		| 'disputed'
-		| 'canceled'
-		| 'refunded'
+	payment_status: 'not_applicable' | 'pending' | 'paid' | 'disputed' | 'canceled' | 'refunded'
 	amount: number
 	currency: string
 	paid_at_iso: string | null
@@ -163,6 +144,14 @@ export interface BookingExportRow {
 	receipt_url: string | null
 	service_name: string
 	timezone: 'UTC'
+	// Invoice info (dual-write path)
+	invoice_series?: string | null
+	invoice_number?: number | null
+	invoice_pdf_path?: string | null
+	// Credit notes (rectificativas)
+	credit_note_numbers?: string[]
+	credit_note_pdf_paths?: string[]
+	credit_note_total_abs?: number
 }
 
 /**
@@ -173,9 +162,7 @@ export interface BookingExportRow {
  * @returns Promise<BookingWithClient[]> - Array of booking objects with client data
  * @throws Error if database operation fails
  */
-export async function getBookingsForUser(
-	userId: string
-): Promise<BookingWithClient[]> {
+export async function getBookingsForUser(userId: string): Promise<BookingWithClient[]> {
 	const { data, error } = await supabase
 		.from('bookings')
 		.select(
@@ -370,10 +357,7 @@ export async function getBookingsForDateRangeAllUsersPaged(
  * @returns Promise<Booking> - The created booking object with generated ID
  * @throws Error if insertion fails or validation errors occur
  */
-export async function createBooking(
-	payload: CreateBookingPayload,
-	supabaseClient?: SupabaseClient
-): Promise<Booking> {
+export async function createBooking(payload: CreateBookingPayload, supabaseClient?: SupabaseClient): Promise<Booking> {
 	// Set default values
 	const bookingData = {
 		...payload,
@@ -383,11 +367,7 @@ export async function createBooking(
 	// Use provided client or fall back to default
 	const client = supabaseClient || supabase
 
-	const { data, error } = await client
-		.from('bookings')
-		.insert([bookingData])
-		.select()
-		.single()
+	const { data, error } = await client.from('bookings').insert([bookingData]).select().single()
 
 	if (error) throw error
 	return data
@@ -434,10 +414,7 @@ export async function updateBookingStatus(
  * @returns Promise<void>
  * @throws Error if deletion fails or booking not found
  */
-export async function deleteBooking(
-	bookingId: string,
-	supabaseClient?: SupabaseClient
-): Promise<void> {
+export async function deleteBooking(bookingId: string, supabaseClient?: SupabaseClient): Promise<void> {
 	const client = supabaseClient || supabase
 
 	const { error } = await client.from('bookings').delete().eq('id', bookingId)
@@ -498,12 +475,7 @@ export async function getBookingByIdAndUser(
 ): Promise<Booking | null> {
 	const client = supabaseClient || supabase
 
-	const { data, error } = await client
-		.from('bookings')
-		.select('*')
-		.eq('id', bookingId)
-		.eq('user_id', userId)
-		.single()
+	const { data, error } = await client.from('bookings').select('*').eq('id', bookingId).eq('user_id', userId).single()
 
 	if (error) {
 		if (error.code === 'PGRST116') {
@@ -590,7 +562,6 @@ export async function getBookingsWithBills(
 				currency,
 				status,
 				created_at,
-				due_date,
 				sent_at,
 				paid_at
 			)
@@ -602,9 +573,7 @@ export async function getBookingsWithBills(
 	if (customerSearch) {
 		// Use computed full_name_search column for clean, reliable filtering
 		// Supports "Hugo", "Sanchez", or "Hugo Sanchez" searches
-		query = query
-			.filter('client.full_name_search', 'ilike', `%${customerSearch}%`)
-			.not('client', 'is', null)
+		query = query.filter('client.full_name_search', 'ilike', `%${customerSearch}%`).not('client', 'is', null)
 	}
 
 	if (statusFilter && statusFilter !== 'all') {
@@ -620,9 +589,7 @@ export async function getBookingsWithBills(
 	}
 
 	// Apply ordering and pagination
-	const { data, error } = await query
-		.order('created_at', { ascending: false })
-		.range(offset, offset + fetchLimit - 1)
+	const { data, error } = await query.order('created_at', { ascending: false }).range(offset, offset + fetchLimit - 1)
 
 	if (error) throw error
 
@@ -636,9 +603,7 @@ export async function getBookingsWithBills(
 
 	// Transform the data to include derived statuses
 	const bookingsWithBills: BookingWithBills[] = bookings.map((booking) => {
-		const bill = Array.isArray(booking.bill)
-			? booking.bill[0]
-			: booking.bill
+		const bill = Array.isArray(booking.bill) ? booking.bill[0] : booking.bill
 
 		// Derive billing and payment statuses from bill status
 		let billing_status: BookingWithBills['billing_status']
@@ -649,6 +614,10 @@ export async function getBookingsWithBills(
 			payment_status = 'not_applicable'
 		} else {
 			switch (bill.status) {
+				case 'scheduled':
+					billing_status = 'pending'
+					payment_status = 'not_applicable'
+					break
 				case 'pending':
 					billing_status = 'pending'
 					payment_status = 'pending'
@@ -731,9 +700,7 @@ export async function getBookingsForExport(
 
 	// Apply filters mirroring dashboard behavior
 	if (customerSearch) {
-		query = query
-			.filter('client.full_name_search', 'ilike', `%${customerSearch}%`)
-			.not('client', 'is', null) as any
+		query = query.filter('client.full_name_search', 'ilike', `%${customerSearch}%`).not('client', 'is', null) as any
 	}
 
 	if (statusFilter && statusFilter !== 'all') {
@@ -753,11 +720,53 @@ export async function getBookingsForExport(
 	})
 	if (error) throw error
 
+	// Build billId list to batch-fetch invoices
+	const billsArray: any[] = (data || []).map((b: any) => (Array.isArray(b.bill) ? b.bill[0] : b.bill)).filter(Boolean)
+	const billIds: string[] = billsArray.map((bill: any) => bill.id).filter(Boolean)
+	let billIdToInvoice: Record<string, any> = {}
+	if (billIds.length > 0) {
+		const { data: invoicesData } = await client
+			.from('invoices')
+			.select('id, legacy_bill_id, series, number, pdf_url')
+			.in('legacy_bill_id', billIds)
+		billIdToInvoice = Object.fromEntries(
+			(invoicesData || []).map((inv: any) => [inv.legacy_bill_id as string, inv])
+		)
+
+		// Fetch credit notes for these invoices
+		const invoiceIds = (invoicesData || []).map((inv: any) => inv.id)
+		if (invoiceIds.length > 0) {
+			const { data: creditNotes } = await client
+				.from('invoices')
+				.select('id, rectifies_invoice_id, series, number, pdf_url, total')
+				.eq('document_kind', 'credit_note')
+				.in('rectifies_invoice_id', invoiceIds)
+
+			// Build a map invoice_id -> credit notes summary
+			const mapCN: Record<string, { numbers: string[]; pdfs: string[]; totalAbs: number }> = {}
+			for (const cn of creditNotes || []) {
+				const invId = (cn as any).rectifies_invoice_id as string
+				if (!mapCN[invId]) mapCN[invId] = { numbers: [], pdfs: [], totalAbs: 0 }
+				const num = (cn as any).number
+				const series = (cn as any).series
+				if (series && typeof num === 'number') mapCN[invId].numbers.push(`${series}-${num}`)
+				if ((cn as any).pdf_url) mapCN[invId].pdfs.push((cn as any).pdf_url as string)
+				const total = Number((cn as any).total || 0)
+				mapCN[invId].totalAbs += Math.abs(total)
+			}
+
+			// Attach summaries onto the invoice objects for later row building
+			for (const inv of invoicesData || []) {
+				const sum = mapCN[inv.id]
+				;(inv as any).__credit_notes = sum || { numbers: [], pdfs: [], totalAbs: 0 }
+			}
+		}
+	}
+
 	const rows = (data || []).map((b: any): BookingExportRow => {
 		const bill = Array.isArray(b.bill) ? b.bill[0] : b.bill
 
-		let payment_status: BookingExportRow['payment_status'] =
-			'not_applicable'
+		let payment_status: BookingExportRow['payment_status'] = 'not_applicable'
 		if (bill) {
 			switch (bill.status) {
 				case 'pending':
@@ -783,6 +792,8 @@ export async function getBookingsForExport(
 			}
 		}
 
+		const invoice = bill ? billIdToInvoice[bill.id as string] : undefined
+
 		return {
 			booking_id: b.id,
 			client_first_name: b.client?.name ?? null,
@@ -798,7 +809,13 @@ export async function getBookingsForExport(
 			refund_amount: bill?.refunded_amount ?? 0,
 			receipt_url: bill?.stripe_receipt_url ?? null,
 			service_name: 'consulta',
-			timezone: 'UTC'
+			timezone: 'UTC',
+			invoice_series: invoice?.series ?? null,
+			invoice_number: invoice?.number ?? null,
+			invoice_pdf_path: invoice?.pdf_url ?? null,
+			credit_note_numbers: invoice?.__credit_notes?.numbers || [],
+			credit_note_pdf_paths: invoice?.__credit_notes?.pdfs || [],
+			credit_note_total_abs: invoice?.__credit_notes?.totalAbs || 0
 		}
 	})
 
@@ -811,11 +828,7 @@ export async function getBookingsForExport(
  *   google_event_id is null.
  * - Caller supplies limit to cap rows (e.g., threshold + 1 for overflow detection).
  */
-export async function getBookingsMissingCalendarEvents(
-	userId: string,
-	limit: number,
-	supabaseClient?: SupabaseClient
-) {
+export async function getBookingsMissingCalendarEvents(userId: string, limit: number, supabaseClient?: SupabaseClient) {
 	const client = supabaseClient || supabase
 
 	// Only consider FUTURE bookings to avoid backfilling historical data
@@ -837,9 +850,7 @@ export async function getBookingsMissingCalendarEvents(
 	if (error) throw error
 
 	// Defensive: ensure we only return bookings with zero related events
-	return (data || []).filter(
-		(b: any) => !b.calendar_events || b.calendar_events.length === 0
-	)
+	return (data || []).filter((b: any) => !b.calendar_events || b.calendar_events.length === 0)
 }
 
 /**

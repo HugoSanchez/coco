@@ -50,6 +50,92 @@ export class StripeService {
 	}
 
 	/**
+	 * Create checkout session for an invoice (can include multiple appointments)
+	 */
+	async createInvoiceCheckout({
+		practitionerStripeAccountId,
+		clientEmail,
+		clientName,
+		practitionerName,
+		practitionerEmail,
+		practitionerUserId,
+		invoiceId,
+		currency = 'EUR',
+		billingPeriodStart,
+		billingPeriodEnd,
+		lineItems
+	}: {
+		practitionerStripeAccountId: string
+		clientEmail?: string
+		clientName?: string
+		practitionerName: string
+		practitionerEmail: string
+		practitionerUserId: string
+		invoiceId: string
+		currency?: string
+		billingPeriodStart?: string | null
+		billingPeriodEnd?: string | null
+		lineItems: Array<{
+			name: string
+			description?: string | null
+			unitAmountEur: number
+			quantity: number
+		}>
+	}): Promise<{ sessionId: string; checkoutUrl: string }> {
+		try {
+			const totalCents = lineItems.reduce((acc, li) => acc + Math.round(li.unitAmountEur * 100) * li.quantity, 0)
+			const idempotencyKey = `invoice:${invoiceId}:${totalCents}:${lineItems.length}`
+
+			const session = await stripe.checkout.sessions.create(
+				{
+					payment_method_types: ['card'],
+					mode: 'payment',
+					line_items: lineItems.map((li) => ({
+						price_data: {
+							currency: (currency || 'EUR').toLowerCase(),
+							product_data: {
+								name: li.name,
+								description: li.description || undefined
+							},
+							unit_amount: Math.round(li.unitAmountEur * 100)
+						},
+						quantity: li.quantity
+					})),
+					customer_email: clientEmail && clientEmail.trim() ? clientEmail.trim() : undefined,
+					metadata: {
+						invoice_id: invoiceId,
+						client_name: clientName || '',
+						practitioner_name: practitionerName,
+						practitioner_email: practitionerEmail,
+						practitioner_user_id: practitionerUserId,
+						billing_period_start: billingPeriodStart || '',
+						billing_period_end: billingPeriodEnd || ''
+					},
+					success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/payment/success?invoice_id=${invoiceId}`,
+					cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/payment/cancelled`,
+					payment_intent_data: {
+						application_fee_amount: Math.round(totalCents * 0.0)
+					}
+				},
+				{ idempotencyKey, stripeAccount: practitionerStripeAccountId }
+			)
+
+			return {
+				sessionId: session.id,
+				checkoutUrl: session.url || ''
+			}
+		} catch (error) {
+			console.error('Error creating invoice checkout session:', error)
+			Sentry.captureException(error, {
+				tags: { component: 'stripe-service', method: 'createInvoiceCheckout' }
+			})
+			throw new Error(
+				`Failed to create invoice checkout session: ${error instanceof Error ? error.message : 'Unknown error'}`
+			)
+		}
+	}
+
+	/**
 	 * Create an onboarding link for a Stripe Connect account
 	 */
 	async createOnboardingLink(
@@ -109,10 +195,7 @@ export class StripeService {
 			const details_submitted = account.details_submitted || false
 			const requirements_due = account.requirements?.currently_due || []
 			const paymentsEnabled =
-				charges_enabled &&
-				payouts_enabled &&
-				details_submitted &&
-				requirements_due.length === 0
+				charges_enabled && payouts_enabled && details_submitted && requirements_due.length === 0
 
 			return {
 				success: true,
@@ -235,9 +318,7 @@ export class StripeService {
 				}
 			})
 			throw new Error(
-				`Failed to create checkout session: ${
-					error instanceof Error ? error.message : 'Unknown error'
-				}`
+				`Failed to create checkout session: ${error instanceof Error ? error.message : 'Unknown error'}`
 			)
 		}
 	}
@@ -298,16 +379,12 @@ export class StripeService {
 							refund_reason: reason || 'Full refund requested'
 						}
 					},
-					practitionerStripeAccountId
-						? { stripeAccount: practitionerStripeAccountId }
-						: undefined
+					practitionerStripeAccountId ? { stripeAccount: practitionerStripeAccountId } : undefined
 				)
 			} catch (err: any) {
 				const isDirectAttempt = Boolean(practitionerStripeAccountId)
 				const isMissing =
-					err?.code === 'resource_missing' ||
-					err?.raw?.code === 'resource_missing' ||
-					err?.statusCode === 404
+					err?.code === 'resource_missing' || err?.raw?.code === 'resource_missing' || err?.statusCode === 404
 				if (isDirectAttempt && isMissing) {
 					// Fallback: try on platform account for legacy charges
 					refund = await stripe.refunds.create({

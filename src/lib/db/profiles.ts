@@ -70,6 +70,14 @@ export interface Profile {
 	profile_picture_url: string | null
 	// Default address for in-person appointments
 	default_in_person_location_text?: string | null
+	// Fiscal identity (issuer) fields for invoicing
+	tax_id?: string | null
+	fiscal_address_line1?: string | null
+	fiscal_address_line2?: string | null
+	fiscal_city?: string | null
+	fiscal_province?: string | null
+	fiscal_postal_code?: string | null
+	fiscal_country?: string | null
 }
 
 /**
@@ -123,19 +131,12 @@ export async function getUserProfileAndScheduleByUsername(username: string) {
  * @param currentUsername - The user's current username (optional, for updates)
  * @returns Promise<boolean> - true if username is available, false if taken
  */
-export async function validateUsername(
-	username: string,
-	currentUsername?: string | null
-) {
+export async function validateUsername(username: string, currentUsername?: string | null) {
 	// If the username is the same as current, it's always valid (no change)
 	if (username === currentUsername) return true
 
 	// Check if any other user has this username
-	const { data, error } = await supabase
-		.from('profiles')
-		.select('username')
-		.eq('username', username)
-		.single()
+	const { data, error } = await supabase.from('profiles').select('username').eq('username', username).single()
 
 	// PGRST116 error code means "no rows found" - username is available
 	if (error?.code === 'PGRST116') {
@@ -157,16 +158,42 @@ export async function validateUsername(
  * @param profileData - Partial profile data to update (only changed fields)
  * @throws Error if update fails or user doesn't have permission
  */
-export async function updateProfile(
-	userId: string,
-	profileData: Partial<Profile>
-) {
+export async function updateProfile(userId: string, profileData: Partial<Profile>) {
 	// Prefer update with filter to avoid RLS insert permission requirements
-	const { error } = await supabase
-		.from('profiles')
-		.update(profileData)
-		.eq('id', userId)
+	const { error } = await supabase.from('profiles').update(profileData).eq('id', userId)
 
+	if (error) throw error
+}
+
+/**
+ * Updates fiscal identity fields for a user profile (issuer data for invoices).
+ */
+export async function updateFiscalData(
+	userId: string,
+	data: {
+		tax_id: string
+		fiscal_address_line1: string
+		fiscal_address_line2?: string | null
+		fiscal_city: string
+		fiscal_province: string
+		fiscal_postal_code: string
+		fiscal_country?: string
+	},
+	supabaseClient?: SupabaseClient
+): Promise<void> {
+	const client = supabaseClient || supabase
+	const { error } = await client
+		.from('profiles')
+		.update({
+			tax_id: data.tax_id,
+			fiscal_address_line1: data.fiscal_address_line1,
+			fiscal_address_line2: data.fiscal_address_line2 ?? null,
+			fiscal_city: data.fiscal_city,
+			fiscal_province: data.fiscal_province,
+			fiscal_postal_code: data.fiscal_postal_code,
+			fiscal_country: data.fiscal_country || 'ES'
+		})
+		.eq('id', userId)
 	if (error) throw error
 }
 
@@ -194,9 +221,7 @@ export async function uploadProfilePicture(userId: string, file: File) {
 	const fileName = `${userId}-${Date.now()}.${fileExt}`
 
 	// Upload file to the 'profile-pictures' storage bucket
-	const { error: uploadError } = await supabase.storage
-		.from('profile-pictures')
-		.upload(fileName, file)
+	const { error: uploadError } = await supabase.storage.from('profile-pictures').upload(fileName, file)
 
 	console.log('uploadError', uploadError)
 	if (uploadError) throw uploadError
@@ -216,18 +241,11 @@ export async function uploadProfilePicture(userId: string, file: File) {
  * @returns Promise<Profile | null> - User profile or null if not found
  * @throws Error if database operation fails
  */
-export async function getProfileById(
-	userId: string,
-	supabaseClient?: SupabaseClient
-): Promise<Profile | null> {
+export async function getProfileById(userId: string, supabaseClient?: SupabaseClient): Promise<Profile | null> {
 	// Use provided client or fall back to default
 	const client = supabaseClient || supabase
 
-	const { data: profile, error } = await client
-		.from('profiles')
-		.select('*')
-		.eq('id', userId)
-		.single()
+	const { data: profile, error } = await client.from('profiles').select('*').eq('id', userId).single()
 
 	if (error) {
 		if (error.code === 'PGRST116') return null // Not found
@@ -244,19 +262,13 @@ export async function getProfileById(
  * @param supabaseClient - Optional Supabase client instance
  * @returns Promise<Array<Profile>> - Matching profile rows (may be fewer than userIds)
  */
-export async function getProfilesByIds(
-	userIds: string[],
-	supabaseClient?: SupabaseClient
-): Promise<Profile[]> {
+export async function getProfilesByIds(userIds: string[], supabaseClient?: SupabaseClient): Promise<Profile[]> {
 	if (!userIds || userIds.length === 0) return []
 
 	// Use provided client or fall back to default
 	const client = supabaseClient || supabase
 
-	const { data, error } = await client
-		.from('profiles')
-		.select('*')
-		.in('id', userIds)
+	const { data, error } = await client.from('profiles').select('*').in('id', userIds)
 
 	if (error) throw error
 	return (data as any) || []
@@ -271,18 +283,11 @@ export async function getProfilesByIds(
  * @returns Promise<string | null> - User email or null if not found
  * @throws Error if database operation fails
  */
-export async function getUserEmail(
-	userId: string,
-	supabaseClient?: SupabaseClient
-): Promise<string | null> {
+export async function getUserEmail(userId: string, supabaseClient?: SupabaseClient): Promise<string | null> {
 	// Use provided client or fall back to default
 	const client = supabaseClient || supabase
 
-	const { data: profile, error } = await client
-		.from('profiles')
-		.select('email')
-		.eq('id', userId)
-		.single()
+	const { data: profile, error } = await client.from('profiles').select('email').eq('id', userId).single()
 
 	if (error) {
 		if (error.code === 'PGRST116') return null // Not found
@@ -292,16 +297,9 @@ export async function getUserEmail(
 }
 
 // Retrieves a user's profile by email (helper for OAuth callbacks)
-export async function getProfileByEmail(
-	email: string,
-	supabaseClient?: SupabaseClient
-) {
+export async function getProfileByEmail(email: string, supabaseClient?: SupabaseClient) {
 	const client = supabaseClient || supabase
-	const { data, error } = await client
-		.from('profiles')
-		.select('*')
-		.eq('email', email)
-		.single()
+	const { data, error } = await client.from('profiles').select('*').eq('email', email).single()
 	return { data, error }
 }
 

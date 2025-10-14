@@ -14,7 +14,7 @@
 
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ClientSearchSelect } from '@/components/ClientSearchSelect'
@@ -116,6 +116,18 @@ export function BookingForm({
 	const [locationText, setLocationText] = useState<string>('')
 	const [savingDefault, setSavingDefault] = useState<boolean>(false)
 	const [savedDefault, setSavedDefault] = useState<boolean>(false)
+	const [resolvedLeadHours, setResolvedLeadHours] = useState<number | null>(
+		null
+	)
+
+	// Billing timing selection (per-booking lead hours or monthly)
+	const [billingTimingSelection, setBillingTimingSelection] =
+		useState<string>('0') // '0' | '24' | '72' | '168' | '-1' | 'monthly'
+	const [isBillingTimingDirty, setIsBillingTimingDirty] =
+		useState<boolean>(false)
+
+	// Track if user has manually edited the address to avoid auto-refilling defaults
+	const hasEditedLocationRef = useRef(false)
 
 	// Context and utilities
 	const { user, profile, refreshProfile } = useUser() // Current user and profile data
@@ -210,6 +222,34 @@ export function BookingForm({
 				setResolvedClientPrice(clientAmount)
 				setResolvedDefaultPrice(defaultAmount)
 
+				// Resolve email lead hours preference (client overrides user default)
+				const leadRaw =
+					clientSettings?.payment_email_lead_hours ??
+					userDefault?.payment_email_lead_hours ??
+					null
+				const normalizedLead =
+					leadRaw == null || Number.isNaN(Number(leadRaw))
+						? null
+						: Math.trunc(Number(leadRaw))
+				setResolvedLeadHours(normalizedLead)
+
+				// Resolve default billing timing selection (monthly vs per booking lead hours)
+				const effectiveBillingType = (clientSettings?.billing_type ||
+					userDefault?.billing_type ||
+					'in-advance') as 'in-advance' | 'right-after' | 'monthly'
+				if (!isBillingTimingDirty) {
+					if (effectiveBillingType === 'monthly') {
+						setBillingTimingSelection('monthly')
+					} else {
+						const sel =
+							normalizedLead == null ||
+							Number.isNaN(Number(normalizedLead))
+								? '0'
+								: String(normalizedLead)
+						setBillingTimingSelection(sel)
+					}
+				}
+
 				const {
 					showSelect,
 					consultationType: type,
@@ -236,6 +276,24 @@ export function BookingForm({
 				const defaultAmount = Number(userDefault?.billing_amount || 0)
 				setResolvedClientPrice(null)
 				setResolvedDefaultPrice(defaultAmount)
+				const leadRaw = userDefault?.payment_email_lead_hours ?? null
+				const normalizedLead =
+					leadRaw == null || Number.isNaN(Number(leadRaw))
+						? null
+						: Math.trunc(Number(leadRaw))
+				setResolvedLeadHours(normalizedLead)
+				if (!isBillingTimingDirty) {
+					if ((userDefault?.billing_type as any) === 'monthly') {
+						setBillingTimingSelection('monthly')
+					} else {
+						const sel =
+							normalizedLead == null ||
+							Number.isNaN(Number(normalizedLead))
+								? '0'
+								: String(normalizedLead)
+						setBillingTimingSelection(sel)
+					}
+				}
 				setShowConsultationType(false)
 				setConsultationType('followup')
 				if (!isPriceDirty) {
@@ -263,14 +321,14 @@ export function BookingForm({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [firstConsultationAmount])
 
-	// Prefill default location when switching to in-person
+	// Prefill default location only when switching to in-person and before user edits
 	useEffect(() => {
-		if (mode === 'in_person') {
-			const def = profile?.default_in_person_location_text || ''
-			if (!locationText) setLocationText(def)
-		}
+		if (mode !== 'in_person') return
+		if (hasEditedLocationRef.current) return
+		const def = profile?.default_in_person_location_text || ''
+		if (!locationText && def) setLocationText(def)
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [mode, locationText, profile?.default_in_person_location_text])
+	}, [mode, profile?.default_in_person_location_text])
 
 	// ===== Helpers for default in-person address =====
 	const isAddressEqualToDefault = useCallback(
@@ -462,10 +520,9 @@ export function BookingForm({
 		setLoading(true)
 
 		try {
-			// Optional: validate and prepare custom price override
-			let overrideAmount: number | undefined
+			// Resolve final amount (>= 0, 0 allowed)
+			let finalAmount: number
 			if (isPriceDirty && customPrice.trim() !== '') {
-				// Normalize decimal separator and parse
 				const normalized = customPrice.replace(',', '.')
 				const parsed = parseFloat(normalized)
 				if (Number.isNaN(parsed) || parsed < 0) {
@@ -473,23 +530,13 @@ export function BookingForm({
 					return toast({
 						title: 'Precio inválido',
 						description:
-							'El precio personalizado debe ser un número mayor o igual a 0.',
+							'El precio debe ser un número mayor o igual a 0.',
 						variant: 'destructive',
 						color: 'error'
 					})
 				}
-				// Round to 2 decimals safely
-				overrideAmount = Math.round(parsed * 100) / 100
-			}
-
-			// If it's a first consultation but the chosen price isn't the first-consultation price,
-			// still send the override to honor user's input (even if not marked dirty)
-			if (
-				overrideAmount === undefined &&
-				consultationType === 'first' &&
-				priceSource !== 'first' &&
-				customPrice.trim() !== ''
-			) {
+				finalAmount = Math.round(parsed * 100) / 100
+			} else {
 				const normalized = customPrice.replace(',', '.')
 				const parsed = parseFloat(normalized)
 				if (Number.isNaN(parsed) || parsed < 0) {
@@ -497,39 +544,47 @@ export function BookingForm({
 					return toast({
 						title: 'Precio inválido',
 						description:
-							'El precio personalizado debe ser un número mayor o igual a 0.',
+							'El precio debe ser un número mayor o igual a 0.',
 						variant: 'destructive',
 						color: 'error'
 					})
 				}
-				overrideAmount = Math.round(parsed * 100) / 100
+				finalAmount = Math.round(parsed * 100) / 100
 			}
 
-			// Call our new server-side booking API
-			// This handles all the complex billing logic server-side:
-			// - Authentication and proper environment variable access
-			// - Billing settings resolution (client-specific or user default)
-			// - Booking creation with appropriate billing configuration
-			// - Payment link generation and email sending
-			// - Returns result with payment info if needed
-			const response = await fetch('/api/bookings/create', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
+			// Build payload for unified API contract
+			const payload = {
+				booking: {
 					clientId: selectedClient,
 					startTime: selectedSlot!.start,
 					endTime: selectedSlot!.end,
 					notes,
-					// Only send override if user modified the suggested value
-					overrideAmount,
 					consultationType,
 					mode,
 					locationText:
-						mode === 'in_person' ? locationText || null : null,
-					saveLocationAsDefault: false
-				})
+						mode === 'in_person' ? locationText || null : null
+				},
+				billing: {
+					type:
+						billingTimingSelection === 'monthly'
+							? 'monthly'
+							: 'per_booking',
+					amount: finalAmount,
+					currency: 'EUR',
+					paymentEmailLeadHours:
+						billingTimingSelection === 'monthly'
+							? null
+							: Number.isNaN(Number(billingTimingSelection))
+								? 0
+								: Number(billingTimingSelection)
+				}
+			}
+
+			// Send request to create booking
+			const response = await fetch('/api/bookings/create', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload)
 			})
 
 			if (!response.ok) {
@@ -628,10 +683,9 @@ export function BookingForm({
 								/>
 							</div>
 
-							{/* Continue button - only show when time is selected */}
-							{/* User must manually continue to review their selection */}
-							{selectedSlot && !loadingBookings && (
-								<div className="pt-4">
+							{/* Navigation buttons */}
+							<div className="pt-4 flex flex-col gap-3">
+								{selectedSlot && !loadingBookings && (
 									<Button
 										variant="default"
 										onClick={handleContinueToClient}
@@ -639,8 +693,16 @@ export function BookingForm({
 									>
 										Continuar
 									</Button>
-								</div>
-							)}
+								)}
+
+								<Button
+									variant="ghost"
+									onClick={handleBack}
+									className="w-full"
+								>
+									Atrás
+								</Button>
+							</div>
 						</>
 					)}
 				</div>
@@ -884,14 +946,15 @@ export function BookingForm({
 											(opcional)
 										</span>
 									</Label>
-									<div className="relative">
+									<div className="relative flex flex-row">
 										<Input
 											placeholder="Introduce la dirección (calle, ciudad)"
 											value={locationText}
-											onChange={(e) =>
+											onChange={(e) => {
+												hasEditedLocationRef.current = true
 												setLocationText(e.target.value)
-											}
-											className="h-12 pr-20"
+											}}
+											className="h-12 w-full pr-24"
 										/>
 										<div className="absolute inset-y-0 right-2 flex items-center">
 											{savedDefault ? (
@@ -902,7 +965,7 @@ export function BookingForm({
 											) : isDefaultAddress ? (
 												<div className="flex items-center text-teal-600 text-sm">
 													<Check className="h-4 w-4 mr-1" />
-													Predeterminada
+													Guardada
 												</div>
 											) : (
 												<button
@@ -922,6 +985,46 @@ export function BookingForm({
 									</div>
 								</div>
 							)}
+
+							{/* Billing type/timing selector */}
+							<div className="space-y-2">
+								<Label className="text-md font-normal text-gray-700">
+									Tipo de facturación
+								</Label>
+								{(() => {
+									const timingValue = billingTimingSelection
+									return (
+										<Select
+											value={timingValue}
+											onValueChange={(value) => {
+												setIsBillingTimingDirty(true)
+												setBillingTimingSelection(value)
+											}}
+										>
+											<SelectTrigger className="h-12">
+												<SelectValue placeholder="Selecciona el tipo de facturación" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="0">
+													Inmediata
+												</SelectItem>
+												<SelectItem value="24">
+													24 horas antes
+												</SelectItem>
+												<SelectItem value="168">
+													1 semana antes
+												</SelectItem>
+												<SelectItem value="-1">
+													Después de la consulta
+												</SelectItem>
+												<SelectItem value="monthly">
+													Mensual
+												</SelectItem>
+											</SelectContent>
+										</Select>
+									)
+								})()}
+							</div>
 
 							{/* Booking Summary */}
 							<div>

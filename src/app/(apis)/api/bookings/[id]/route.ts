@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
+import { getBookingById } from '@/lib/db/bookings'
+import { getClientById } from '@/lib/db/clients'
+import { getProfileById } from '@/lib/db/profiles'
+import { getBillsForBooking } from '@/lib/db/bills'
+import { findInvoiceByLegacyBillId, getInvoiceById } from '@/lib/db/invoices'
 
 /**
  * GET /api/bookings/[id]
@@ -13,77 +18,96 @@ import { createClient } from '@supabase/supabase-js'
  * - Practitioner name for confirmation
  * - Basic booking information for display
  */
-export async function GET(
-	request: NextRequest,
-	{ params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
 	try {
 		const bookingId = params.id
 
 		if (!bookingId) {
-			return NextResponse.json(
-				{ error: 'Booking ID is required' },
-				{ status: 400 }
-			)
+			return NextResponse.json({ error: 'Booking ID is required' }, { status: 400 })
 		}
 
-		// Use service role client to bypass RLS since client is not authenticated
-		const supabase = createClient(
-			process.env.NEXT_PUBLIC_SUPABASE_URL!,
-			process.env.SUPABASE_SERVICE_ROLE_KEY!
-		)
-
-		// First, let's try a simple query without joins to see if the booking exists
-		const { data: simpleBooking, error: simpleError } = await supabase
-			.from('bookings')
-			.select('*')
-			.eq('id', bookingId)
-			.single()
-
-		// If simple booking doesn't work, return early with debug info
-		if (simpleError || !simpleBooking) {
-			console.log('Simple booking query failed')
-			return NextResponse.json({
-				debug: true,
-				bookingId,
-				simpleError: simpleError?.message,
-				simpleBooking
-			})
+		const supabase = createClient()
+		const service = createServiceRoleClient()
+		const booking = await getBookingById(bookingId, supabase)
+		if (!booking) {
+			return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
 		}
+		const client = booking.client_id ? await getClientById(booking.client_id, supabase) : null
+		const practitioner = await getProfileById(booking.user_id, supabase)
+		const bills = await getBillsForBooking(booking.id, supabase)
 
-		// Get booking information
-		const booking = simpleBooking
+		// Build invoice links (PDFs) if dual-write is enabled and an invoice exists
+		let invoiceLinks: Array<{
+			kind: 'invoice' | 'credit_note'
+			display: string
+			url: string | null
+		}> = []
+		// Also include invoice header if resolvable from the bill link
+		let invoice: any = null
+		try {
+			if (bills?.[0]?.id) {
+				// Prefer direct link via bills.invoice_id if present; fallback to legacy link
+				let inv = null
+				if ((bills[0] as any).invoice_id) {
+					inv = await getInvoiceById((bills[0] as any).invoice_id as string, service as any)
+				}
+				if (!inv) {
+					inv = await findInvoiceByLegacyBillId(bills[0].id, service as any)
+				}
+				if (inv) {
+					invoice = inv
+					const display =
+						inv.series && inv.number != null ? `${inv.series}-${inv.number}` : inv.id.slice(0, 8)
+					let url: string | null = null
+					if (inv.pdf_url) {
+						const key = inv.pdf_url.replace(/^invoices\//, '')
+						const { data: signed } = await service.storage.from('invoices').createSignedUrl(key, 2592000)
+						url = signed?.signedUrl || null
+					}
+					invoiceLinks.push({ kind: 'invoice', display, url })
 
-		// Get client information
-		const { data: client } = await supabase
-			.from('clients')
-			.select('name, last_name, email')
-			.eq('id', booking.client_id)
-			.single()
-
-		// Get practitioner information
-		const { data: practitioner } = await supabase
-			.from('profiles')
-			.select('name, email')
-			.eq('id', booking.user_id)
-			.single()
-
-		// Get bill information
-		const { data: bills } = await supabase
-			.from('bills')
-			.select(
-				'id, amount, currency, status, email_scheduled_at, sent_at, paid_at, created_at, stripe_receipt_url'
-			)
-			.eq('booking_id', booking.id)
-
-		// Debug: verify receipt URL presence on server
-		console.log('[GET /api/bookings/:id] receipt debug', {
-			bookingId: booking.id,
-			firstBill: bills?.[0],
-			stripe_receipt_url: bills?.[0]?.stripe_receipt_url
-		})
+					// Credit notes
+					const { data: creditNotes } = await service
+						.from('invoices')
+						.select('*')
+						.eq('rectifies_invoice_id', inv.id)
+						.order('issued_at', { ascending: true })
+					if (creditNotes && creditNotes.length > 0) {
+						for (const cn of creditNotes as any[]) {
+							const displayCN =
+								cn.series && cn.number != null
+									? `${cn.series}-${cn.number}`
+									: (cn.id as string).slice(0, 8)
+							let urlCN: string | null = null
+							if (cn.pdf_url) {
+								const keyCN = (cn.pdf_url as string).replace(/^invoices\//, '')
+								const { data: signedCN } = await service.storage
+									.from('invoices')
+									.createSignedUrl(keyCN, 2592000)
+								urlCN = signedCN?.signedUrl || null
+							}
+							invoiceLinks.push({
+								kind: 'credit_note',
+								display: displayCN,
+								url: urlCN
+							})
+						}
+					}
+				}
+			}
+		} catch (e) {
+			// Non-fatal; continue without invoice links
+		}
 
 		// Format the response for display
+		const receiptFromInvoice = (invoice as any)?.stripe_receipt_url || null
+		const receiptFromBill = (bills?.[0] as any)?.stripe_receipt_url || null
+		const documents = {
+			receiptUrl: receiptFromInvoice || receiptFromBill || null,
+			invoiceLinks,
+			hasInvoice: Array.isArray(invoiceLinks) && invoiceLinks.length > 0
+		}
+
 		const response = {
 			bookingId: booking.id,
 			clientName: client?.name || 'Cliente',
@@ -95,7 +119,10 @@ export async function GET(
 			status: booking.status,
 			amount: bills?.[0]?.amount || 0,
 			currency: bills?.[0]?.currency || 'EUR',
-			bill: bills && bills.length > 0 ? bills[0] : null
+			bill: bills && bills.length > 0 ? bills[0] : null,
+			invoices: invoiceLinks,
+			invoice,
+			documents
 		}
 
 		return NextResponse.json(response)
@@ -104,8 +131,7 @@ export async function GET(
 		return NextResponse.json(
 			{
 				error: 'Failed to fetch booking details',
-				details:
-					error instanceof Error ? error.message : 'Unknown error'
+				details: error instanceof Error ? error.message : 'Unknown error'
 			},
 			{ status: 500 }
 		)

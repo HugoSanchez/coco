@@ -87,8 +87,7 @@ function calculateAvailableSlots(
 	calendarTimeZone: string
 ): { [day: string]: TimeSlot[] } {
 	const availableSlots: { [day: string]: TimeSlot[] } = {}
-	const { weekly_availability, meeting_duration, time_zone } =
-		availabilitySettings
+	const { weekly_availability, meeting_duration, time_zone } = availabilitySettings
 
 	const monthStart = startOfMonth(date)
 	const monthEnd = endOfMonth(date)
@@ -103,25 +102,14 @@ function calculateAvailableSlots(
 			availableSlots[dayKey] = []
 
 			for (const slot of dayAvailability.timeSlots) {
-				const [startHour, startMinute] = slot.start
-					.split(':')
-					.map(Number)
+				const [startHour, startMinute] = slot.start.split(':').map(Number)
 				const [endHour, endMinute] = slot.end.split(':').map(Number)
 
-				let slotStart = fromZonedTime(
-					setMinutes(setHours(day, startHour), startMinute),
-					time_zone
-				)
-				const slotEnd = fromZonedTime(
-					setMinutes(setHours(day, endHour), endMinute),
-					time_zone
-				)
+				let slotStart = fromZonedTime(setMinutes(setHours(day, startHour), startMinute), time_zone)
+				const slotEnd = fromZonedTime(setMinutes(setHours(day, endHour), endMinute), time_zone)
 
 				while (isBefore(slotStart, slotEnd)) {
-					const potentialEndTime = addMinutes(
-						slotStart,
-						meeting_duration
-					)
+					const potentialEndTime = addMinutes(slotStart, meeting_duration)
 
 					if (isAfter(potentialEndTime, slotEnd)) {
 						break
@@ -132,14 +120,10 @@ function calculateAvailableSlots(
 
 						if (event.start.dateTime) {
 							eventStartUTC = parseISO(event.start.dateTime)
-							eventEndUTC = event.end.dateTime
-								? parseISO(event.end.dateTime)
-								: addHours(eventStartUTC, 1)
+							eventEndUTC = event.end.dateTime ? parseISO(event.end.dateTime) : addHours(eventStartUTC, 1)
 						} else if (event.start.date) {
 							eventStartUTC = parseISO(event.start.date)
-							eventEndUTC = event.end.date
-								? parseISO(event.end.date)
-								: addDays(eventStartUTC, 1)
+							eventEndUTC = event.end.date ? parseISO(event.end.date) : addDays(eventStartUTC, 1)
 						} else {
 							return false
 						}
@@ -153,8 +137,7 @@ function calculateAvailableSlots(
 								start: eventStartUTC,
 								end: eventEndUTC
 							}) ||
-							(isBefore(slotStart, eventStartUTC) &&
-								isAfter(potentialEndTime, eventEndUTC))
+							(isBefore(slotStart, eventStartUTC) && isAfter(potentialEndTime, eventEndUTC))
 						)
 					})
 
@@ -225,9 +208,7 @@ export async function getAvailableSlots(username: string, month: Date) {
 		// If there is an error, throw an error
 	} catch (error: any) {
 		console.error('Calendar access error:', error)
-		throw new Error(
-			'Calendar access failed. Please reconnect your Google Calendar.'
-		)
+		throw new Error('Calendar access failed. Please reconnect your Google Calendar.')
 	}
 }
 
@@ -301,16 +282,8 @@ export async function createCalendarEventWithInvite(
 	payload: CreateCalendarEventPayload,
 	supabaseClient?: SupabaseClient
 ): Promise<CalendarEventResult> {
-	const {
-		userId,
-		clientName,
-		clientEmail,
-		practitionerName,
-		practitionerEmail,
-		startTime,
-		endTime,
-		bookingNotes
-	} = payload
+	const { userId, clientName, clientEmail, practitionerName, practitionerEmail, startTime, endTime, bookingNotes } =
+		payload
 
 	try {
 		// Get authenticated calendar client using the new helper
@@ -330,12 +303,15 @@ export async function createCalendarEventWithInvite(
 			bookingNotes,
 			conferenceRequestId,
 			bookingId: (payload as any).bookingId,
-			location:
-				(payload as any).mode === 'in_person'
-					? (payload as any).locationText
-					: undefined,
+			location: (payload as any).mode === 'in_person' ? (payload as any).locationText : undefined,
 			includeMeet: (payload as any).mode !== 'in_person'
 		})
+
+		console.log('[calendar] createCalendarEventWithInvite payload', {
+			mode: (payload as any).mode,
+			locationText: (payload as any).locationText
+		})
+		console.log('[calendar] eventData.location', (eventData as any).location)
 
 		// Create the event
 		const response = await calendar.events.insert({
@@ -348,9 +324,7 @@ export async function createCalendarEventWithInvite(
 		const createdEvent = response.data
 
 		if (!createdEvent.id) {
-			throw new Error(
-				'Failed to create calendar event: No event ID returned'
-			)
+			throw new Error('Failed to create calendar event: No event ID returned')
 		}
 
 		return {
@@ -389,15 +363,7 @@ export async function createInternalConfirmedCalendarEvent(
 	},
 	supabaseClient?: SupabaseClient
 ): Promise<CalendarEventResult> {
-	const {
-		userId,
-		clientName,
-		practitionerName,
-		practitionerEmail,
-		startTime,
-		endTime,
-		bookingNotes
-	} = payload
+	const { userId, clientName, practitionerName, practitionerEmail, startTime, endTime, bookingNotes } = payload
 
 	try {
 		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
@@ -420,9 +386,7 @@ export async function createInternalConfirmedCalendarEvent(
 
 		const createdEvent = response.data
 		if (!createdEvent.id) {
-			throw new Error(
-				'Failed to create internal confirmed event: No event ID returned'
-			)
+			throw new Error('Failed to create internal confirmed event: No event ID returned')
 		}
 
 		return { success: true, googleEventId: createdEvent.id }
@@ -462,8 +426,7 @@ export async function createPendingCalendarEvent(
 	payload: CreatePendingCalendarEventPayload,
 	supabaseClient?: SupabaseClient
 ): Promise<CalendarEventResult> {
-	const { userId, clientName, practitionerEmail, startTime, endTime } =
-		payload
+	const { userId, clientName, practitionerEmail, startTime, endTime } = payload
 
 	try {
 		// Get authenticated calendar client using the new helper
@@ -476,11 +439,14 @@ export async function createPendingCalendarEvent(
 			startTime,
 			endTime,
 			bookingId: (payload as any).bookingId,
-			location:
-				(payload as any).mode === 'in_person'
-					? (payload as any).locationText
-					: undefined
+			location: (payload as any).mode === 'in_person' ? (payload as any).locationText : undefined
 		})
+
+		console.log('[calendar] createPendingCalendarEvent payload', {
+			mode: (payload as any).mode,
+			locationText: (payload as any).locationText
+		})
+		console.log('[calendar] eventData.location', (eventData as any).location)
 
 		// Create the pending event in Google Calendar
 		const response = await calendar.events.insert({
@@ -492,13 +458,8 @@ export async function createPendingCalendarEvent(
 		const createdEvent = response.data
 
 		if (!createdEvent.id) {
-			console.error(
-				'❌ [Calendar API] Google returned event without ID for user:',
-				userId
-			)
-			throw new Error(
-				'Failed to create pending calendar event: No event ID returned'
-			)
+			console.error('❌ [Calendar API] Google returned event without ID for user:', userId)
+			throw new Error('Failed to create pending calendar event: No event ID returned')
 		}
 
 		return {
@@ -507,16 +468,12 @@ export async function createPendingCalendarEvent(
 			googleMeetLink: undefined // No meet link for pending events
 		}
 	} catch (error: any) {
-		console.error(
-			'❌ [Calendar API] Pending calendar event creation error for user:',
-			userId,
-			{
-				message: error.message,
-				code: error.code,
-				status: error.status,
-				userId
-			}
-		)
+		console.error('❌ [Calendar API] Pending calendar event creation error for user:', userId, {
+			message: error.message,
+			code: error.code,
+			status: error.status,
+			userId
+		})
 
 		return {
 			success: false,
@@ -547,13 +504,7 @@ export async function updatePendingToConfirmed(
 	payload: UpdatePendingToConfirmedPayload,
 	supabaseClient?: SupabaseClient
 ): Promise<CalendarEventResult> {
-	const {
-		googleEventId,
-		userId,
-		clientEmail,
-		practitionerName,
-		practitionerEmail
-	} = payload
+	const { googleEventId, userId, clientEmail, practitionerName, practitionerEmail } = payload
 
 	try {
 		// Get authenticated calendar client using the new helper
@@ -577,10 +528,15 @@ export async function updatePendingToConfirmed(
 			throw new Error('Original event missing start or end time')
 		}
 
-		// Generate unique conference request ID for Google Meet
+		// Decide online vs in-person from existing event
+		// If the pending event already has a location, we treat it as in-person and DO NOT add Meet
+		// Otherwise, we add Google Meet on confirm
+		const hasLocation = Boolean(currentEvent.data.location)
+
+		// Generate unique conference request ID when we need to add Meet
 		const conferenceRequestId = generateConferenceRequestId('confirmed')
 
-		// Prepare the updated event data using the builder
+		// Prepare a minimal patch body: do NOT set location so it stays unchanged
 		const updatedEventData = buildConfirmedEventData({
 			clientName,
 			clientEmail,
@@ -590,29 +546,26 @@ export async function updatePendingToConfirmed(
 			originalEnd,
 			conferenceRequestId,
 			bookingId: payload.bookingId,
-			location:
-				(payload as any).mode === 'in_person'
-					? (payload as any).locationText
-					: undefined,
-			includeMeet: (payload as any).mode !== 'in_person'
+			// Leave "location" undefined to preserve existing value on patch
+			includeMeet: !hasLocation
 		})
 
-		// Update the existing event in Google Calendar
-		const response = await calendar.events.update({
+		// Patch the existing event so unspecified fields (like location) remain unchanged
+		const response = await calendar.events.patch({
 			calendarId: 'primary',
 			eventId: googleEventId,
 			requestBody: updatedEventData,
-			conferenceDataVersion: 1, // Required for Google Meet creation
-			sendUpdates: 'all' // Send invitations to all attendees
+			// Only required when creating/altering conference data
+			...(hasLocation ? {} : { conferenceDataVersion: 1 }),
+			sendUpdates: 'all'
 		})
 
 		const updatedEvent = response.data
 
 		// Extract Google Meet link from the updated event
 		const googleMeetLink =
-			updatedEvent.conferenceData?.entryPoints?.find(
-				(entry) => entry.entryPointType === 'video'
-			)?.uri || undefined
+			updatedEvent.conferenceData?.entryPoints?.find((entry) => entry.entryPointType === 'video')?.uri ||
+			undefined
 
 		return {
 			success: true,
@@ -780,10 +733,7 @@ export async function rescheduleCalendarEvent(
 ): Promise<CalendarEventResult> {
 	try {
 		// Get authenticated calendar client
-		const calendar = await getAuthenticatedCalendar(
-			payload.userId,
-			supabaseClient
-		)
+		const calendar = await getAuthenticatedCalendar(payload.userId, supabaseClient)
 
 		// First, get the existing event to preserve its properties
 		const existingEvent = await calendar.events.get({
@@ -848,40 +798,20 @@ export async function rescheduleCalendarEvent(
 /**
  * Gets the user's time zone from their schedule settings
  */
-async function getUserTimeZone(
-	userId: string,
-	supabaseClient?: SupabaseClient
-): Promise<string> {
+async function getUserTimeZone(userId: string, supabaseClient?: SupabaseClient): Promise<string> {
 	try {
 		const client = supabaseClient || supabase
-		const { data, error } = await client
-			.from('schedules')
-			.select('time_zone')
-			.eq('user_id', userId)
-			.single()
+		const { data, error } = await client.from('schedules').select('time_zone').eq('user_id', userId).single()
 
 		if (error || !data?.time_zone) {
-			console.log(
-				'🗓️ [Calendar Events] No time zone found for user:',
-				userId,
-				'using UTC'
-			)
+			console.log('🗓️ [Calendar Events] No time zone found for user:', userId, 'using UTC')
 			return 'UTC' // Default to UTC if no time zone found
 		}
 
-		console.log(
-			'🗓️ [Calendar Events] Using time zone for user:',
-			userId,
-			'time zone:',
-			data.time_zone
-		)
+		console.log('🗓️ [Calendar Events] Using time zone for user:', userId, 'time zone:', data.time_zone)
 		return data.time_zone
 	} catch (error) {
-		console.log(
-			'🗓️ [Calendar Events] Error getting time zone for user:',
-			userId,
-			'using UTC'
-		)
+		console.log('🗓️ [Calendar Events] Error getting time zone for user:', userId, 'using UTC')
 		return 'UTC'
 	}
 }
@@ -984,11 +914,7 @@ export async function reconcileCalendarEventsForUser(
 		//// Step 1: Read bookings missing calendar events
 		//// - Fetch up to threshold + 1 to detect overflow
 		////////////////////////////////////////////////////////
-		const candidates = await getBookingsMissingCalendarEvents(
-			userId,
-			threshold + 1,
-			client
-		)
+		const candidates = await getBookingsMissingCalendarEvents(userId, threshold + 1, client)
 		console.log('🧩 [Reconcile] Missing candidates', candidates.length)
 		////////////////////////////////////////////////////////
 		//// Step 2: Short-circuit if nothing to do
@@ -1014,10 +940,7 @@ export async function reconcileCalendarEventsForUser(
 		////////////////////////////////////////////////////////
 		let created = 0
 		const practitionerProfile = await getProfileById(userId, client)
-		const practitionerEmail =
-			practitionerProfile?.email ||
-			(await getUserEmail(userId, client)) ||
-			''
+		const practitionerEmail = practitionerProfile?.email || (await getUserEmail(userId, client)) || ''
 
 		////////////////////////////////////////////////////////
 		//// Step 5: Create events based on booking.status
@@ -1027,24 +950,18 @@ export async function reconcileCalendarEventsForUser(
 		////////////////////////////////////////////////////////
 		for (const booking of candidates) {
 			try {
-				const isConfirmed =
-					booking.status === 'scheduled' ||
-					booking.status === 'completed'
+				const isConfirmed = booking.status === 'scheduled' || booking.status === 'completed'
 
 				if (isConfirmed) {
 					// Try to create confirmed event if we can resolve client email
-					const clientRow = await getClientById(
-						booking.client_id,
-						client
-					)
+					const clientRow = await getClientById(booking.client_id, client)
 					if (clientRow && clientRow.email) {
 						const result = await createCalendarEventWithInvite(
 							{
 								userId,
 								clientName: clientRow.name,
 								clientEmail: clientRow.email,
-								practitionerName:
-									practitionerProfile?.name || 'Practitioner',
+								practitionerName: practitionerProfile?.name || 'Practitioner',
 								practitionerEmail,
 								startTime: booking.start_time,
 								endTime: booking.end_time,
@@ -1095,10 +1012,7 @@ export async function reconcileCalendarEventsForUser(
 					}
 				} else {
 					// Pending placeholder
-					const pendingClientRow = await getClientById(
-						booking.client_id,
-						client
-					)
+					const pendingClientRow = await getClientById(booking.client_id, client)
 					const pending = await createPendingCalendarEvent(
 						{
 							userId,
@@ -1126,11 +1040,7 @@ export async function reconcileCalendarEventsForUser(
 				}
 			} catch (e) {
 				// Keep going; this is a best-effort convenience, not a hard requirement
-				console.error(
-					'🧩 [Reconcile] Failed creating event for booking',
-					booking.id,
-					e
-				)
+				console.error('🧩 [Reconcile] Failed creating event for booking', booking.id, e)
 			}
 		}
 
