@@ -5,6 +5,8 @@ import { useUser } from '@/contexts/UserContext'
 import { updateFiscalData } from '@/lib/db/profiles'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useToast } from '@/components/ui/use-toast'
+import { usePathname } from 'next/navigation'
 
 interface FiscalDataFormProps {
 	onSaved?: () => void
@@ -13,6 +15,8 @@ interface FiscalDataFormProps {
 export default function FiscalDataForm({ onSaved }: FiscalDataFormProps) {
 	const { user, profile, refreshProfile } = useUser()
 	const [saving, setSaving] = useState(false)
+	const { toast } = useToast()
+	const pathname = usePathname()
 	const [form, setForm] = useState({
 		tax_id: profile?.tax_id || '',
 		fiscal_address_line1: profile?.fiscal_address_line1 || '',
@@ -44,6 +48,14 @@ export default function FiscalDataForm({ onSaved }: FiscalDataFormProps) {
 			})
 			await refreshProfile()
 			onSaved?.()
+			// Show success toast only on settings page (not during onboarding)
+			if (pathname && pathname.startsWith('/settings')) {
+				toast({
+					title: 'Datos fiscales actualizados',
+					description: 'Se aplicarán a tus próximas facturas.',
+					color: 'success'
+				})
+			}
 		} finally {
 			setSaving(false)
 		}
