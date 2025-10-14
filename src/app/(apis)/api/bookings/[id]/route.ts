@@ -108,14 +108,24 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 			hasInvoice: Array.isArray(invoiceLinks) && invoiceLinks.length > 0
 		}
 
+		// Normalize timestamps to strict ISO 8601 (with timezone) for mobile browser compatibility
+		const startIso = (() => {
+			try {
+				const d = new Date(booking.start_time as any)
+				return Number.isNaN(d.getTime()) ? String(booking.start_time) : d.toISOString()
+			} catch {
+				return String(booking.start_time)
+			}
+		})()
+
 		const response = {
 			bookingId: booking.id,
 			clientName: client?.name || 'Cliente',
 			clientLastName: client?.last_name || null,
 			clientEmail: client?.email || null,
 			practitionerName: practitioner?.name || 'Profesional',
-			consultationDate: booking.start_time,
-			consultationTime: booking.start_time,
+			consultationDate: startIso,
+			consultationTime: startIso,
 			status: booking.status,
 			amount: bills?.[0]?.amount || 0,
 			currency: bills?.[0]?.currency || 'EUR',

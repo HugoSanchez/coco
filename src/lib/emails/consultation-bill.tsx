@@ -85,9 +85,6 @@ export default function ConsultationBillEmail({
 	return (
 		<Html>
 			<Head />
-			<Preview>
-				{billingTrigger === 'after_consultation' ? 'Consulta pendiente de pago' : 'Pago requerido'}
-			</Preview>
 			<Body style={main}>
 				<Container style={container}>
 					{/* Logo */}

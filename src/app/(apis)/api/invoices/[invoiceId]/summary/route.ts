@@ -26,10 +26,20 @@ export async function GET(_req: NextRequest, { params }: { params: { invoiceId: 
 			const booking = await getBookingById(firstBookingId, supabase)
 			if (!booking) return NextResponse.json({ error: 'booking_not_found' }, { status: 404 })
 			const practitioner = await getProfileById(booking.user_id, supabase)
+			// Normalize to strict ISO 8601 string for mobile compatibility
+			const startIso = (() => {
+				try {
+					const d = new Date(booking.start_time as any)
+					return Number.isNaN(d.getTime()) ? String(booking.start_time) : d.toISOString()
+				} catch {
+					return String(booking.start_time)
+				}
+			})()
+
 			return NextResponse.json({
 				type: 'per_booking',
 				practitionerName: practitioner?.name || 'Tu profesional',
-				consultationDate: booking.start_time
+				consultationDate: startIso
 			})
 		}
 
