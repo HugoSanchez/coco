@@ -28,13 +28,14 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
 		const supabase = createClient()
 		const service = createServiceRoleClient()
-		const booking = await getBookingById(bookingId, supabase)
+		// Use service role for public confirmation page reads to avoid RLS issues on mobile (no session)
+		const booking = await getBookingById(bookingId, service)
 		if (!booking) {
 			return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
 		}
-		const client = booking.client_id ? await getClientById(booking.client_id, supabase) : null
-		const practitioner = await getProfileById(booking.user_id, supabase)
-		const bills = await getBillsForBooking(booking.id, supabase)
+		const client = booking.client_id ? await getClientById(booking.client_id, service) : null
+		const practitioner = await getProfileById(booking.user_id, service)
+		const bills = await getBillsForBooking(booking.id, service)
 
 		// Build invoice links (PDFs) if dual-write is enabled and an invoice exists
 		let invoiceLinks: Array<{
