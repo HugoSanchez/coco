@@ -399,12 +399,17 @@ export async function sendBillPaymentEmail(
 		////////////////////////////////////////////////////////////////////////////////////////////////////////
 		const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 		const paymentGatewayUrl = `${baseUrl}/api/payments/${bill.booking_id}`
+		// Decide email copy variant based on whether the consultation already ended
+		const bookingEnded = new Date(booking.end_time).getTime() <= Date.now()
+		const trigger: 'before_consultation' | 'after_consultation' = bookingEnded
+			? 'after_consultation'
+			: 'before_consultation'
 		const emailResult = await sendConsultationBillEmail({
 			to: client.email,
 			clientName: client.name,
 			consultationDate: booking.start_time,
 			amount: bill.amount,
-			billingTrigger: 'before_consultation',
+			billingTrigger: trigger,
 			practitionerName: practitioner.name || 'Your Practitioner',
 			practitionerEmail: practitioner.email,
 			practitionerImageUrl: practitioner.profile_picture_url || undefined,
