@@ -98,11 +98,10 @@ export default function ConsultationBillEmail({
 						{billingTrigger === 'after_consultation' ? (
 							<>
 								<Text style={text}>
-									{`${practitionerName} ha registrado tu consulta del ${formatDateWithTimeToSpanish(consultationDate)}.`}
+									{`Aquí tienes la factura de tu consulta del ${formatDateWithTimeToSpanish(consultationDate)}.`}
 								</Text>
 								<Text style={textTight}>
-									Puedes abonar la consulta a través del enlace que te proporcionamos a continuación.
-									Si tienes cualquier duda, por favor ponte en contacto con {practitionerName}.
+									Puedes abonarla a través del enlace que te proporcionamos a continuación.
 								</Text>
 							</>
 						) : (

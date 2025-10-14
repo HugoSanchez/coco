@@ -41,9 +41,7 @@ export function buildFullEventData({
 }) {
 	const base: any = {
 		summary: `${clientName} - ${practitionerName}`,
-		description: bookingNotes
-			? `Consultation appointment.\n\nNotes: ${bookingNotes}`
-			: 'Consultation appointment.',
+		description: bookingNotes ? `Consultation appointment.\n\nNotes: ${bookingNotes}` : 'Consultation appointment.',
 		start: {
 			dateTime: startTime,
 			timeZone: 'UTC'
@@ -100,8 +98,7 @@ export function buildPendingEventData({
 }) {
 	const base: any = {
 		summary: `${clientName} - Pending`, // Clear pending status in title
-		description:
-			'Pending payment confirmation. This appointment is not yet confirmed.',
+		description: 'Pending payment confirmation. This appointment is not yet confirmed.',
 		start: {
 			dateTime: startTime,
 			timeZone: 'UTC'
@@ -112,13 +109,8 @@ export function buildPendingEventData({
 		},
 		// Color ID 2 = Light green for pending status
 		colorId: '2',
-		// Only practitioner as attendee - no client invitation yet
-		attendees: [
-			{
-				email: practitionerEmail, // Fallback if email not found
-				responseStatus: 'accepted'
-			}
-		],
+		// No attendees to avoid any email notifications to practitioner
+		transparency: 'opaque',
 		// Restrict guest permissions since this is just a placeholder
 		guestsCanModify: false,
 		guestsCanInviteOthers: false,
@@ -247,8 +239,6 @@ export function buildInternalConfirmedEventData({
  * Generates a unique conference request ID for Google Meet
  * Each booking needs a unique ID to avoid conflicts
  */
-export function generateConferenceRequestId(
-	prefix: string = 'booking'
-): string {
+export function generateConferenceRequestId(prefix: string = 'booking'): string {
 	return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
 }
