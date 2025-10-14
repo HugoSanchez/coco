@@ -1,13 +1,4 @@
-import {
-	Body,
-	Container,
-	Head,
-	Heading,
-	Html,
-	Preview,
-	Section,
-	Text
-} from '@react-email/components'
+import { Body, Container, Head, Heading, Html, Preview, Section, Text } from '@react-email/components'
 import { formatInTimeZone } from 'date-fns-tz'
 import { es } from 'date-fns/locale'
 
@@ -40,44 +31,35 @@ export default function RefundNotificationEmail({
 	consultationDate
 }: RefundNotificationEmailProps) {
 	return (
-		<Html>
-			<Head />
+		<Html lang="es">
+			<Head>
+				<meta http-equiv="Content-Language" content="es" />
+			</Head>
 			<Preview>{'Confirmación de reembolso'}</Preview>
 			<Body style={main}>
 				<Container style={container}>
 					<Section style={{ ...section, marginBottom: '16px' }}>
-						<Text
-							style={greeting}
-						>{`Hola ${clientName.trim()},`}</Text>
+						<Text style={greeting}>{`Hola ${clientName.trim()},`}</Text>
 
 						<Text style={text}>
-							Este email es para notificarte que{' '}
-							{practitionerName} ha procesado el reembolso del
-							pago de tu consulta del{' '}
-							{formatDateWithTimeToSpanish(
-								consultationDate as string
-							)}
-							. El importe devuelto es{' '}
-							<strong>{formatCurrency(amount, currency)}</strong>.
+							Este email es para notificarte que {practitionerName} ha procesado el reembolso del pago de
+							tu consulta del {formatDateWithTimeToSpanish(consultationDate as string)}. El importe
+							devuelto es <strong>{formatCurrency(amount, currency)}</strong>.
 						</Text>
 						<Text style={text}>
-							Dependiendo de tu banco o método de pago, el
-							reembolso puede tardar varios días laborables en
-							reflejarse.
+							Dependiendo de tu banco o método de pago, el reembolso puede tardar varios días laborables
+							en reflejarse.
 						</Text>
 					</Section>
 
 					<Section style={section}>
 						<Text style={signatureLine}>Atentamente,</Text>
-						<Text style={signatureLine}>
-							{practitionerName} y el equipo de Coco.
-						</Text>
+						<Text style={signatureLine}>{practitionerName} y el equipo de Coco.</Text>
 					</Section>
 
 					<Section style={footer}>
 						<Text style={footerText}>
-							Si no reconoces este reembolso, por favor ponte en
-							contacto con tu profesional.
+							Si no reconoces este reembolso, por favor ponte en contacto con tu profesional.
 						</Text>
 					</Section>
 				</Container>
@@ -88,8 +70,7 @@ export default function RefundNotificationEmail({
 
 const main = {
 	backgroundColor: '#ffffff',
-	fontFamily:
-		'-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Ubuntu,sans-serif'
+	fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Ubuntu,sans-serif'
 }
 
 const container = {
@@ -148,12 +129,9 @@ const footerText = {
 function formatDateWithTimeToSpanish(dateString: string): string {
 	try {
 		return (
-			formatInTimeZone(
-				new Date(dateString),
-				'Europe/Madrid',
-				"d 'de' MMMM 'de' yyyy 'a las' HH:mm",
-				{ locale: es }
-			) + 'h'
+			formatInTimeZone(new Date(dateString), 'Europe/Madrid', "d 'de' MMMM 'de' yyyy 'a las' HH:mm", {
+				locale: es
+			}) + 'h'
 		)
 	} catch (error) {
 		return dateString

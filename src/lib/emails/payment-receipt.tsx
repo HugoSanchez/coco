@@ -24,8 +24,10 @@ export default function PaymentReceiptEmail({
 }: PaymentReceiptEmailProps) {
 	const firstName = (clientName || '').trim().split(' ')[0] || clientName
 	return (
-		<Html>
-			<Head />
+		<Html lang="es">
+			<Head>
+				<meta http-equiv="Content-Language" content="es" />
+			</Head>
 			<Preview>{'Aquí tienes tu recibo'}</Preview>
 			<Body style={main}>
 				<Container style={container}>

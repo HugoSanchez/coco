@@ -239,12 +239,15 @@ export async function orchestrateBookingCreation(
 
 		const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 		const paymentGatewayUrl = `${baseUrl}/api/payments/${booking.id}`
+		const triggerImmediate: 'before_consultation' | 'after_consultation' = isPast
+			? 'after_consultation'
+			: 'before_consultation'
 		const emailResult = await sendConsultationBillEmail({
 			to: client.email,
 			clientName: client.name,
 			consultationDate: request.startTime,
 			amount,
-			billingTrigger: 'before_consultation',
+			billingTrigger: triggerImmediate,
 			practitionerName: practitioner.name || 'Your Practitioner',
 			practitionerEmail: practitioner.email,
 			practitionerImageUrl: practitioner.profile_picture_url || undefined,

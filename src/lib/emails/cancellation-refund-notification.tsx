@@ -1,12 +1,4 @@
-import {
-	Body,
-	Container,
-	Head,
-	Html,
-	Preview,
-	Section,
-	Text
-} from '@react-email/components'
+import { Body, Container, Head, Html, Preview, Section, Text } from '@react-email/components'
 
 function formatCurrency(amount: number, currency: string = 'EUR'): string {
 	return new Intl.NumberFormat('es-ES', {
@@ -39,47 +31,36 @@ export default function CancellationRefundNotificationEmail({
 	consultationDate
 }: CancellationRefundNotificationEmailProps) {
 	return (
-		<Html>
-			<Head />
+		<Html lang="es">
+			<Head>
+				<meta http-equiv="Content-Language" content="es" />
+			</Head>
 			<Preview>{`${practitionerName} ha cancelado tu cita`}</Preview>
 			<Body style={main}>
 				<Container style={container}>
 					<Section style={{ ...section, marginBottom: '16px' }}>
-						<Text
-							style={greeting}
-						>{`Hola ${clientName.trim()},`}</Text>
+						<Text style={greeting}>{`Hola ${clientName.trim()},`}</Text>
 
 						<Text style={text}>
-							Este email es para notificarte que{' '}
-							{practitionerName} ha cancelado tu cita del{' '}
-							{formatDateWithTimeToSpanish(
-								consultationDate as string
-							)}
-							. Además, hemos iniciado el proceso de rembolso de
-							<strong>
-								{' '}
-								{formatCurrency(amount, currency)}
-							</strong>{' '}
-							correspondiente.
+							Este email es para notificarte que {practitionerName} ha cancelado tu cita del{' '}
+							{formatDateWithTimeToSpanish(consultationDate as string)}. Además, hemos iniciado el proceso
+							de rembolso de
+							<strong> {formatCurrency(amount, currency)}</strong> correspondiente.
 						</Text>
 						<Text style={text}>
-							Dependiendo de tu banco o método de pago, el
-							reembolso puede tardar varios días laborables en
-							reflejarse.
+							Dependiendo de tu banco o método de pago, el reembolso puede tardar varios días laborables
+							en reflejarse.
 						</Text>
 					</Section>
 
 					<Section style={section}>
 						<Text style={signatureLine}>Atentamente,</Text>
-						<Text style={signatureLine}>
-							{practitionerName} y el equipo de Coco.
-						</Text>
+						<Text style={signatureLine}>{practitionerName} y el equipo de Coco.</Text>
 					</Section>
 
 					<Section style={footer}>
 						<Text style={footerText}>
-							Si necesitas reprogramar o tienes dudas, ponte en
-							contacto con tu profesional.
+							Si necesitas reprogramar o tienes dudas, ponte en contacto con tu profesional.
 						</Text>
 					</Section>
 				</Container>
@@ -90,8 +71,7 @@ export default function CancellationRefundNotificationEmail({
 
 const main = {
 	backgroundColor: '#ffffff',
-	fontFamily:
-		'-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Ubuntu,sans-serif'
+	fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Ubuntu,sans-serif'
 }
 
 const container = {
@@ -150,12 +130,9 @@ const footerText = {
 function formatDateWithTimeToSpanish(dateString: string): string {
 	try {
 		return (
-			formatInTimeZone(
-				new Date(dateString),
-				'Europe/Madrid',
-				"d 'de' MMMM 'de' yyyy 'a las' HH:mm",
-				{ locale: es }
-			) + 'h'
+			formatInTimeZone(new Date(dateString), 'Europe/Madrid', "d 'de' MMMM 'de' yyyy 'a las' HH:mm", {
+				locale: es
+			}) + 'h'
 		)
 	} catch (error) {
 		return dateString

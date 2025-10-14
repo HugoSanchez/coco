@@ -83,8 +83,10 @@ export default function ConsultationBillEmail({
 	paymentUrl
 }: ConsultationBillEmailProps) {
 	return (
-		<Html>
-			<Head />
+		<Html lang="es">
+			<Head>
+				<meta http-equiv="Content-Language" content="es" />
+			</Head>
 			<Body style={main}>
 				<Container style={container}>
 					{/* Logo */}

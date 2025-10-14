@@ -19,8 +19,10 @@ export default function MonthlyBillEmail({
 }: MonthlyBillEmailProps) {
 	const firstName = (clientName || '').trim().split(' ')[0] || clientName
 	return (
-		<Html>
-			<Head />
+		<Html lang="es">
+			<Head>
+				<meta http-equiv="Content-Language" content="es" />
+			</Head>
 			<Preview>{`${practitionerName}`}</Preview>
 			<Body style={main}>
 				<Container style={container}>
