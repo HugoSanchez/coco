@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Plus, X, RotateCcw } from 'lucide-react'
+import { useToast } from '@/components/ui/use-toast'
 
 type TimeSlot = {
 	id: string
@@ -86,6 +87,37 @@ export function WeeklyAvailability() {
 			slots: day.available ? [{ id: crypto.randomUUID(), startTime: '09:00', endTime: '17:00' }] : []
 		}))
 	)
+	const { toast } = useToast()
+
+	// Load existing availability from API
+	useEffect(() => {
+		;(async () => {
+			try {
+				const res = await fetch('/api/settings/availability')
+				if (!res.ok) return
+				const payload = await res.json()
+				const rows: Array<{ weekday: number; start_time: string; end_time: string; timezone: string }> =
+					payload.rules || []
+				const map: Record<number, TimeSlot[]> = {}
+				for (const r of rows) {
+					const start = r.start_time.slice(0, 5)
+					const end = r.end_time.slice(0, 5)
+					;(map[r.weekday] = map[r.weekday] || []).push({
+						id: crypto.randomUUID(),
+						startTime: start,
+						endTime: end
+					})
+				}
+				setAvailability((prev) =>
+					prev.map((d, idx) => ({
+						...d,
+						available: (map[idx] || []).length > 0,
+						slots: map[idx] || d.slots
+					}))
+				)
+			} catch (_) {}
+		})()
+	}, [])
 
 	const toggleDayAvailability = (dayIndex: number) => {
 		setAvailability((prev) =>
@@ -141,6 +173,33 @@ export function WeeklyAvailability() {
 					: day
 			)
 		)
+	}
+
+	const handleSave = async () => {
+		// Build rules payload
+		const rules: Array<{ weekday: number; start: string; end: string; timezone: string }> = []
+		availability.forEach((day, idx) => {
+			if (!day.available) return
+			day.slots.forEach((s) => {
+				rules.push({ weekday: idx, start: s.startTime, end: s.endTime, timezone: 'Europe/Madrid' })
+			})
+		})
+		try {
+			const res = await fetch('/api/settings/availability', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ rules })
+			})
+			if (!res.ok) throw new Error('Error al guardar disponibilidad')
+			toast({ title: '¡Guardado!', description: 'Disponibilidad actualizada', color: 'success' })
+		} catch (e) {
+			toast({
+				title: 'Error',
+				description: 'No se pudo guardar la disponibilidad',
+				variant: 'destructive',
+				color: 'error'
+			})
+		}
 	}
 
 	return (
@@ -266,7 +325,9 @@ export function WeeklyAvailability() {
 
 			{/* Save Button */}
 			<div className="pt-4">
-				<Button className="w-full h-12 bg-teal-600 hover:bg-teal-700 text-white">Save Availability</Button>
+				<Button onClick={handleSave} className="w-full h-12 bg-teal-600 hover:bg-teal-700 text-white">
+					Save Availability
+				</Button>
 			</div>
 		</div>
 	)

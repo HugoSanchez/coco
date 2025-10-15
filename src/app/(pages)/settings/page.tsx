@@ -10,6 +10,7 @@ import { CalendarStep } from '@/components/CalendarStep'
 import { BillingPreferencesStep } from '@/components/BillingPreferencesStep'
 import { PaymentsStep } from '@/components/PaymentsStep'
 import { Spinner } from '@/components/ui/spinner'
+import { WeeklyAvailability } from '@/components/WeeklyAvailabilty2'
 
 type SettingsSection = 'profile' | 'calendar' | 'billing' | 'payments' | 'fiscal'
 
@@ -143,6 +144,9 @@ function SettingsContent() {
 								console.log('Calendar settings updated')
 							}}
 						/>
+						<div className="mt-10">
+							<WeeklyAvailability />
+						</div>
 					</div>
 				)
 
