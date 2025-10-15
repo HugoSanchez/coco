@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import { useToast } from '@/components/ui/use-toast'
 import { useRouter } from 'next/navigation'
@@ -126,6 +126,9 @@ export default function Dashboard() {
 	})
 
 	const { toast } = useToast()
+	// Guards to prevent duplicate stats requests
+	const statsInitRef = useRef(false)
+	const statsInFlightRef = useRef(false)
 
 	const exportWithCurrentFilters = async () => {
 		if (!user) return
@@ -194,8 +197,10 @@ export default function Dashboard() {
 	 */
 	const fetchDashboardStats = async () => {
 		if (!user) return
+		if (statsInFlightRef.current) return
 
 		try {
+			statsInFlightRef.current = true
 			setDashboardStats((prev) => ({
 				...prev,
 				loading: true,
@@ -232,6 +237,8 @@ export default function Dashboard() {
 				loading: false,
 				error: error instanceof Error ? error.message : 'Failed to load statistics'
 			})
+		} finally {
+			statsInFlightRef.current = false
 		}
 	}
 
@@ -243,11 +250,12 @@ export default function Dashboard() {
 		fetchDashboardStats()
 	}
 
-	// Fetch dashboard statistics when user is available
+	// Fetch dashboard statistics once when user is available (guarded)
 	useEffect(() => {
-		if (user) {
-			fetchDashboardStats()
-		}
+		if (!user) return
+		if (statsInitRef.current) return
+		statsInitRef.current = true
+		fetchDashboardStats()
 	}, [user])
 
 	useEffect(() => {
@@ -377,6 +385,8 @@ export default function Dashboard() {
 				variant: 'default',
 				color: 'success'
 			})
+			// Refresh stats after major state change
+			fetchDashboardStats()
 		} catch (error) {
 			toast({
 				title: 'Error',
@@ -429,6 +439,7 @@ export default function Dashboard() {
 				variant: 'default',
 				color: 'success'
 			})
+			fetchDashboardStats()
 		} catch (error) {
 			toast({
 				title: 'Error',
@@ -484,6 +495,7 @@ export default function Dashboard() {
 				variant: 'default',
 				color: 'success'
 			})
+			fetchDashboardStats()
 		} catch (error) {
 			// Close the modal even on error
 			setMarkingAsPaidBookingId(null)
@@ -603,6 +615,7 @@ export default function Dashboard() {
 				variant: 'default',
 				color: 'success'
 			})
+			fetchDashboardStats()
 		} catch (error) {
 			toast({
 				title: 'Error',

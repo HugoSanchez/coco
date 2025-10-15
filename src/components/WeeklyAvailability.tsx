@@ -5,13 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createClient as createSupabaseClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/use-toast'
 import { Spinner } from '@/components/ui/spinner'
@@ -150,9 +144,7 @@ export function WeeklyAvailability({ onComplete }: WeeklyAvailabilityProps) {
 
 	// State variables for the component status
 	const [isLoading, setIsLoading] = useState(true)
-	const [saveStatus, setSaveStatus] = useState<
-		'idle' | 'loading' | 'success' | 'error'
-	>('idle')
+	const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
 	const [statusMessage, setStatusMessage] = useState<string>('')
 
 	/**
@@ -164,9 +156,7 @@ export function WeeklyAvailability({ onComplete }: WeeklyAvailabilityProps) {
 	useEffect(() => {
 		// Set the time zone to the user's time zone
 		const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
-		const matchingTimeZone = timezones.find(
-			(tz) => tz.value === userTimeZone
-		)
+		const matchingTimeZone = timezones.find((tz) => tz.value === userTimeZone)
 		if (matchingTimeZone) {
 			setTimeZone(matchingTimeZone.value)
 		}
@@ -215,11 +205,7 @@ export function WeeklyAvailability({ onComplete }: WeeklyAvailabilityProps) {
 			return null
 		}
 
-		const { data, error } = await supabase
-			.from('schedules')
-			.select('*')
-			.eq('user_id', user.id)
-			.single()
+		const { data, error } = await supabase.from('schedules').select('*').eq('user_id', user.id).single()
 
 		if (error) {
 			console.error('Error fetching schedule:', error)
@@ -236,11 +222,7 @@ export function WeeklyAvailability({ onComplete }: WeeklyAvailabilityProps) {
 	 */
 	const handleDayToggle = (index: number) => {
 		// Toggle the availability of a day
-		setAvailability((prev) =>
-			prev.map((day, i) =>
-				i === index ? { ...day, isAvailable: !day.isAvailable } : day
-			)
-		)
+		setAvailability((prev) => prev.map((day, i) => (i === index ? { ...day, isAvailable: !day.isAvailable } : day)))
 	}
 
 	/**
@@ -251,12 +233,7 @@ export function WeeklyAvailability({ onComplete }: WeeklyAvailabilityProps) {
 	 * @param field - Whether to update 'start' or 'end' time
 	 * @param value - The new time value in HH:MM format
 	 */
-	const handleTimeChange = (
-		dayIndex: number,
-		slotIndex: number,
-		field: 'start' | 'end',
-		value: string
-	) => {
+	const handleTimeChange = (dayIndex: number, slotIndex: number, field: 'start' | 'end', value: string) => {
 		// Handle the time change for a time slot
 		setAvailability((prev) =>
 			prev.map((day, i) =>
@@ -264,11 +241,9 @@ export function WeeklyAvailability({ onComplete }: WeeklyAvailabilityProps) {
 					? {
 							...day,
 							timeSlots: day.timeSlots.map((slot, j) =>
-								j === slotIndex
-									? { ...slot, [field]: value }
-									: slot
+								j === slotIndex ? { ...slot, [field]: value } : slot
 							)
-					  }
+						}
 					: day
 			)
 		)
@@ -290,7 +265,7 @@ export function WeeklyAvailability({ onComplete }: WeeklyAvailabilityProps) {
 								...day.timeSlots,
 								{ start: '09:00', end: '17:00' } // Default new slot
 							]
-					  }
+						}
 					: day
 			)
 		)
@@ -303,10 +278,8 @@ export function WeeklyAvailability({ onComplete }: WeeklyAvailabilityProps) {
 				i === dayIndex
 					? {
 							...day,
-							timeSlots: day.timeSlots.filter(
-								(_, j) => j !== slotIndex
-							)
-					  }
+							timeSlots: day.timeSlots.filter((_, j) => j !== slotIndex)
+						}
 					: day
 			)
 		)
@@ -390,15 +363,10 @@ export function WeeklyAvailability({ onComplete }: WeeklyAvailabilityProps) {
 								<Checkbox
 									id={`day-${dayIndex}`}
 									checked={day.isAvailable}
-									onCheckedChange={() =>
-										handleDayToggle(dayIndex)
-									}
+									onCheckedChange={() => handleDayToggle(dayIndex)}
 								/>
 							</div>
-							<Label
-								htmlFor={`day-${dayIndex}`}
-								className="font-bold w-14"
-							>
+							<Label htmlFor={`day-${dayIndex}`} className="font-bold w-14">
 								{daysOfWeek[dayIndex]}
 							</Label>
 
@@ -407,47 +375,25 @@ export function WeeklyAvailability({ onComplete }: WeeklyAvailabilityProps) {
 									<Input
 										type="time"
 										value={day.timeSlots[0].start}
-										onChange={(e) =>
-											handleTimeChange(
-												dayIndex,
-												0,
-												'start',
-												e.target.value
-											)
-										}
+										onChange={(e) => handleTimeChange(dayIndex, 0, 'start', e.target.value)}
 										className="w-24"
 									/>
 									<span>-</span>
 									<Input
 										type="time"
 										value={day.timeSlots[0].end}
-										onChange={(e) =>
-											handleTimeChange(
-												dayIndex,
-												0,
-												'end',
-												e.target.value
-											)
-										}
+										onChange={(e) => handleTimeChange(dayIndex, 0, 'end', e.target.value)}
 										className="w-24"
 									/>
 									{day.timeSlots.length === 1 && (
-										<Button
-											variant="ghost"
-											size="icon"
-											onClick={() =>
-												removeTimeSlot(dayIndex, 0)
-											}
-										>
+										<Button variant="ghost" size="icon" onClick={() => removeTimeSlot(dayIndex, 0)}>
 											×
 										</Button>
 									)}
 								</div>
 							) : (
 								<p className="font-light text-gray-500 flex-grow">
-									{day.isAvailable
-										? 'No time slots'
-										: 'Unavailable'}
+									{day.isAvailable ? 'No time slots' : 'Unavailable'}
 								</p>
 							)}
 
@@ -465,54 +411,34 @@ export function WeeklyAvailability({ onComplete }: WeeklyAvailabilityProps) {
 
 						{day.isAvailable && day.timeSlots.length > 1 && (
 							<div className="ml-28 space-y-2">
-								{day.timeSlots
-									.slice(1)
-									.map((slot, slotIndex) => (
-										<div
-											key={slotIndex + 1}
-											className="flex items-center space-x-2 pl-30"
+								{day.timeSlots.slice(1).map((slot, slotIndex) => (
+									<div key={slotIndex + 1} className="flex items-center space-x-2 pl-30">
+										<Input
+											type="time"
+											value={slot.start}
+											onChange={(e) =>
+												handleTimeChange(dayIndex, slotIndex + 1, 'start', e.target.value)
+											}
+											className="w-24"
+										/>
+										<span>-</span>
+										<Input
+											type="time"
+											value={slot.end}
+											onChange={(e) =>
+												handleTimeChange(dayIndex, slotIndex + 1, 'end', e.target.value)
+											}
+											className="w-24"
+										/>
+										<Button
+											variant="ghost"
+											size="icon"
+											onClick={() => removeTimeSlot(dayIndex, slotIndex + 1)}
 										>
-											<Input
-												type="time"
-												value={slot.start}
-												onChange={(e) =>
-													handleTimeChange(
-														dayIndex,
-														slotIndex + 1,
-														'start',
-														e.target.value
-													)
-												}
-												className="w-24"
-											/>
-											<span>-</span>
-											<Input
-												type="time"
-												value={slot.end}
-												onChange={(e) =>
-													handleTimeChange(
-														dayIndex,
-														slotIndex + 1,
-														'end',
-														e.target.value
-													)
-												}
-												className="w-24"
-											/>
-											<Button
-												variant="ghost"
-												size="icon"
-												onClick={() =>
-													removeTimeSlot(
-														dayIndex,
-														slotIndex + 1
-													)
-												}
-											>
-												×
-											</Button>
-										</div>
-									))}
+											×
+										</Button>
+									</div>
+								))}
 							</div>
 						)}
 					</div>
@@ -538,10 +464,7 @@ export function WeeklyAvailability({ onComplete }: WeeklyAvailabilityProps) {
 
 				<div>
 					<Label htmlFor="duration">Meeting Duration</Label>
-					<Select
-						value={meetingDuration}
-						onValueChange={setMeetingDuration}
-					>
+					<Select value={meetingDuration} onValueChange={setMeetingDuration}>
 						<SelectTrigger id="duration">
 							<SelectValue placeholder="Select meeting duration" />
 						</SelectTrigger>

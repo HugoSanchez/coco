@@ -192,7 +192,7 @@ function BookingPageContent() {
 									<img
 										src={state.userProfile.profile_picture_url}
 										alt={state.userProfile.name}
-										className="lg:h-10 lg:w-10 h-8 w-8 rounded-full object-cover"
+										className="lg:h-8 lg:w-8 h-8 w-8 rounded-full object-cover"
 									/>
 								</div>
 							)}
@@ -244,6 +244,8 @@ function BookingPageContent() {
 							<ConfirmationForm
 								selectedSlot={state.selectedSlot}
 								userTimeZone={state.userTimeZone}
+								practitionerPricing={state.userProfile?.pricing}
+								username={username as string}
 								onConfirm={async (details) => {
 									// Handle booking confirmation
 									console.log('Booking details:', details)

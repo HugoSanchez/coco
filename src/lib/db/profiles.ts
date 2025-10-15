@@ -47,6 +47,11 @@ export interface UserProfileWithSchedule {
 		created_at: string
 		updated_at: string
 	}
+	pricing?: {
+		amount: number
+		currency: string
+		first_consultation_amount?: number | null
+	}
 }
 
 /**
@@ -232,6 +237,25 @@ export async function uploadProfilePicture(userId: string, file: File) {
 	} = supabase.storage.from('profile-pictures').getPublicUrl(fileName)
 
 	return publicUrl
+}
+
+/**
+ * Resolves a user's ID by their username.
+ * Accepts an optional Supabase client (use a service-role client for server/public APIs).
+ *
+ * @param username - The public username
+ * @param supabaseClient - Optional Supabase client to use
+ * @returns Promise<string | null> - The user ID or null if not found
+ */
+export async function getUserIdByUsername(username: string, supabaseClient?: SupabaseClient): Promise<string | null> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client.from('profiles').select('id').eq('username', username).single()
+
+	if (error) {
+		if ((error as any).code === 'PGRST116') return null
+		throw error
+	}
+	return (data as any)?.id ?? null
 }
 
 /**

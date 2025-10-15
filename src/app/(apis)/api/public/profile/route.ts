@@ -24,6 +24,16 @@ export async function GET(request: NextRequest) {
 			.eq('user_id', profile.id)
 			.single()
 
+		// Fetch default billing settings to expose price info publicly (non-sensitive subset)
+		const { data: billingDefaults } = await service
+			.from('billing_settings')
+			.select('billing_amount, currency, first_consultation_amount')
+			.eq('user_id', profile.id)
+			.is('client_id', null)
+			.is('booking_id', null)
+			.eq('is_default', true)
+			.single()
+
 		const response = {
 			id: profile.id,
 			name: profile.name,
@@ -31,6 +41,11 @@ export async function GET(request: NextRequest) {
 			profile_picture_url: profile.profile_picture_url,
 			schedules: {
 				meeting_duration: schedule?.meeting_duration ?? 60
+			},
+			pricing: {
+				amount: billingDefaults?.billing_amount ?? 0,
+				currency: billingDefaults?.currency ?? 'EUR',
+				first_consultation_amount: billingDefaults?.first_consultation_amount ?? null
 			}
 		}
 
