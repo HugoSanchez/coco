@@ -883,6 +883,51 @@ export async function getGoogleCalendarEventsForDay(
 }
 
 /**
+ * Fetches Google Calendar events for a date RANGE (single API call)
+ * Returns external events with start/end and id for deduplication.
+ */
+export async function getGoogleCalendarEventsForRange(
+	userId: string,
+	rangeStart: Date,
+	rangeEnd: Date,
+	supabaseClient?: SupabaseClient
+): Promise<
+	Array<{
+		start: string
+		end: string
+		title: string
+		type: string
+		googleEventId: string
+	}>
+> {
+	try {
+		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+		const response = await calendar.events.list({
+			calendarId: 'primary',
+			timeMin: rangeStart.toISOString(),
+			timeMax: rangeEnd.toISOString(),
+			singleEvents: true,
+			orderBy: 'startTime'
+		})
+
+		const events = response.data.items || []
+
+		return events
+			.filter((event) => event.start?.dateTime && event.end?.dateTime && event.id)
+			.map((event) => ({
+				start: event.start!.dateTime!,
+				end: event.end!.dateTime!,
+				title: 'Busy',
+				type: 'external',
+				googleEventId: event.id!
+			}))
+	} catch (error: any) {
+		console.error('❌ [Calendar Events] Range fetch failed for user:', userId, error?.message || error)
+		return []
+	}
+}
+
+/**
  * Reconciles future bookings for a user by ensuring a Google Calendar event exists.
  *
  * MVP scope (threshold-based):
