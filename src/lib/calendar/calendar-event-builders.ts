@@ -87,7 +87,8 @@ export function buildPendingEventData({
 	startTime,
 	endTime,
 	bookingId,
-	location
+	location,
+	extraDescription
 }: {
 	clientName: string
 	practitionerEmail: string
@@ -95,10 +96,13 @@ export function buildPendingEventData({
 	endTime: string
 	bookingId?: string
 	location?: string | null
+	extraDescription?: string
 }) {
 	const base: any = {
 		summary: `${clientName} - Pending`, // Clear pending status in title
-		description: 'Pending payment confirmation. This appointment is not yet confirmed.',
+		description:
+			'Pending payment confirmation. This appointment is not yet confirmed.' +
+			(extraDescription ? `\n\n${extraDescription}` : ''),
 		start: {
 			dateTime: startTime,
 			timeZone: 'UTC'
@@ -135,7 +139,8 @@ export function buildConfirmedEventData({
 	conferenceRequestId,
 	bookingId,
 	location,
-	includeMeet
+	includeMeet,
+	extraDescription
 }: {
 	clientName: string
 	clientEmail: string
@@ -147,10 +152,11 @@ export function buildConfirmedEventData({
 	bookingId?: string
 	location?: string | null
 	includeMeet?: boolean
+	extraDescription?: string
 }) {
 	const base: any = {
 		summary: `${clientName} - ${practitionerName}`, // New confirmed title format
-		description: 'Consultation appointment confirmed.',
+		description: 'Cita confirmada.' + (extraDescription ? `\n\n${extraDescription}` : ''),
 		// Preserve original timing
 		start: originalStart,
 		end: originalEnd,

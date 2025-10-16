@@ -176,8 +176,8 @@ export function ConfirmationForm({
 				<FaCheckCircle className="text-teal-400 text-4xl" />
 
 				{/* Confirmation message */}
-				<h2 className="text-2xl font-bold">Cita programada</h2>
-				<p className="text-center mb-4 px-4">
+				<h2 className="text-2xl font-bold">Revisa tu correo</h2>
+				<p className="text-center mb-4">
 					Por favor, revisa tu correo electrónico para acabar de confirmar la cita.
 				</p>
 			</div>

@@ -27,6 +27,7 @@ interface PageState {
 	selectedSlot: TimeSlot | null
 	currentMonth: Date
 	userTimeZone: string
+	bookingConfirmed: boolean
 }
 
 function BookingPageContent() {
@@ -45,7 +46,8 @@ function BookingPageContent() {
 		selectedDate: null,
 		selectedSlot: null,
 		currentMonth: startOfMonth(new Date()),
-		userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+		userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+		bookingConfirmed: false
 	})
 
 	// Fetch user profile and initial data
@@ -143,7 +145,16 @@ function BookingPageContent() {
 	}
 
 	const handleBack = () => {
-		if (state.selectedSlot) {
+		if (state.bookingConfirmed) {
+			// From success screen: return to calendar and clear URL param
+			updateURL(state.currentMonth, null)
+			setState((prev) => ({
+				...prev,
+				selectedSlot: null,
+				selectedDate: null,
+				bookingConfirmed: false
+			}))
+		} else if (state.selectedSlot) {
 			setState((prev) => ({ ...prev, selectedSlot: null }))
 		} else {
 			updateURL(state.currentMonth, null)
@@ -252,7 +263,7 @@ function BookingPageContent() {
 
 	return (
 		<div className="container flex justify-center px-6 py-20 md:py-20 min-h-screen">
-			<div className="mb:h-[80vh] md:max-w-[30vw] overflow-hidden">
+			<div className="mb:h-[80vh] md:max-w-[30vw] overflow-visible">
 				<div className="flex flex-col space-y-8 md:space-y-16">
 					<div className="w-full">
 						{/* Back button on steps 2 and 3 */}
@@ -290,7 +301,8 @@ function BookingPageContent() {
 								practitionerPricing={state.userProfile?.pricing}
 								username={username as string}
 								onConfirm={async (details) => {
-									console.log(details)
+									// Mark confirmation complete to adjust back-button behavior
+									setState((prev) => ({ ...prev, bookingConfirmed: true }))
 								}}
 								onCancel={() => setState((prev) => ({ ...prev, selectedSlot: null }))}
 							/>

@@ -106,7 +106,8 @@ export async function createBookingCalendarEvent(options: {
 				endTime: request.endTime,
 				bookingId: bookingId,
 				mode: request.mode,
-				locationText: request.mode === 'in_person' ? request.locationText || null : null
+				locationText: request.mode === 'in_person' ? request.locationText || null : null,
+				extraDescription: request.notes
 			},
 			supabaseClient
 		)
