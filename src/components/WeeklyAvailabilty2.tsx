@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, X, RotateCcw } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 
 type TimeSlot = {
@@ -20,13 +20,13 @@ type DayAvailability = {
 }
 
 const DAYS: Omit<DayAvailability, 'slots'>[] = [
-	{ day: 'Sunday', dayLetter: 'S', available: false },
-	{ day: 'Monday', dayLetter: 'M', available: true },
-	{ day: 'Tuesday', dayLetter: 'T', available: true },
-	{ day: 'Wednesday', dayLetter: 'W', available: true },
-	{ day: 'Thursday', dayLetter: 'T', available: true },
-	{ day: 'Friday', dayLetter: 'F', available: true },
-	{ day: 'Saturday', dayLetter: 'S', available: false }
+	{ day: 'Domingo', dayLetter: 'D', available: false },
+	{ day: 'Lunes', dayLetter: 'L', available: true },
+	{ day: 'Martes', dayLetter: 'M', available: true },
+	{ day: 'Miércoles', dayLetter: 'M', available: true },
+	{ day: 'Jueves', dayLetter: 'J', available: true },
+	{ day: 'Viernes', dayLetter: 'V', available: true },
+	{ day: 'Sábado', dayLetter: 'S', available: false }
 ]
 
 const TIME_OPTIONS = [
@@ -97,7 +97,12 @@ export function WeeklyAvailability() {
 				if (!res.ok) return
 				const payload = await res.json()
 				const rows: Array<{ weekday: number; start_time: string; end_time: string; timezone: string }> =
-					payload.rules || []
+					Array.isArray(payload?.rules) ? payload.rules : []
+
+				// If user has no saved availability, keep the default pre-filled availability
+				if (rows.length === 0) {
+					return
+				}
 				const map: Record<number, TimeSlot[]> = {}
 				for (const r of rows) {
 					const start = r.start_time.slice(0, 5)
@@ -207,12 +212,10 @@ export function WeeklyAvailability() {
 			{/* Header */}
 			<div className="space-y-2">
 				<div className="flex items-center gap-2">
-					<RotateCcw className="h-5 w-5 text-gray-700" />
 					<h2 className="text-2xl font-semibold text-gray-900">Disponibilidad</h2>
 				</div>
 				<p className="text-gray-600">
-					Configura tu disponibilidad semanal para que tus pacientes puedan agendar sus citas de forma
-					automática
+					Configura tu disponibilidad semanal para que tus pacientes puedan agendar sus citas directamente.
 				</p>
 			</div>
 
@@ -225,7 +228,7 @@ export function WeeklyAvailability() {
 							onClick={() => toggleDayAvailability(dayIndex)}
 							className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-colors ${
 								day.available
-									? 'bg-teal-600 text-white hover:bg-teal-700'
+									? 'bg-teal-400 text-white hover:bg-teal-700'
 									: 'bg-gray-200 text-gray-600 hover:bg-gray-300'
 							}`}
 							aria-label={`Toggle ${day.day} availability`}
@@ -237,7 +240,7 @@ export function WeeklyAvailability() {
 						<div className="flex-1 space-y-3">
 							{!day.available ? (
 								<div className="flex items-center gap-3 h-10">
-									<span className="text-gray-500">Unavailable</span>
+									<span className="text-gray-500 font-light">No disponible</span>
 									<button
 										onClick={() => toggleDayAvailability(dayIndex)}
 										className="text-gray-700 hover:text-gray-900 transition-colors"
@@ -320,13 +323,13 @@ export function WeeklyAvailability() {
 
 			{/* Timezone Selector */}
 			<div className="pt-4 border-t border-gray-200">
-				<p className="text-teal-600 font-medium">CET - Madrid</p>
+				<p className="text-gray-600 font-normal">CET - Madrid</p>
 			</div>
 
 			{/* Save Button */}
 			<div className="pt-4">
-				<Button onClick={handleSave} className="w-full h-12 bg-teal-600 hover:bg-teal-700 text-white">
-					Save Availability
+				<Button onClick={handleSave} className="w-full h-12 bg-teal-400 hover:bg-teal-400/90 text-white">
+					Guardar
 				</Button>
 			</div>
 		</div>

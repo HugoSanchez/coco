@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 		const { data: profile, error: pErr } = await service
 			.from('profiles')
 			.select('id, name, description, profile_picture_url')
-			.eq('username', username)
+			.ilike('username', username)
 			.single()
 		if (pErr || !profile) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 

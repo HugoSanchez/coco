@@ -186,7 +186,7 @@ export function ConfirmationForm({
 
 	// Render booking form
 	return (
-		<div className="p-4">
+		<div className="px-0">
 			{/* Pricing and appointment details */}
 			<h2 className="text-xl font-bold mb-1">Confirma tu cita</h2>
 			<p className="mb-4 text-gray-600 font-light text-sm">
@@ -277,7 +277,7 @@ export function ConfirmationForm({
 							<Spinner size="sm" />
 						) : (
 							<>
-								<p>Confirmar consulta</p>
+								<p>Confirmar cita</p>
 							</>
 						)}
 					</Button>

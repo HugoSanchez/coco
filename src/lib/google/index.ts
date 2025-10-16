@@ -55,7 +55,7 @@ export async function refreshToken(
 	refreshToken: string,
 	supabaseClient?: SupabaseClient
 ): Promise<string> {
-	console.log('🔄 [Token] Starting token refresh for user:', userId)
+	console.log('[Token] Starting token refresh for user:', userId)
 
 	// Use a per-request OAuth2 client to avoid cross-user credential bleed
 	const oauth2Client = createOAuthClient()
@@ -108,7 +108,7 @@ export async function refreshToken(
 			responseData: error?.response?.data,
 			hint: 'If errorMessage includes invalid_grant, user likely revoked access or refresh token aged out.'
 		}
-		console.log('🧪 [Token] Refresh debug payload:', debugPayload)
+		console.log('[Token] Refresh debug payload:', debugPayload)
 
 		// Handle invalid_grant errors specifically
 		if (error.message?.includes('invalid_grant')) {

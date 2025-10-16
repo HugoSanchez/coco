@@ -42,6 +42,24 @@ export default function Header() {
 
 	const isLandingPage = pathname === '/'
 
+	// Detect public booking page: /[username]
+	// We consider any single top-level path segment that is not a reserved
+	// app route as a username page (e.g., "/hugo").
+	const reservedRoutes = new Set([
+		'calendar',
+		'dashboard',
+		'login',
+		'onboarding',
+		'payment',
+		'payments',
+		'privacy-policy',
+		'settings'
+	])
+	const segments = (pathname || '').split('?')[0].split('/').filter(Boolean)
+	const firstSegment = segments[0] || ''
+	const isSingleSegment = segments.length === 1
+	const isUsernamePage = isSingleSegment && !reservedRoutes.has(firstSegment)
+
 	/**
 	 * Effect to handle scroll-based header styling
 	 * Adds shadow to header when user scrolls down
@@ -87,18 +105,11 @@ export default function Header() {
 		>
 			<div className="mx-auto px-6 md:px-16 h-full flex justify-between items-center">
 				{/* Logo/brand link */}
-				<Link
-					href={user ? '/dashboard' : '/'}
-					className="text-xl font-bold text-primary tracking-wide"
-				>
+				<Link href={user ? '/dashboard' : '/'} className="text-xl font-bold text-primary tracking-wide">
 					coco.
 				</Link>
-				{user && (
-					<DropDownUserMenu
-						user={user}
-						profile={profile}
-						handleSignOut={handleSignOut}
-					/>
+				{user && !isUsernamePage && (
+					<DropDownUserMenu user={user} profile={profile} handleSignOut={handleSignOut} />
 				)}
 			</div>
 		</header>

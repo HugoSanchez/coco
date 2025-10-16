@@ -71,7 +71,7 @@ export default function TimeSlots({ date, availableSlots, onSelectSlot, userTime
 	const slotsForDate = availableSlots[dateKey] || []
 
 	return (
-		<div>
+		<div className="pt-4">
 			{/* Header showing the selected date */}
 			<h2 className="text-xl font-bold mb-1">
 				{(() => {
@@ -82,8 +82,8 @@ export default function TimeSlots({ date, availableSlots, onSelectSlot, userTime
 					return `${cap}`
 				})()}
 			</h2>
-			<p className="mb-4 text-gray-600 font-light text-sm">
-				Estas son las horas disponibles, elige la que más te convenga.
+			<p className="mb-6 text-gray-600 font-light text-sm">
+				Estas son las horas disponibles para este día, elige la que más te convenga.
 			</p>
 
 			{/* Grid container for time slot buttons */}

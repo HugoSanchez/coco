@@ -3,6 +3,7 @@ import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getBookingsForDateRange } from '@/lib/db/bookings'
 import { getSystemGoogleEventIds } from '@/lib/db/calendar-events'
+import { getWeeklyAvailability } from '@/lib/db/availability'
 import { getGoogleCalendarEventsForRange } from '@/lib/calendar/calendar'
 
 type IsoString = string
@@ -79,6 +80,28 @@ export async function computeMonthlySlots(options: {
 	const slotsByDay: Record<string, Array<{ start: IsoString; end: IsoString }>> = {}
 
 	////////////////////////////////////////////////////////////
+	//// Step 3b: Load weekly availability configuration
+	//// - If no rules exist, we will fall back to windowStr for all days
+	////////////////////////////////////////////////////////////
+	let availabilityByWeekday: Record<
+		number,
+		Array<{ startH: number; startM: number; endH: number; endM: number; tz: string }>
+	> = {}
+	try {
+		const rules = await getWeeklyAvailability(options.userId, options.supabase)
+		for (const r of rules) {
+			const s = (r.start_time || '').slice(0, 5)
+			const e = (r.end_time || '').slice(0, 5)
+			const [sh, sm] = s.split(':').map((v) => parseInt(v || '0', 10))
+			const [eh, em] = e.split(':').map((v) => parseInt(v || '0', 10))
+			if (!availabilityByWeekday[r.weekday]) availabilityByWeekday[r.weekday] = []
+			availabilityByWeekday[r.weekday].push({ startH: sh, startM: sm, endH: eh, endM: em, tz: r.timezone || tz })
+		}
+	} catch (_) {
+		availabilityByWeekday = {}
+	}
+
+	////////////////////////////////////////////////////////////
 	//// Step 4: Fetch external events ONCE for the month
 	//// - Single Google call, then bucket by dayKey in tz
 	////////////////////////////////////////////////////////////
@@ -106,65 +129,75 @@ export async function computeMonthlySlots(options: {
 
 	for (const day of days) {
 		////////////////////////////////////////////////////////////
-		//// Step 5: Prepare day context (key + window in UTC)
+		//// Step 5: Prepare day context (key)
 		////////////////////////////////////////////////////////////
 		const dayKey = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
 		slotsByDay[dayKey] = []
 
-		// Compute CET window for the day → UTC instants
-		const windowStartUTC = fromZonedTime(setMinutes(setHours(day, startH), startM), tz)
-		const windowEndUTC = fromZonedTime(setMinutes(setHours(day, endH), endM), tz)
+		// Determine applicable availability rules for this weekday
+		const weekday = day.getDay() // 0..6 (Sun..Sat)
+		const rulesForDay = availabilityByWeekday[weekday]
 
-		////////////////////////////////////////////////////////////
-		//// Step 6: Build busy intervals for this day
-		//// 6a) From DB bookings (range was preloaded)
-		////////////////////////////////////////////////////////////
-		const busy: Array<{ start: Date; end: Date }> = []
-
-		// DB bookings (status filter assumed upstream; here we only test overlap)
-		for (const b of bookings) {
-			const bStart = new Date(b.start_time)
-			const bEnd = new Date(b.end_time)
-			// Only consider if overlaps the day window
-			if (overlaps(windowStartUTC, windowEndUTC, bStart, bEnd)) {
-				busy.push({ start: bStart, end: bEnd })
-			}
+		// If weekly availability exists but there are no rules for this day, skip (no slots)
+		if (Object.keys(availabilityByWeekday).length > 0 && (!rulesForDay || rulesForDay.length === 0)) {
+			continue
 		}
 
-		////////////////////////////////////////////////////////////
-		//// 6b) From external calendar (bucketed for day)
-		////////////////////////////////////////////////////////////
-		try {
-			const bucket = externalBuckets.get(dayKey) || []
-			for (const e of bucket) {
-				if (systemIdSet.has(e.googleEventId)) continue // dedup system-created events
-				const eStart = new Date(e.start)
-				const eEnd = new Date(e.end)
-				if (overlaps(windowStartUTC, windowEndUTC, eStart, eEnd)) {
-					busy.push({ start: eStart, end: eEnd })
+		// If no weekly rules configured at all, fall back to global window
+		const effectiveRules =
+			rulesForDay && rulesForDay.length > 0 ? rulesForDay : [{ startH, startM, endH, endM, tz }]
+
+		for (const rule of effectiveRules) {
+			// Compute window for the day → UTC instants using rule's timezone
+			const windowStartUTC = fromZonedTime(setMinutes(setHours(day, rule.startH), rule.startM), rule.tz)
+			const windowEndUTC = fromZonedTime(setMinutes(setHours(day, rule.endH), rule.endM), rule.tz)
+
+			//////////////////////////////////////////////////////////
+			//// Step 6: Build busy intervals for this day+rule window
+			//////////////////////////////////////////////////////////
+			const busy: Array<{ start: Date; end: Date }> = []
+
+			// DB bookings overlap with this window
+			for (const b of bookings) {
+				const bStart = new Date(b.start_time)
+				const bEnd = new Date(b.end_time)
+				if (overlaps(windowStartUTC, windowEndUTC, bStart, bEnd)) {
+					busy.push({ start: bStart, end: bEnd })
 				}
 			}
-		} catch (_) {
-			// ignore google failures
-		}
 
-		////////////////////////////////////////////////////////////
-		//// Step 7: Generate candidate slots and filter by overlaps
-		////////////////////////////////////////////////////////////
-		let cursor = new Date(windowStartUTC)
-		while (
-			isBefore(addMinutes(cursor, durationMin), windowEndUTC) ||
-			+addMinutes(cursor, durationMin) === +windowEndUTC
-		) {
-			const slotStart = new Date(cursor)
-			const slotEnd = addMinutes(slotStart, durationMin)
-
-			// Overlap check with any busy interval
-			const overlapping = busy.some((b) => overlaps(slotStart, slotEnd, b.start, b.end))
-			if (!overlapping) {
-				slotsByDay[dayKey].push({ start: slotStart.toISOString(), end: slotEnd.toISOString() })
+			// External events overlap with this window
+			try {
+				const bucket = externalBuckets.get(dayKey) || []
+				for (const e of bucket) {
+					if (systemIdSet.has(e.googleEventId)) continue
+					const eStart = new Date(e.start)
+					const eEnd = new Date(e.end)
+					if (overlaps(windowStartUTC, windowEndUTC, eStart, eEnd)) {
+						busy.push({ start: eStart, end: eEnd })
+					}
+				}
+			} catch (_) {
+				// ignore google failures
 			}
-			cursor = slotEnd
+
+			//////////////////////////////////////////////////////////
+			//// Step 7: Generate candidate slots and filter by overlaps
+			//////////////////////////////////////////////////////////
+			let cursor = new Date(windowStartUTC)
+			while (
+				isBefore(addMinutes(cursor, durationMin), windowEndUTC) ||
+				+addMinutes(cursor, durationMin) === +windowEndUTC
+			) {
+				const slotStart = new Date(cursor)
+				const slotEnd = addMinutes(slotStart, durationMin)
+
+				const overlapping = busy.some((b) => overlaps(slotStart, slotEnd, b.start, b.end))
+				if (!overlapping) {
+					slotsByDay[dayKey].push({ start: slotStart.toISOString(), end: slotEnd.toISOString() })
+				}
+				cursor = slotEnd
+			}
 		}
 	}
 

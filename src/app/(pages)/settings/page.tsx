@@ -11,8 +11,9 @@ import { BillingPreferencesStep } from '@/components/BillingPreferencesStep'
 import { PaymentsStep } from '@/components/PaymentsStep'
 import { Spinner } from '@/components/ui/spinner'
 import { WeeklyAvailability } from '@/components/WeeklyAvailabilty2'
+import { WeeklyAgenda } from '@/components/WeeklyAgenda'
 
-type SettingsSection = 'profile' | 'calendar' | 'billing' | 'payments' | 'fiscal'
+type SettingsSection = 'profile' | 'calendar' | 'availability' | 'billing' | 'payments' | 'fiscal'
 
 const settingsMenuItems = [
 	{
@@ -26,6 +27,12 @@ const settingsMenuItems = [
 		label: 'Calendario',
 		icon: Calendar,
 		description: 'Configure your calendar settings'
+	},
+	{
+		id: 'availability' as SettingsSection,
+		label: 'Disponibilidad',
+		icon: Calendar,
+		description: 'Gestiona tu disponibilidad semanal'
 	},
 	{
 		id: 'billing' as SettingsSection,
@@ -67,7 +74,7 @@ function SettingsContent() {
 	useEffect(() => {
 		// Check for tab parameter in URL and set active section
 		const tabParam = searchParams.get('tab')
-		if (tabParam && ['profile', 'calendar', 'billing', 'payments', 'fiscal'].includes(tabParam)) {
+		if (tabParam && ['profile', 'calendar', 'availability', 'billing', 'payments', 'fiscal'].includes(tabParam)) {
 			setActiveSection(tabParam as SettingsSection)
 			setIsInitialized(true)
 		} else if (!tabParam) {
@@ -144,7 +151,13 @@ function SettingsContent() {
 								console.log('Calendar settings updated')
 							}}
 						/>
-						<div className="mt-10">
+					</div>
+				)
+
+			case 'availability':
+				return (
+					<div className="">
+						<div className="mt-0">
 							<WeeklyAvailability />
 						</div>
 					</div>

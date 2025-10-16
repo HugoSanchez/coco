@@ -20,7 +20,11 @@ export async function GET(request: NextRequest) {
 
 		const service = createServiceRoleClient()
 		// Resolve practitioner by username → userId
-		const { data: profile, error } = await service.from('profiles').select('id').eq('username', username).single()
+		const { data: profile, error } = await service
+			.from('profiles')
+			.select('id')
+			.ilike('username', username)
+			.single()
 		if (error || !profile) return NextResponse.json({ error: 'Practitioner not found' }, { status: 404 })
 
 		const result = await computeMonthlySlots({
@@ -31,6 +35,8 @@ export async function GET(request: NextRequest) {
 			durationMin: duration,
 			supabase: service as any
 		})
+
+		// debug logs removed
 
 		return NextResponse.json(result)
 	} catch (e) {
