@@ -7,28 +7,29 @@ import { verifyManageSig } from '@/lib/crypto'
 export const dynamic = 'force-dynamic'
 
 /**
- * GET /api/public/bookings/:id/context?sig=...
+ * GET /api/public/bookings/:id/context?sig=...&action=reschedule|cancel
  *
- * Verifies the reschedule link and returns minimal data needed by the
- * public rescheduling page:
+ * Verifies the HMAC link for the given action and returns minimal data needed:
  * - username (for fetching slots/profile)
- * - currentStart/currentEnd (ISO) for context
+ * - currentStart/currentEnd (ISO)
+ * - status (e.g., 'canceled')
  */
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
 	try {
 		const { id } = params
 		const { searchParams } = new URL(request.url)
 		const sig = searchParams.get('sig') || ''
+		const action = (searchParams.get('action') || 'reschedule') as 'reschedule' | 'cancel'
 		if (!id || !sig) return NextResponse.json({ error: 'missing_params' }, { status: 400 })
 
 		const service = createServiceRoleClient()
 		const booking = await getBookingById(id, service as any)
 		if (!booking) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
-		// Validate signature with bookingId + client.email + 'reschedule'
+		// Validate signature with bookingId + client.email + action
 		const clientEmail = booking.client?.email
 		if (!clientEmail) return NextResponse.json({ error: 'client_not_found' }, { status: 404 })
-		const ok = verifyManageSig(sig, id, clientEmail, 'reschedule')
+		const ok = verifyManageSig(sig, id, clientEmail, action)
 		if (!ok) return NextResponse.json({ error: 'invalid_signature' }, { status: 401 })
 
 		const profile = await getProfileById(booking.user_id, service as any)
@@ -41,7 +42,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 			userId: booking.user_id,
 			username,
 			currentStart: booking.start_time,
-			currentEnd: booking.end_time
+			currentEnd: booking.end_time,
+			status: booking.status
 		})
 	} catch (e) {
 		console.error('public context error', e)
