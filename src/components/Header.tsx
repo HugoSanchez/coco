@@ -60,6 +60,9 @@ export default function Header() {
 	const isSingleSegment = segments.length === 1
 	const isUsernamePage = isSingleSegment && !reservedRoutes.has(firstSegment)
 
+	// Hide dropdown on rescheduling flows as well
+	const isReschedulingsPage = (pathname || '').startsWith('/reschedulings')
+
 	/**
 	 * Effect to handle scroll-based header styling
 	 * Adds shadow to header when user scrolls down
@@ -108,7 +111,7 @@ export default function Header() {
 				<Link href={user ? '/dashboard' : '/'} className="text-xl font-bold text-primary tracking-wide">
 					coco.
 				</Link>
-				{user && !isUsernamePage && (
+				{user && !isUsernamePage && !isReschedulingsPage && (
 					<DropDownUserMenu user={user} profile={profile} handleSignOut={handleSignOut} />
 				)}
 			</div>

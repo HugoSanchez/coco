@@ -103,7 +103,7 @@ export default function TimeSlots({ date, availableSlots, onSelectSlot, userTime
 						<button
 							key={index}
 							onClick={() => onSelectSlot(slot)}
-							className="bg-white border border-gray-200 rounded-md py-4 px-4 hover:bg-emerald-50 hover:border-emerald-300 text-sm font-normal text-gray-700"
+							className="bg-white border border-gray-200 rounded-md py-4 px-4 hover:bg-teal-50 hover:border-teal-300 text-sm font-normal text-gray-700"
 						>
 							{/* Mostrar hora de inicio en formato 24h */}
 							{format(startTime, 'HH:mm', { locale: es })}h

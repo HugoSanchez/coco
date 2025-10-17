@@ -27,3 +27,17 @@ export function formatSpanishTime24h(date: Date): string {
 export function formatSpanishDateWithTime(date: Date): string {
 	return `${formatSpanishLongDate(date)} a las ${formatSpanishTime24h(date)}`
 }
+
+/**
+ * Formats a Date exactly like: "Viernes 24 de Octubre de 2025 a las 16:00h"
+ * - No comma after weekday
+ * - 24h time with trailing 'h'
+ */
+export function formatSpanishDateTimeExact(date: Date): string {
+	const label = format(date, "EEEE d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })
+	// Capitalize first letter and the month name's first letter
+	const cap = label
+		.replace(/^./, (c) => c.toUpperCase())
+		.replace(/ de ([a-záéíóúñ])/, (match, p1) => ` de ${String(p1).toUpperCase()}`)
+	return `${cap}h`
+}

@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { format } from 'date-fns'
-import { formatSpanishLongDate, formatSpanishTime24h, formatSpanishDateWithTime } from '@/lib/date/format'
+import { formatSpanishLongDate, formatSpanishTime24h, formatSpanishDateWithTime } from '@/lib/dates/format'
 import { toZonedTime } from 'date-fns-tz'
 import { TimeSlot } from '@/lib/calendar/calendar'
 import { FaApple, FaCheckCircle } from 'react-icons/fa'
@@ -197,7 +197,7 @@ export function ConfirmationForm({
 			<form onSubmit={handleSubmit} className="space-y-4 mt-8">
 				{/* Name input field */}
 				<div>
-					<label htmlFor="name" className="block text-sm font-medium text-gray-700">
+					<label htmlFor="name" className="block text-sm mb-2 font-medium text-gray-700">
 						Nombre
 					</label>
 					<Input
@@ -212,7 +212,7 @@ export function ConfirmationForm({
 
 				{/* Email input field */}
 				<div>
-					<label htmlFor="email" className="block text-sm font-medium text-gray-700">
+					<label htmlFor="email" className="block mb-2 text-sm font-medium text-gray-700">
 						Email
 					</label>
 					<Input

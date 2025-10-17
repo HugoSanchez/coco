@@ -35,9 +35,10 @@ export async function GET(request: NextRequest) {
 			durationMin: duration,
 			supabase: service as any
 		})
-
-		// debug logs removed
-
+		console.log('available-slots result', {
+			userId: profile.id,
+			days: (result?.daysWithSlots || []).length
+		})
 		return NextResponse.json(result)
 	} catch (e) {
 		console.error('available-slots error', e)
