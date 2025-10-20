@@ -283,15 +283,18 @@ export function ProfileSetup({
 					<p className="text-xs text-gray-500 my-2">itscoco.app/book/{username}</p>
 				</div>
 
-				<div hidden>
+				<div>
 					<label htmlFor="description" className="block text-md font-medium text-gray-700">
-						Calendar Description
+						Descripción (opcional)
 					</label>
-					<p className="text-sm text-gray-500 mb-2">Help your clients understand what they are booking.</p>
+					<p className="text-sm text-gray-500 mb-2">
+						Esta descripción se mostrará en tu calendario de citas, solo si decides hacerlo público.
+					</p>
 					<Textarea
 						id="description"
 						value={description}
 						onChange={(e) => setDescription(e.target.value)}
+						placeholder="Ej. Psicóloga especializada en ansiedad y estrés. Sesiones online."
 						className="autofill:bg-white transition-none text-gray-700"
 						rows={3}
 					/>

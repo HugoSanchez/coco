@@ -214,9 +214,14 @@ function BookingPageContent() {
 					initialMonth={state.currentMonth}
 				/>
 				{/* About Section */}
+
 				<div className="bg-gray-50 p-2 rounded-lg mt-10">
 					<h2 className="text-lg font-semibold mb-2">Sobre {name}</h2>
-					<p className="text-md text-gray-700 font-light mb-6">{description}</p>
+					{(profile.description || description) && (profile.description || description)?.toString().trim() ? (
+						<p className="text-md text-gray-700 font-light mb-6 whitespace-pre-line">
+							{profile.description || description}
+						</p>
+					) : null}
 					<div className="flex flex-row items-center">
 						<Clock className="w-4 h-4 mr-2" />
 						<p className="font-light text-gray-700">{minutes || 60} minutos</p>

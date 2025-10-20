@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { computeMonthlySlots } from '@/lib/calendar/availability-orchestration'
+import { addHours } from 'date-fns'
+import { toZonedTime, fromZonedTime } from 'date-fns-tz'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,11 +37,33 @@ export async function GET(request: NextRequest) {
 			durationMin: duration,
 			supabase: service as any
 		})
-		console.log('available-slots result', {
-			userId: profile.id,
-			days: (result?.daysWithSlots || []).length
-		})
-		return NextResponse.json(result)
+		// Post-filter: enforce a 2-hour buffer for "now" in practitioner's timezone
+		// Any slot with start time before (now_in_tz + 2h) is removed
+		try {
+			const nowUtc = new Date()
+			const nowInTz = toZonedTime(nowUtc, tz)
+			const cutoffInTz = addHours(nowInTz, 2)
+			const cutoffUtc = fromZonedTime(cutoffInTz, tz)
+
+			const filteredSlotsByDay: Record<string, Array<{ start: string; end: string }>> = {}
+			for (const [day, slots] of Object.entries(result.slotsByDay || {})) {
+				filteredSlotsByDay[day] = (slots || []).filter((s) => new Date(s.start) >= cutoffUtc)
+			}
+			const daysWithSlots = Object.keys(filteredSlotsByDay).filter(
+				(d) => (filteredSlotsByDay[d] || []).length > 0
+			)
+
+			const payload = { ...result, slotsByDay: filteredSlotsByDay, daysWithSlots }
+			console.log('available-slots result', {
+				userId: profile.id,
+				days: daysWithSlots.length
+			})
+			return NextResponse.json(payload)
+		} catch (filterErr) {
+			// If anything goes wrong during filtering, fall back to original result
+			console.warn('[available-slots] buffer filter failed', filterErr)
+			return NextResponse.json(result)
+		}
 	} catch (e) {
 		console.error('available-slots error', e)
 		return NextResponse.json({ error: 'failed_to_compute_slots' }, { status: 500 })
