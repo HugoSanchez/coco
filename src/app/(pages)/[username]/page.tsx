@@ -2,18 +2,13 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
-
-import Calendar from '@/components/Calendar'
 import TimeSlots from '@/components/TimeSlots'
 import { ConfirmationForm } from '@/components/ConfirmationForm'
-import { Clock, ChevronLeft } from 'lucide-react'
-// Drawer removed in favor of inline 3-step flow
-import { Button } from '@/components/ui/button'
+import CalendarInfoStep from '@/components/CalendarInfoStep'
 import { parse, format, startOfMonth } from 'date-fns'
 import { TimeSlot } from '@/lib/calendar/calendar'
 import { Spinner } from '@/components/ui/spinner'
 import { UserProfileWithSchedule } from '@/lib/db/profiles'
-
 // Force dynamic rendering since this page uses useSearchParams and useParams
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +23,7 @@ interface PageState {
 	currentMonth: Date
 	userTimeZone: string
 	bookingConfirmed: boolean
+	consultationType: 'first' | 'followup'
 }
 
 function BookingPageContent() {
@@ -47,7 +43,8 @@ function BookingPageContent() {
 		selectedSlot: null,
 		currentMonth: startOfMonth(new Date()),
 		userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-		bookingConfirmed: false
+		bookingConfirmed: false,
+		consultationType: 'followup'
 	})
 
 	// Fetch user profile and initial data
@@ -165,71 +162,11 @@ function BookingPageContent() {
 		}
 	}
 
-	// Inline component: Profile info card
-	function CalendarInfocard({
-		name,
-		description,
-		minutes,
-		profile,
-		availableSlots,
-		selectedDate,
-		onSelectDate,
-		onMonthChange,
-		usernameStr
-	}: {
-		name: string
-		description: string | null
-		minutes: number | null
-		profile: UserProfileWithSchedule
-		availableSlots: { [day: string]: TimeSlot[] }
-		selectedDate: Date | null
-		onSelectDate: (date: Date) => void
-		onMonthChange: (newMonth: Date) => void
-		usernameStr: string
-	}) {
-		return (
-			<>
-				{/* Header Section */}
-				<div className="flex flex-col items-center mb-12 space-y-4">
-					{profile.profile_picture_url && window.innerWidth < 768 && (
-						<div className="flex items-center justify-center">
-							<img
-								src={profile.profile_picture_url}
-								alt={profile.name}
-								className="lg:h-8 lg:w-8 h-8 w-8 mr-3 lg:mr-0 rounded-full object-cover"
-							/>
-						</div>
-					)}
-					<div className="">
-						<h2 className="text-2xl font-light text-center">Agenda una cita con {profile.name}</h2>
-					</div>
-				</div>
-				{/* Calendar Section */}
-				<Calendar
-					username={usernameStr}
-					selectedDay={selectedDate}
-					availableSlots={availableSlots}
-					onSelectDate={onSelectDate}
-					onMonthChange={onMonthChange}
-					initialMonth={state.currentMonth}
-				/>
-				{/* About Section */}
-
-				<div className="bg-gray-50 p-2 rounded-lg mt-10">
-					<h2 className="text-lg font-semibold mb-2">Sobre {name}</h2>
-					{(profile.description || description) && (profile.description || description)?.toString().trim() ? (
-						<p className="text-md text-gray-700 font-light mb-6 whitespace-pre-line">
-							{profile.description || description}
-						</p>
-					) : null}
-					<div className="flex flex-row items-center">
-						<Clock className="w-4 h-4 mr-2" />
-						<p className="font-light text-gray-700">{minutes || 60} minutos</p>
-					</div>
-				</div>
-			</>
-		)
+	const handleConsultationTypeChange = (v: 'first' | 'followup') => {
+		setState((prev) => ({ ...prev, consultationType: v }))
 	}
+
+	// Removed legacy inline component (CalendarInfocard) in favor of CalendarInfoStep
 
 	function BackButtonComponent() {
 		if (state.selectedSlot || state.selectedDate) {
@@ -276,16 +213,19 @@ function BookingPageContent() {
 
 						{!state.selectedDate && (
 							<>
-								<CalendarInfocard
-									name={state.userProfile.name}
-									description={state.userProfile.description}
-									minutes={state.userProfile.schedules?.meeting_duration as any}
+								<CalendarInfoStep
 									profile={state.userProfile!}
-									availableSlots={state.availableSlots}
-									selectedDate={state.selectedDate}
-									onSelectDate={handleDateSelect}
-									onMonthChange={handleMonthChange}
-									usernameStr={username as string}
+									pricing={state.userProfile?.pricing}
+									calendar={{
+										availableSlots: state.availableSlots,
+										selectedDate: state.selectedDate,
+										onSelectDate: handleDateSelect,
+										onMonthChange: handleMonthChange,
+										username: username as string,
+										initialMonth: state.currentMonth
+									}}
+									consultationType={state.consultationType}
+									onConsultationTypeChange={handleConsultationTypeChange}
 								/>
 							</>
 						)}
@@ -305,6 +245,7 @@ function BookingPageContent() {
 								userTimeZone={state.userTimeZone}
 								practitionerPricing={state.userProfile?.pricing}
 								username={username as string}
+								selectedConsultationType={state.consultationType}
 								onConfirm={async (details) => {
 									// Mark confirmation complete to adjust back-button behavior
 									setState((prev) => ({ ...prev, bookingConfirmed: true }))

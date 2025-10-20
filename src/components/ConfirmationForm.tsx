@@ -9,6 +9,7 @@ import { toZonedTime } from 'date-fns-tz'
 import { TimeSlot } from '@/lib/calendar/calendar'
 import { FaApple, FaCheckCircle } from 'react-icons/fa'
 import { Spinner } from './ui/spinner'
+import { useToast } from '@/components/ui/use-toast'
 
 /**
  * Props interface for the ConfirmationForm component
@@ -30,6 +31,7 @@ interface ConfirmationFormProps {
 		first_consultation_amount?: number | null
 	}
 	username?: string
+	selectedConsultationType?: 'first' | 'followup'
 }
 
 /**
@@ -82,13 +84,17 @@ export function ConfirmationForm({
 	onConfirm,
 	onCancel,
 	practitionerPricing,
-	username
+	username,
+	selectedConsultationType
 }: ConfirmationFormProps) {
 	// Form state management
 	const [name, setName] = useState('')
 	const [email, setEmail] = useState('')
 	const [loading, setLoading] = useState(false)
-	const [consultationType, setConsultationType] = useState<'first' | 'followup'>('followup')
+	const [errorMsg, setErrorMsg] = useState<string | null>(null)
+	const [consultationType, setConsultationType] = useState<'first' | 'followup'>(
+		selectedConsultationType ?? 'followup'
+	)
 	const [isConfirmed, setIsConfirmed] = useState(false)
 	const [fadeIn, setFadeIn] = useState(false)
 
@@ -124,6 +130,7 @@ export function ConfirmationForm({
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
 		setLoading(true)
+		setErrorMsg(null)
 
 		try {
 			const res = await fetch('/api/public/bookings', {
@@ -139,21 +146,26 @@ export function ConfirmationForm({
 				})
 			})
 
+			console.log('[ConfirmationForm] booking created', res)
+
 			if (!res.ok) {
 				const payload = await res.json().catch(() => ({}))
 				if (res.status === 409 || payload?.error === 'slot_conflict') {
-					throw new Error('Ese hueco ya ha sido reservado. Por favor, elige otra hora.')
+					setErrorMsg('Ese hueco ya ha sido reservado. Por favor, elige otra hora.')
+					return
 				}
 				if (res.status === 400 && payload?.error === 'missing_fields') {
-					throw new Error('Faltan datos para completar la reserva.')
+					setErrorMsg('Faltan datos para completar la reserva.')
+					return
 				}
-				throw new Error('No se ha podido crear la cita. Inténtalo de nuevo.')
+				setErrorMsg('No se ha podido crear la cita. Inténtalo de nuevo.')
+				return
 			}
 
 			setIsConfirmed(true)
 			onConfirm({ name, email })
 		} catch (err) {
-			console.error(err)
+			setErrorMsg(err instanceof Error ? err.message : 'No se pudo crear la cita.')
 		} finally {
 			setLoading(false)
 		}
@@ -188,13 +200,16 @@ export function ConfirmationForm({
 	return (
 		<div className="px-0">
 			{/* Pricing and appointment details */}
-			<h2 className="text-xl font-bold mb-1">Confirma tu cita</h2>
+			<h2 className="text-xl font-bold mb-1">Introduce tus datos</h2>
 			<p className="mb-4 text-gray-600 font-light text-sm">
 				Rellena el formulario con tus datos y confirma la cita.
 			</p>
 
 			{/* Contact information form */}
 			<form onSubmit={handleSubmit} className="space-y-4 mt-8">
+				{errorMsg && (
+					<p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{errorMsg}</p>
+				)}
 				{/* Name input field */}
 				<div>
 					<label htmlFor="name" className="block text-sm mb-2 font-medium text-gray-700">
@@ -225,44 +240,6 @@ export function ConfirmationForm({
 					/>
 				</div>
 
-				{/* Appointment type and price (consistent select UI) */}
-				<div className="space-y-2">
-					<label htmlFor="email" className="block text-sm font-medium text-gray-700">
-						Tipo de consulta
-					</label>
-					{hasFirstPrice ? (
-						<Select
-							value={consultationType}
-							onValueChange={(val) => setConsultationType(val as 'first' | 'followup')}
-						>
-							<SelectTrigger className="h-12">
-								<SelectValue placeholder="Selecciona tipo de consulta" />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="first">
-									{`Primera consulta — ${new Intl.NumberFormat('es-ES', { style: 'currency', currency: practitionerPricing?.currency || 'EUR' }).format(Number(firstAmount || 0))}`}
-								</SelectItem>
-								<SelectItem value="followup">
-									{`Consulta de seguimiento — ${new Intl.NumberFormat('es-ES', { style: 'currency', currency: practitionerPricing?.currency || 'EUR' }).format(Number(baseAmount || 0))}`}
-								</SelectItem>
-							</SelectContent>
-						</Select>
-					) : (
-						<Select value={'followup'}>
-							<SelectTrigger className="h-12" disabled>
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="followup">
-									{`Consulta — ${new Intl.NumberFormat('es-ES', { style: 'currency', currency: practitionerPricing?.currency || 'EUR' }).format(Number(baseAmount || 0))}`}
-								</SelectItem>
-							</SelectContent>
-						</Select>
-					)}
-				</div>
-
-				{/* Information notice */}
-
 				{/* Payment button */}
 				<div className="flex flex-col justify-between">
 					<p className="mt-8 text-sm text-gray-700 font-light">
@@ -270,7 +247,8 @@ export function ConfirmationForm({
 						<span className="font-medium">{formatSpanishDateWithTime(startTime)}h</span>
 					</p>
 					<Button
-						onClick={handleSubmit}
+						type="submit"
+						disabled={loading || !name.trim() || !email.trim()}
 						className="w-full mt-8 h-12 text-white flex items-center justify-center"
 					>
 						{loading ? (

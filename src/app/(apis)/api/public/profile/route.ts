@@ -27,12 +27,14 @@ export async function GET(request: NextRequest) {
 		// Fetch default billing settings to expose price info publicly (non-sensitive subset)
 		const { data: billingDefaults } = await service
 			.from('billing_settings')
-			.select('billing_amount, currency, first_consultation_amount')
+			.select('billing_amount, currency, first_consultation_amount, updated_at, is_default')
 			.eq('user_id', profile.id)
 			.is('client_id', null)
 			.is('booking_id', null)
 			.eq('is_default', true)
-			.single()
+			.order('created_at', { ascending: false })
+			.limit(1)
+			.maybeSingle()
 
 		const response = {
 			id: profile.id,
@@ -48,6 +50,8 @@ export async function GET(request: NextRequest) {
 				first_consultation_amount: billingDefaults?.first_consultation_amount ?? null
 			}
 		}
+
+		console.log('[public/profile] fetched', response)
 
 		return NextResponse.json(response)
 	} catch (e) {
