@@ -51,8 +51,6 @@ export async function GET(request: NextRequest) {
 			}
 		}
 
-		console.log('[public/profile] fetched', response)
-
 		return NextResponse.json(response)
 	} catch (e) {
 		console.error('public profile error', e)

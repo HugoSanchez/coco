@@ -8,6 +8,7 @@ import CalendarInfoStep from '@/components/CalendarInfoStep'
 import { parse, format, startOfMonth } from 'date-fns'
 import { TimeSlot } from '@/lib/calendar/calendar'
 import { Spinner } from '@/components/ui/spinner'
+import { hasVisitedBooking, markVisitedBooking } from '@/lib/utils'
 import { UserProfileWithSchedule } from '@/lib/db/profiles'
 // Force dynamic rendering since this page uses useSearchParams and useParams
 export const dynamic = 'force-dynamic'
@@ -165,6 +166,22 @@ function BookingPageContent() {
 	const handleConsultationTypeChange = (v: 'first' | 'followup') => {
 		setState((prev) => ({ ...prev, consultationType: v }))
 	}
+
+	// Initialize consultation type smart default based on visit flag
+	const consultInitRef = useRef(false)
+	useEffect(() => {
+		if (consultInitRef.current) return
+		if (!state.userProfile) return
+		const pricing = state.userProfile?.pricing
+		const firstExists =
+			pricing?.first_consultation_amount != null && !Number.isNaN(Number(pricing.first_consultation_amount))
+		const followupExists = pricing?.amount != null && !Number.isNaN(Number(pricing.amount))
+		const isReturning = hasVisitedBooking(String(username))
+		const next: 'first' | 'followup' = !isReturning && firstExists ? 'first' : followupExists ? 'followup' : 'first'
+		setState((prev) => ({ ...prev, consultationType: next }))
+		markVisitedBooking(String(username))
+		consultInitRef.current = true
+	}, [state.userProfile, username])
 
 	// Removed legacy inline component (CalendarInfocard) in favor of CalendarInfoStep
 

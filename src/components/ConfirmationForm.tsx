@@ -10,6 +10,7 @@ import { TimeSlot } from '@/lib/calendar/calendar'
 import { FaApple, FaCheckCircle } from 'react-icons/fa'
 import { Spinner } from './ui/spinner'
 import { useToast } from '@/components/ui/use-toast'
+import confetti from 'canvas-confetti'
 
 /**
  * Props interface for the ConfirmationForm component
@@ -108,6 +109,7 @@ export function ConfirmationForm({
 	 */
 	useEffect(() => {
 		if (isConfirmed) {
+			confetti({ particleCount: 20 })
 			// Trigger the fade-in effect after a short delay
 			// This ensures the confirmation screen appears smoothly
 			const timer = setTimeout(() => setFadeIn(true), 50)
