@@ -51,6 +51,9 @@ export interface BillingPreferences {
 	billingType: BillingType
 	billingAmount: string
 	firstConsultationAmount?: string
+	// Durations (minutes). Normal is required-ish; first is optional
+	meetingDurationMin?: string
+	firstMeetingDurationMin?: string
 	paymentEmailLeadHours?: string
 }
 
@@ -60,9 +63,7 @@ export interface BillingPreferences {
  * @param userId - UUID of the user whose default settings to fetch
  * @returns Promise<BillingPreferences|null> - Billing preferences in form format, or null if none exist
  */
-export async function getBillingPreferences(
-	userId: string
-): Promise<BillingPreferences | null> {
+export async function getBillingPreferences(userId: string): Promise<BillingPreferences | null> {
 	try {
 		const { data, error } = await supabase
 			.from('billing_settings')
@@ -84,12 +85,15 @@ export async function getBillingPreferences(
 		return {
 			billingType: data.billing_type,
 			billingAmount: data.billing_amount?.toString() || '',
-			firstConsultationAmount:
-				data.first_consultation_amount?.toString() || '',
+			firstConsultationAmount: data.first_consultation_amount?.toString() || '',
+			meetingDurationMin:
+				(data as any).meeting_duration_min != null ? String((data as any).meeting_duration_min) : '60',
+			firstMeetingDurationMin:
+				(data as any).first_meeting_duration_min != null
+					? String((data as any).first_meeting_duration_min)
+					: '',
 			paymentEmailLeadHours:
-				(data as any).payment_email_lead_hours != null
-					? String((data as any).payment_email_lead_hours)
-					: '0'
+				(data as any).payment_email_lead_hours != null ? String((data as any).payment_email_lead_hours) : '0'
 		}
 	} catch (error) {
 		console.error('Error in getBillingPreferences:', error)
@@ -116,27 +120,29 @@ export async function saveBillingPreferences(
 		}
 
 		// Optional first consultation amount
-		if (
-			preferences.firstConsultationAmount != null &&
-			preferences.firstConsultationAmount !== ''
-		) {
+		if (preferences.firstConsultationAmount != null && preferences.firstConsultationAmount !== '') {
 			const parsed = parseFloat(preferences.firstConsultationAmount)
-			billingData.first_consultation_amount = isNaN(parsed)
-				? null
-				: parsed
+			billingData.first_consultation_amount = isNaN(parsed) ? null : parsed
 		} else {
 			billingData.first_consultation_amount = null
 		}
 
 		// Optional payment email lead hours
-		if (
-			preferences.paymentEmailLeadHours != null &&
-			preferences.paymentEmailLeadHours !== ''
-		) {
+		if (preferences.paymentEmailLeadHours != null && preferences.paymentEmailLeadHours !== '') {
 			const parsedLead = parseInt(preferences.paymentEmailLeadHours, 10)
-			billingData.payment_email_lead_hours = isNaN(parsedLead)
-				? null
-				: parsedLead
+			billingData.payment_email_lead_hours = isNaN(parsedLead) ? null : parsedLead
+		}
+
+		// Durations (minutes)
+		{
+			const parsedMeeting = preferences.meetingDurationMin ? parseInt(preferences.meetingDurationMin, 10) : 60
+			billingData.meeting_duration_min = Number.isNaN(parsedMeeting) ? 60 : parsedMeeting
+		}
+		if (preferences.firstMeetingDurationMin != null && preferences.firstMeetingDurationMin !== '') {
+			const parsedFirst = parseInt(preferences.firstMeetingDurationMin, 10)
+			billingData.first_meeting_duration_min = Number.isNaN(parsedFirst) ? null : parsedFirst
+		} else {
+			billingData.first_meeting_duration_min = null
 		}
 
 		// First, attempt to update existing default settings
@@ -244,10 +250,7 @@ export async function getUserDefaultBillingSettings(
 			if (error.code === 'PGRST116') {
 				return null // Not found
 			}
-			console.error(
-				'❌ Error fetching user default billing settings:',
-				error
-			)
+			console.error('❌ Error fetching user default billing settings:', error)
 			return null
 		}
 
@@ -330,13 +333,8 @@ export async function getClientBillingPreferences(
 	if (!data) return null
 	return {
 		billingType: data.billing_type as BillingType,
-		billingAmount:
-			data.billing_amount != null
-				? String(data.billing_amount)
-				: undefined,
+		billingAmount: data.billing_amount != null ? String(data.billing_amount) : undefined,
 		paymentEmailLeadHours:
-			(data as any).payment_email_lead_hours != null
-				? String((data as any).payment_email_lead_hours)
-				: undefined
+			(data as any).payment_email_lead_hours != null ? String((data as any).payment_email_lead_hours) : undefined
 	}
 }
