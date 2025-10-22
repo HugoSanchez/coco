@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "13.0.4"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       billing_settings: {
@@ -23,8 +48,10 @@ export type Database = {
           created_at: string | null
           currency: string
           first_consultation_amount: number | null
+          first_meeting_duration_min: number | null
           id: string
           is_default: boolean | null
+          meeting_duration_min: number | null
           payment_email_lead_hours: number | null
           updated_at: string | null
           user_id: string | null
@@ -37,8 +64,10 @@ export type Database = {
           created_at?: string | null
           currency?: string
           first_consultation_amount?: number | null
+          first_meeting_duration_min?: number | null
           id?: string
           is_default?: boolean | null
+          meeting_duration_min?: number | null
           payment_email_lead_hours?: number | null
           updated_at?: string | null
           user_id?: string | null
@@ -51,8 +80,10 @@ export type Database = {
           created_at?: string | null
           currency?: string
           first_consultation_amount?: number | null
+          first_meeting_duration_min?: number | null
           id?: string
           is_default?: boolean | null
+          meeting_duration_min?: number | null
           payment_email_lead_hours?: number | null
           updated_at?: string | null
           user_id?: string | null
@@ -91,18 +122,21 @@ export type Database = {
           client_name: string
           created_at: string
           currency: string
-          due_date: string | null
           email_scheduled_at: string | null
           email_send_locked_at: string | null
           id: string
+          invoice_id: string | null
           notes: string | null
           paid_at: string | null
+          refund_invoice_id: string | null
           refund_reason: string | null
           refunded_amount: number
           refunded_at: string | null
           sent_at: string | null
           status: string
           stripe_refund_id: string | null
+          tax_amount: number
+          tax_rate_percent: number
           updated_at: string
           user_id: string
         }
@@ -115,18 +149,21 @@ export type Database = {
           client_name: string
           created_at?: string
           currency?: string
-          due_date?: string | null
           email_scheduled_at?: string | null
           email_send_locked_at?: string | null
           id?: string
+          invoice_id?: string | null
           notes?: string | null
           paid_at?: string | null
+          refund_invoice_id?: string | null
           refund_reason?: string | null
           refunded_amount?: number
           refunded_at?: string | null
           sent_at?: string | null
           status?: string
           stripe_refund_id?: string | null
+          tax_amount?: number
+          tax_rate_percent?: number
           updated_at?: string
           user_id: string
         }
@@ -139,18 +176,21 @@ export type Database = {
           client_name?: string
           created_at?: string
           currency?: string
-          due_date?: string | null
           email_scheduled_at?: string | null
           email_send_locked_at?: string | null
           id?: string
+          invoice_id?: string | null
           notes?: string | null
           paid_at?: string | null
+          refund_invoice_id?: string | null
           refund_reason?: string | null
           refunded_amount?: number
           refunded_at?: string | null
           sent_at?: string | null
           status?: string
           stripe_refund_id?: string | null
+          tax_amount?: number
+          tax_rate_percent?: number
           updated_at?: string
           user_id?: string
         }
@@ -167,6 +207,20 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_refund_invoice_id_fkey"
+            columns: ["refund_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
         ]
@@ -404,6 +458,150 @@ export type Database = {
           },
         ]
       }
+      invoice_counters: {
+        Row: {
+          next_number: number
+          series: string
+          user_id: string
+        }
+        Insert: {
+          next_number: number
+          series: string
+          user_id: string
+        }
+        Update: {
+          next_number?: number
+          series?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      invoices: {
+        Row: {
+          billing_period_end: string | null
+          billing_period_start: string | null
+          canceled_at: string | null
+          client_email_snapshot: string
+          client_id: string | null
+          client_name_snapshot: string
+          created_at: string
+          currency: string
+          document_kind: string
+          due_date: string | null
+          id: string
+          issued_at: string | null
+          issuer_address_snapshot: Json | null
+          issuer_name_snapshot: string | null
+          issuer_tax_id_snapshot: string | null
+          legacy_bill_id: string | null
+          month: number | null
+          notes: string | null
+          number: number | null
+          paid_at: string | null
+          pdf_sha256: string | null
+          pdf_url: string | null
+          reason: string | null
+          rectifies_invoice_id: string | null
+          series: string | null
+          status: string
+          stripe_receipt_url: string | null
+          stripe_refund_id: string | null
+          subtotal: number
+          tax_total: number
+          total: number
+          updated_at: string
+          user_id: string
+          year: number | null
+        }
+        Insert: {
+          billing_period_end?: string | null
+          billing_period_start?: string | null
+          canceled_at?: string | null
+          client_email_snapshot: string
+          client_id?: string | null
+          client_name_snapshot: string
+          created_at?: string
+          currency?: string
+          document_kind?: string
+          due_date?: string | null
+          id?: string
+          issued_at?: string | null
+          issuer_address_snapshot?: Json | null
+          issuer_name_snapshot?: string | null
+          issuer_tax_id_snapshot?: string | null
+          legacy_bill_id?: string | null
+          month?: number | null
+          notes?: string | null
+          number?: number | null
+          paid_at?: string | null
+          pdf_sha256?: string | null
+          pdf_url?: string | null
+          reason?: string | null
+          rectifies_invoice_id?: string | null
+          series?: string | null
+          status?: string
+          stripe_receipt_url?: string | null
+          stripe_refund_id?: string | null
+          subtotal?: number
+          tax_total?: number
+          total?: number
+          updated_at?: string
+          user_id: string
+          year?: number | null
+        }
+        Update: {
+          billing_period_end?: string | null
+          billing_period_start?: string | null
+          canceled_at?: string | null
+          client_email_snapshot?: string
+          client_id?: string | null
+          client_name_snapshot?: string
+          created_at?: string
+          currency?: string
+          document_kind?: string
+          due_date?: string | null
+          id?: string
+          issued_at?: string | null
+          issuer_address_snapshot?: Json | null
+          issuer_name_snapshot?: string | null
+          issuer_tax_id_snapshot?: string | null
+          legacy_bill_id?: string | null
+          month?: number | null
+          notes?: string | null
+          number?: number | null
+          paid_at?: string | null
+          pdf_sha256?: string | null
+          pdf_url?: string | null
+          reason?: string | null
+          rectifies_invoice_id?: string | null
+          series?: string | null
+          status?: string
+          stripe_receipt_url?: string | null
+          stripe_refund_id?: string | null
+          subtotal?: number
+          tax_total?: number
+          total?: number
+          updated_at?: string
+          user_id?: string
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_rectifies_invoice_id_fkey"
+            columns: ["rectifies_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_sessions: {
         Row: {
           amount: number
@@ -411,6 +609,7 @@ export type Database = {
           completed_at: string | null
           created_at: string | null
           id: string
+          invoice_id: string | null
           status: string
           stripe_payment_intent_id: string | null
           stripe_session_id: string
@@ -421,6 +620,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           id?: string
+          invoice_id?: string | null
           status?: string
           stripe_payment_intent_id?: string | null
           stripe_session_id: string
@@ -431,6 +631,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           id?: string
+          invoice_id?: string | null
           status?: string
           stripe_payment_intent_id?: string | null
           stripe_session_id?: string
@@ -443,6 +644,13 @@ export type Database = {
             referencedRelation: "bookings"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "payment_sessions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profiles: {
@@ -451,9 +659,16 @@ export type Database = {
           default_in_person_location_text: string | null
           description: string | null
           email: string
+          fiscal_address_line1: string | null
+          fiscal_address_line2: string | null
+          fiscal_city: string | null
+          fiscal_country: string | null
+          fiscal_postal_code: string | null
+          fiscal_province: string | null
           id: string
           name: string | null
           profile_picture_url: string | null
+          tax_id: string | null
           updated_at: string
           username: string | null
         }
@@ -462,9 +677,16 @@ export type Database = {
           default_in_person_location_text?: string | null
           description?: string | null
           email: string
+          fiscal_address_line1?: string | null
+          fiscal_address_line2?: string | null
+          fiscal_city?: string | null
+          fiscal_country?: string | null
+          fiscal_postal_code?: string | null
+          fiscal_province?: string | null
           id: string
           name?: string | null
           profile_picture_url?: string | null
+          tax_id?: string | null
           updated_at?: string
           username?: string | null
         }
@@ -473,9 +695,16 @@ export type Database = {
           default_in_person_location_text?: string | null
           description?: string | null
           email?: string
+          fiscal_address_line1?: string | null
+          fiscal_address_line2?: string | null
+          fiscal_city?: string | null
+          fiscal_country?: string | null
+          fiscal_postal_code?: string | null
+          fiscal_province?: string | null
           id?: string
           name?: string | null
           profile_picture_url?: string | null
+          tax_id?: string | null
           updated_at?: string
           username?: string | null
         }
@@ -544,12 +773,48 @@ export type Database = {
         }
         Relationships: []
       }
+      weekly_availability: {
+        Row: {
+          created_at: string
+          end_time: string
+          id: string
+          start_time: string
+          timezone: string
+          updated_at: string
+          user_id: string
+          weekday: number
+        }
+        Insert: {
+          created_at?: string
+          end_time: string
+          id?: string
+          start_time: string
+          timezone?: string
+          updated_at?: string
+          user_id: string
+          weekday: number
+        }
+        Update: {
+          created_at?: string
+          end_time?: string
+          id?: string
+          start_time?: string
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+          weekday?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      ensure_invoice_counter: {
+        Args: { s: string; u: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
@@ -678,6 +943,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

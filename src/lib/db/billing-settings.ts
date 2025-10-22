@@ -34,6 +34,9 @@ export interface BillingSettings {
 	created_at: string
 	updated_at: string
 	first_consultation_amount?: number | null
+	// New duration fields stored with practitioner defaults
+	meeting_duration_min?: number | null
+	first_meeting_duration_min?: number | null
 	/**
 	 * When to send the payment email relative to the booking.
 	 * NULL or 0 => immediate; positive hours => that many hours before start_time; -1 => after at end_time

@@ -19,6 +19,7 @@ interface PageState {
 	error: string | null
 	userProfile: UserProfileWithSchedule | null // Update this type
 	availableSlots: { [day: string]: TimeSlot[] }
+	firstSlots?: { [day: string]: TimeSlot[] }
 	selectedDate: Date | null
 	selectedSlot: TimeSlot | null
 	currentMonth: Date
@@ -40,6 +41,7 @@ function BookingPageContent() {
 		error: null,
 		userProfile: null,
 		availableSlots: {},
+		firstSlots: {},
 		selectedDate: null,
 		selectedSlot: null,
 		currentMonth: startOfMonth(new Date()),
@@ -84,7 +86,8 @@ function BookingPageContent() {
 				if (!slotsRes.ok) throw new Error('Failed to fetch available slots')
 				const slotsPayload = await slotsRes.json()
 				const availableSlots = slotsPayload?.slotsByDay || {}
-				setState((prev) => ({ ...prev, availableSlots, isLoadingSlots: false }))
+				const firstSlots = slotsPayload?.firstSlotsByDay || {}
+				setState((prev) => ({ ...prev, availableSlots, firstSlots, isLoadingSlots: false }))
 			} catch (error) {
 				console.error('Error initializing page:', error)
 				setState((prev) => ({
@@ -122,7 +125,13 @@ function BookingPageContent() {
 			if (!res.ok) throw new Error('Failed to fetch available slots')
 			const payload = await res.json()
 			const nextSlots = payload?.slotsByDay || {}
-			setState((prev) => ({ ...prev, availableSlots: nextSlots, isLoadingSlots: false }))
+			const nextFirstSlots = payload?.firstSlotsByDay || {}
+			setState((prev) => ({
+				...prev,
+				availableSlots: nextSlots,
+				firstSlots: nextFirstSlots,
+				isLoadingSlots: false
+			}))
 		} catch (error) {
 			console.error('Error fetching available slots:', error)
 			setState((prev) => ({ ...prev, isLoadingSlots: false }))
@@ -152,6 +161,29 @@ function BookingPageContent() {
 				selectedDate: null,
 				bookingConfirmed: false
 			}))
+
+			// Refresh available slots to reflect the latest booking
+			;(async () => {
+				try {
+					setState((prev) => ({ ...prev, isLoadingSlots: true }))
+					const res = await fetch(
+						`/api/calendar/available-slots?username=${username}&month=${state.currentMonth.toISOString()}`
+					)
+					if (!res.ok) throw new Error('Failed to fetch available slots')
+					const payload = await res.json()
+					const nextSlots = payload?.slotsByDay || {}
+					const nextFirstSlots = payload?.firstSlotsByDay || {}
+					setState((prev) => ({
+						...prev,
+						availableSlots: nextSlots,
+						firstSlots: nextFirstSlots,
+						isLoadingSlots: false
+					}))
+				} catch (error) {
+					console.error('Error refreshing available slots:', error)
+					setState((prev) => ({ ...prev, isLoadingSlots: false }))
+				}
+			})()
 		} else if (state.selectedSlot) {
 			setState((prev) => ({ ...prev, selectedSlot: null }))
 		} else {
@@ -234,7 +266,10 @@ function BookingPageContent() {
 									profile={state.userProfile!}
 									pricing={state.userProfile?.pricing}
 									calendar={{
-										availableSlots: state.availableSlots,
+										availableSlots:
+											state.consultationType === 'first' && state.firstSlots
+												? (state.firstSlots as { [day: string]: TimeSlot[] })
+												: state.availableSlots,
 										selectedDate: state.selectedDate,
 										onSelectDate: handleDateSelect,
 										onMonthChange: handleMonthChange,
@@ -250,7 +285,11 @@ function BookingPageContent() {
 						{state.selectedDate && !state.selectedSlot && (
 							<TimeSlots
 								date={state.selectedDate}
-								availableSlots={state.availableSlots}
+								availableSlots={
+									state.consultationType === 'first' && state.firstSlots
+										? (state.firstSlots as { [day: string]: TimeSlot[] })
+										: state.availableSlots
+								}
 								userTimeZone={state.userTimeZone}
 								onSelectSlot={handleSlotSelect}
 							/>

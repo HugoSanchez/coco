@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 			.is('client_id', null)
 			.is('booking_id', null)
 			.eq('is_default', true)
-			.order('created_at', { ascending: false })
+			.order('updated_at', { ascending: false })
 			.limit(1)
 			.maybeSingle()
 

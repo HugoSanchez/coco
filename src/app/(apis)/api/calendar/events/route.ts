@@ -67,15 +67,18 @@ export async function GET(request: NextRequest) {
 			// Non-fatal: external calendar may be disconnected
 		}
 
-		// Format system bookings
-		const formattedSystemBookings = systemBookings.map((booking: any) => ({
-			start: booking.start_time,
-			end: booking.end_time,
-			title: booking.client?.name || 'Cliente',
-			type: 'system',
-			status: booking.status,
-			bookingId: booking.id
-		}))
+		// Format system bookings with patient's full name when available
+		const formattedSystemBookings = systemBookings.map((booking: any) => {
+			const fullName = [booking.client?.name, booking.client?.last_name].filter(Boolean).join(' ').trim()
+			return {
+				start: booking.start_time,
+				end: booking.end_time,
+				title: fullName || 'Cliente',
+				type: 'system',
+				status: booking.status,
+				bookingId: booking.id
+			}
+		})
 
 		// Filter out Google events that are actually our system bookings
 		const systemEventIdSet = new Set(systemEventIds)

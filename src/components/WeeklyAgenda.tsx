@@ -456,10 +456,10 @@ export function WeeklyAgenda() {
 				}
 			case 'scheduled':
 				return {
-					bg: 'bg-blue-50',
-					text: 'text-blue-700',
-					icon: <Clock className="h-3 w-3" />,
-					label: 'Scheduled'
+					bg: '',
+					text: 'text-teal-700',
+					icon: <Check className="h-3 w-3" />,
+					label: 'Pagada'
 				}
 			case 'canceled':
 				return {
@@ -483,11 +483,11 @@ export function WeeklyAgenda() {
 			case 'completed':
 				return 'border-l-teal-500'
 			case 'scheduled':
-				return 'border-l-blue-500'
+				return 'border-l-teal-500'
 			case 'canceled':
 				return 'border-l-red-500'
 			case 'waiting':
-				return 'border-l-amber-500'
+				return 'border-l-teal-200'
 		}
 	}
 
@@ -647,7 +647,7 @@ export function WeeklyAgenda() {
 										return (
 											<div
 												key={booking.id}
-												className={`absolute left-2 right-2 bg-white rounded border border-gray-200 border-l-4 ${borderColor} cursor-pointer transition-all hover:shadow-md pointer-events-auto z-0 overflow-hidden`}
+												className={`absolute left-2 right-2 bg-teal-50 rounded border border-gray-200 border-l-4 ${borderColor} cursor-pointer transition-all hover:shadow-md pointer-events-auto z-0 overflow-hidden`}
 												style={{
 													top: position.top,
 													height: position.height
@@ -666,9 +666,9 @@ export function WeeklyAgenda() {
 														</div>
 													</div>
 													<div
-														className={`flex items-center gap-1.5 mt-2 px-2 py-1 rounded text-xs font-medium ${statusBadge.bg} ${statusBadge.text}`}
+														className={`flex items-center gap-1.5 mt-2 py-1 rounded text-xs font-medium ${statusBadge.bg} ${statusBadge.text}`}
 													>
-														{statusBadge.icon}
+														<div className="h-2 w-2 bg-teal-500 rounded-full" />
 														{statusBadge.label}
 													</div>
 												</div>

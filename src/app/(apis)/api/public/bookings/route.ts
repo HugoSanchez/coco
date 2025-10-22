@@ -65,12 +65,14 @@ export async function POST(req: NextRequest) {
 		////// Step 2: Re-check availability quickly using existing monthly slots (CET window)
 		//////////////////////////////////////////////////////////////////////////////////////////
 		const monthIso = new Date(startIso).toISOString()
+		// Derive the intended slot duration from the provided start/end
+		const durationMin = Math.max(1, Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000))
 		const slotsResult = await computeMonthlySlots({
 			userId,
 			monthIso,
 			tz: 'Europe/Madrid',
 			window: '08:00-20:00',
-			durationMin: 60,
+			durationMin: durationMin,
 			supabase: service as any
 		})
 		const startDay = startIso.slice(0, 10)
