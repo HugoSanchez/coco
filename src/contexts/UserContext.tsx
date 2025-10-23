@@ -43,6 +43,8 @@ import posthog from 'posthog-js'
 interface UserProfile {
 	id: string
 	name: string
+	last_name?: string | null
+	full_name?: string | null
 	username: string
 	email: string
 	description?: string

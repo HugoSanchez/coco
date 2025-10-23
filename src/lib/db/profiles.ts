@@ -36,6 +36,8 @@ const supabase = createSupabaseClient()
 export interface UserProfileWithSchedule {
 	id: string
 	name: string
+	last_name?: string | null
+	full_name?: string | null
 	description: string
 	profile_picture_url?: string
 	schedules?: {
@@ -69,6 +71,8 @@ export interface UserProfileWithSchedule {
 export interface Profile {
 	id: string
 	name: string | null
+	last_name?: string | null
+	full_name?: string | null
 	username: string | null
 	email: string
 	description: string | null
@@ -83,6 +87,36 @@ export interface Profile {
 	fiscal_province?: string | null
 	fiscal_postal_code?: string | null
 	fiscal_country?: string | null
+}
+
+/**
+ * Returns a user's full name using name + last_name when available.
+ */
+export function getUserFullName(user: { name: string | null; last_name?: string | null } | null): string {
+	if (!user) return 'Usuario'
+	const first = (user.name || '').trim()
+	const last = (user.last_name || '').trim()
+	return (first + ' ' + last).trim() || first || last || 'Usuario'
+}
+
+/**
+ * Retrieves a user's profile by their username (case-insensitive) with public fields.
+ */
+export async function getProfileByUsername(username: string, supabaseClient?: SupabaseClient): Promise<Profile | null> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('profiles')
+		.select(
+			'id, name, last_name, full_name, username, email, description, profile_picture_url, default_in_person_location_text, tax_id, updated_at'
+		)
+		.ilike('username', username)
+		.single()
+
+	if (error) {
+		if ((error as any).code === 'PGRST116') return null
+		throw error
+	}
+	return data as any
 }
 
 /**

@@ -35,6 +35,7 @@ export function ProfileSetup({
 	const pathname = usePathname()
 	const [name, setName] = useState('')
 	const [username, setUsername] = useState('')
+	const [lastName, setLastName] = useState('')
 	const [description, setDescription] = useState('')
 	const [profilePicture, setProfilePicture] = useState<File | null>(null)
 	const [isLoading, setIsLoading] = useState(false)
@@ -44,6 +45,7 @@ export function ProfileSetup({
 	useEffect(() => {
 		if (profile) {
 			setName(profile.name || '')
+			setLastName((profile as any).last_name || '')
 			setUsername(profile.username || '')
 			setDescription(profile.description || '')
 			setPreviewUrl(profile.profile_picture_url || null)
@@ -90,6 +92,7 @@ export function ProfileSetup({
 
 			await updateProfile(user.id, {
 				name: name.trim(),
+				last_name: lastName.trim() || null,
 				username: username.toLowerCase().trim().replace(/\s+/g, '-'),
 				description,
 				email: user.email,
@@ -258,6 +261,20 @@ export function ProfileSetup({
 						required
 						onChange={(e) => setName(e.target.value)}
 						onInvalid={(e) => e.preventDefault()}
+						className="autofill:bg-white transition-none text-gray-700"
+					/>
+				</div>
+
+				<div>
+					<label htmlFor="last_name" className="block text-md font-medium text-gray-700">
+						Apellidos
+					</label>
+					<p className="text-sm text-gray-500 mb-2">Tal y como deben aparecer en tus facturas.</p>
+					<Input
+						id="last_name"
+						type="text"
+						value={lastName}
+						onChange={(e) => setLastName(e.target.value)}
 						className="autofill:bg-white transition-none text-gray-700"
 					/>
 				</div>
