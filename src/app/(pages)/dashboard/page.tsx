@@ -10,6 +10,7 @@ import { BookingsTable, Booking } from '@/components/BookingsTable'
 import { SideSheetHeadless } from '@/components/SideSheetHeadless'
 import { BookingFilters, BookingFiltersState } from '@/components/BookingFilters'
 import { FilterX, DollarSign, Users, Plus, CalendarCheck, TriangleAlert } from 'lucide-react'
+import ShareBookingLinkButton from '@/components/ShareBookingLinkButton'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -751,6 +752,9 @@ export default function Dashboard() {
 						<Plus className="h-5 w-5 mr-2" />
 						Crear cita
 					</Button>
+
+					{/* Share booking link button component */}
+					<ShareBookingLinkButton username={profile?.username} />
 				</div>
 			</header>
 			<main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:px-16">
