@@ -122,14 +122,12 @@ export function ProfileSetup({
 			}
 		} catch (error) {
 			console.error('Error:', error)
-			// Show error toast if there was an error and toasts are enabled
-			if (showSuccessToast) {
-				toast({
-					title: 'Error',
-					description: 'Hubo un problema al guardar los cambios. Inténtalo de nuevo.',
-					color: 'error'
-				})
-			}
+			// Always show error toast on failure and DO NOT advance step
+			toast({
+				title: 'Error',
+				description: 'Hubo un problema al guardar los cambios. Inténtalo de nuevo.',
+				color: 'error'
+			})
 		} finally {
 			setIsLoading(false)
 		}

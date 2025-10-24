@@ -6,18 +6,14 @@ import { WeeklyAvailability } from '@/components/WeeklyAvailability'
 import { CalendarStep } from '@/components/CalendarStep'
 import { OnboardingBreadcrumb } from '@/components/Breadcrumb'
 import { BillingPreferencesStep } from '@/components/BillingPreferencesStep'
+import FiscalDataForm from '@/components/FiscalDataForm'
 import { PaymentsStep } from '@/components/PaymentsStep'
 import { CustomerStep } from '@/components/CustomerStep'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
 import confetti from 'canvas-confetti'
-import {
-	Card,
-	CardHeader,
-	CardTitle,
-	CardDescription
-} from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Check } from 'lucide-react'
 import { captureOnboardingStep } from '@/lib/posthog/client'
 
@@ -32,8 +28,7 @@ const steps = [
 	},
 	{
 		name: '2. Calendario',
-		description:
-			'This way coco will always be in sync with your google calendar.',
+		description: 'This way coco will always be in sync with your google calendar.',
 		component: CalendarStep
 	},
 	{
@@ -42,15 +37,16 @@ const steps = [
 		component: BillingPreferencesStep
 	},
 	{
-		name: '4. Pagos',
-		description: 'Connect your payment account to receive payments.',
-		component: PaymentsStep
+		name: '4. Datos fiscales',
+		description: 'Se usarán para tus facturas y el alta en Stripe.',
+		component: function FiscalStepWrapper(props: any) {
+			return <FiscalDataForm onSaved={props.onComplete} />
+		}
 	},
 	{
-		name: '5. Tu primer paciente',
-		description:
-			'If you have any questions, you can start by adding yourself to test our features!',
-		component: CustomerStep
+		name: '5. Pagos',
+		description: 'Connect your payment account to receive payments.',
+		component: PaymentsStep
 	}
 ]
 
@@ -59,9 +55,7 @@ function OnboardingContent() {
 	const step = searchParams.get('step')
 
 	// Initialize currentStep based on URL parameter
-	const initialStep = step
-		? Math.max(0, Math.min(parseInt(step) - 1, steps.length - 1))
-		: -1 // -1 represents the Welcome screen
+	const initialStep = step ? Math.max(0, Math.min(parseInt(step) - 1, steps.length - 1)) : -1 // -1 represents the Welcome screen
 
 	const [onNext, setOnNext] = useState(false)
 	const [onPrevious, setOnPrevious] = useState(false)
@@ -69,8 +63,7 @@ function OnboardingContent() {
 	const router = useRouter()
 	const calendarConnected = searchParams.get('calendar_connected')
 
-	const CurrentStepComponent =
-		currentStep >= 0 ? steps[currentStep].component : null
+	const CurrentStepComponent = currentStep >= 0 ? steps[currentStep].component : null
 
 	// Keep the rest of your useEffects for subsequent updates
 	useEffect(() => {
@@ -84,11 +77,7 @@ function OnboardingContent() {
 		const step = searchParams.get('step')
 		if (step) {
 			const stepIndex = parseInt(step) - 1
-			if (
-				stepIndex >= 0 &&
-				stepIndex < steps.length &&
-				stepIndex !== currentStep
-			) {
+			if (stepIndex >= 0 && stepIndex < steps.length && stepIndex !== currentStep) {
 				setCurrentStep(stepIndex)
 			}
 		}
@@ -112,19 +101,13 @@ function OnboardingContent() {
 			<div className="min-h-screen flex items-center lg:max-w-3xl mx-auto px-4">
 				<div className="flex flex-col items-center justify-center mb-20 text-center">
 					<CardHeader className="text-center gap-4">
-						<h1 className="text-5xl font-black text-primary">
-							¡Bienvenid@ a coco!
-						</h1>
+						<h1 className="text-5xl font-black text-primary">¡Bienvenid@ a coco!</h1>
 						<p className="text-xl text-gray-600 font-light">
-							En menos de 5 minutos tendrás tu cuenta activada con
-							tu agenda y pasarela de pagos integradas. ¿Vamos a
-							por ello?
+							En menos de 5 minutos tendrás tu cuenta activada con tu agenda y pasarela de pagos
+							integradas. ¿Vamos a por ello?
 						</p>
 					</CardHeader>
-					<Button
-						onClick={handleStart}
-						className="mt-2 px-10 text-base"
-					>
+					<Button onClick={handleStart} className="mt-2 px-10 text-base">
 						Activar cuenta
 					</Button>
 				</div>
@@ -162,23 +145,13 @@ function OnboardingContent() {
 
 	return (
 		<div className="xl:px-96 md:px-44 px-6 mt-16 py-2 bg-gray-50">
-			<OnboardingBreadcrumb
-				steps={steps}
-				currentStep={currentStep}
-				onStepClick={handleStepClick}
-			/>
+			<OnboardingBreadcrumb steps={steps} currentStep={currentStep} onStepClick={handleStepClick} />
 			<div className="mt-12">
-				{CurrentStepComponent && (
-					<CurrentStepComponent onComplete={handleStepComplete} />
-				)}
+				{CurrentStepComponent && <CurrentStepComponent onComplete={handleStepComplete} />}
 			</div>
 			<div className="mt-8 flex justify-between">
 				{currentStep > 0 && (
-					<Button
-						variant="ghost"
-						onClick={handlePrevious}
-						disabled={currentStep === 0}
-					>
+					<Button variant="ghost" onClick={handlePrevious} disabled={currentStep === 0}>
 						Atrás
 					</Button>
 				)}

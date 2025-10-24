@@ -198,9 +198,9 @@ export async function validateUsername(username: string, currentUsername?: strin
  * @throws Error if update fails or user doesn't have permission
  */
 export async function updateProfile(userId: string, profileData: Partial<Profile>) {
-	// Prefer update with filter to avoid RLS insert permission requirements
-	const { error } = await supabase.from('profiles').update(profileData).eq('id', userId)
-
+	const { error } = await supabase
+		.from('profiles')
+		.upsert([{ id: userId, ...(profileData as any) }], { onConflict: 'id' })
 	if (error) throw error
 }
 

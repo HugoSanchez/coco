@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import { useToast } from '@/components/ui/use-toast'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import confetti from 'canvas-confetti'
 import { ClientList } from '@/components/ClientList'
 import { BookingsTable, Booking } from '@/components/BookingsTable'
 import { SideSheetHeadless } from '@/components/SideSheetHeadless'
@@ -170,6 +171,7 @@ export default function Dashboard() {
 		}
 	}
 	const router = useRouter()
+	const searchParams = useSearchParams()
 
 	// Minimal guard: only redirect if we definitively know both are false
 	useEffect(() => {
@@ -179,6 +181,20 @@ export default function Dashboard() {
 			router.replace('/onboarding')
 		}
 	}, [user, stripeOnboardingCompleted, calendarConnected, router])
+
+	// Celebrate successful Stripe onboarding once
+	useEffect(() => {
+		const flag = searchParams.get('stripe_onboarded')
+		if (flag === 'true') {
+			confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } })
+			// Clean param to avoid re-firing on refresh
+			try {
+				const url = new URL(window.location.href)
+				url.searchParams.delete('stripe_onboarded')
+				window.history.replaceState({}, '', url.toString())
+			} catch {}
+		}
+	}, [searchParams])
 
 	// Simple responsive switch for mobile tabs behavior
 	const [isMobile, setIsMobile] = useState(false)

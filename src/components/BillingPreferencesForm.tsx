@@ -60,8 +60,9 @@ export function BillingPreferencesForm({ values, onChange, disabled }: BillingPr
 								<Input
 									id="billingAmount"
 									type="number"
-									step="0.01"
+									step="1"
 									min={1}
+									placeholder="0"
 									value={values.billingAmount}
 									onChange={(e) => handleInputChange('billingAmount', e.target.value)}
 									onBlur={(e) => {
@@ -92,7 +93,7 @@ export function BillingPreferencesForm({ values, onChange, disabled }: BillingPr
 									max={240}
 									step={5}
 									/* presets removed to avoid showing native dropdown */
-									placeholder="p. ej. 50"
+									placeholder="0"
 									value={values.meetingDurationMin || ''}
 									onKeyDown={(e) => {
 										if (['e', 'E', '+', '-', '.', '/'].includes(e.key)) e.preventDefault()
@@ -133,7 +134,8 @@ export function BillingPreferencesForm({ values, onChange, disabled }: BillingPr
 								<Input
 									id="firstConsultationAmount"
 									type="number"
-									step="0.01"
+									step="1"
+									placeholder="0"
 									min={0}
 									value={values.firstConsultationAmount || ''}
 									onChange={(e) => handleInputChange('firstConsultationAmount', e.target.value)}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { stripeService } from '@/lib/payments/stripe-service'
 import { getStripeAccountByUserId } from '@/lib/db/stripe-accounts'
+import { getProfileById } from '@/lib/db/profiles'
 
 // Force dynamic rendering since this page uses useSearchParams
 export const dynamic = 'force-dynamic'
@@ -44,43 +45,29 @@ export async function POST(request: NextRequest) {
 		const stripeAccount = await getStripeAccountByUserId(user.id, supabase)
 
 		if (!stripeAccount) {
-			return NextResponse.json(
-				{ error: 'No Stripe account found. Please create one first.' },
-				{ status: 404 }
-			)
+			return NextResponse.json({ error: 'No Stripe account found. Please create one first.' }, { status: 404 })
 		}
 
 		// Step 3: Validate onboarding hasn't already been completed
 		// Allow updates from settings, but prevent duplicate onboarding from onboarding flow
 		if (stripeAccount.onboarding_completed && source !== 'settings') {
-			return NextResponse.json(
-				{ error: 'Onboarding already completed' },
-				{ status: 400 }
-			)
+			return NextResponse.json({ error: 'Onboarding already completed' }, { status: 400 })
 		}
 
 		// Step 4: Generate return and refresh URLs based on source
 		// Webhook will handle status updates
-		const origin =
-			request.headers.get('origin') ||
-			process.env.NEXT_PUBLIC_BASE_URL ||
-			'http://localhost:3000'
+		const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 
-		const redirectUrl =
-			source === 'settings'
-				? `${origin}/settings?tab=payments`
-				: `${origin}/onboarding?step=4`
+		const redirectUrl = source === 'settings' ? `${origin}/settings?tab=payments` : `${origin}/onboarding?step=5`
 
 		const returnUrl = redirectUrl
 		const refreshUrl = redirectUrl
 
-		// Step 5: Create Stripe onboarding link
+		// Step 5 removed: we no longer attempt to prefill PII; Stripe collects it during onboarding
+
+		// Step 6: Create Stripe onboarding link
 		// This generates a secure URL for the user to complete verification
-		const result = await stripeService.createOnboardingLink(
-			stripeAccount.stripe_account_id,
-			returnUrl,
-			refreshUrl
-		)
+		const result = await stripeService.createOnboardingLink(stripeAccount.stripe_account_id, returnUrl, refreshUrl)
 
 		if (!result.success) {
 			console.error('[Stripe] Create onboarding link failed', {
@@ -117,8 +104,7 @@ export async function POST(request: NextRequest) {
 		return NextResponse.json(
 			{
 				error: 'Internal server error',
-				details:
-					error instanceof Error ? error.message : 'Unknown error'
+				details: error instanceof Error ? error.message : 'Unknown error'
 			},
 			{ status: 500 }
 		)

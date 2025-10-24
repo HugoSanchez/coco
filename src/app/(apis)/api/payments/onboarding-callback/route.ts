@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import {
-	getStripeAccountByUserId,
-	updateStripeAccountStatus
-} from '@/lib/db/stripe-accounts'
+import { getStripeAccountByUserId, updateStripeAccountStatus } from '@/lib/db/stripe-accounts'
 import { stripeService } from '@/lib/payments/stripe-service'
 import { createClient } from '@/lib/supabase/server'
 import { captureEvent } from '@/lib/posthog/server'
@@ -39,12 +36,7 @@ export async function GET(request: NextRequest) {
 		// Step 1: Validate user_id parameter
 		if (!userId) {
 			console.error('Missing user_id parameter in onboarding callback')
-			return NextResponse.redirect(
-				new URL(
-					'/onboarding?step=4&stripe_error=missing_user',
-					request.url
-				)
-			)
+			return NextResponse.redirect(new URL('/onboarding?step=5&stripe_error=missing_user', request.url))
 		}
 
 		// Step 2: Create Supabase client and validate user has a Stripe account
@@ -53,42 +45,23 @@ export async function GET(request: NextRequest) {
 
 		if (!stripeAccount) {
 			console.error(`No Stripe account found for user ${userId}`)
-			return NextResponse.redirect(
-				new URL(
-					'/onboarding?step=4&stripe_error=no_account',
-					request.url
-				)
-			)
+			return NextResponse.redirect(new URL('/onboarding?step=5&stripe_error=no_account', request.url))
 		}
 
 		// Step 3: Check real Stripe account status via API
-		console.log(
-			`Checking Stripe status for account: ${stripeAccount.stripe_account_id}`
-		)
+		console.log(`Checking Stripe status for account: ${stripeAccount.stripe_account_id}`)
 
-		const stripeStatus = await stripeService.getAccountStatus(
-			stripeAccount.stripe_account_id
-		)
+		const stripeStatus = await stripeService.getAccountStatus(stripeAccount.stripe_account_id)
 
 		if (!stripeStatus.success) {
-			console.error(
-				'Failed to get Stripe account status:',
-				stripeStatus.error
-			)
-			return NextResponse.redirect(
-				new URL(
-					'/onboarding?step=4&stripe_error=status_check_failed',
-					request.url
-				)
-			)
+			console.error('Failed to get Stripe account status:', stripeStatus.error)
+			return NextResponse.redirect(new URL('/onboarding?step=5&stripe_error=status_check_failed', request.url))
 		}
 
 		// Step 4: Determine if account is ready for payments and why it might not be
 		const isReadyForPayments = stripeStatus.paymentsEnabled
 
-		console.log(
-			`Stripe account ${stripeAccount.stripe_account_id} ready for payments: ${isReadyForPayments}`
-		)
+		console.log(`Stripe account ${stripeAccount.stripe_account_id} ready for payments: ${isReadyForPayments}`)
 
 		if (stripeStatus.details) {
 			console.log('Stripe account details:', {
@@ -109,14 +82,9 @@ export async function GET(request: NextRequest) {
 				},
 				supabase
 			)
-			console.log(
-				`Updated database: onboarding_completed=true, payments_enabled=${isReadyForPayments}`
-			)
+			console.log(`Updated database: onboarding_completed=true, payments_enabled=${isReadyForPayments}`)
 		} catch (dbError) {
-			console.error(
-				'Failed to update Stripe account status in database:',
-				dbError
-			)
+			console.error('Failed to update Stripe account status in database:', dbError)
 			// Don't fail the entire flow if database update fails
 			// User can still proceed, but we'll log the issue
 		}
@@ -131,21 +99,14 @@ export async function GET(request: NextRequest) {
 					properties: { step: 'stripe_connect_completed' }
 				})
 			} catch {}
-			// Account is fully ready - proceed to next onboarding step
-			return NextResponse.redirect(
-				new URL('/onboarding?step=5&stripe_ready=true', request.url)
-			)
+			// Account is fully ready - send to dashboard and trigger celebration
+			return NextResponse.redirect(new URL('/dashboard?stripe_onboarded=true', request.url))
 		} else {
 			// Account needs more setup - determine specific reason
 			let reason = 'incomplete'
 
 			if (stripeStatus.details) {
-				const {
-					charges_enabled,
-					payouts_enabled,
-					details_submitted,
-					requirements_due
-				} = stripeStatus.details
+				const { charges_enabled, payouts_enabled, details_submitted, requirements_due } = stripeStatus.details
 
 				if (!details_submitted) {
 					// User hasn't completed the onboarding form
@@ -171,10 +132,7 @@ export async function GET(request: NextRequest) {
 
 			// Redirect with specific reason for better user messaging
 			return NextResponse.redirect(
-				new URL(
-					`/onboarding?step=4&stripe_incomplete=true&reason=${reason}`,
-					request.url
-				)
+				new URL(`/onboarding?step=5&stripe_incomplete=true&reason=${reason}`, request.url)
 			)
 		}
 	} catch (error) {
@@ -187,11 +145,6 @@ export async function GET(request: NextRequest) {
 		}
 
 		// Redirect to error state if something goes wrong
-		return NextResponse.redirect(
-			new URL(
-				'/onboarding?step=4&stripe_error=callback_failed',
-				request.url
-			)
-		)
+		return NextResponse.redirect(new URL('/onboarding?step=5&stripe_error=callback_failed', request.url))
 	}
 }
