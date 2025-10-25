@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import { useToast } from '@/components/ui/use-toast'
 import { useRouter, useSearchParams } from 'next/navigation'
-import confetti from 'canvas-confetti'
 import { ClientList } from '@/components/ClientList'
 import { BookingsTable, Booking } from '@/components/BookingsTable'
 import { SideSheetHeadless } from '@/components/SideSheetHeadless'
@@ -187,13 +186,18 @@ export default function Dashboard() {
 	useEffect(() => {
 		const flag = searchParams.get('stripe_onboarded')
 		if (flag === 'true') {
-			confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } })
-			// Clean param to avoid re-firing on refresh
-			try {
-				const url = new URL(window.location.href)
-				url.searchParams.delete('stripe_onboarded')
-				window.history.replaceState({}, '', url.toString())
-			} catch {}
+			;(async () => {
+				try {
+					const mod = await import('canvas-confetti')
+					mod.default({ particleCount: 80, spread: 70, origin: { y: 0.6 } })
+				} catch {}
+				// Clean param to avoid re-firing on refresh
+				try {
+					const url = new URL(window.location.href)
+					url.searchParams.delete('stripe_onboarded')
+					window.history.replaceState({}, '', url.toString())
+				} catch {}
+			})()
 		}
 	}, [searchParams])
 
