@@ -20,7 +20,13 @@ import { formatDurationMinutes } from '@/lib/utils'
 
 export interface CalendarInfoStepProps {
 	profile: UserProfileWithSchedule
-	pricing?: { amount: number; currency: string; first_consultation_amount?: number | null }
+	pricing?: {
+		amount: number
+		currency: string
+		first_consultation_amount?: number | null
+		meeting_duration_min?: number | null
+		first_meeting_duration_min?: number | null
+	}
 	calendar: {
 		availableSlots: { [day: string]: TimeSlot[] }
 		selectedDate: Date | null
@@ -42,7 +48,7 @@ export function CalendarInfoStep({
 }: CalendarInfoStepProps) {
 	const name = profile.name
 	const description = (profile as any)?.description ?? null
-	const minutes = (profile as any)?.schedules?.meeting_duration ?? null
+	const scheduleMinutes = (profile as any)?.schedules?.meeting_duration ?? null
 	const { availableSlots, selectedDate, onSelectDate, onMonthChange, username, initialMonth } = calendar
 	const baseAmount = pricing?.amount ?? 0
 	const firstAmount = pricing?.first_consultation_amount
@@ -111,20 +117,27 @@ export function CalendarInfoStep({
 						</SelectContent>
 					</Select>
 				)}
+				{(() => {
+					const followupMin = pricing?.meeting_duration_min ?? scheduleMinutes ?? 60
+					const firstMin = pricing?.first_meeting_duration_min ?? followupMin
+					const selectedMin = consultationType === 'first' ? firstMin : followupMin
+					return (
+						<div className="flex flex-row items-center">
+							<Clock className="w-4 h-4 mr-2" />
+							<p className="font-light text-gray-700">{formatDurationMinutes(selectedMin)}</p>
+						</div>
+					)
+				})()}
 			</div>
 
 			{/* About Section */}
-			<div className="bg-gray-50 p-2 rounded-lg mt-6">
+			<div className="bg-gray-50 py-2 rounded-lg mt-6">
 				<h2 className="text-lg font-semibold mb-2">Sobre {name}</h2>
 				{(profile.description || description) && (profile.description || description)?.toString().trim() ? (
 					<p className="text-md text-gray-700 font-light mb-6 whitespace-pre-line">
 						{profile.description || description}
 					</p>
 				) : null}
-				<div className="flex flex-row items-center">
-					<Clock className="w-4 h-4 mr-2" />
-					<p className="font-light text-gray-700">{formatDurationMinutes(minutes ?? 60)}</p>
-				</div>
 			</div>
 		</>
 	)
