@@ -182,25 +182,6 @@ export default function Dashboard() {
 		}
 	}, [user, stripeOnboardingCompleted, calendarConnected, router])
 
-	// Celebrate successful Stripe onboarding once
-	useEffect(() => {
-		const flag = searchParams.get('stripe_onboarded')
-		if (flag === 'true') {
-			;(async () => {
-				try {
-					const mod = await import('canvas-confetti')
-					mod.default({ particleCount: 80, spread: 70, origin: { y: 0.6 } })
-				} catch {}
-				// Clean param to avoid re-firing on refresh
-				try {
-					const url = new URL(window.location.href)
-					url.searchParams.delete('stripe_onboarded')
-					window.history.replaceState({}, '', url.toString())
-				} catch {}
-			})()
-		}
-	}, [searchParams])
-
 	// Simple responsive switch for mobile tabs behavior
 	const [isMobile, setIsMobile] = useState(false)
 	const [mobileTab, setMobileTab] = useState<'bookings' | 'clients' | 'stats'>('bookings')
