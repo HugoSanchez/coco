@@ -13,13 +13,15 @@ export async function GET(request: NextRequest) {
 	try {
 		const { searchParams } = new URL(request.url)
 		const username = searchParams.get('username')
-		const month = searchParams.get('month')
+		const monthParam = searchParams.get('month')
 		const tz = searchParams.get('tz') || 'Europe/Madrid'
 		const window = searchParams.get('window') || '08:00-20:00'
 
-		if (!username || !month) {
+		if (!username || !monthParam) {
 			return NextResponse.json({ error: 'Missing username or month' }, { status: 400 })
 		}
+		// Accept either full ISO or just 'YYYY-MM' and normalize to first day of month UTC
+		const monthIso = monthParam.length === 7 ? `${monthParam}-01T00:00:00.000Z` : monthParam
 
 		const service = createServiceRoleClient()
 		// Resolve practitioner by username → userId
@@ -38,7 +40,7 @@ export async function GET(request: NextRequest) {
 		// Compute both slot sets
 		const followup = await computeMonthlySlots({
 			userId: userId,
-			monthIso: month,
+			monthIso,
 			tz,
 			window,
 			durationMin: followupDuration,
@@ -48,7 +50,7 @@ export async function GET(request: NextRequest) {
 			firstDuration != null
 				? await computeMonthlySlots({
 						userId: userId,
-						monthIso: month,
+						monthIso,
 						tz,
 						window,
 						durationMin: firstDuration,

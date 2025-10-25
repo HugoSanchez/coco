@@ -65,8 +65,10 @@ function BookingPageContent() {
 
 				// Fire profile and slots in parallel; render as soon as profile arrives
 				const profilePromise = fetch(`/api/public/profile?username=${username}`)
+				const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+				const monthLabel = format(monthToFetch, 'yyyy-MM')
 				const slotsPromise = fetch(
-					`/api/calendar/available-slots?username=${username}&month=${monthToFetch.toISOString()}`
+					`/api/calendar/available-slots?username=${username}&month=${monthLabel}&tz=${encodeURIComponent(tz)}`
 				)
 
 				const profileRes = await profilePromise
