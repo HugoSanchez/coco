@@ -16,6 +16,7 @@ import { Clock } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { TimeSlot } from '@/lib/calendar/calendar'
 import type { UserProfileWithSchedule } from '@/lib/db/profiles'
+import { formatDurationMinutes } from '@/lib/utils'
 
 export interface CalendarInfoStepProps {
 	profile: UserProfileWithSchedule
@@ -122,7 +123,7 @@ export function CalendarInfoStep({
 				) : null}
 				<div className="flex flex-row items-center">
 					<Clock className="w-4 h-4 mr-2" />
-					<p className="font-light text-gray-700">{minutes || 60} minutos</p>
+					<p className="font-light text-gray-700">{formatDurationMinutes(minutes ?? 60)}</p>
 				</div>
 			</div>
 		</>

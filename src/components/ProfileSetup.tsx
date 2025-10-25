@@ -295,7 +295,7 @@ export function ProfileSetup({
 						}`}
 					/>
 					{usernameError && <p className="text-red-500 text-sm mt-1">{usernameError}</p>}
-					<p className="text-xs text-gray-500 my-2">itscoco.app/book/{username}</p>
+					<p className="text-xs text-gray-500 my-2">itscoco.app/{username}</p>
 				</div>
 
 				<div>
@@ -309,7 +309,7 @@ export function ProfileSetup({
 						id="description"
 						value={description}
 						onChange={(e) => setDescription(e.target.value)}
-						placeholder="Ej. Psicóloga especializada en ansiedad y estrés. Sesiones online."
+						placeholder=""
 						className="autofill:bg-white transition-none text-gray-700"
 						rows={3}
 					/>
