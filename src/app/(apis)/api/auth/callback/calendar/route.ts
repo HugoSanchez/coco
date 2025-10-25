@@ -3,10 +3,7 @@ import { google } from 'googleapis'
 import { createClient } from '@supabase/supabase-js'
 import { getProfileByEmail } from '@/lib/db/profiles'
 import { reconcileCalendarEventsForUser } from '@/lib/calendar/calendar'
-import {
-	getExistingRefreshToken,
-	upsertCalendarTokens
-} from '@/lib/db/calendar-tokens'
+import { getExistingRefreshToken, upsertCalendarTokens } from '@/lib/db/calendar-tokens'
 
 const oauth2Client = new google.auth.OAuth2(
 	process.env.GOOGLE_CLIENT_ID_CALENDAR,
@@ -72,10 +69,7 @@ export async function GET(request: NextRequest) {
 					grantedScopes = tokenInfo.scope.split(' ')
 				}
 			} catch (scopeError) {
-				console.warn(
-					'Failed to fetch token info for scope detection:',
-					scopeError
-				)
+				console.warn('Failed to fetch token info for scope detection:', scopeError)
 				// Continue without scope info - we'll handle this in the UI
 			}
 
@@ -104,8 +98,7 @@ export async function GET(request: NextRequest) {
 			)
 
 			// Get Supabase user by email via DB helper
-			const { data: profileUser, error: profileError } =
-				await getProfileByEmail(googleUserInfo.email, supabase)
+			const { data: profileUser, error: profileError } = await getProfileByEmail(googleUserInfo.email, supabase)
 
 			if (profileError || !profileUser) {
 				console.error('Error finding user profile:', profileError)
@@ -115,13 +108,9 @@ export async function GET(request: NextRequest) {
 			////////////////////////////////////////////////////////
 			//// Step 5: Upsert calendar tokens (preserve refresh_token)
 			////////////////////////////////////////////////////////
-			const existingRefreshToken = await getExistingRefreshToken(
-				profileUser.id,
-				supabase
-			)
+			const existingRefreshToken = await getExistingRefreshToken(profileUser.id, supabase)
 
-			const effectiveRefreshToken =
-				tokens.refresh_token ?? existingRefreshToken ?? null
+			const effectiveRefreshToken = tokens.refresh_token ?? existingRefreshToken ?? null
 
 			const upsertPayload: {
 				user_id: string
@@ -144,22 +133,14 @@ export async function GET(request: NextRequest) {
 			////////////////////////////////////////////////////////
 			//// Step 6: Optional reconciliation (requires full access)
 			////////////////////////////////////////////////////////
-			const hasCalendarAccess = grantedScopes.includes(
-				'https://www.googleapis.com/auth/calendar.events'
-			)
+			const hasCalendarAccess = grantedScopes.includes('https://www.googleapis.com/auth/calendar.events')
 
 			// Reconciliation: only attempt if full access granted
 			if (hasCalendarAccess) {
-				const res = await reconcileCalendarEventsForUser(
-					profileUser.id,
-					{ limit: 50 },
-					supabase
-				)
+				const res = await reconcileCalendarEventsForUser(profileUser.id, { limit: 50 }, supabase)
 				console.log('🧩 [Calendar Reconcile] Completed', res)
 			} else {
-				console.log(
-					'🧩 [Calendar Reconcile] Skipped — missing calendar.events scope'
-				)
+				console.log('🧩 [Calendar Reconcile] Skipped — missing calendar.events scope')
 			}
 
 			////////////////////////////////////////////////////////
@@ -168,17 +149,14 @@ export async function GET(request: NextRequest) {
 			let successRedirect: string
 
 			if (source === 'settings') {
-				successRedirect =
-					'/settings?tab=calendar&calendar_connected=true'
+				successRedirect = '/settings?tab=calendar&calendar_connected=true'
 			} else {
 				if (hasCalendarAccess) {
 					// Full permissions granted - proceed to step 3
-					successRedirect =
-						'/onboarding?step=3&calendar_connected=true'
+					successRedirect = '/onboarding?step=3&calendar_connected=true'
 				} else {
 					// Calendar permissions not granted - stay on step 2 to show upgrade message
-					successRedirect =
-						'/onboarding?step=2&calendar_connected=partial'
+					successRedirect = '/onboarding?step=2&calendar_connected=partial'
 				}
 			}
 

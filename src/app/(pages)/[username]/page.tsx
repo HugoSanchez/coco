@@ -1,34 +1,31 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
-
-import Calendar from '@/components/Calendar'
 import TimeSlots from '@/components/TimeSlots'
 import { ConfirmationForm } from '@/components/ConfirmationForm'
-import { Clock, ChevronLeft } from 'lucide-react'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
-import { Button } from '@/components/ui/button'
+import CalendarInfoStep from '@/components/CalendarInfoStep'
 import { parse, format, startOfMonth } from 'date-fns'
 import { TimeSlot } from '@/lib/calendar/calendar'
-import {
-	getUserProfileAndScheduleByUsername,
-	UserProfileWithSchedule
-} from '@/lib/db/profiles'
-
+import { Spinner } from '@/components/ui/spinner'
+import { hasVisitedBooking, markVisitedBooking } from '@/lib/utils'
+import { UserProfileWithSchedule } from '@/lib/db/profiles'
 // Force dynamic rendering since this page uses useSearchParams and useParams
 export const dynamic = 'force-dynamic'
 
 interface PageState {
 	isLoading: boolean
+	isLoadingSlots: boolean
 	error: string | null
 	userProfile: UserProfileWithSchedule | null // Update this type
 	availableSlots: { [day: string]: TimeSlot[] }
+	firstSlots?: { [day: string]: TimeSlot[] }
 	selectedDate: Date | null
 	selectedSlot: TimeSlot | null
 	currentMonth: Date
-	isDrawerOpen: boolean
 	userTimeZone: string
+	bookingConfirmed: boolean
+	consultationType: 'first' | 'followup'
 }
 
 function BookingPageContent() {
@@ -40,63 +37,64 @@ function BookingPageContent() {
 	// Initialize all state in one object for better management
 	const [state, setState] = useState<PageState>({
 		isLoading: true,
+		isLoadingSlots: true,
 		error: null,
 		userProfile: null,
 		availableSlots: {},
+		firstSlots: {},
 		selectedDate: null,
 		selectedSlot: null,
 		currentMonth: startOfMonth(new Date()),
-		isDrawerOpen: false,
-		userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+		userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+		bookingConfirmed: false,
+		consultationType: 'followup'
 	})
 
 	// Fetch user profile and initial data
+	const initRef = useRef(false)
 	useEffect(() => {
+		if (initRef.current) return
+		initRef.current = true
 		async function initializePageData() {
 			try {
-				// Get user profile
-				const profileData = await getUserProfileAndScheduleByUsername(
-					username as string
-				)
-				// Handle URL parameters
+				// Derive URL parameters
 				const monthParam = searchParams.get('month')
 				const dateParam = searchParams.get('date')
-				// Get the month to fetch
-				const monthToFetch = monthParam
-					? parse(monthParam, 'yyyy-MM', new Date())
-					: startOfMonth(new Date())
-				// Get the date to fetch
-				const selectedDate = dateParam
-					? parse(dateParam, 'yyyy-MM-dd', new Date())
-					: null
+				const monthToFetch = monthParam ? parse(monthParam, 'yyyy-MM', new Date()) : startOfMonth(new Date())
+				const selectedDate = dateParam ? parse(dateParam, 'yyyy-MM-dd', new Date()) : null
 
-				// Fetch available slots
-				const response = await fetch(
+				// Fire profile and slots in parallel; render as soon as profile arrives
+				const profilePromise = fetch(`/api/public/profile?username=${username}`)
+				const slotsPromise = fetch(
 					`/api/calendar/available-slots?username=${username}&month=${monthToFetch.toISOString()}`
 				)
-				if (!response.ok)
-					throw new Error('Failed to fetch available slots')
-				const availableSlots = await response.json()
-				console.log('availableSlots:', availableSlots)
+
+				const profileRes = await profilePromise
+				if (!profileRes.ok) throw new Error('Profile not found')
+				const profileData = await profileRes.json()
 
 				setState((prev) => ({
 					...prev,
 					isLoading: false,
+					isLoadingSlots: true,
 					userProfile: profileData,
-					availableSlots,
 					currentMonth: monthToFetch,
-					selectedDate,
-					isDrawerOpen: !!selectedDate
+					selectedDate
 				}))
+
+				const slotsRes = await slotsPromise
+				if (!slotsRes.ok) throw new Error('Failed to fetch available slots')
+				const slotsPayload = await slotsRes.json()
+				const availableSlots = slotsPayload?.slotsByDay || {}
+				const firstSlots = slotsPayload?.firstSlotsByDay || {}
+				setState((prev) => ({ ...prev, availableSlots, firstSlots, isLoadingSlots: false }))
 			} catch (error) {
 				console.error('Error initializing page:', error)
 				setState((prev) => ({
 					...prev,
 					isLoading: false,
-					error:
-						error instanceof Error
-							? error.message
-							: 'An error occurred'
+					isLoadingSlots: false,
+					error: error instanceof Error ? error.message : 'An error occurred'
 				}))
 			}
 		}
@@ -108,35 +106,44 @@ function BookingPageContent() {
 	const updateURL = (month: Date, date: Date | null) => {
 		const newParams = new URLSearchParams(searchParams)
 		newParams.set('month', format(month, 'yyyy-MM'))
-		date
-			? newParams.set('date', format(date, 'yyyy-MM-dd'))
-			: newParams.delete('date')
+		date ? newParams.set('date', format(date, 'yyyy-MM-dd')) : newParams.delete('date')
 		router.push(`/${username}?${newParams.toString()}`)
 	}
 
 	// Event handlers
+	const slotsInFlightRef = useRef<string | null>(null)
 	const handleMonthChange = async (newMonth: Date) => {
 		updateURL(newMonth, state.selectedDate)
-		setState((prev) => ({ ...prev, currentMonth: newMonth }))
-
+		setState((prev) => ({ ...prev, currentMonth: newMonth, isLoadingSlots: true }))
+		const key = `${username}:${newMonth.toISOString()}`
+		if (slotsInFlightRef.current === key) return
+		slotsInFlightRef.current = key
 		try {
-			const response = await fetch(
+			const res = await fetch(
 				`/api/calendar/available-slots?username=${username}&month=${newMonth.toISOString()}`
 			)
-			if (!response.ok) throw new Error('Failed to fetch available slots')
-			const availableSlots = await response.json()
-			setState((prev) => ({ ...prev, availableSlots }))
+			if (!res.ok) throw new Error('Failed to fetch available slots')
+			const payload = await res.json()
+			const nextSlots = payload?.slotsByDay || {}
+			const nextFirstSlots = payload?.firstSlotsByDay || {}
+			setState((prev) => ({
+				...prev,
+				availableSlots: nextSlots,
+				firstSlots: nextFirstSlots,
+				isLoadingSlots: false
+			}))
 		} catch (error) {
 			console.error('Error fetching available slots:', error)
+			setState((prev) => ({ ...prev, isLoadingSlots: false }))
 		}
+		if (slotsInFlightRef.current === key) slotsInFlightRef.current = null
 	}
 
 	const handleDateSelect = (date: Date) => {
 		updateURL(state.currentMonth, date)
 		setState((prev) => ({
 			...prev,
-			selectedDate: date,
-			isDrawerOpen: true
+			selectedDate: date
 		}))
 	}
 
@@ -145,22 +152,88 @@ function BookingPageContent() {
 	}
 
 	const handleBack = () => {
-		if (state.selectedSlot) {
-			setState((prev) => ({ ...prev, selectedSlot: null }))
-		} else {
+		if (state.bookingConfirmed) {
+			// From success screen: return to calendar and clear URL param
+			updateURL(state.currentMonth, null)
 			setState((prev) => ({
 				...prev,
+				selectedSlot: null,
 				selectedDate: null,
-				isDrawerOpen: false
+				bookingConfirmed: false
+			}))
+
+			// Refresh available slots to reflect the latest booking
+			;(async () => {
+				try {
+					setState((prev) => ({ ...prev, isLoadingSlots: true }))
+					const res = await fetch(
+						`/api/calendar/available-slots?username=${username}&month=${state.currentMonth.toISOString()}`
+					)
+					if (!res.ok) throw new Error('Failed to fetch available slots')
+					const payload = await res.json()
+					const nextSlots = payload?.slotsByDay || {}
+					const nextFirstSlots = payload?.firstSlotsByDay || {}
+					setState((prev) => ({
+						...prev,
+						availableSlots: nextSlots,
+						firstSlots: nextFirstSlots,
+						isLoadingSlots: false
+					}))
+				} catch (error) {
+					console.error('Error refreshing available slots:', error)
+					setState((prev) => ({ ...prev, isLoadingSlots: false }))
+				}
+			})()
+		} else if (state.selectedSlot) {
+			setState((prev) => ({ ...prev, selectedSlot: null }))
+		} else {
+			updateURL(state.currentMonth, null)
+			setState((prev) => ({
+				...prev,
+				selectedDate: null
 			}))
 		}
+	}
+
+	const handleConsultationTypeChange = (v: 'first' | 'followup') => {
+		setState((prev) => ({ ...prev, consultationType: v }))
+	}
+
+	// Initialize consultation type smart default based on visit flag
+	const consultInitRef = useRef(false)
+	useEffect(() => {
+		if (consultInitRef.current) return
+		if (!state.userProfile) return
+		const pricing = state.userProfile?.pricing
+		const firstExists =
+			pricing?.first_consultation_amount != null && !Number.isNaN(Number(pricing.first_consultation_amount))
+		const followupExists = pricing?.amount != null && !Number.isNaN(Number(pricing.amount))
+		const isReturning = hasVisitedBooking(String(username))
+		const next: 'first' | 'followup' = !isReturning && firstExists ? 'first' : followupExists ? 'followup' : 'first'
+		setState((prev) => ({ ...prev, consultationType: next }))
+		markVisitedBooking(String(username))
+		consultInitRef.current = true
+	}, [state.userProfile, username])
+
+	// Removed legacy inline component (CalendarInfocard) in favor of CalendarInfoStep
+
+	function BackButtonComponent() {
+		if (state.selectedSlot || state.selectedDate) {
+			return (
+				<button onClick={handleBack} className="mb-4 text-teal-600 hover:underline flex items-center gap-1">
+					<span>←</span>
+					<span>Volver</span>
+				</button>
+			)
+		}
+		return null
 	}
 
 	// Render loading state
 	if (state.isLoading) {
 		return (
 			<div className="container flex justify-center items-center min-h-screen">
-				Loading...
+				<Spinner size="sm" color="dark" />
 			</div>
 		)
 	}
@@ -170,12 +243,9 @@ function BookingPageContent() {
 		return (
 			<div className="container flex justify-center items-center min-h-screen">
 				<div className="text-center">
-					<h1 className="text-2xl font-semibold mb-2">
-						Calendar Not Found
-					</h1>
+					<h1 className="text-2xl font-semibold mb-2">Calendar Not Found</h1>
 					<p className="text-gray-600">
-						The calendar you&apos;re looking for doesn&apos;t exist
-						or has been removed.
+						The calendar you&apos;re looking for doesn&apos;t exist or has been removed.
 					</p>
 				</div>
 			</div>
@@ -183,115 +253,74 @@ function BookingPageContent() {
 	}
 
 	return (
-		<div className="container flex justify-center px-6 py-24 md:py-20 min-h-screen">
-			<div className="mb:h-[80vh] md:max-w-[30vw] overflow-hidden">
+		<div className="container flex justify-center px-6 py-20 md:py-20 min-h-screen">
+			<div className="mb:h-[80vh] md:max-w-[30vw] overflow-visible">
 				<div className="flex flex-col space-y-8 md:space-y-16">
-					{/* Profile Section */}
-					<div className="flex flex-col">
-						<div className="flex items-center gap-4 mb-4">
-							{state.userProfile.profile_picture_url && (
-								<img
-									src={state.userProfile.profile_picture_url}
-									alt={state.userProfile.name}
-									className="lg:h-16 lg:w-16 h-8 w-8 rounded-full object-cover"
-								/>
-							)}
-							<h2 className="text-3xl font-light">
-								Book an appointment with{' '}
-								{state.userProfile.name}
-							</h2>
-						</div>
-					</div>
-
-					{/* Calendar Section */}
 					<div className="w-full">
-						<Calendar
-							username={username as string}
-							selectedDay={state.selectedDate}
-							availableSlots={state.availableSlots}
-							onSelectDate={handleDateSelect}
-							onMonthChange={handleMonthChange}
-						/>
-					</div>
+						{/* Back button on steps 2 and 3 */}
+						<BackButtonComponent />
 
-					{/* Profile Info Section */}
-					<div className="bg-gray-50 p-6 rounded-lg">
-						<h2 className="text-lg font-semibold mb-2">
-							About {state.userProfile.name}
-						</h2>
-						<p className="text-md text-gray-700 font-light mb-6">
-							{state.userProfile.description}
-						</p>
-						<div className="flex flex-row items-center">
-							<Clock className="w-4 h-4 mr-2" />
-							<p className="font-light text-gray-700">
-								{state.userProfile.schedules
-									?.meeting_duration || 60}{' '}
-								minutes
-							</p>
-						</div>
-					</div>
-				</div>
-			</div>
+						{!state.selectedDate && (
+							<>
+								<CalendarInfoStep
+									profile={state.userProfile!}
+									pricing={state.userProfile?.pricing}
+									calendar={{
+										availableSlots:
+											state.consultationType === 'first' && state.firstSlots
+												? (state.firstSlots as { [day: string]: TimeSlot[] })
+												: state.availableSlots,
+										selectedDate: state.selectedDate,
+										onSelectDate: handleDateSelect,
+										onMonthChange: handleMonthChange,
+										username: username as string,
+										initialMonth: state.currentMonth
+									}}
+									consultationType={state.consultationType}
+									onConsultationTypeChange={handleConsultationTypeChange}
+								/>
+							</>
+						)}
 
-			{/* Time Slots Drawer */}
-			<Drawer
-				direction="right"
-				open={state.isDrawerOpen}
-				onOpenChange={(open) =>
-					setState((prev) => ({ ...prev, isDrawerOpen: open }))
-				}
-			>
-				<DrawerContent className="w-full sm:max-w-md bg-gray-50">
-					<div className="p-4">
-						<Button
-							variant="ghost"
-							onClick={handleBack}
-							className="mb-4"
-						>
-							<ChevronLeft className="mr-2 h-4 w-4" />
-							Back
-						</Button>
-
-						{state.selectedSlot ? (
-							<ConfirmationForm
-								selectedSlot={state.selectedSlot}
-								userTimeZone={state.userTimeZone}
-								onConfirm={async (details) => {
-									// Handle booking confirmation
-									console.log('Booking details:', details)
-								}}
-								onCancel={() =>
-									setState((prev) => ({
-										...prev,
-										selectedSlot: null
-									}))
-								}
-							/>
-						) : (
+						{state.selectedDate && !state.selectedSlot && (
 							<TimeSlots
 								date={state.selectedDate}
-								availableSlots={state.availableSlots}
+								availableSlots={
+									state.consultationType === 'first' && state.firstSlots
+										? (state.firstSlots as { [day: string]: TimeSlot[] })
+										: state.availableSlots
+								}
 								userTimeZone={state.userTimeZone}
 								onSelectSlot={handleSlotSelect}
 							/>
 						)}
+
+						{state.selectedSlot && (
+							<ConfirmationForm
+								selectedSlot={state.selectedSlot}
+								userTimeZone={state.userTimeZone}
+								practitionerPricing={state.userProfile?.pricing}
+								username={username as string}
+								selectedConsultationType={state.consultationType}
+								onConfirm={async (details) => {
+									// Mark confirmation complete to adjust back-button behavior
+									setState((prev) => ({ ...prev, bookingConfirmed: true }))
+								}}
+								onCancel={() => setState((prev) => ({ ...prev, selectedSlot: null }))}
+							/>
+						)}
 					</div>
-				</DrawerContent>
-			</Drawer>
+				</div>
+			</div>
+
+			{/* Drawer removed */}
 		</div>
 	)
 }
 
 export default function BookingPage() {
 	return (
-		<Suspense
-			fallback={
-				<div className="container flex justify-center items-center min-h-screen">
-					Loading...
-				</div>
-			}
-		>
+		<Suspense fallback={<div className="container flex justify-center items-center min-h-screen">Loading...</div>}>
 			<BookingPageContent />
 		</Suspense>
 	)

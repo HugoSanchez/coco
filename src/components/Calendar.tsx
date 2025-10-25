@@ -36,6 +36,7 @@ interface CalendarProps {
 	availableSlots: { [day: string]: TimeSlot[] }
 	onMonthChange: (newMonth: Date) => void
 	allowPastDates?: boolean
+	initialMonth?: Date
 }
 
 /**
@@ -76,10 +77,22 @@ export default function Calendar({
 	onMonthChange,
 	selectedDay,
 	availableSlots,
-	allowPastDates
+	allowPastDates,
+	initialMonth
 }: CalendarProps) {
 	// State to track the currently displayed month
 	const [currentMonth, setCurrentMonth] = useState(new Date())
+
+	// Sync initial month from parent (e.g., URL state) once or when it changes
+	useEffect(() => {
+		if (!initialMonth) return
+		const next = startOfMonth(initialMonth)
+		// Only update if month actually differs to avoid unnecessary renders
+		if (startOfMonth(currentMonth).getTime() !== next.getTime()) {
+			setCurrentMonth(next)
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [initialMonth])
 
 	/**
 	 * Effect to ensure calendar doesn't show past months
@@ -106,10 +119,7 @@ export default function Calendar({
 	const prevMonth = () => {
 		const newMonth = subMonths(currentMonth, 1)
 		// Only allow navigation if not going before current month
-		if (
-			allowPastDates ||
-			!isBefore(startOfMonth(newMonth), startOfMonth(new Date()))
-		) {
+		if (allowPastDates || !isBefore(startOfMonth(newMonth), startOfMonth(new Date()))) {
 			onMonthChange(subMonths(currentMonth, 1))
 			setCurrentMonth(newMonth)
 		}
@@ -142,29 +152,20 @@ export default function Calendar({
 			<div className="flex items-center justify-between mb-4">
 				{/* Previous month button */}
 				<button
-					disabled={
-						!allowPastDates && isSameMonth(currentMonth, new Date())
-					}
+					disabled={!allowPastDates && isSameMonth(currentMonth, new Date())}
 					onClick={prevMonth}
 					className={`p-2 ${
-						!allowPastDates && isSameMonth(currentMonth, new Date())
-							? ''
-							: 'rounded-full bg-teal-100'
+						!allowPastDates && isSameMonth(currentMonth, new Date()) ? '' : 'rounded-full bg-teal-100'
 					}`}
 				>
 					<ChevronLeft className="h-5 w-5 text-gray-400" />
 				</button>
 
 				{/* Current month and year display */}
-				<h2 className="text-lg font-semibold text-gray-800">
-					{format(currentMonth, 'MMMM yyyy')}
-				</h2>
+				<h2 className="text-lg font-semibold text-gray-800">{format(currentMonth, 'MMMM yyyy')}</h2>
 
 				{/* Next month button */}
-				<button
-					onClick={nextMonth}
-					className="p-2 rounded-full bg-teal-100"
-				>
+				<button onClick={nextMonth} className="p-2 rounded-full bg-teal-100">
 					<ChevronRight className="h-5 w-5 text-gray-400" />
 				</button>
 			</div>
@@ -172,16 +173,14 @@ export default function Calendar({
 			{/* Calendar grid */}
 			<div className="grid grid-cols-7 gap-1">
 				{/* Day of week headers */}
-				{['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map(
-					(day) => (
-						<div
-							key={day}
-							className="text-center md:p-2 md:h-10 md:w-10 md:text-left font-medium text-xs text-gray-400 mb-1 py-4"
-						>
-							{day}
-						</div>
-					)
-				)}
+				{['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day) => (
+					<div
+						key={day}
+						className="text-center md:p-2 md:h-10 md:w-10 md:text-left font-medium text-xs text-gray-400 mb-1 py-4"
+					>
+						{day}
+					</div>
+				))}
 
 				{/* Calendar days */}
 				{days.map((day) => {
@@ -189,12 +188,10 @@ export default function Calendar({
 					const isCurrentMonth = isSameMonth(day, currentMonth)
 					const isSelectable = allowPastDates
 						? isCurrentMonth
-						: isCurrentMonth &&
-							startOfDay(day) >= startOfDay(new Date())
+						: isCurrentMonth && startOfDay(day) >= startOfDay(new Date())
 					const dateKey = format(day, 'yyyy-MM-dd')
 					const hasAvailableSlots = allowPastDates
-						? availableSlots[dateKey] &&
-							availableSlots[dateKey].length > 0
+						? availableSlots[dateKey] && availableSlots[dateKey].length > 0
 						: availableSlots[dateKey] &&
 							availableSlots[dateKey].length > 0 &&
 							startOfDay(day) >= startOfDay(new Date())
@@ -206,23 +203,13 @@ export default function Calendar({
 						>
 							<button
 								key={day.toString()}
-								onClick={() =>
-									isSelectable && onSelectDate(day)
-								}
+								onClick={() => isSelectable && onSelectDate(day)}
 								disabled={!isSelectable}
 								className={`p-2 h-10 w-10 md:h-12 md:w-12 text-center text-sm font-medium rounded-full
                         ${hasAvailableSlots ? 'bg-teal-100' : ''}
-                        ${
-							isSelectable
-								? 'hover:bg-teal-200 hover:opacity-80'
-								: 'cursor-default'
-						}
+                        ${isSelectable ? 'hover:bg-teal-200 hover:opacity-80' : 'cursor-default'}
                         ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}
-                        ${
-							isSameDay(day, selectedDay as Date)
-								? 'bg-teal-200 text-teal-500 font-semibold'
-								: ''
-						}
+                        ${isSameDay(day, selectedDay as Date) ? 'bg-teal-200 text-teal-500 font-semibold' : ''}
                         ${isSameDay(day, new Date()) ? 'bg-gray-200' : ''}`}
 							>
 								{format(day, 'd')}

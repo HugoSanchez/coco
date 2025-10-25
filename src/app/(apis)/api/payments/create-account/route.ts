@@ -48,10 +48,7 @@ export async function POST() {
 
 		if (!userEmail) {
 			console.log('No email found for user')
-			return NextResponse.json(
-				{ error: 'Profile not found' },
-				{ status: 404 }
-			)
+			return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 		}
 
 		// Step 3: Check if user already has a Stripe account (prevent duplicates)
@@ -61,22 +58,19 @@ export async function POST() {
 		console.log('User has existing account:', userHasAccount)
 
 		if (userHasAccount) {
-			console.log(
-				'User already has Stripe account, returning success to continue onboarding'
-			)
+			console.log('User already has Stripe account, returning success to continue onboarding')
 			// User already has an account - that's fine, they can continue to onboarding
 			// This handles cases where account was created but onboarding wasn't completed
 			return NextResponse.json({
 				success: true,
-				message:
-					'Stripe account already exists - continuing to onboarding',
+				message: 'Stripe account already exists - continuing to onboarding',
 				accountExists: true
 			})
 		}
 
 		// Step 4: Create Stripe Connect account with Stripe
 		// This creates the account but doesn't complete onboarding yet
-		const result = await stripeService.createConnectAccount(userEmail)
+		const result = await stripeService.createConnectAccount(userEmail, 'ES')
 
 		if (!result.success) {
 			console.error('[Stripe] Create Connect Account failed', {
@@ -125,8 +119,7 @@ export async function POST() {
 		return NextResponse.json(
 			{
 				error: 'Internal server error',
-				details:
-					error instanceof Error ? error.message : 'Unknown error'
+				details: error instanceof Error ? error.message : 'Unknown error'
 			},
 			{ status: 500 }
 		)

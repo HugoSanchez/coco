@@ -35,6 +35,7 @@ export function ProfileSetup({
 	const pathname = usePathname()
 	const [name, setName] = useState('')
 	const [username, setUsername] = useState('')
+	const [lastName, setLastName] = useState('')
 	const [description, setDescription] = useState('')
 	const [profilePicture, setProfilePicture] = useState<File | null>(null)
 	const [isLoading, setIsLoading] = useState(false)
@@ -44,6 +45,7 @@ export function ProfileSetup({
 	useEffect(() => {
 		if (profile) {
 			setName(profile.name || '')
+			setLastName((profile as any).last_name || '')
 			setUsername(profile.username || '')
 			setDescription(profile.description || '')
 			setPreviewUrl(profile.profile_picture_url || null)
@@ -90,6 +92,7 @@ export function ProfileSetup({
 
 			await updateProfile(user.id, {
 				name: name.trim(),
+				last_name: lastName.trim() || null,
 				username: username.toLowerCase().trim().replace(/\s+/g, '-'),
 				description,
 				email: user.email,
@@ -119,14 +122,12 @@ export function ProfileSetup({
 			}
 		} catch (error) {
 			console.error('Error:', error)
-			// Show error toast if there was an error and toasts are enabled
-			if (showSuccessToast) {
-				toast({
-					title: 'Error',
-					description: 'Hubo un problema al guardar los cambios. Inténtalo de nuevo.',
-					color: 'error'
-				})
-			}
+			// Always show error toast on failure and DO NOT advance step
+			toast({
+				title: 'Error',
+				description: 'Hubo un problema al guardar los cambios. Inténtalo de nuevo.',
+				color: 'error'
+			})
 		} finally {
 			setIsLoading(false)
 		}
@@ -263,6 +264,20 @@ export function ProfileSetup({
 				</div>
 
 				<div>
+					<label htmlFor="last_name" className="block text-md font-medium text-gray-700">
+						Apellidos
+					</label>
+					<p className="text-sm text-gray-500 mb-2">Tal y como deben aparecer en tus facturas.</p>
+					<Input
+						id="last_name"
+						type="text"
+						value={lastName}
+						onChange={(e) => setLastName(e.target.value)}
+						className="autofill:bg-white transition-none text-gray-700"
+					/>
+				</div>
+
+				<div>
 					<label htmlFor="username" className="block text-md font-medium text-gray-700">
 						Nombre de usuario
 					</label>
@@ -280,18 +295,21 @@ export function ProfileSetup({
 						}`}
 					/>
 					{usernameError && <p className="text-red-500 text-sm mt-1">{usernameError}</p>}
-					<p className="text-xs text-gray-500 my-2">itscoco.app/book/{username}</p>
+					<p className="text-xs text-gray-500 my-2">itscoco.app/{username}</p>
 				</div>
 
-				<div hidden>
+				<div>
 					<label htmlFor="description" className="block text-md font-medium text-gray-700">
-						Calendar Description
+						Descripción (opcional)
 					</label>
-					<p className="text-sm text-gray-500 mb-2">Help your clients understand what they are booking.</p>
+					<p className="text-sm text-gray-500 mb-2">
+						Esta descripción se mostrará en tu calendario de citas, solo si decides hacerlo público.
+					</p>
 					<Textarea
 						id="description"
 						value={description}
 						onChange={(e) => setDescription(e.target.value)}
+						placeholder=""
 						className="autofill:bg-white transition-none text-gray-700"
 						rows={3}
 					/>

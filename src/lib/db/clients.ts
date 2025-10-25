@@ -14,10 +14,7 @@
 
 import { Tables } from '@/types/database.types'
 import { createClient as createSupabaseClient } from '@/lib/supabase/client'
-import {
-	type BillingType,
-	getClientBillingSettings
-} from '@/lib/db/billing-settings'
+import { type BillingType, getClientBillingSettings } from '@/lib/db/billing-settings'
 import type { SupabaseClient } from '@supabase/supabase-js'
 const supabase = createSupabaseClient()
 
@@ -74,18 +71,11 @@ export async function getClientsForUser(userId: string): Promise<Client[]> {
  * @returns Promise<Client | null> - The client object or null if not found
  * @throws Error if database operation fails
  */
-export async function getClientById(
-	clientId: string,
-	supabaseClient?: SupabaseClient
-): Promise<Client | null> {
+export async function getClientById(clientId: string, supabaseClient?: SupabaseClient): Promise<Client | null> {
 	// Use provided client or fall back to default
 	const client = supabaseClient || supabase
 
-	const { data, error } = await client
-		.from('clients')
-		.select('*')
-		.eq('id', clientId)
-		.single()
+	const { data, error } = await client.from('clients').select('*').eq('id', clientId).single()
 
 	if (error) {
 		if (error.code === 'PGRST116') return null // Not found
@@ -178,14 +168,8 @@ export interface UpsertBillingPayload {
  * @returns Promise<Client> - The created client object with generated ID
  * @throws Error if insertion fails or validation errors occur
  */
-export async function createClient(
-	payload: CreateClientPayload
-): Promise<Client> {
-	const { data, error } = await supabase
-		.from('clients')
-		.insert([payload])
-		.select()
-		.single()
+export async function createClient(payload: CreateClientPayload): Promise<Client> {
+	const { data, error } = await supabase.from('clients').insert([payload]).select().single()
 
 	if (error) throw error
 	return data
@@ -203,9 +187,7 @@ export async function createClient(
  * @returns Promise<any> - The created billing settings object
  * @throws Error if insertion fails or unique constraints are violated
  */
-export async function createClientBillingSettings(
-	payload: ClientBillingSettingsPayload
-) {
+export async function createClientBillingSettings(payload: ClientBillingSettingsPayload) {
 	// Prepare the billing data with the correct structure for the billing_settings table
 	const billingData = {
 		user_id: payload.user_id,
@@ -218,11 +200,7 @@ export async function createClientBillingSettings(
 		payment_email_lead_hours: payload.payment_email_lead_hours ?? null
 	}
 
-	const { data, error } = await supabase
-		.from('billing_settings')
-		.insert([billingData])
-		.select()
-		.single()
+	const { data, error } = await supabase.from('billing_settings').insert([billingData]).select().single()
 
 	if (error) throw error
 	return data
@@ -309,11 +287,7 @@ export async function upsertClientWithBilling(
 		clientData = data
 	} else {
 		// CREATE: Use insert for new client
-		const { data, error } = await supabase
-			.from('clients')
-			.insert([clientPayload])
-			.select()
-			.single()
+		const { data, error } = await supabase.from('clients').insert([clientPayload]).select().single()
 
 		if (error) throw error
 		clientData = data
@@ -324,10 +298,7 @@ export async function upsertClientWithBilling(
 		if (clientPayload.id) {
 			// UPDATE: Manually handle existing client billing settings
 			// First check if billing settings exist for this client
-			const existingBillingSettings = await getClientBillingSettings(
-				clientPayload.user_id,
-				clientData.id
-			)
+			const existingBillingSettings = await getClientBillingSettings(clientPayload.user_id, clientData.id)
 
 			const billingData = {
 				user_id: clientPayload.user_id,
@@ -337,8 +308,7 @@ export async function upsertClientWithBilling(
 				billing_amount: billingPayload.billing_amount || null,
 				billing_type: billingPayload.billing_type || 'in-advance',
 				currency: billingPayload.currency || 'EUR',
-				payment_email_lead_hours:
-					billingPayload.payment_email_lead_hours ?? null
+				payment_email_lead_hours: billingPayload.payment_email_lead_hours ?? null
 			}
 
 			if (existingBillingSettings) {
@@ -351,9 +321,7 @@ export async function upsertClientWithBilling(
 				if (error) throw error
 			} else {
 				// Create new billing settings
-				const { error } = await supabase
-					.from('billing_settings')
-					.insert([billingData])
+				const { error } = await supabase.from('billing_settings').insert([billingData])
 
 				if (error) throw error
 			}
@@ -365,8 +333,7 @@ export async function upsertClientWithBilling(
 				billing_amount: billingPayload.billing_amount || null,
 				billing_type: billingPayload.billing_type || 'in-advance',
 				currency: billingPayload.currency || 'EUR',
-				payment_email_lead_hours:
-					billingPayload.payment_email_lead_hours ?? null
+				payment_email_lead_hours: billingPayload.payment_email_lead_hours ?? null
 			})
 		}
 	}
@@ -394,12 +361,7 @@ export async function clientEmailExists(
 		return { exists: false, existingClientId: null }
 	}
 
-	let query = supabase
-		.from('clients')
-		.select('id')
-		.eq('user_id', userId)
-		.ilike('email', trimmedEmail)
-		.limit(1)
+	let query = supabase.from('clients').select('id').eq('user_id', userId).ilike('email', trimmedEmail).limit(1)
 
 	if (excludeClientId) {
 		query = query.neq('id', excludeClientId)
@@ -413,4 +375,50 @@ export async function clientEmailExists(
 		exists,
 		existingClientId: exists ? (data?.[0]?.id ?? null) : null
 	}
+}
+
+/**
+ * Finds a client by email for a practitioner or creates one if it doesn't exist.
+ * - Case-insensitive match on email
+ * - Minimal required fields: user_id, name, email
+ *
+ * @param userId - Practitioner user id (owner of the client)
+ * @param name - Patient first name (fallback to email local-part if empty)
+ * @param email - Patient email (required)
+ * @param supabaseClient - Optional Supabase client (service role for public endpoints)
+ */
+export async function findOrCreateClientByEmail(
+	userId: string,
+	name: string,
+	email: string,
+	supabaseClient?: SupabaseClient
+): Promise<Client> {
+	const client = supabaseClient || supabase
+	const trimmedEmail = (email || '').trim()
+	if (!trimmedEmail) throw new Error('Email is required')
+
+	// Try to find existing client by email for this user (case-insensitive)
+	// If multiple exist, pick the most recently created one
+	const { data: existingList, error: existingErr } = await client
+		.from('clients')
+		.select('*')
+		.eq('user_id', userId)
+		.ilike('email', trimmedEmail)
+		.order('created_at', { ascending: false })
+		.limit(1)
+
+	if (!existingErr && existingList && existingList.length > 0) {
+		return existingList[0] as Client
+	}
+
+	// Create a new client with minimal fields
+	const safeName = name && name.trim().length > 0 ? name.trim() : trimmedEmail.split('@')[0]
+	const { data: created, error: insertError } = await client
+		.from('clients')
+		.insert([{ user_id: userId, name: safeName, email: trimmedEmail }])
+		.select()
+		.single()
+
+	if (insertError) throw insertError
+	return created as Client
 }

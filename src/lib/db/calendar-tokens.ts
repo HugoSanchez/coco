@@ -84,12 +84,13 @@ export async function getUserCalendarTokens(
 	refresh_token: string
 	expiry_date: number | null
 	granted_scopes: string[] | null
+    updated_at: string
 } | null> {
 	const client = supabaseClient || supabase
 
-	const { data, error } = await client
-		.from('calendar_tokens')
-		.select('access_token, refresh_token, expiry_date, granted_scopes')
+    const { data, error } = await client
+        .from('calendar_tokens')
+        .select('access_token, refresh_token, expiry_date, granted_scopes, updated_at')
 		.eq('user_id', userId)
 		.maybeSingle()
 

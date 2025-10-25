@@ -28,7 +28,8 @@ export class StripeService {
 				capabilities: {
 					card_payments: { requested: true },
 					transfers: { requested: true }
-				}
+				},
+				business_profile: { support_email: email }
 			})
 
 			return {
@@ -170,6 +171,58 @@ export class StripeService {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error'
 			}
+		}
+	}
+
+	/**
+	 * Prefill a Stripe Connect account with known practitioner data so the onboarding form is pre-populated.
+	 * Only sends non-sensitive fields publicly displayed to the user, and NIF/DNI as id_number server-side.
+	 */
+	async prefillAccount(
+		accountId: string,
+		params: {
+			firstName?: string | null
+			lastName?: string | null
+			email?: string | null
+			taxId?: string | null // NIF/DNI
+			address?: {
+				line1?: string | null
+				line2?: string | null
+				city?: string | null
+				province?: string | null
+				postalCode?: string | null
+				country?: string | null
+			} | null
+		}
+	): Promise<{ success: boolean; error?: string }> {
+		try {
+			await stripe.accounts.update(accountId, {
+				business_type: 'individual',
+				individual: {
+					first_name: params.firstName || undefined,
+					last_name: params.lastName || undefined,
+					email: params.email || undefined,
+					id_number: params.taxId || undefined,
+					address: {
+						line1: params.address?.line1 || undefined,
+						line2: params.address?.line2 || undefined,
+						city: params.address?.city || undefined,
+						state: params.address?.province || undefined,
+						postal_code: params.address?.postalCode || undefined,
+						country: (params.address?.country || 'ES') as any
+					}
+				},
+				business_profile: {
+					support_email: params.email || undefined
+				}
+			})
+
+			return { success: true }
+		} catch (error) {
+			Sentry.captureException(error, {
+				tags: { component: 'stripe-service', method: 'prefillAccount' }
+			})
+			return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
 		}
 	}
 

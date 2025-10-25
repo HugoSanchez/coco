@@ -1,4 +1,5 @@
 import { format, parseISO } from 'date-fns'
+import { es } from 'date-fns/locale'
 import { toZonedTime } from 'date-fns-tz'
 
 /**
@@ -58,19 +59,10 @@ interface TimeSlotsProps {
  * />
  * ```
  */
-export default function TimeSlots({
-	date,
-	availableSlots,
-	onSelectSlot,
-	userTimeZone
-}: TimeSlotsProps) {
+export default function TimeSlots({ date, availableSlots, onSelectSlot, userTimeZone }: TimeSlotsProps) {
 	// Show placeholder when no date is selected
 	if (!date) {
-		return (
-			<div className="text-gray-500">
-				Select a date to view available times
-			</div>
-		)
+		return <div className="text-gray-500">Select a date to view available times</div>
 	}
 
 	// Format date as key for looking up available slots
@@ -79,50 +71,49 @@ export default function TimeSlots({
 	const slotsForDate = availableSlots[dateKey] || []
 
 	return (
-		<div>
+		<div className="pt-4">
 			{/* Header showing the selected date */}
-			<h3 className="text-lg font-light text-gray-900 mb-4">
-				Available times for {format(date, 'EEEE, MMMM d')}
-			</h3>
+			<h2 className="text-xl font-bold mb-1">
+				{(() => {
+					const label = format(date, "EEEE, d 'de' MMMM", { locale: es })
+					const cap = label
+						.replace(/^./, (c) => c.toUpperCase())
+						.replace(/ de ([a-z])/, (match, p1) => ` de ${p1.toUpperCase()}`)
+					return `${cap}`
+				})()}
+			</h2>
+			<p className="mb-6 text-gray-600 font-light text-sm">
+				Estas son las horas disponibles para este día, elige la que más te convenga.
+			</p>
 
 			{/* Grid container for time slot buttons */}
 			<div className="grid grid-cols-1 gap-2">
 				{/* Show message when no slots are available for the selected date */}
 				{slotsForDate.length === 0 && (
-					<div className="text-gray-500">
-						No available times for this day
-					</div>
+					<div className="text-gray-500">No hay huecos disponibles para este día</div>
 				)}
 
 				{/* Render each available time slot as a clickable button */}
 				{slotsForDate.map((slot, index) => {
 					// Convert UTC times to user's timezone for display
-					const startTime = toZonedTime(
-						parseISO(slot.start),
-						userTimeZone
-					)
-					const endTime = toZonedTime(
-						parseISO(slot.end),
-						userTimeZone
-					)
+					const startTime = toZonedTime(parseISO(slot.start), userTimeZone)
+					const endTime = toZonedTime(parseISO(slot.end), userTimeZone)
 
 					return (
 						<button
 							key={index}
 							onClick={() => onSelectSlot(slot)}
-							className="bg-white border border-gray-200 rounded-md py-4 px-4 hover:bg-emerald-50 hover:border-emerald-300 text-sm font-medium text-gray-700"
+							className="bg-white border border-gray-200 rounded-md py-4 px-4 hover:bg-teal-50 hover:border-teal-300 text-sm font-normal text-gray-700"
 						>
-							{/* Display only start time (end time is typically 30-60 min later) */}
-							{format(startTime, 'h:mm a')}
+							{/* Mostrar hora de inicio en formato 24h */}
+							{format(startTime, 'HH:mm', { locale: es })}h
 						</button>
 					)
 				})}
 			</div>
 
 			{/* Timezone information for user clarity */}
-			<p className="mt-8 text-sm text-gray-500 font-light">
-				Times are shown in your local timezone: {userTimeZone}
-			</p>
+			<p className="mt-8 text-sm text-gray-500 font-light">Zona horaria: {userTimeZone}</p>
 		</div>
 	)
 }

@@ -24,6 +24,7 @@ import { getBookingById } from '@/lib/db/bookings'
 import { createEmailCommunication } from '@/lib/db/email-communications'
 import { createBookingCalendarEvent } from '@/lib/calendar/calendar-orchestration'
 import { computeEmailScheduledAt } from '@/lib/utils'
+import { buildManageUrl } from '@/lib/crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import * as Sentry from '@sentry/nextjs'
 
@@ -41,6 +42,10 @@ export interface CreateBookingRequest {
 	consultationType?: 'first' | 'followup'
 	mode?: 'online' | 'in_person'
 	locationText?: string | null
+	// If true, booking was created by patient; we will append manage links
+	patientCreated?: boolean
+	// Email used to bind manage-link signature
+	patientEmail?: string
 }
 
 /**
@@ -165,10 +170,24 @@ export async function orchestrateBookingCreation(
 	////// Step 6: Calendar events (single helper, preserves earlier behavior by variant)
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	if (normalizedType === 'per_booking') {
+		// If patient-created, append manage links using the REAL bookingId now
+		const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+		const suffix =
+			request.patientCreated && request.patientEmail
+				? (() => {
+						const resUrl = buildManageUrl(baseUrl, 'reschedule', booking.id, request.patientEmail as string)
+						const canUrl = buildManageUrl(baseUrl, 'cancel', booking.id, request.patientEmail as string)
+						return `¿Necesitas hacer cambios?\nReprogramar: ${resUrl}\n\nCancelar: ${canUrl}`
+					})()
+				: undefined
+		const requestWithSuffix: CreateBookingRequest = {
+			...request,
+			notes: suffix ? `${request.notes || ''}${request.notes ? '\n\n' : ''}${suffix}` : request.notes
+		}
 		if (amount === 0) {
 			await createCalendarEventForBooking({
 				variant: 'confirmed',
-				request,
+				request: requestWithSuffix,
 				bookingId: booking.id,
 				client,
 				practitioner,
@@ -177,7 +196,7 @@ export async function orchestrateBookingCreation(
 		} else if (isPast) {
 			await createCalendarEventForBooking({
 				variant: 'internal_confirmed',
-				request,
+				request: requestWithSuffix,
 				bookingId: booking.id,
 				client,
 				practitioner,
@@ -186,7 +205,7 @@ export async function orchestrateBookingCreation(
 		} else {
 			await createCalendarEventForBooking({
 				variant: 'pending',
-				request,
+				request: requestWithSuffix,
 				bookingId: booking.id,
 				client,
 				practitioner,

@@ -133,4 +133,40 @@ export function computeEmailScheduledAt(
 	}
 	return null
 }
-//////
+
+/**
+ * Lightweight localStorage helpers for booking visit tracking
+ */
+export function hasVisitedBooking(username: string): boolean {
+	if (typeof window === 'undefined') return false
+	try {
+		return !!localStorage.getItem(`booking:visited:${username}`)
+	} catch {
+		return false
+	}
+}
+
+export function markVisitedBooking(username: string): void {
+	if (typeof window === 'undefined') return
+	try {
+		localStorage.setItem(`booking:visited:${username}`, '1')
+	} catch {}
+}
+
+/**
+ * Formats a duration in minutes to a compact human string.
+ * Examples:
+ *  - 45 -> "45 min"
+ *  - 60 -> "1h"
+ *  - 75 -> "1h15min"
+ *  - 90 -> "1h30min"
+ */
+export function formatDurationMinutes(totalMinutes: number | null | undefined): string {
+	const m = Number(totalMinutes || 0)
+	if (!isFinite(m) || m <= 0) return '0 min'
+	const hours = Math.floor(m / 60)
+	const minutes = m % 60
+	if (hours === 0) return `${minutes} min`
+	if (minutes === 0) return `${hours}h`
+	return `${hours}h${minutes}min`
+}

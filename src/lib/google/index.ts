@@ -15,11 +15,7 @@
 
 import { google } from 'googleapis'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import {
-	getUserCalendarTokens,
-	updateUserCalendarTokens,
-	deleteUserCalendarTokens
-} from '../db/calendar-tokens'
+import { getUserCalendarTokens, updateUserCalendarTokens, deleteUserCalendarTokens } from '../db/calendar-tokens'
 
 const clientId = process.env.GOOGLE_CLIENT_ID_CALENDAR
 const clientSecret = process.env.GOOGLE_CLIENT_SECRET_CALENDAR
@@ -59,7 +55,7 @@ export async function refreshToken(
 	refreshToken: string,
 	supabaseClient?: SupabaseClient
 ): Promise<string> {
-	console.log('🔄 [Token] Starting token refresh for user:', userId)
+	console.log('[Token] Starting token refresh for user:', userId)
 
 	// Use a per-request OAuth2 client to avoid cross-user credential bleed
 	const oauth2Client = createOAuthClient()
@@ -67,70 +63,40 @@ export async function refreshToken(
 	oauth2Client.setCredentials({ refresh_token: refreshToken })
 
 	try {
-		console.log(
-			'🔄 [Token] Requesting new access token from Google for user:',
-			userId
-		)
+		// Request a new access token from Google
 		// Ask Google for a new access token
 		const tokenResponse = await oauth2Client.getAccessToken()
 
 		// If unsuccessful, throw an error
 		if (!tokenResponse.token) {
-			console.error(
-				'❌ [Token] Google returned no access token for user:',
-				userId
-			)
+			console.error('❌ [Token] Google returned no access token for user:', userId)
 			throw new Error('No access token returned after refresh')
 		}
 
-		console.log(
-			'✅ [Token] New access token received from Google for user:',
-			userId
-		)
-
-		// Extract expiry duration (defaults to 1 hour if not provided)
-		const expiryDuration = oauth2Client.credentials.expiry_date
-			? oauth2Client.credentials.expiry_date - Date.now()
-			: 3600 * 1000
-
-		console.log(
-			'🔄 [Token] Updating token in database for user:',
-			userId,
-			'Expiry:',
-			new Date(Date.now() + expiryDuration)
-		)
+		// Determine absolute expiry epoch (ms).
+		// Prefer the HTTP response's expires_in (seconds) when available.
+		// Guard against near-now expiries to avoid immediate re-refresh loops.
+		const expiresInSeconds: number | undefined = (tokenResponse as any)?.res?.data?.expires_in
+		let expiryEpochMs =
+			expiresInSeconds && Number.isFinite(expiresInSeconds) && expiresInSeconds > 0
+				? Date.now() + expiresInSeconds * 1000
+				: oauth2Client.credentials.expiry_date || Date.now() + 3600 * 1000
+		if (expiryEpochMs <= Date.now() + 120_000) {
+			expiryEpochMs = Date.now() + 3600 * 1000
+		}
 
 		try {
 			// update the token in the database
-			await updateUserCalendarTokens(
-				tokenResponse,
-				userId,
-				expiryDuration,
-				supabaseClient
-			)
-			console.log(
-				'✅ [Token] Token successfully updated in database for user:',
-				userId
-			)
+			await updateUserCalendarTokens(tokenResponse, userId, expiryEpochMs, supabaseClient)
 		} catch (dbError) {
-			console.error(
-				'❌ [Token] Failed to update token in database for user:',
-				userId,
-				'Error:',
-				dbError
-			)
+			console.error('❌ [Token] Failed to update token in database for user:', userId, 'Error:', dbError)
 			throw new Error('Failed to update refreshed token in database')
 		}
 
 		// and return token
 		return tokenResponse.token
 	} catch (error: any) {
-		console.error(
-			'❌ [Token] Token refresh failed for user:',
-			userId,
-			'Error:',
-			error.message || error
-		)
+		console.error('❌ [Token] Token refresh failed for user:', userId, 'Error:', error.message || error)
 
 		// Structured debug payload for invalid_grant and other auth failures
 		const debugPayload = {
@@ -142,32 +108,19 @@ export async function refreshToken(
 			responseData: error?.response?.data,
 			hint: 'If errorMessage includes invalid_grant, user likely revoked access or refresh token aged out.'
 		}
-		console.log('🧪 [Token] Refresh debug payload:', debugPayload)
+		console.log('[Token] Refresh debug payload:', debugPayload)
 
 		// Handle invalid_grant errors specifically
 		if (error.message?.includes('invalid_grant')) {
-			console.log(
-				'🧹 [Token] Cleaning up invalid tokens for user:',
-				userId
-			)
+			console.log('🧹 [Token] Cleaning up invalid tokens for user:', userId)
 			try {
 				// Clean up the invalid tokens from database
 				await deleteUserCalendarTokens(userId, supabaseClient)
-				console.log(
-					'✅ [Token] Invalid tokens cleaned up for user:',
-					userId
-				)
+				console.log('✅ [Token] Invalid tokens cleaned up for user:', userId)
 			} catch (cleanupError) {
-				console.error(
-					'❌ [Token] Failed to cleanup tokens for user:',
-					userId,
-					'Error:',
-					cleanupError
-				)
+				console.error('❌ [Token] Failed to cleanup tokens for user:', userId, 'Error:', cleanupError)
 			}
-			throw new Error(
-				'Calendar access expired - please reconnect your Google Calendar'
-			)
+			throw new Error('Calendar access expired - please reconnect your Google Calendar')
 		}
 
 		throw error
@@ -191,10 +144,7 @@ export async function refreshToken(
  * @returns Promise<google.calendar_v3.Calendar> - Authenticated calendar client
  * @throws Error if user has no calendar tokens or authentication fails
  */
-export async function getAuthenticatedCalendar(
-	userId: string,
-	supabaseClient?: SupabaseClient
-) {
+export async function getAuthenticatedCalendar(userId: string, supabaseClient?: SupabaseClient) {
 	// ————————————————————————————————————————————————————————————————
 	// STEP 1 — Load stored Google credentials for this user
 	// We persist three key fields per user in `calendar_tokens`:
@@ -217,14 +167,23 @@ export async function getAuthenticatedCalendar(
 
 	// ————————————————————————————————————————————————————————————————
 	// STEP 2 — Decide whether we must refresh the access token
+	// Normalize stored expiry to ms since epoch (some schemas store seconds).
 	// Access tokens typically last ~1 hour. We refresh only when:
 	//   a) `expiry_date` exists AND
-	//   b) it is strictly in the past relative to `now`.
+	//   b) it is <= now + small skew.
 	// If no `expiry_date` was stored, we assume the access token is valid and
 	// let Google reject if it is not (rare, but safe and simple).
 	// ————————————————————————————————————————————————————————————————
 	const now = Date.now()
-	const needsRefresh = tokens.expiry_date != null && tokens.expiry_date < now
+	const skewMs = 60_000 // small clock-drift / network skew
+	const rawExpiry = tokens.expiry_date
+	const storedExpiryMs =
+		rawExpiry == null
+			? null
+			: rawExpiry < 1_000_000_000_000 // treat values < 1e12 as seconds
+				? rawExpiry * 1000
+				: rawExpiry
+	const needsRefresh = storedExpiryMs != null && storedExpiryMs <= now + skewMs
 
 	// ————————————————————————————————————————————————————————————————
 	// STEP 3 — Prepare an OAuth2 client for this request
@@ -240,11 +199,7 @@ export async function getAuthenticatedCalendar(
 		// ————————————————————————————————————————————————————————————————
 		try {
 			// Refresh using the long-lived refresh token, then apply new access token
-			const newAccessToken = await refreshToken(
-				userId,
-				tokens.refresh_token,
-				supabaseClient
-			)
+			const newAccessToken = await refreshToken(userId, tokens.refresh_token, supabaseClient)
 			oauth2Client.setCredentials({
 				access_token: newAccessToken,
 				refresh_token: tokens.refresh_token

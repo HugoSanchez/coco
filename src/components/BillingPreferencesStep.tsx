@@ -5,14 +5,8 @@ import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
 import { Spinner } from '@/components/ui/spinner'
 import { useUser } from '@/contexts/UserContext'
-import {
-	getBillingPreferences,
-	saveBillingPreferences
-} from '@/lib/db/billing-settings'
-import {
-	BillingPreferencesForm,
-	BillingPreferences
-} from '@/components/BillingPreferencesForm'
+import { getBillingPreferences, saveBillingPreferences } from '@/lib/db/billing-settings'
+import { BillingPreferencesForm, BillingPreferences } from '@/components/BillingPreferencesForm'
 import { captureOnboardingStep } from '@/lib/posthog/client'
 
 interface BillingPreferencesStepProps {
@@ -27,7 +21,7 @@ interface BillingPreferencesStepProps {
 
 const defaultPrefs: BillingPreferences = {
 	billingType: 'in-advance',
-	billingAmount: '80'
+	billingAmount: ''
 }
 
 export function BillingPreferencesStep({
@@ -41,8 +35,7 @@ export function BillingPreferencesStep({
 }: BillingPreferencesStepProps) {
 	const [isLoading, setIsLoading] = useState(false)
 	const [isLoadingPrefs, setIsLoadingPrefs] = useState(true)
-	const [billingPrefs, setBillingPrefs] =
-		useState<BillingPreferences>(defaultPrefs)
+	const [billingPrefs, setBillingPrefs] = useState<BillingPreferences>(defaultPrefs)
 	const { toast } = useToast()
 	const { user } = useUser()
 
@@ -81,8 +74,7 @@ export function BillingPreferencesStep({
 			if (showSuccessToast) {
 				toast({
 					title: 'Configuración guardada',
-					description:
-						'Preferencias de facturación actualizadas correctamente.',
+					description: 'Preferencias de facturación actualizadas correctamente.',
 					color: 'success'
 				})
 			}
@@ -121,10 +113,7 @@ export function BillingPreferencesStep({
 
 			<form onSubmit={handleSubmit} className="mb-8">
 				<div className="pt-2">
-					<BillingPreferencesForm
-						values={billingPrefs}
-						onChange={setBillingPrefs}
-					/>
+					<BillingPreferencesForm values={billingPrefs} onChange={setBillingPrefs} />
 				</div>
 				<Button
 					type="submit"

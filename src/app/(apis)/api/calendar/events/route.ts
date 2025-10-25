@@ -27,10 +27,7 @@ export async function GET(request: NextRequest) {
 			error: authError
 		} = await supabase.auth.getUser()
 		if (authError || !user) {
-			return NextResponse.json(
-				{ error: 'Authentication required' },
-				{ status: 401 }
-			)
+			return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
 		}
 
 		// Parse query parameters
@@ -39,42 +36,20 @@ export async function GET(request: NextRequest) {
 		const endParam = searchParams.get('end')
 
 		if (!startParam || !endParam) {
-			return NextResponse.json(
-				{ error: 'Both start and end parameters required' },
-				{ status: 400 }
-			)
+			return NextResponse.json({ error: 'Both start and end parameters required' }, { status: 400 })
 		}
 
 		const startDate = new Date(startParam)
 		const endDate = new Date(endParam)
 
-		console.log(
-			'🗓️ [API] Date parsing for user:',
-			user.id,
-			'Start param:',
-			startParam,
-			'Parsed start:',
-			startDate.toISOString(),
-			'End param:',
-			endParam,
-			'Parsed end:',
-			endDate.toISOString()
-		)
+		// Parsed dates validated below; remove verbose logging
 
 		if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-			return NextResponse.json(
-				{ error: 'Invalid date format' },
-				{ status: 400 }
-			)
+			return NextResponse.json({ error: 'Invalid date format' }, { status: 400 })
 		}
 
 		// Fetch system bookings first (this should always work)
-		const systemBookings = await getBookingsForDateRange(
-			user.id,
-			startParam,
-			endParam,
-			supabase
-		)
+		const systemBookings = await getBookingsForDateRange(user.id, startParam, endParam, supabase)
 
 		// Try to fetch Google Calendar events and system event IDs, but don't fail if they error
 		let googleEvents: any[] = []
@@ -83,88 +58,49 @@ export async function GET(request: NextRequest) {
 		try {
 			systemEventIds = await getSystemGoogleEventIds(user.id, supabase)
 		} catch (error) {
-			console.log('Could not fetch system Google event IDs:', error)
+			// Non-fatal: proceed without system IDs if lookup fails
 		}
 
 		try {
-			console.log(
-				'🗓️ [API] Attempting to fetch Google Calendar events for user:',
-				user.id,
-				'date:',
-				startDate.toISOString()
-			)
-			googleEvents = await getGoogleCalendarEventsForDay(
-				user.id,
-				startDate,
-				supabase
-			)
-			console.log(
-				'✅ [API] Successfully fetched',
-				googleEvents.length,
-				'Google Calendar events for user:',
-				user.id
-			)
+			googleEvents = await getGoogleCalendarEventsForDay(user.id, startDate, supabase)
 		} catch (error) {
-			console.error(
-				'❌ [API] Could not fetch Google Calendar events for user:',
-				user.id,
-				'Error:',
-				error
-			)
+			// Non-fatal: external calendar may be disconnected
 		}
 
-		// Format system bookings
-		const formattedSystemBookings = systemBookings.map((booking: any) => ({
-			start: booking.start_time,
-			end: booking.end_time,
-			title: booking.client?.name || 'Cliente',
-			type: 'system',
-			status: booking.status,
-			bookingId: booking.id
-		}))
+		// Format system bookings with patient's full name when available
+		const formattedSystemBookings = systemBookings.map((booking: any) => {
+			const fullName = [booking.client?.name, booking.client?.last_name].filter(Boolean).join(' ').trim()
+			return {
+				start: booking.start_time,
+				end: booking.end_time,
+				title: fullName || 'Cliente',
+				type: 'system',
+				status: booking.status,
+				bookingId: booking.id
+			}
+		})
 
 		// Filter out Google events that are actually our system bookings
 		const systemEventIdSet = new Set(systemEventIds)
-		const filteredGoogleEvents = googleEvents.filter(
-			(event: any) => !systemEventIdSet.has(event.googleEventId)
-		)
+		const filteredGoogleEvents = googleEvents.filter((event: any) => !systemEventIdSet.has(event.googleEventId))
 
 		// Format external events
-		const formattedExternalEvents = filteredGoogleEvents.map(
-			(event: any) => ({
-				start: event.start,
-				end: event.end,
-				title: 'Busy',
-				type: 'external'
-			})
-		)
+		const formattedExternalEvents = filteredGoogleEvents.map((event: any) => ({
+			start: event.start,
+			end: event.end,
+			title: 'Busy',
+			type: 'external'
+		}))
 
 		// Combine and sort by start time
-		const allEvents = [
-			...formattedSystemBookings,
-			...formattedExternalEvents
-		]
-		allEvents.sort(
-			(a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
-		)
+		const allEvents = [...formattedSystemBookings, ...formattedExternalEvents]
+		allEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
 
-		console.log(
-			'📊 [API] Final response for user:',
-			user.id,
-			'System bookings:',
-			formattedSystemBookings.length,
-			'External events:',
-			formattedExternalEvents.length,
-			'Total events:',
-			allEvents.length
-		)
+		// Return combined busy view (system + external)
 
 		return NextResponse.json({ events: allEvents })
 	} catch (error: any) {
 		console.error('Calendar events API error:', error)
-		return NextResponse.json(
-			{ events: [], error: 'Failed to fetch calendar events' },
-			{ status: 500 }
-		)
+		return NextResponse.json({ events: [], error: 'Failed to fetch calendar events' }, { status: 500 })
 	}
 }

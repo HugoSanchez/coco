@@ -1,14 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import { useToast } from '@/components/ui/use-toast'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import confetti from 'canvas-confetti'
 import { ClientList } from '@/components/ClientList'
 import { BookingsTable, Booking } from '@/components/BookingsTable'
 import { SideSheetHeadless } from '@/components/SideSheetHeadless'
 import { BookingFilters, BookingFiltersState } from '@/components/BookingFilters'
 import { FilterX, DollarSign, Users, Plus, CalendarCheck, TriangleAlert } from 'lucide-react'
+import ShareBookingLinkButton from '@/components/ShareBookingLinkButton'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -126,6 +128,9 @@ export default function Dashboard() {
 	})
 
 	const { toast } = useToast()
+	// Guards to prevent duplicate stats requests
+	const statsInitRef = useRef(false)
+	const statsInFlightRef = useRef(false)
 
 	const exportWithCurrentFilters = async () => {
 		if (!user) return
@@ -167,6 +172,7 @@ export default function Dashboard() {
 		}
 	}
 	const router = useRouter()
+	const searchParams = useSearchParams()
 
 	// Minimal guard: only redirect if we definitively know both are false
 	useEffect(() => {
@@ -176,6 +182,20 @@ export default function Dashboard() {
 			router.replace('/onboarding')
 		}
 	}, [user, stripeOnboardingCompleted, calendarConnected, router])
+
+	// Celebrate successful Stripe onboarding once
+	useEffect(() => {
+		const flag = searchParams.get('stripe_onboarded')
+		if (flag === 'true') {
+			confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } })
+			// Clean param to avoid re-firing on refresh
+			try {
+				const url = new URL(window.location.href)
+				url.searchParams.delete('stripe_onboarded')
+				window.history.replaceState({}, '', url.toString())
+			} catch {}
+		}
+	}, [searchParams])
 
 	// Simple responsive switch for mobile tabs behavior
 	const [isMobile, setIsMobile] = useState(false)
@@ -194,8 +214,10 @@ export default function Dashboard() {
 	 */
 	const fetchDashboardStats = async () => {
 		if (!user) return
+		if (statsInFlightRef.current) return
 
 		try {
+			statsInFlightRef.current = true
 			setDashboardStats((prev) => ({
 				...prev,
 				loading: true,
@@ -232,6 +254,8 @@ export default function Dashboard() {
 				loading: false,
 				error: error instanceof Error ? error.message : 'Failed to load statistics'
 			})
+		} finally {
+			statsInFlightRef.current = false
 		}
 	}
 
@@ -243,11 +267,12 @@ export default function Dashboard() {
 		fetchDashboardStats()
 	}
 
-	// Fetch dashboard statistics when user is available
+	// Fetch dashboard statistics once when user is available (guarded)
 	useEffect(() => {
-		if (user) {
-			fetchDashboardStats()
-		}
+		if (!user) return
+		if (statsInitRef.current) return
+		statsInitRef.current = true
+		fetchDashboardStats()
 	}, [user])
 
 	useEffect(() => {
@@ -377,6 +402,8 @@ export default function Dashboard() {
 				variant: 'default',
 				color: 'success'
 			})
+			// Refresh stats after major state change
+			fetchDashboardStats()
 		} catch (error) {
 			toast({
 				title: 'Error',
@@ -429,6 +456,7 @@ export default function Dashboard() {
 				variant: 'default',
 				color: 'success'
 			})
+			fetchDashboardStats()
 		} catch (error) {
 			toast({
 				title: 'Error',
@@ -484,6 +512,7 @@ export default function Dashboard() {
 				variant: 'default',
 				color: 'success'
 			})
+			fetchDashboardStats()
 		} catch (error) {
 			// Close the modal even on error
 			setMarkingAsPaidBookingId(null)
@@ -603,6 +632,7 @@ export default function Dashboard() {
 				variant: 'default',
 				color: 'success'
 			})
+			fetchDashboardStats()
 		} catch (error) {
 			toast({
 				title: 'Error',
@@ -722,6 +752,9 @@ export default function Dashboard() {
 						<Plus className="h-5 w-5 mr-2" />
 						Crear cita
 					</Button>
+
+					{/* Share booking link button component */}
+					<ShareBookingLinkButton username={profile?.username} />
 				</div>
 			</header>
 			<main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:px-16">

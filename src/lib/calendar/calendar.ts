@@ -243,6 +243,7 @@ export interface CreatePendingCalendarEventPayload {
 	bookingId?: string // Optional: tag Google event for idempotent reconciliation
 	mode?: 'online' | 'in_person'
 	locationText?: string | null
+	extraDescription?: string | null
 }
 
 /**
@@ -258,6 +259,7 @@ export interface UpdatePendingToConfirmedPayload {
 	bookingId?: string // Optional: tag confirmed event for idempotent reconciliation
 	mode?: 'online' | 'in_person'
 	locationText?: string | null
+	extraDescription?: string | null
 }
 
 /**
@@ -439,7 +441,8 @@ export async function createPendingCalendarEvent(
 			startTime,
 			endTime,
 			bookingId: (payload as any).bookingId,
-			location: (payload as any).mode === 'in_person' ? (payload as any).locationText : undefined
+			location: (payload as any).mode === 'in_person' ? (payload as any).locationText : undefined,
+			extraDescription: (payload as any).extraDescription || undefined
 		})
 
 		console.log('[calendar] createPendingCalendarEvent payload', {
@@ -536,6 +539,14 @@ export async function updatePendingToConfirmed(
 		// Generate unique conference request ID when we need to add Meet
 		const conferenceRequestId = generateConferenceRequestId('confirmed')
 
+		// Try to preserve any self-service links from the pending description
+		const pendingDesc = String(currentEvent.data.description || '')
+		const linkLines = pendingDesc
+			.split('\n')
+			.filter((l) => /^(Reschedule:|Cancelar:|Cancel:|Reagendar:|Reprogramar:)/i.test(l.trim()))
+		// Ensure a blank line between the two actions when both exist
+		const carryOver = linkLines.length > 1 ? `${linkLines[0]}\n\n${linkLines[1]}` : linkLines[0] || undefined
+
 		// Prepare a minimal patch body: do NOT set location so it stays unchanged
 		const updatedEventData = buildConfirmedEventData({
 			clientName,
@@ -547,7 +558,8 @@ export async function updatePendingToConfirmed(
 			conferenceRequestId,
 			bookingId: payload.bookingId,
 			// Leave "location" undefined to preserve existing value on patch
-			includeMeet: !hasLocation
+			includeMeet: !hasLocation,
+			extraDescription: carryOver
 		})
 
 		// Patch the existing event so unspecified fields (like location) remain unchanged
@@ -878,6 +890,51 @@ export async function getGoogleCalendarEventsForDay(
 			'Full error:',
 			error
 		)
+		return []
+	}
+}
+
+/**
+ * Fetches Google Calendar events for a date RANGE (single API call)
+ * Returns external events with start/end and id for deduplication.
+ */
+export async function getGoogleCalendarEventsForRange(
+	userId: string,
+	rangeStart: Date,
+	rangeEnd: Date,
+	supabaseClient?: SupabaseClient
+): Promise<
+	Array<{
+		start: string
+		end: string
+		title: string
+		type: string
+		googleEventId: string
+	}>
+> {
+	try {
+		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+		const response = await calendar.events.list({
+			calendarId: 'primary',
+			timeMin: rangeStart.toISOString(),
+			timeMax: rangeEnd.toISOString(),
+			singleEvents: true,
+			orderBy: 'startTime'
+		})
+
+		const events = response.data.items || []
+
+		return events
+			.filter((event) => event.start?.dateTime && event.end?.dateTime && event.id)
+			.map((event) => ({
+				start: event.start!.dateTime!,
+				end: event.end!.dateTime!,
+				title: 'Busy',
+				type: 'external',
+				googleEventId: event.id!
+			}))
+	} catch (error: any) {
+		console.error('❌ [Calendar Events] Range fetch failed for user:', userId, error?.message || error)
 		return []
 	}
 }

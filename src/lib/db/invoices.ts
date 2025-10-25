@@ -226,12 +226,12 @@ export async function issueInvoice(
 		const { data: profile } = await db
 			.from('profiles')
 			.select(
-				'name, tax_id, fiscal_address_line1, fiscal_address_line2, fiscal_city, fiscal_province, fiscal_postal_code, fiscal_country'
+				'full_name, name, tax_id, fiscal_address_line1, fiscal_address_line2, fiscal_city, fiscal_province, fiscal_postal_code, fiscal_country'
 			)
 			.eq('id', userId)
 			.single()
 		if (profile) {
-			issuerName = (profile as any).name || null
+			issuerName = (profile as any).full_name || (profile as any).name || null
 			issuerTaxId = (profile as any).tax_id || null
 			issuerAddress = {
 				line1: (profile as any).fiscal_address_line1 || null,
@@ -306,12 +306,12 @@ export async function issueCreditNote(
 		const { data: profile } = await db
 			.from('profiles')
 			.select(
-				'name, tax_id, fiscal_address_line1, fiscal_address_line2, fiscal_city, fiscal_province, fiscal_postal_code, fiscal_country'
+				'full_name, name, tax_id, fiscal_address_line1, fiscal_address_line2, fiscal_city, fiscal_province, fiscal_postal_code, fiscal_country'
 			)
 			.eq('id', userId)
 			.single()
 		if (profile) {
-			issuerName = (profile as any).name || null
+			issuerName = (profile as any).full_name || (profile as any).name || null
 			issuerTaxId = (profile as any).tax_id || null
 			issuerAddress = {
 				line1: (profile as any).fiscal_address_line1 || null,

@@ -23,7 +23,7 @@ export async function generateAndStoreInvoicePdf(invoiceId: string): Promise<{ s
 	const invoice = await getInvoiceById(invoiceId, supabase)
 	if (!invoice) throw new Error('Invoice not found')
 	const practitionerProfile = await getProfileById(invoice.user_id, supabase)
-	const practitionerName = practitionerProfile?.name || ''
+	const practitionerName = (practitionerProfile as any)?.full_name || practitionerProfile?.name || ''
 
 	// Skip PDF generation if issuer fiscal data is missing (proxy for invoicing setup)
 	const missingFiscal =
