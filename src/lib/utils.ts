@@ -95,10 +95,7 @@ export function getUrl(path: string): string {
  * - Ensures proper quoting for commas, quotes, and newlines
  * - Preserves header order as provided
  */
-export function toCsv(
-	headers: string[],
-	rows: Array<Record<string, any>>
-): string {
+export function toCsv(headers: string[], rows: Array<Record<string, any>>): string {
 	const escape = (value: any): string => {
 		if (value === null || typeof value === 'undefined') return ''
 		const str = String(value)
@@ -110,9 +107,7 @@ export function toCsv(
 	}
 
 	const headerLine = headers.map(escape).join(',')
-	const lines = rows.map((row) =>
-		headers.map((h) => escape(row[h])).join(',')
-	)
+	const lines = rows.map((row) => headers.map((h) => escape(row[h])).join(','))
 	return [headerLine, ...lines].join('\r\n') + '\r\n'
 }
 
@@ -138,3 +133,4 @@ export function computeEmailScheduledAt(
 	}
 	return null
 }
+//////
