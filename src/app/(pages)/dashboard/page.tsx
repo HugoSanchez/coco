@@ -171,7 +171,6 @@ export default function Dashboard() {
 		}
 	}
 	const router = useRouter()
-	const searchParams = useSearchParams()
 
 	// Minimal guard: only redirect if we definitively know both are false
 	useEffect(() => {
