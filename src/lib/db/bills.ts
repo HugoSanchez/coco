@@ -315,32 +315,6 @@ export async function getBillsWithBookings(
 }
 
 /**
- * Retrieves overdue bills for a user
- * Bills are considered overdue if status is 'sent' and due_date has passed
- *
- * @param userId - Optional user ID to filter by (if not provided, gets all overdue bills)
- * @returns Promise<Bill[]> - Array of overdue bills
- * @throws Error if database operation fails
- */
-export async function getOverdueBills(userId?: string): Promise<Bill[]> {
-	let query = supabase
-		.from('bills')
-		.select('*')
-		.eq('status', 'sent')
-		.lt('due_date', new Date().toISOString())
-		.order('due_date', { ascending: true })
-
-	if (userId) {
-		query = query.eq('user_id', userId)
-	}
-
-	const { data, error } = await query
-
-	if (error) throw error
-	return data || []
-}
-
-/**
  * Retrieves bills by status across all users
  * Useful for administrative operations and analytics
  *
@@ -601,47 +575,6 @@ export async function markBillReceiptEmailSent(billId: string, supabaseClient?: 
 
 	if (error) throw error
 	return data
-}
-
-/**
- * Utility function to check if a bill is overdue
- *
- * @param bill - The bill object to check
- * @returns boolean - True if the bill is overdue
- */
-export function isBillOverdue(bill: Bill): boolean {
-	if (bill.status !== 'sent' || !bill.due_date) return false
-	return new Date() > new Date(bill.due_date)
-}
-
-/**
- * Utility function to get bills due for reminder emails
- * Gets bills that are sent, overdue, but not too old (within last 90 days)
- *
- * @param userId - Optional user ID to filter by
- * @returns Promise<Bill[]> - Array of bills needing reminders
- * @throws Error if database operation fails
- */
-export async function getBillsDueForReminder(userId?: string): Promise<Bill[]> {
-	const now = new Date()
-	const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-
-	let query = supabase
-		.from('bills')
-		.select('*')
-		.eq('status', 'sent')
-		.lt('due_date', now.toISOString())
-		.gte('due_date', ninetyDaysAgo.toISOString())
-		.order('due_date', { ascending: true })
-
-	if (userId) {
-		query = query.eq('user_id', userId)
-	}
-
-	const { data, error } = await query
-
-	if (error) throw error
-	return data || []
 }
 
 export async function getBillForBookingAndMarkAsPaid(
