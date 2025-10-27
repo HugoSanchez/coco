@@ -6,6 +6,8 @@ import { getUserDefaultBillingSettings } from '@/lib/db/billing-settings'
 import { orchestrateBookingCreation } from '@/lib/bookings/booking-orchestration-service'
 import { buildManageUrl } from '@/lib/crypto'
 import { getUserIdByUsername } from '@/lib/db/profiles'
+import { getProfileById } from '@/lib/db/profiles'
+import { sendPractitionerBookingNotificationEmail } from '@/lib/emails/email-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -110,6 +112,33 @@ export async function POST(req: NextRequest) {
 		}
 
 		const result = await orchestrateBookingCreation(requestPayload as any, billing as any, service as any)
+
+		// Send practitioner notification email (patient-created booking)
+		try {
+			const practitioner = await getProfileById(userId, service as any)
+			const practitionerEmail = practitioner?.email
+			if (practitionerEmail) {
+				const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+				const dashboardBookingUrl = `${baseUrl}/dashboard?panel=booking&id=${result.booking.id}`
+				const patientFullName = [client.name || '', (client as any).last_name || '']
+					.filter(Boolean)
+					.join(' ')
+					.trim()
+				await sendPractitionerBookingNotificationEmail({
+					to: practitionerEmail,
+					practitionerName: practitioner?.name || undefined,
+					consultationType: (consultationType === 'first' ? 'first' : 'followup') as 'first' | 'followup',
+					patientFullName,
+					patientEmail: client.email,
+					startTimeIso: startIso,
+					googleMeetUrl: undefined,
+					dashboardBookingUrl
+				})
+			}
+		} catch (emailError) {
+			console.warn('public booking: practitioner notification failed', emailError)
+		}
+
 		return NextResponse.json({ success: true, bookingId: result.booking.id })
 	} catch (e) {
 		console.error('public bookings create error', e)

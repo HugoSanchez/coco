@@ -6,6 +6,7 @@ import RefundNotificationEmail from './refund-notification'
 import CancellationNotificationEmail from './cancellation-notification'
 import CancellationRefundNotificationEmail from './cancellation-refund-notification'
 import PaymentReceiptEmail from './payment-receipt'
+import PractitionerBookingNotificationEmail from './practitioner-booking-notification'
 
 /**
  * Get Resend client instance
@@ -555,6 +556,57 @@ export async function sendAppointmentReminderEmail({
 			success: false,
 			error: error instanceof Error ? error.message : 'Unknown error'
 		}
+	}
+}
+
+/**
+ * Send practitioner notification when a patient books directly
+ */
+export async function sendPractitionerBookingNotificationEmail({
+	to,
+	practitionerName,
+	consultationType,
+	patientFullName,
+	patientEmail,
+	startTimeIso,
+	googleMeetUrl,
+	dashboardBookingUrl
+}: {
+	to: string
+	practitionerName?: string
+	consultationType: 'first' | 'followup'
+	patientFullName: string
+	patientEmail: string
+	startTimeIso: string
+	googleMeetUrl?: string | null
+	dashboardBookingUrl: string
+}) {
+	try {
+		const resend = getResendClient()
+		const html = await render(
+			PractitionerBookingNotificationEmail({
+				practitionerName,
+				consultationType,
+				patientFullName,
+				patientEmail,
+				startTimeIso,
+				googleMeetUrl,
+				dashboardBookingUrl
+			})
+		)
+		const subject = `Nueva cita: ${patientFullName}`
+		const result = await resend.emails.send({
+			from: EMAIL_CONFIG.from,
+			replyTo: EMAIL_CONFIG.replyTo,
+			to: [to],
+			subject,
+			html
+		})
+		if (result.error) throw new Error(result.error.message)
+		return { success: true, emailId: result.data?.id }
+	} catch (error) {
+		console.error('Practitioner booking notification email failed:', error)
+		return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
 	}
 }
 
