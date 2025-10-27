@@ -105,7 +105,8 @@ export async function POST(request: NextRequest) {
 				user_id: result.booking.user_id,
 				requires_payment: result.requiresPayment,
 				amount: result.bill?.amount,
-				currency: result.bill?.currency
+				currency: result.bill?.currency,
+				patient_created: false
 			}
 		})
 

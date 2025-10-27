@@ -8,6 +8,7 @@ import { buildManageUrl } from '@/lib/crypto'
 import { getUserIdByUsername } from '@/lib/db/profiles'
 import { getProfileById } from '@/lib/db/profiles'
 import { sendPractitionerBookingNotificationEmail } from '@/lib/emails/email-service'
+import { captureEvent } from '@/lib/posthog/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -113,9 +114,32 @@ export async function POST(req: NextRequest) {
 
 		const result = await orchestrateBookingCreation(requestPayload as any, billing as any, service as any)
 
+		// Fetch practitioner once (email + analytics identity)
+		let practitioner: any = null
+		try {
+			practitioner = await getProfileById(userId, service as any)
+		} catch (_) {}
+
+		// Analytics: booking_created (patient_created=true) — keep parity with private endpoint
+		try {
+			await captureEvent({
+				userId,
+				event: 'booking_created',
+				userEmail: practitioner?.email || undefined,
+				properties: {
+					booking_id: result.booking.id,
+					client_id: client.id,
+					user_id: userId,
+					requires_payment: result.requiresPayment,
+					amount: result.bill?.amount ?? amount,
+					currency: result.bill?.currency ?? 'EUR',
+					patient_created: true
+				}
+			})
+		} catch (_) {}
+
 		// Send practitioner notification email (patient-created booking)
 		try {
-			const practitioner = await getProfileById(userId, service as any)
 			const practitionerEmail = practitioner?.email
 			if (practitionerEmail) {
 				const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'

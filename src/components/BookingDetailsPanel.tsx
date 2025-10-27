@@ -216,6 +216,8 @@ export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelPro
 						<Clock className="h-4 w-4 text-gray-600 ml-2" />
 					) : bill?.billing_type === 'monthly' ? (
 						<Clock className="h-4 w-4 text-gray-600 ml-2" />
+					) : Number(bill?.amount) === 0 && bill?.status === 'paid' ? (
+						<Check className="h-4 w-4 text-teal-500 ml-2" />
 					) : (
 						<AlertCircle className="h-4 w-4 ml-2" />
 					)}
@@ -238,6 +240,10 @@ export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelPro
 					) : bill?.billing_type === 'monthly' ? (
 						<div className="flex items-start">
 							<span>Facturación mensual programada</span>
+						</div>
+					) : Number(bill?.amount) === 0 && bill?.status === 'paid' ? (
+						<div className="flex items-start">
+							<span className="text-gray-600 text-sm">Invitación de calendario enviada.</span>
 						</div>
 					) : (
 						<div className="flex items-start text-red-700">

@@ -91,7 +91,6 @@ export default function PractitionerBookingNotificationEmail({
 								)
 							}
 						/>
-						<RowItem label="Nota del paciente" value={''} />
 					</Section>
 
 					<Section style={sectionCta}>

@@ -131,7 +131,12 @@ export async function POST(request: NextRequest) {
 						}
 					}
 				} catch (receiptError) {
-					logger.logError('receipt', receiptError, { bookingId })
+					logger.logError('receipt', receiptError, {
+						bookingId,
+						stripeSessionId: session.id,
+						connectedAccountId,
+						practitionerUserId: session.metadata?.practitioner_user_id
+					})
 				}
 			}
 
@@ -156,12 +161,13 @@ export async function POST(request: NextRequest) {
 						},
 						supabase as any
 					)
-					console.log('[webhook] per-booking invoice ensured+finalized', {
-						billId: bill.id,
-						hasReceiptUrl: Boolean(receiptUrl)
-					})
 				} catch (e) {
-					logger.logError('invoice_finalize', e, { bookingId })
+					logger.logError('invoice_finalize', e, {
+						bookingId,
+						stripeSessionId: session.id,
+						connectedAccountId,
+						practitionerUserId: session.metadata?.practitioner_user_id
+					})
 				}
 			}
 
@@ -203,7 +209,13 @@ export async function POST(request: NextRequest) {
 						}
 					} catch (_) {}
 				} catch (e) {
-					logger.logError('invoice_flow', e, { invoiceId })
+					logger.logError('invoice_flow', e, {
+						invoiceId,
+						stripeSessionId: session.id,
+						connectedAccountId,
+						practitionerUserId: session.metadata?.practitioner_user_id,
+						bookingId
+					})
 				}
 			}
 
@@ -244,7 +256,12 @@ export async function POST(request: NextRequest) {
 					!startTime ||
 					!endTime
 				) {
-					logger.logWarn('missing_metadata', 'webhooks:stripe-payments missing metadata', { bookingId })
+					logger.logWarn('missing_metadata', 'webhooks:stripe-payments missing metadata', {
+						bookingId,
+						stripeSessionId: session.id,
+						connectedAccountId,
+						practitionerUserId
+					})
 					return NextResponse.json({ received: true })
 				}
 
@@ -259,7 +276,12 @@ export async function POST(request: NextRequest) {
 				})
 			} catch (calendarError) {
 				// Don't fail the webhook if calendar update fails
-				logger.logError('calendar', calendarError, { bookingId })
+				logger.logError('calendar', calendarError, {
+					bookingId,
+					stripeSessionId: session.id,
+					connectedAccountId,
+					practitionerUserId: session.metadata?.practitioner_user_id
+				})
 			}
 		}
 		///////////////////////////////////////////////////////////
@@ -298,21 +320,25 @@ function createSentryLogger(baseTags: Record<string, string>) {
 			try {
 				console.error(`[stripe-webhook:${name}]`, error)
 			} catch (_) {}
-			Sentry.captureException(error, { tags: { ...baseTags, name }, extra })
+			Sentry.captureException(error, { tags: { ...baseTags, name, stage: name, step: name }, extra })
 		},
 		logWarn(name: string, message?: string, extra?: any) {
 			const msg = message || name
 			try {
 				console.warn(`[stripe-webhook:${name}] ${msg}`)
 			} catch (_) {}
-			Sentry.captureMessage(msg, { level: 'warning', tags: { ...baseTags, name }, extra })
+			Sentry.captureMessage(msg, {
+				level: 'warning',
+				tags: { ...baseTags, name, stage: name, step: name },
+				extra
+			})
 		},
 		logInfo(name: string, message?: string, extra?: any) {
 			const msg = message || name
 			try {
 				console.log(`[stripe-webhook:${name}] ${msg}`)
 			} catch (_) {}
-			Sentry.captureMessage(msg, { level: 'info', tags: { ...baseTags, name }, extra })
+			Sentry.captureMessage(msg, { level: 'info', tags: { ...baseTags, name, stage: name, step: name }, extra })
 		}
 	}
 }
