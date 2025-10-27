@@ -21,7 +21,7 @@ export default function MonthlyBillEmail({
 	return (
 		<Html lang="es">
 			<Head>
-				<meta http-equiv="Content-Language" content="es" />
+				<meta httpEquiv="Content-Language" content="es" />
 			</Head>
 			<Preview>{`${practitionerName}`}</Preview>
 			<Body style={main}>

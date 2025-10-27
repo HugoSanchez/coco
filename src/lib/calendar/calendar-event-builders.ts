@@ -99,7 +99,7 @@ export function buildPendingEventData({
 	extraDescription?: string
 }) {
 	const base: any = {
-		summary: `${clientName} - Pending`, // Clear pending status in title
+		summary: `${clientName} - Pendiente de pago`, // Clear pending status in title
 		description:
 			'Pending payment confirmation. This appointment is not yet confirmed.' +
 			(extraDescription ? `\n\n${extraDescription}` : ''),

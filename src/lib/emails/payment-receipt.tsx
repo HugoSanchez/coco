@@ -26,7 +26,7 @@ export default function PaymentReceiptEmail({
 	return (
 		<Html lang="es">
 			<Head>
-				<meta http-equiv="Content-Language" content="es" />
+				<meta httpEquiv="Content-Language" content="es" />
 			</Head>
 			<Preview>{'Aquí tienes tu recibo'}</Preview>
 			<Body style={main}>

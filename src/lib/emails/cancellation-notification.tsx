@@ -16,7 +16,7 @@ export default function CancellationNotificationEmail({
 	return (
 		<Html lang="es">
 			<Head>
-				<meta http-equiv="Content-Language" content="es" />
+				<meta httpEquiv="Content-Language" content="es" />
 			</Head>
 			<Preview>{`${practitionerName} ha cancelado tu cita`}</Preview>
 			<Body style={main}>

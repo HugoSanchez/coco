@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Plus, X } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
@@ -180,6 +181,8 @@ export function WeeklyAvailability() {
 		)
 	}
 
+	const [saving, setSaving] = useState(false)
+
 	const handleSave = async () => {
 		// Build rules payload
 		const rules: Array<{ weekday: number; start: string; end: string; timezone: string }> = []
@@ -190,6 +193,7 @@ export function WeeklyAvailability() {
 			})
 		})
 		try {
+			setSaving(true)
 			const res = await fetch('/api/settings/availability', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -204,6 +208,8 @@ export function WeeklyAvailability() {
 				variant: 'destructive',
 				color: 'error'
 			})
+		} finally {
+			setSaving(false)
 		}
 	}
 
@@ -328,8 +334,19 @@ export function WeeklyAvailability() {
 
 			{/* Save Button */}
 			<div className="pt-4">
-				<Button onClick={handleSave} className="w-full h-12 bg-teal-400 hover:bg-teal-400/90 text-white">
-					Guardar
+				<Button
+					onClick={handleSave}
+					disabled={saving}
+					className="w-full h-12 bg-teal-400 hover:bg-teal-400/90 text-white"
+				>
+					{saving ? (
+						<span className="flex items-center justify-center gap-2">
+							<Spinner size="sm" color="light" />
+							Guardando…
+						</span>
+					) : (
+						'Guardar'
+					)}
 				</Button>
 			</div>
 		</div>

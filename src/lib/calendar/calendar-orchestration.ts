@@ -145,6 +145,7 @@ export async function createBookingCalendarEvent(options: {
 export async function updatePendingCalendarEventToConfirmed(options: {
 	bookingId: string
 	practitionerUserId: string
+	clientName: string
 	clientEmail: string
 	practitionerName: string
 	practitionerEmail: string
@@ -155,6 +156,7 @@ export async function updatePendingCalendarEventToConfirmed(options: {
 	const {
 		bookingId,
 		practitionerUserId,
+		clientName,
 		clientEmail,
 		practitionerName,
 		practitionerEmail,
@@ -174,6 +176,7 @@ export async function updatePendingCalendarEventToConfirmed(options: {
 			{
 				googleEventId: pendingEvent.google_event_id,
 				userId: practitionerUserId,
+				clientName,
 				clientEmail,
 				practitionerName,
 				practitionerEmail,

@@ -85,7 +85,7 @@ export default function ConsultationBillEmail({
 	return (
 		<Html lang="es">
 			<Head>
-				<meta http-equiv="Content-Language" content="es" />
+				<meta httpEquiv="Content-Language" content="es" />
 			</Head>
 			<Body style={main}>
 				<Container style={container}>

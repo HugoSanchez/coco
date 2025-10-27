@@ -33,7 +33,7 @@ export default function RefundNotificationEmail({
 	return (
 		<Html lang="es">
 			<Head>
-				<meta http-equiv="Content-Language" content="es" />
+				<meta httpEquiv="Content-Language" content="es" />
 			</Head>
 			<Preview>{'Confirmación de reembolso'}</Preview>
 			<Body style={main}>

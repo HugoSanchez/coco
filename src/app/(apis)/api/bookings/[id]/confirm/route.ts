@@ -110,6 +110,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 					{
 						googleEventId: pendingEvent.google_event_id,
 						userId: user.id,
+						clientName: client.name,
 						clientEmail: client.email,
 						practitionerName: practitioner.name || 'Practitioner',
 						practitionerEmail: practitioner.email,

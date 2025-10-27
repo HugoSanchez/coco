@@ -53,8 +53,7 @@ import { getProfileById } from '@/lib/db/profiles'
 
 // Simple admin guard using header. Expect X-Admin-Key to match env ADMIN_API_KEY
 function isAuthorizedAdmin(request: NextRequest): boolean {
-	const headerKey =
-		request.headers.get('x-admin-key') || request.headers.get('X-Admin-Key')
+	const headerKey = request.headers.get('x-admin-key') || request.headers.get('X-Admin-Key')
 	const adminKey = process.env.ADMIN_API_KEY
 	return Boolean(adminKey && headerKey && headerKey === adminKey)
 }
@@ -68,30 +67,20 @@ export async function POST(request: NextRequest) {
 	try {
 		// Step 1 — Parse body and validate
 		const body = await request.json().catch(() => ({}))
-		const bookingId: string | undefined =
-			body?.bookingId || body?.id || body?.booking_id
+		const bookingId: string | undefined = body?.bookingId || body?.id || body?.booking_id
 		if (!bookingId) {
-			return NextResponse.json(
-				{ error: 'bookingId is required' },
-				{ status: 400 }
-			)
+			return NextResponse.json({ error: 'bookingId is required' }, { status: 400 })
 		}
 
 		// Step 2 — Init service-role client (bypass RLS)
 		// Service role client to bypass RLS
-		const supabase = createClient(
-			process.env.NEXT_PUBLIC_SUPABASE_URL!,
-			process.env.SUPABASE_SERVICE_ROLE_KEY!
-		)
+		const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 		// Step 3 — Fetch booking (ownership not required)
 		// 1) Fetch booking and related data (ownership not required with service role)
 		const booking = await getBookingById(bookingId, supabase)
 		if (!booking) {
-			return NextResponse.json(
-				{ error: 'Booking not found' },
-				{ status: 404 }
-			)
+			return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
 		}
 
 		// Step 4 — Mark bill as paid (idempotent)
@@ -121,26 +110,14 @@ export async function POST(request: NextRequest) {
 		// 4) Ensure a confirmed calendar event exists
 		let calendarEnsured = false
 		try {
-			const existingEvents = await getCalendarEventsForBooking(
-				bookingId,
-				supabase
-			)
-			const confirmed = existingEvents.find(
-				(e) => e.event_type === 'confirmed'
-			)
+			const existingEvents = await getCalendarEventsForBooking(bookingId, supabase)
+			const confirmed = existingEvents.find((e) => e.event_type === 'confirmed')
 			if (confirmed) {
 				calendarEnsured = true
 			} else {
-				const pending = existingEvents.find(
-					(e) => e.event_type === 'pending'
-				)
-				const practitioner = await getProfileById(
-					booking.user_id,
-					supabase
-				)
-				const client = booking.client_id
-					? await getClientById(booking.client_id, supabase)
-					: null
+				const pending = existingEvents.find((e) => e.event_type === 'pending')
+				const practitioner = await getProfileById(booking.user_id, supabase)
+				const client = booking.client_id ? await getClientById(booking.client_id, supabase) : null
 
 				if (pending && practitioner && client && client.email) {
 					// Promote pending event to confirmed and update DB record
@@ -148,9 +125,9 @@ export async function POST(request: NextRequest) {
 						{
 							googleEventId: pending.google_event_id,
 							userId: booking.user_id,
+							clientName: client.name,
 							clientEmail: client.email,
-							practitionerName:
-								practitioner.name || 'Practitioner',
+							practitionerName: practitioner.name || 'Practitioner',
 							practitionerEmail: practitioner.email,
 							bookingId,
 							mode: (booking as any).mode,
@@ -159,11 +136,7 @@ export async function POST(request: NextRequest) {
 						supabase
 					)
 					if (result.success) {
-						await updateCalendarEventType(
-							pending.id,
-							'confirmed',
-							supabase
-						)
+						await updateCalendarEventType(pending.id, 'confirmed', supabase)
 						calendarEnsured = true
 					}
 				} else if (practitioner && client && client.email) {
@@ -173,8 +146,7 @@ export async function POST(request: NextRequest) {
 							userId: booking.user_id,
 							clientName: client.name,
 							clientEmail: client.email,
-							practitionerName:
-								practitioner.name || 'Practitioner',
+							practitionerName: practitioner.name || 'Practitioner',
 							practitionerEmail: practitioner.email,
 							startTime: booking.start_time,
 							endTime: booking.end_time,
@@ -204,8 +176,7 @@ export async function POST(request: NextRequest) {
 						{
 							userId: booking.user_id,
 							clientName: client ? client.name : 'Client',
-							practitionerName:
-								practitioner.name || 'Practitioner',
+							practitionerName: practitioner.name || 'Practitioner',
 							practitionerEmail: practitioner.email,
 							startTime: booking.start_time,
 							endTime: booking.end_time,
@@ -257,8 +228,7 @@ export async function POST(request: NextRequest) {
 		return NextResponse.json(
 			{
 				error: 'Failed to repair booking',
-				details:
-					error instanceof Error ? error.message : 'Unknown error'
+				details: error instanceof Error ? error.message : 'Unknown error'
 			},
 			{ status: 500 }
 		)

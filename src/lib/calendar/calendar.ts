@@ -253,6 +253,7 @@ export interface CreatePendingCalendarEventPayload {
 export interface UpdatePendingToConfirmedPayload {
 	googleEventId: string // Existing Google Calendar event ID
 	userId: string // Practitioner's auth user ID
+	clientName: string
 	clientEmail: string
 	practitionerName: string
 	practitionerEmail: string
@@ -507,21 +508,17 @@ export async function updatePendingToConfirmed(
 	payload: UpdatePendingToConfirmedPayload,
 	supabaseClient?: SupabaseClient
 ): Promise<CalendarEventResult> {
-	const { googleEventId, userId, clientEmail, practitionerName, practitionerEmail } = payload
+	const { googleEventId, userId, clientEmail, practitionerName, practitionerEmail, clientName } = payload
 
 	try {
 		// Get authenticated calendar client using the new helper
 		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
 
-		// First, get the current event to extract client name from title
+		// First, get the current event to preserve timing and properties
 		const currentEvent = await calendar.events.get({
 			calendarId: 'primary',
 			eventId: googleEventId
 		})
-
-		// Extract client name by removing " - Pending" from the current title
-		const currentTitle = currentEvent.data.summary || ''
-		const clientName = currentTitle.replace(' - Pending', '')
 
 		// Preserve the original start and end times from the existing event
 		const originalStart = currentEvent.data.start

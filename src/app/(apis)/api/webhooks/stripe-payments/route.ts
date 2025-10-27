@@ -251,6 +251,7 @@ export async function POST(request: NextRequest) {
 				await updatePendingCalendarEventToConfirmed({
 					bookingId: bookingId as string,
 					practitionerUserId,
+					clientName,
 					clientEmail,
 					practitionerName,
 					practitionerEmail,
