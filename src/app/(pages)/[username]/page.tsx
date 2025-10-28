@@ -1,27 +1,33 @@
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import BookingPageClient from './BookingPageClient'
+import { createServiceRoleClient } from '@/lib/supabase/server'
+import { getProfileByUsername } from '@/lib/db/profiles'
 
 export const dynamic = 'force-dynamic'
 
-async function fetchPublicProfile(username: string) {
+async function loadPublicProfile(username: string) {
 	try {
-		const base = process.env.NEXT_PUBLIC_BASE_URL || ''
-		const res = await fetch(`${base}/api/public/profile?username=${encodeURIComponent(username)}`, {
-			cache: 'no-store'
-		})
-		if (!res.ok) return null
-		return await res.json()
+		const service = createServiceRoleClient()
+		const profile = await getProfileByUsername(username, service as any)
+		return profile
 	} catch (_) {
 		return null
 	}
 }
 
 export async function generateMetadata({ params }: { params: { username: string } }): Promise<Metadata> {
-	const profile = await fetchPublicProfile(params.username)
-	const practitionerName = profile?.full_name || profile?.name || params.username
+	const profile = await loadPublicProfile(params.username)
+	const practitionerName = (profile as any)?.full_name || (profile as any)?.name || params.username
 	const description = `Utiliza este enlace para reservar tu cita con ${practitionerName} en Coco.`
 	const title = `${practitionerName} · Reserva tu cita`
-	const ogImage = profile?.profile_picture_url || '/coco-logo-small.png'
+	const ogImage = (profile as any)?.profile_picture_url || '/coco-logo-small.png'
+
+	// Build absolute URL for OG tags
+	const hdrs = headers()
+	const host = hdrs.get('x-forwarded-host') || hdrs.get('host') || 'itscoco.app'
+	const proto = hdrs.get('x-forwarded-proto') || 'https'
+	const absoluteUrl = `${proto}://${host}/${params.username}`
 
 	return {
 		title,
@@ -29,11 +35,17 @@ export async function generateMetadata({ params }: { params: { username: string 
 		openGraph: {
 			title,
 			description,
-			url: `${process.env.NEXT_PUBLIC_BASE_URL || ''}/${params.username}`,
+			url: absoluteUrl,
 			siteName: 'Coco App',
 			locale: 'es_ES',
 			type: 'website',
 			images: [{ url: ogImage }]
+		},
+		twitter: {
+			card: 'summary_large_image',
+			title,
+			description,
+			images: [ogImage]
 		}
 	}
 }
