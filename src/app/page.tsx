@@ -90,9 +90,7 @@ export default function LandingPage() {
 				<div className="max-w-7xl mx-auto px-6 lg:px-8">
 					<div className="flex justify-between items-center h-16">
 						<div className="flex items-center">
-							<span className="text-lg font-bold text-gray-900">
-								coco.
-							</span>
+							<span className="text-lg font-bold text-gray-900">coco.</span>
 						</div>
 						<Button
 							size="sm"
@@ -113,17 +111,13 @@ export default function LandingPage() {
 						animate={{ y: 0, opacity: 1 }}
 						transition={{ duration: 0.8, delay: 0.1 }}
 					>
-						<p className="text-base text-gray-900 mb-16 font-normal">
-							Sencillo. Seguro. Efectivo.
-						</p>
+						<p className="text-base text-gray-900 mb-16 font-normal">Sencillo. Seguro. Efectivo.</p>
 
 						<h1
 							style={{ lineHeight: 1.1 }}
 							className="text-3xl md:text-5xl lg:text-6xl font-normal text-gray-900 mb-8 md:mb-16 max-w-5xl"
 						>
-							{isMobile
-								? 'Bienvenido a coco,'
-								: 'Facilita el cobro de tus consultas.'}{' '}
+							{isMobile ? 'Bienvenido a coco,' : 'Facilita el cobro de tus consultas.'}{' '}
 							<span className="text-gray-400 font-light">
 								{isMobile
 									? 'la plataforma de reservas y cobro de honorarios que tu consulta online necesita.'
@@ -135,7 +129,7 @@ export default function LandingPage() {
 							onClick={handleLoginRedirect}
 							className="bg-teal-400 hover:bg-teal-400/90 text-white px-8 py-3 rounded-full text-base font-normal"
 						>
-							Pruébalo
+							Pruébalo gratis
 							<ArrowRight className="ml-2 w-4 h-4" />
 						</Button>
 					</motion.div>
@@ -195,9 +189,8 @@ export default function LandingPage() {
 							Digitaliza tu consulta
 						</h2>
 						<p className="text-base lg:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed font-light">
-							Coco automatiza tanto la gestión de tu agenda como
-							el cobro de tus honorarios, haciendo que puedas
-							dedicar tu tiempo a lo que realmente importa.
+							Coco automatiza tanto la gestión de tu agenda como el cobro de tus honorarios, haciendo que
+							puedas dedicar tu tiempo a lo que realmente importa.
 						</p>
 					</motion.div>
 
@@ -206,8 +199,7 @@ export default function LandingPage() {
 							{
 								icon: Target,
 								title: 'Evita malentendidos',
-								description:
-									'Con coco tus pacientes y tú estaréis siempre en la misma página.'
+								description: 'Con coco tus pacientes y tú estaréis siempre en la misma página.'
 							},
 							{
 								icon: Users,
@@ -218,8 +210,7 @@ export default function LandingPage() {
 							{
 								icon: Shield,
 								title: 'Tus cuentas, cuadradas',
-								description:
-									'Deja de dedicarle horas a cuadrar tus cuentas, coco te lo pone muy fácil.'
+								description: 'Deja de dedicarle horas a cuadrar tus cuentas, coco te lo pone muy fácil.'
 							}
 						].map((benefit, index) => (
 							<motion.div
@@ -232,9 +223,7 @@ export default function LandingPage() {
 								}}
 								viewport={{ once: true }}
 								className={`text-left font-light p-8 lg:p-12 bg-white ${
-									index == 1
-										? 'sm:border-y lg:border-y-0 lg:border-x border-gray-200'
-										: ''
+									index == 1 ? 'sm:border-y lg:border-y-0 lg:border-x border-gray-200' : ''
 								}`}
 							>
 								<div className="mb-6 flex flex-row items-center space-x-2">
@@ -244,9 +233,7 @@ export default function LandingPage() {
 									</h3>
 								</div>
 
-								<p className="text-gray-600 leading-relaxed text-base">
-									{benefit.description}
-								</p>
+								<p className="text-gray-600 leading-relaxed text-base">{benefit.description}</p>
 							</motion.div>
 						))}
 					</div>
@@ -268,15 +255,9 @@ export default function LandingPage() {
 								className="text-3xl md:text-4xl lg:text-5xl font-normal text-gray-900 max-w-4xl"
 								style={{ lineHeight: '1.2' }}
 							>
-								<span className="text-gray-400 font-light">
-									En menos de 10 minutos tendrás
-								</span>{' '}
-								tu propia agenda virtual con pasarela de pago
-								integrada.
-								<span className="text-gray-400 font-light">
-									{' '}
-									Así de fácil.
-								</span>
+								<span className="text-gray-400 font-light">En menos de 10 minutos tendrás</span> tu
+								propia agenda virtual con pasarela de pago integrada.
+								<span className="text-gray-400 font-light"> Así de fácil.</span>
 							</h2>
 						</div>
 						<div className="flex-shrink-0 lg:ml-8 lg:mt-2">
@@ -311,8 +292,7 @@ export default function LandingPage() {
 							style={{ lineHeight: 1.2 }}
 							className="text-3xl md:text-4xl lg:text-5xl font-normal text-gray-900 mb-8 max-w-4xl mx-auto leading-tight"
 						>
-							Funcionalidades pensadas para hacerte la vida más
-							fácil
+							Funcionalidades pensadas para hacerte la vida más fácil
 						</h2>
 					</motion.div>
 
@@ -333,17 +313,10 @@ export default function LandingPage() {
 										<div className="w-16 h-16 bg-teal-400 rounded-2xl flex items-center justify-center shadow-lg">
 											<Calendar className="w-8 h-8 text-white" />
 										</div>
-										<div className="text-4xl text-gray-400">
-											↔
-										</div>
+										<div className="text-4xl text-gray-400">↔</div>
 										{/* Google Calendar Logo */}
 										<div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-lg border border-gray-200">
-											<svg
-												width="32"
-												height="32"
-												viewBox="0 0 24 24"
-												fill="none"
-											>
+											<svg width="32" height="32" viewBox="0 0 24 24" fill="none">
 												<path
 													d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"
 													fill="#4285F4"
@@ -363,8 +336,7 @@ export default function LandingPage() {
 									Integrado con Google Calendar
 								</h3>
 								<p className="text-gray-700 font-light leading-relaxed">
-									Coco está integrado con Google Calendar
-									haciendo que gestionar tu agenda sea fácil e
+									Coco está integrado con Google Calendar haciendo que gestionar tu agenda sea fácil e
 									intuitvo.
 								</p>
 							</div>
@@ -383,12 +355,7 @@ export default function LandingPage() {
 									<div className="flex items-center justify-center space-x-4 mb-6">
 										{/* Google Pay Logo */}
 										<div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center shadow-lg border border-gray-200">
-											<svg
-												width="28"
-												height="28"
-												viewBox="0 0 24 24"
-												fill="none"
-											>
+											<svg width="28" height="28" viewBox="0 0 24 24" fill="none">
 												<path
 													d="M12.24 10.285V14.4h6.806c-.275 1.765-2.056 5.174-6.806 5.174-4.095 0-7.439-3.389-7.439-7.574s3.345-7.574 7.439-7.574c2.33 0 3.891.989 4.785 1.849l3.254-3.138C18.189 1.186 15.479 0 12.24 0c-6.635 0-12 5.365-12 12s5.365 12 12 12c6.926 0 11.52-4.869 11.52-11.726 0-.788-.085-1.39-.189-1.989H12.24z"
 													fill="#4285F4"
@@ -397,27 +364,17 @@ export default function LandingPage() {
 										</div>
 										{/* Apple Pay Logo */}
 										<div className="w-14 h-14 bg-black rounded-xl flex items-center justify-center shadow-lg">
-											<svg
-												width="28"
-												height="28"
-												viewBox="0 0 24 24"
-												fill="white"
-											>
+											<svg width="28" height="28" viewBox="0 0 24 24" fill="white">
 												<path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
 											</svg>
 										</div>
 									</div>
 									<div className="bg-white rounded-xl px-10 py-6 shadow-sm border border-gray-200 max-w-xs mx-auto">
-										<div className="text-2xl font-bold text-gray-900 mb-2">
-											€75.00
-										</div>
-										<div className="text-sm text-gray-500 mb-4">
-											Consulta con Laura García
-										</div>
+										<div className="text-2xl font-bold text-gray-900 mb-2">€75.00</div>
+										<div className="text-sm text-gray-500 mb-4">Consulta con Laura García</div>
 										<div className="w-full h-10 px-4 bg-gray-800 rounded-lg flex items-center justify-center">
 											<span className="text-white font-regular">
-												Confirmar{' '}
-												{isMobile ? 'cita' : 'consulta'}
+												Confirmar {isMobile ? 'cita' : 'consulta'}
 											</span>
 										</div>
 									</div>
@@ -428,9 +385,8 @@ export default function LandingPage() {
 									Integrado con Google y Apple Pay
 								</h3>
 								<p className="text-gray-700 font-light leading-relaxed">
-									Olvídate de transferencias bancarias o
-									bizums, con coco tus pacientes pagan de
-									forma rápida y segura.
+									Olvídate de transferencias bancarias o bizums, con coco tus pacientes pagan de forma
+									rápida y segura.
 								</p>
 							</div>
 						</motion.div>
@@ -452,19 +408,14 @@ export default function LandingPage() {
 									<div className="flex items-center justify-between mb-4">
 										<div className="flex items-center space-x-1 text-gray-800">
 											<TrendingUp className="w-3 h-3" />
-											<span className="text-xs font-medium">
-												25%
-											</span>
+											<span className="text-xs font-medium">25%</span>
 										</div>
 									</div>
 
 									{/* Chart */}
 									<div className="flex items-end justify-between space-x-1 h-20 mb-2">
 										{chartData.map((data, index) => (
-											<div
-												key={index}
-												className="flex flex-col items-center space-y-1"
-											>
+											<div key={index} className="flex flex-col items-center space-y-1">
 												<div
 													className="bg-gray-700 rounded-t-sm transition-all duration-500 ease-out"
 													style={{
@@ -479,11 +430,7 @@ export default function LandingPage() {
 									{/* Month Labels */}
 									<div className="flex items-center justify-between font-light sm:text-gray-50 text-xs lg:text-gray-500">
 										{chartData.map((data, index) => (
-											<span
-												key={index}
-												className="text-center"
-												style={{ width: '12px' }}
-											>
+											<span key={index} className="text-center" style={{ width: '12px' }}>
 												{data.month}
 											</span>
 										))}
@@ -491,12 +438,9 @@ export default function LandingPage() {
 								</div>
 							</div>
 							<div className="p-6">
-								<h3 className="text-lg font-semibold text-gray-900 mb-2">
-									Reporting inetgrado
-								</h3>
+								<h3 className="text-lg font-semibold text-gray-900 mb-2">Reporting inetgrado</h3>
 								<p className="text-gray-700 font-light text-sm leading-relaxed">
-									La información que necesitas cuando la
-									necesitas. Fácil y sin complicaciones.
+									La información que necesitas cuando la necesitas. Fácil y sin complicaciones.
 								</p>
 							</div>
 						</motion.div>
@@ -517,16 +461,10 @@ export default function LandingPage() {
 									<div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200 opacity-75">
 										<div className="flex items-center justify-between">
 											<div className="flex items-center space-x-2">
-												<div className="text-xs font-medium text-gray-900 lg:mr-4">
-													10:30
-												</div>
+												<div className="text-xs font-medium text-gray-900 lg:mr-4">10:30</div>
 												<div>
-													<p className="text-xs font-medium text-gray-900">
-														Carlos R.
-													</p>
-													<p className="text-xs text-gray-500">
-														Pago recibido
-													</p>
+													<p className="text-xs font-medium text-gray-900">Carlos R.</p>
+													<p className="text-xs text-gray-500">Pago recibido</p>
 												</div>
 											</div>
 											<span className="text-xs px-2 lg:px-4 py-1 rounded-full bg-teal-100 text-teal-700">
@@ -539,16 +477,10 @@ export default function LandingPage() {
 									<div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200 opacity-50">
 										<div className="flex items-center justify-between">
 											<div className="flex items-center space-x-2">
-												<div className="text-xs font-medium text-gray-900 lg:mr-4">
-													12:00
-												</div>
+												<div className="text-xs font-medium text-gray-900 lg:mr-4">12:00</div>
 												<div>
-													<p className="text-xs font-medium text-gray-900">
-														Ana L.
-													</p>
-													<p className="text-xs text-gray-500">
-														Próximo recordatorio
-													</p>
+													<p className="text-xs font-medium text-gray-900">Ana L.</p>
+													<p className="text-xs text-gray-500">Próximo recordatorio</p>
 												</div>
 											</div>
 											<span className="text-xs px-2 lg:px-4 py-1 rounded-full bg-gray-200 text-gray-700">
@@ -563,9 +495,8 @@ export default function LandingPage() {
 									Dashboard sencillo y funcional
 								</h3>
 								<p className="text-gray-600 text-sm font-light leading-relaxed">
-									En un único dashboard tendrás visibilidad
-									sobre toda tu agenda y estado de facturación
-									de cada una de tus consultas
+									En un único dashboard tendrás visibilidad sobre toda tu agenda y estado de
+									facturación de cada una de tus consultas
 								</p>
 							</div>
 						</motion.div>
@@ -614,9 +545,8 @@ export default function LandingPage() {
 									Diseño moderno y responsive
 								</h3>
 								<p className="text-gray-700 font-light text-sm leading-relaxed">
-									Coco se adapta tanto a ti como tus
-									pacientes, facilitándote la gestión estés
-									donde estés.
+									Coco se adapta tanto a ti como tus pacientes, facilitándote la gestión estés donde
+									estés.
 								</p>
 							</div>
 						</motion.div>
@@ -641,8 +571,7 @@ export default function LandingPage() {
 							>
 								Tu trabajo es mejorar la vida de tus pacientes,{' '}
 								<span className="text-gray-400 font-light">
-									nosotros te facilitamos el cobro de
-									honorarios. Empieza hoy.
+									nosotros te facilitamos el cobro de honorarios. Empieza hoy.
 								</span>
 							</h2>
 						</div>
@@ -669,9 +598,7 @@ export default function LandingPage() {
 						viewport={{ once: true }}
 						className="mb-16"
 					>
-						<h2 className="text-lg font-light text-gray-900 mb-6">
-							Cómo funciona
-						</h2>
+						<h2 className="text-lg font-light text-gray-900 mb-6">Cómo funciona</h2>
 
 						<div className="space-y-0">
 							{steps.map((step, index) => (
@@ -752,16 +679,13 @@ export default function LandingPage() {
 							>
 								¿Todavía te quedan dudas?{' '}
 								<span className="text-gray-400 font-light">
-									Escríbenos y te responderemos lo antes
-									posible.
+									Escríbenos y te responderemos lo antes posible.
 								</span>
 							</h2>
 						</div>
 						<div className="flex-shrink-0 lg:ml-8 lg:mt-2">
 							<Button
-								onClick={() =>
-									window.open('mailto:info@itscoco.app')
-								}
+								onClick={() => window.open('mailto:info@itscoco.app')}
 								className="bg-gray-200 hover:bg-gray-200/90 text-gray-900 px-8 py-3 rounded-full text-base font-normal"
 							>
 								Escríbenos
@@ -776,22 +700,14 @@ export default function LandingPage() {
 			<footer className="py-8 px-32 bg-gray-50">
 				<div className="mx-auto flex flex-col md:flex-row justify-between items-center">
 					<div className="flex space-x-6 text-sm text-gray-500">
-						<Link
-							href="/privacy-policy"
-							className="hover:text-gray-900 transition-colors"
-						>
+						<Link href="/privacy-policy" className="hover:text-gray-900 transition-colors">
 							Privacidad
 						</Link>
-						<a
-							href="#"
-							className="hover:text-gray-900 transition-colors"
-						>
+						<a href="#" className="hover:text-gray-900 transition-colors">
 							Términos
 						</a>
 						<p
-							onClick={() =>
-								window.open('mailto:info@itscoco.app')
-							}
+							onClick={() => window.open('mailto:info@itscoco.app')}
 							className="hover:text-gray-900 transition-colors"
 						>
 							Contacto

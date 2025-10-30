@@ -12,7 +12,7 @@ import Script from 'next/script'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-	title: 'Coco App',
+	title: 'Software de facturación y agenda para profesionales de la salud',
 	description: 'Coco es la plataforma de gestión de agenda y cobro de honorarios que tu consulta online necesita',
 	icons: {
 		icon: '/favicon.ico'
@@ -43,6 +43,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 						gtag('js', new Date());
 						gtag('config', 'AW-17690492683');
 					`}
+				</Script>
+				<Script id="ld-software" type="application/ld+json">
+					{JSON.stringify({
+						'@context': 'https://schema.org',
+						'@type': 'SoftwareApplication',
+						name: 'Coco',
+						applicationCategory: 'BusinessApplication',
+						operatingSystem: 'Web',
+						description:
+							'Software de facturación y agenda para psicólogos y nutricionistas en España. Exento de IVA sanitario y cobros con Stripe.',
+						url: 'https://www.itscoco.app'
+					})}
 				</Script>
 			</head>
 			<body className={`${inter.className} flex flex-col h-full bg-gray-50`}>
