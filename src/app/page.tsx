@@ -127,11 +127,20 @@ export default function LandingPage() {
 
 						<Button
 							onClick={handleLoginRedirect}
-							className="bg-teal-400 hover:bg-teal-400/90 text-white px-8 py-3 rounded-full text-base font-normal"
+							className="mb-4 bg-teal-400 hover:bg-teal-400/90 text-white px-8 py-3 rounded-full text-base font-normal"
 						>
 							Pruébalo gratis
 							<ArrowRight className="ml-2 w-4 h-4" />
 						</Button>
+						<br></br>
+						<a
+							className="text-gray-400 inline-block font-light ml-2 hover:underline"
+							href="https://www.itscoco.app/hugo"
+							target="_blank"
+							rel="noopener noreferrer"
+						>
+							O agenda una demo con nosotros <ArrowRight className="ml-2 w-4 h-4 inline-block" />
+						</a>
 					</motion.div>
 				</div>
 			</section>
@@ -685,7 +694,7 @@ export default function LandingPage() {
 						</div>
 						<div className="flex-shrink-0 lg:ml-8 lg:mt-2">
 							<Button
-								onClick={() => window.open('mailto:info@itscoco.app')}
+								onClick={() => window.open('mailto:hugo@itscoco.app')}
 								className="bg-gray-200 hover:bg-gray-200/90 text-gray-900 px-8 py-3 rounded-full text-base font-normal"
 							>
 								Escríbenos
@@ -707,7 +716,7 @@ export default function LandingPage() {
 							Términos
 						</a>
 						<p
-							onClick={() => window.open('mailto:info@itscoco.app')}
+							onClick={() => window.open('mailto:hugo@itscoco.app')}
 							className="hover:text-gray-900 transition-colors"
 						>
 							Contacto

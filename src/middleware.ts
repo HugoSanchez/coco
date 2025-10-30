@@ -9,14 +9,30 @@ export async function middleware(request: NextRequest) {
 	const response = NextResponse.next()
 	// Set global Content-Language header to help browsers avoid translating Spanish content
 	response.headers.set('Content-Language', 'es')
+	// Persist UTM params into short-lived cookies for later attribution
+	try {
+		const params = request.nextUrl.searchParams
+		const utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content']
+		utmKeys.forEach((key) => {
+			const val = params.get(key)
+			if (val) {
+				response.cookies.set(key, val, {
+					path: '/',
+					httpOnly: false,
+					sameSite: 'lax',
+					secure: true,
+					maxAge: 60 * 60 * 24 * 90 // 90 days
+				})
+			}
+		})
+	} catch (_) {}
+
 	// Create a Supabase client
 	const supabase = createMiddlewareClient(request, response)
 	// Define protected routes
 	const protectedPages = ['/dashboard', '/settings', '/onboarding']
 	// Check if the current path is a protected page
-	const isProtectedPage = protectedPages.some((route) =>
-		pathname.startsWith(route)
-	)
+	const isProtectedPage = protectedPages.some((route) => pathname.startsWith(route))
 
 	// If the current path is a protected page,
 	// check if the user is authenticated

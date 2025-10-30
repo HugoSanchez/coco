@@ -12,7 +12,7 @@ import Script from 'next/script'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-	title: 'Software de facturación y agenda para profesionales de la salud',
+	title: 'Coco App - Software de facturación y agenda para profesionales de la salud',
 	description: 'Coco es la plataforma de gestión de agenda y cobro de honorarios que tu consulta online necesita',
 	icons: {
 		icon: '/favicon.ico'

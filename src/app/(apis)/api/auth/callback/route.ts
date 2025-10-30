@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { captureEvent } from '@/lib/posthog/server'
+import { cookies } from 'next/headers'
 
 // Force dynamic rendering since this route uses cookies for authentication
 export const dynamic = 'force-dynamic'
@@ -25,14 +26,20 @@ export async function GET(request: Request) {
 			// Capture auth analytics (signup vs signin) using reusable helper
 			try {
 				const user = data.user
-				const isNewSignup =
-					Date.now() - new Date(user.created_at).getTime() <
-					10 * 60 * 1000 // 10 minutes heuristic
+				const isNewSignup = Date.now() - new Date(user.created_at).getTime() < 10 * 60 * 1000 // 10 minutes heuristic
+				const c = cookies()
+				const utm = {
+					utm_source: c.get('utm_source')?.value,
+					utm_medium: c.get('utm_medium')?.value,
+					utm_campaign: c.get('utm_campaign')?.value,
+					utm_term: c.get('utm_term')?.value,
+					utm_content: c.get('utm_content')?.value
+				}
 				await captureEvent({
 					userId: user.id,
 					userEmail: user.email,
 					event: isNewSignup ? 'user_signed_up' : 'user_logged_in',
-					properties: { source: redirectTo || 'auth_callback' }
+					properties: { source: redirectTo || 'auth_callback', ...utm }
 				})
 			} catch (_) {
 				// Swallow analytics errors; do not block auth flow
