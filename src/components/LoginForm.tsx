@@ -108,21 +108,12 @@ export default function LoginForm() {
 			{isSubmitted ? (
 				// Success confirmation screen
 				<div className="text-center md:max-w-lg w-full px-6">
-					<h1 className="text-3xl font-black mb-3 text-center">
-						¡Revisa tu correo!
-					</h1>
+					<h1 className="text-3xl font-black mb-3 text-center">¡Revisa tu correo!</h1>
 					<p className="mt-3 text-base md:text-lg text-gray-600 font-light">
-						Te hemos enviado un enlace de confirmación a{' '}
-						<span className="font-semibold text-primary">
-							{email}
-						</span>{' '}
-						para que puedas acceder.
+						Si no lo encuentras en tu bandeja de entrada,
+						<span className="font-bold text-primary"> asegúrate de mirar en tu bandeja de spam.</span>
 					</p>
-					<Button
-						variant="link"
-						onClick={handleReset}
-						className="mt-2 text-teal-500 hover:text-teal-600"
-					>
+					<Button variant="link" onClick={handleReset} className="mt-2 text-teal-500 hover:text-teal-600">
 						Volver a introducir mi email
 					</Button>
 				</div>
@@ -130,42 +121,27 @@ export default function LoginForm() {
 				// Main login form
 				<div className="w-full max-w-md p-10">
 					<div className="text-center">
-						<h1 className="text-4xl font-black mb-3 text-center">
-							Sign In
-						</h1>
+						<h1 className="text-4xl font-black mb-3 text-center">Sign In</h1>
 						<p className="text-center mb-8 text-lg text-gray-600 font-light">
 							Tanto si ya tienes cuenta como si no,{' '}
-							<span className="font-medium text-gray-800">
-								introduce tu email
-							</span>{' '}
-							para acceder a Coco.
+							<span className="font-medium text-gray-800">introduce tu email</span> para acceder a Coco.
 						</p>
 					</div>
 
-					<form
-						onSubmit={handleLogin}
-						className="space-y-4"
-						noValidate
-					>
+					<form onSubmit={handleLogin} className="space-y-4" noValidate>
 						<Input
 							type="email"
 							placeholder="Introduce tu email"
 							value={email}
 							onChange={(e) => setEmail(e.target.value)}
 							onBlur={() => setTouched(true)}
-							className={cn(
-								'h-14',
-								isInvalid &&
-									'border-destructive focus-visible:ring-destructive'
-							)}
+							className={cn('h-14', isInvalid && 'border-destructive focus-visible:ring-destructive')}
 						/>
 						<Button
 							type="submit"
 							variant="default"
 							disabled={loading}
-							className={`w-full h-14 ${
-								!isValidEmail ? 'cursor-not-allowed' : ''
-							}`}
+							className={`w-full h-14 ${!isValidEmail ? 'cursor-not-allowed' : ''}`}
 						>
 							{loading ? <Spinner /> : 'Confirmar'}
 						</Button>
@@ -178,9 +154,7 @@ export default function LoginForm() {
 								<span className="w-full border-t" />
 							</div>
 							<div className="relative flex justify-center text-xs uppercase">
-								<span className="bg-gray-50 px-2 text-muted-foreground">
-									O continua con
-								</span>
+								<span className="bg-gray-50 px-2 text-muted-foreground">O continua con</span>
 							</div>
 						</div>
 
