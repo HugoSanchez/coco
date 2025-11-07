@@ -604,17 +604,6 @@ export async function markBillReceiptEmailSent(billId: string, supabaseClient?: 
 }
 
 /**
- * Utility function to check if a bill is overdue
- *
- * @param bill - The bill object to check
- * @returns boolean - True if the bill is overdue
- */
-export function isBillOverdue(bill: Bill): boolean {
-	if (bill.status !== 'sent' || !bill.due_date) return false
-	return new Date() > new Date(bill.due_date)
-}
-
-/**
  * Utility function to get bills due for reminder emails
  * Gets bills that are sent, overdue, but not too old (within last 90 days)
  *

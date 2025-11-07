@@ -823,6 +823,67 @@ export async function getBookingsForExport(
 }
 
 /**
+ * Returns existing bookings for a series (occurrence index + times) to avoid duplicates.
+ */
+export async function getExistingSeriesBookings(
+	seriesId: string,
+	supabaseClient?: SupabaseClient
+): Promise<Array<{ id: string; occurrence_index: number; start_time: string; end_time: string }>> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('bookings')
+		.select('id, occurrence_index, start_time, end_time')
+		.eq('series_id', seriesId)
+		.order('occurrence_index', { ascending: true })
+
+	if (error) throw error
+	return (data as any) || []
+}
+
+/**
+ * Bulk inserts booking drafts (from series materializer) and returns created ids.
+ * V1 assumes drafts are already validated and deduped by caller.
+ */
+export async function bulkInsertSeriesBookings(
+	drafts: Array<{
+		series_id: string
+		user_id: string
+		client_id: string
+		start_time: string
+		end_time: string
+		occurrence_index: number
+		is_conflicted?: boolean
+		mode?: string | null
+		location_text?: string | null
+		consultation_type?: string | null
+	}>,
+	supabaseClient?: SupabaseClient
+): Promise<Array<{ id: string }>> {
+	if (!drafts || drafts.length === 0) return []
+	const client = supabaseClient || supabase
+	const { data, error } = await client.from('bookings').insert(drafts).select('id')
+	if (error) throw error
+	return ((data as any) || []).map((row: any) => ({ id: row.id as string }))
+}
+
+/**
+ * Tags an existing booking with its series linkage (series_id + occurrence_index).
+ */
+export async function tagBookingWithSeries(
+	bookingId: string,
+	seriesId: string,
+	occurrenceIndex: number,
+	supabaseClient?: SupabaseClient
+): Promise<void> {
+	const client = supabaseClient || supabase
+	const { error } = await client
+		.from('bookings')
+		.update({ series_id: seriesId, occurrence_index: occurrenceIndex })
+		.eq('id', bookingId)
+	if (error) throw error
+}
+
+/**
  * Returns bookings missing a linked calendar event for a given user.
  * - Uses a left relation to calendar_events and filters where the related
  *   google_event_id is null.
