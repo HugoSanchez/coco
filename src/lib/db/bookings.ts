@@ -884,6 +884,46 @@ export async function tagBookingWithSeries(
 }
 
 /**
+ * Cancels all FUTURE bookings for a series (start_time >= now UTC).
+ * NOTE: This does not touch Google Calendar events in V1.
+ */
+export async function cancelFutureBookingsForSeries(
+	seriesId: string,
+	nowIsoUtc: string,
+	supabaseClient?: SupabaseClient
+): Promise<number> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('bookings')
+		.update({ status: 'canceled', updated_at: new Date().toISOString() })
+		.eq('series_id', seriesId)
+		.gte('start_time', nowIsoUtc)
+		.select('id')
+	if (error) throw error
+	return (data as any)?.length || 0
+}
+
+/**
+ * Returns the maximum occurrence_index for a series, or -1 if none.
+ */
+export async function getSeriesMaxOccurrenceIndex(
+	seriesId: string,
+	supabaseClient?: SupabaseClient
+): Promise<number> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('bookings')
+		.select('occurrence_index')
+		.eq('series_id', seriesId)
+		.order('occurrence_index', { ascending: false })
+		.limit(1)
+	if (error) throw error
+	if (!data || data.length === 0) return -1
+	const idx = (data[0] as any).occurrence_index
+	return typeof idx === 'number' ? idx : -1
+}
+
+/**
  * Returns bookings missing a linked calendar event for a given user.
  * - Uses a left relation to calendar_events and filters where the related
  *   google_event_id is null.

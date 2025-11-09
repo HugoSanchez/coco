@@ -46,6 +46,7 @@ import {
 	SelectTrigger,
 	SelectValue
 } from '@/components/ui/select'
+import { utcToZonedTime } from 'date-fns-tz'
 
 interface BookingFormProps {
 	onSuccess?: () => void // Called when booking is successfully created
@@ -120,11 +121,24 @@ export function BookingForm({
 		null
 	)
 
+	// Recurrence (V1 minimal): checkbox + interval weeks (1 or 2)
+	const [isRecurring, setIsRecurring] = useState<boolean>(false)
+	const [intervalWeeks, setIntervalWeeks] = useState<1 | 2>(1)
+
 	// Billing timing selection (per-booking lead hours or monthly)
 	const [billingTimingSelection, setBillingTimingSelection] =
 		useState<string>('0') // '0' | '24' | '72' | '168' | '-1' | 'monthly'
 	const [isBillingTimingDirty, setIsBillingTimingDirty] =
 		useState<boolean>(false)
+
+	// When recurrence is ON, restrict billing options to monthly, 24h before, after.
+	useEffect(() => {
+		if (!isRecurring) return
+		const allowed = new Set(['monthly', '24', '-1'])
+		if (!allowed.has(billingTimingSelection)) {
+			setBillingTimingSelection('24')
+		}
+	}, [isRecurring])
 
 	// Track if user has manually edited the address to avoid auto-refilling defaults
 	const hasEditedLocationRef = useRef(false)
@@ -520,6 +534,63 @@ export function BookingForm({
 		setLoading(true)
 
 		try {
+			// Branch: recurring series vs single booking
+			if (isRecurring) {
+				// --------- Recurring Flow (V1 minimal) ---------
+				// Validate required fields
+				if (!user?.id || !selectedSlot || !selectedClient || !selectedDate) return
+
+				// 1) Compute timezone-local wall time for dtstart_local (Europe/Madrid)
+				const tz = 'Europe/Madrid'
+				const startUtc = new Date(selectedSlot.start)
+				const endUtc = new Date(selectedSlot.end)
+				const localStart = utcToZonedTime(startUtc, tz)
+				const durationMin = Math.max(1, Math.round((endUtc.getTime() - startUtc.getTime()) / 60000))
+				const byWeekday = localStart.getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6
+				const dtstartLocal = format(localStart, "yyyy-MM-dd'T'HH:mm:ss")
+
+				// 2) Map billing policy from existing selector (restricted when isRecurring)
+				let billingPolicy: 'monthly' | 'right_after' | '24h_before'
+				if (billingTimingSelection === 'monthly') billingPolicy = 'monthly'
+				else if (billingTimingSelection === '24') billingPolicy = '24h_before'
+				else if (billingTimingSelection === '-1') billingPolicy = 'right_after'
+				else billingPolicy = 'right_after'
+
+				// 3) Build payload and call series endpoint
+				const seriesPayload = {
+					user_id: user.id,
+					client_id: selectedClient,
+					timezone: tz,
+					dtstart_local: dtstartLocal,
+					duration_min: durationMin,
+					rule: { interval_weeks: intervalWeeks, by_weekday: byWeekday },
+					billing_policy: billingPolicy,
+					mode,
+					location_text: mode === 'in_person' ? (locationText || null) : null,
+					consultation_type: consultationType
+				}
+
+				const response = await fetch('/api/booking-series/create', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(seriesPayload)
+				})
+
+				if (!response.ok) {
+					const errorData = await response.json()
+					throw new Error(errorData.details || errorData.error || 'Failed to create series')
+				}
+
+				const result = await response.json()
+				toast({
+					title: 'Serie creada',
+					description: `Se han creado ${result.created_count || 0} citas`,
+					color: 'success'
+				})
+				onSuccess?.()
+				return
+			}
+
 			// Resolve final amount (>= 0, 0 allowed)
 			let finalAmount: number
 			if (isPriceDirty && customPrice.trim() !== '') {
@@ -580,7 +651,7 @@ export function BookingForm({
 				}
 			}
 
-			// Send request to create booking
+			// Send request to create booking (one-off)
 			const response = await fetch('/api/bookings/create', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -991,40 +1062,65 @@ export function BookingForm({
 								<Label className="text-md font-normal text-gray-700">
 									Tipo de facturación
 								</Label>
-								{(() => {
-									const timingValue = billingTimingSelection
-									return (
-										<Select
-											value={timingValue}
-											onValueChange={(value) => {
-												setIsBillingTimingDirty(true)
-												setBillingTimingSelection(value)
-											}}
-										>
-											<SelectTrigger className="h-12">
-												<SelectValue placeholder="Selecciona el tipo de facturación" />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectItem value="0">
-													Inmediata
-												</SelectItem>
-												<SelectItem value="24">
-													24 horas antes
-												</SelectItem>
-												<SelectItem value="168">
-													1 semana antes
-												</SelectItem>
-												<SelectItem value="-1">
-													Después de la consulta
-												</SelectItem>
-												<SelectItem value="monthly">
-													Mensual
-												</SelectItem>
-											</SelectContent>
-										</Select>
-									)
-								})()}
+				{(() => {
+					const timingValue = billingTimingSelection
+					return (
+						<Select
+							value={timingValue}
+							onValueChange={(value) => {
+								setIsBillingTimingDirty(true)
+								setBillingTimingSelection(value)
+							}}
+						>
+							<SelectTrigger className="h-12">
+								<SelectValue placeholder="Selecciona el tipo de facturación" />
+							</SelectTrigger>
+							<SelectContent>
+								{!isRecurring && (
+									<>
+										<SelectItem value="0">Inmediata</SelectItem>
+										<SelectItem value="168">1 semana antes</SelectItem>
+									</>
+								)}
+								<SelectItem value="24">24 horas antes</SelectItem>
+								<SelectItem value="-1">Después de la consulta</SelectItem>
+								<SelectItem value="monthly">Mensual</SelectItem>
+							</SelectContent>
+						</Select>
+					)
+				})()}
 							</div>
+
+			{/* ===== Recurrence (V1 minimal) ===== */}
+			<div className="space-y-3 pt-2">
+				<div className="flex items-center justify-between">
+					<Label className="text-md font-normal text-gray-700">Programar recurrencia</Label>
+					<input
+						type="checkbox"
+						checked={isRecurring}
+						onChange={(e) => setIsRecurring(e.target.checked)}
+						className="h-4 w-4"
+					/>
+				</div>
+
+				{isRecurring && (
+					<div className="space-y-2">
+						<Label className="text-md font-normal text-gray-700">Repetir</Label>
+						<Select
+							value={String(intervalWeeks)}
+							onValueChange={(v) => setIntervalWeeks((Number(v) as 1 | 2) || 1)}
+						>
+							<SelectTrigger className="h-12">
+								<SelectValue placeholder="Frecuencia" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="1">Cada semana</SelectItem>
+								<SelectItem value="2">Cada 2 semanas</SelectItem>
+							</SelectContent>
+						</Select>
+					</div>
+				)}
+			</div>
 
 							{/* Booking Summary */}
 							<div>

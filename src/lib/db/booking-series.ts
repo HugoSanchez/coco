@@ -99,4 +99,34 @@ export async function listActiveSeriesForUser(
 	return (data as BookingSeriesRow[]) || []
 }
 
+/**
+ * Lists all active series across users (for cron extension).
+ */
+export async function listAllActiveSeries(client: SupabaseClient): Promise<BookingSeriesRow[]> {
+    const { data, error } = await client
+        .from('booking_series')
+        .select('*')
+        .eq('status', 'active')
+        .order('dtstart_local', { ascending: true })
+
+    if (error) throw error
+    return (data as BookingSeriesRow[]) || []
+}
+
+/**
+ * Sets series status and optional until date.
+ */
+export async function setBookingSeriesStatus(
+    client: SupabaseClient,
+    id: string,
+    status: 'active' | 'paused' | 'ended',
+    untilLocal?: string | null
+): Promise<void> {
+    const { error } = await client
+        .from('booking_series')
+        .update({ status, until: untilLocal ?? null })
+        .eq('id', id)
+    if (error) throw error
+}
+
 
