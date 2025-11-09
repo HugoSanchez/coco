@@ -447,7 +447,7 @@ export default function LandingPage() {
 								</div>
 							</div>
 							<div className="p-6">
-								<h3 className="text-lg font-semibold text-gray-900 mb-2">Reporting inetgrado</h3>
+								<h3 className="text-lg font-semibold text-gray-900 mb-2">Reporting integrado</h3>
 								<p className="text-gray-700 font-light text-sm leading-relaxed">
 									La información que necesitas cuando la necesitas. Fácil y sin complicaciones.
 								</p>
