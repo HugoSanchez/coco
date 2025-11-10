@@ -502,8 +502,8 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 
 				const result = await response.json()
 				toast({
-					title: 'Serie creada',
-					description: `Se han creado ${result.created_count || 0} citas`,
+					title: 'Cita creada correctamente',
+					description: `Tu evento recurrente se ha creado correctamente`,
 					color: 'success'
 				})
 				onSuccess?.()
@@ -979,7 +979,8 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 								disabled={loading || !selectedClient}
 								className="w-full"
 							>
-								{loading ? 'Creando cita...' : 'Crear Cita'}
+								{loading && <Spinner size="sm" color="light" className="mr-2" />}
+								{loading ? 'Creando cita' : 'Crear Cita'}
 							</Button>
 						</form>
 					)}

@@ -21,6 +21,7 @@ export type BookingActionBooking = {
 	id: string
 	status: 'pending' | 'scheduled' | 'completed' | 'canceled'
 	payment_status: 'not_applicable' | 'pending' | 'paid' | 'disputed' | 'canceled' | 'refunded'
+	series_id?: string // V2: For recurring bookings
 }
 
 export function BookingActions({
@@ -31,7 +32,8 @@ export function BookingActions({
 	onMarkAsPaid,
 	onRefundBooking,
 	onRescheduleBooking,
-	onResendEmail
+	onResendEmail,
+	onCancelSeries
 }: {
 	isMobile: boolean
 	booking: BookingActionBooking
@@ -41,6 +43,7 @@ export function BookingActions({
 	onRefundBooking: (bookingId: string) => void
 	onRescheduleBooking: (bookingId: string) => void
 	onResendEmail: (bookingId: string) => void
+	onCancelSeries?: (seriesId: string) => void // V2: Optional cancel series handler
 }) {
 	const { toast } = useToast()
 	const [isResending, setIsResending] = useState(false)
@@ -130,10 +133,25 @@ export function BookingActions({
 					</DropdownMenuItem>
 				)}
 				{booking.status !== 'canceled' && (
-					<DropdownMenuItem onClick={() => onCancelBooking(booking.id)} className="flex items-center gap-3">
-						<Ban className="h-3 w-3" />
-						Cancelar cita
-					</DropdownMenuItem>
+					<>
+						<DropdownMenuItem
+							onClick={() => onCancelBooking(booking.id)}
+							className="flex items-center gap-3"
+						>
+							<Ban className="h-3 w-3" />
+							Cancelar cita
+						</DropdownMenuItem>
+						{/* V2: Show cancel series option if this booking is part of a series */}
+						{booking.series_id && onCancelSeries && (
+							<DropdownMenuItem
+								onClick={() => onCancelSeries(booking.series_id!)}
+								className="flex items-center gap-3 text-red-800 focus:text-red-700"
+							>
+								<Ban className="h-3 w-3" />
+								Cancelar evento recurrente
+							</DropdownMenuItem>
+						)}
+					</>
 				)}
 			</DropdownMenuContent>
 		</DropdownMenu>

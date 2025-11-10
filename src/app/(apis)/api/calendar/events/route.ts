@@ -92,8 +92,27 @@ export async function GET(request: NextRequest) {
 			type: 'external'
 		}))
 
+		// Filter out external events that overlap with bookings
+		// This ensures bookings always take precedence over calendar events
+		const eventsWithoutConflicts = formattedExternalEvents.filter((externalEvent) => {
+			const eventStart = new Date(externalEvent.start)
+			const eventEnd = new Date(externalEvent.end)
+
+			// Check if this external event overlaps with any booking
+			const overlapsWithBooking = formattedSystemBookings.some((booking) => {
+				const bookingStart = new Date(booking.start)
+				const bookingEnd = new Date(booking.end)
+
+				// Check for overlap: events overlap if one starts before the other ends
+				return eventStart < bookingEnd && eventEnd > bookingStart
+			})
+
+			// Keep the event only if it doesn't overlap with any booking
+			return !overlapsWithBooking
+		})
+
 		// Combine and sort by start time
-		const allEvents = [...formattedSystemBookings, ...formattedExternalEvents]
+		const allEvents = [...formattedSystemBookings, ...eventsWithoutConflicts]
 		allEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
 
 		// Return combined busy view (system + external)

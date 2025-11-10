@@ -1,7 +1,7 @@
 'use client'
 
 import { Badge } from '@/components/ui/badge'
-import { Check, Clock, Loader, RefreshCcw, X } from 'lucide-react'
+import { Check, Clock, Loader, RefreshCcw, X, Repeat } from 'lucide-react'
 
 type Size = 'sm' | 'lg'
 
@@ -122,4 +122,19 @@ export function PaymentBadge({ status, size = 'sm' }: { status: DisplayPaymentSt
 				</Badge>
 			)
 	}
+}
+
+/**
+ * Series Badge - Shows that a booking is part of a recurring series
+ */
+export function SeriesBadge({ size = 'sm' }: { size?: Size }) {
+	return (
+		<Badge
+			variant="outline"
+			className={`${sizeClasses[size]} bg-blue-50 text-blue-700 border-blue-200 font-normal rounded-full`}
+		>
+			<Repeat className="h-3 w-3 mr-1.5" />
+			Serie recurrente
+		</Badge>
+	)
 }

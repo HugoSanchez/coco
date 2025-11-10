@@ -530,6 +530,27 @@ export async function rescheduleBooking(
 }
 
 /**
+ * V2: Updates the google_standalone_event_id for a booking (used for rescheduled occurrences).
+ */
+export async function updateBookingStandaloneEventId(
+	bookingId: string,
+	googleEventId: string | null,
+	supabaseClient?: SupabaseClient
+): Promise<void> {
+	const client = supabaseClient || supabase
+
+	const { error } = await client
+		.from('bookings')
+		.update({ google_standalone_event_id: googleEventId })
+		.eq('id', bookingId)
+
+	if (error) {
+		console.log('Error updating booking standalone event ID', error)
+		throw error
+	}
+}
+
+/**
  * Retrieves bookings for a user with complete billing information and pagination support
  * Perfect for dashboard tables that need comprehensive booking data with efficient loading
  *

@@ -11,9 +11,15 @@
 
 import { NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/server'
-import { setBookingSeriesStatus, getBookingSeriesById, setBookingSeriesMasterEventId } from '@/lib/db/booking-series'
+import {
+	setBookingSeriesStatus,
+	getBookingSeriesById,
+	setBookingSeriesMasterEventId,
+	getAllStandaloneEventIdsForSeries
+} from '@/lib/db/booking-series'
 import { cancelFutureBookingsForSeries } from '@/lib/db/bookings'
 import { deleteMasterRecurringEvent } from '@/lib/calendar/master-recurring'
+import { deleteCalendarEvent } from '@/lib/calendar/calendar'
 
 type CancelSeriesPayload = {
 	series_id: string
@@ -49,6 +55,27 @@ export async function POST(req: Request) {
 			} catch (e) {
 				console.error('[cancel series] failed clearing master event id', e)
 			}
+		}
+
+		// V2: Stage 1C: Delete all standalone events for rescheduled occurrences
+		try {
+			const standaloneEventIds = await getAllStandaloneEventIdsForSeries(client, body.series_id)
+			for (const eventId of standaloneEventIds) {
+				try {
+					const result = await deleteCalendarEvent(eventId, series.user_id, client)
+					if (result.success) {
+						console.log(`[cancel series] deleted standalone event ${eventId}`)
+					} else {
+						console.warn(`[cancel series] failed to delete standalone event ${eventId}: ${result.error}`)
+					}
+				} catch (e) {
+					console.warn(`[cancel series] error deleting standalone event ${eventId}:`, e)
+					// Continue with other events
+				}
+			}
+		} catch (e) {
+			// Non-fatal; continue cancellation flow
+			console.error('[cancel series] failed fetching/deleting standalone events', e)
 		}
 
 		// Stage 2: optionally delete eligible future bookings (no bills/payments)

@@ -43,30 +43,49 @@ function mapBillingFromSettings(settings: any, amount: number) {
 	return { type: 'per_booking', amount, currency, paymentEmailLeadHours: lead } as const
 }
 
-export async function GET() {
+export async function GET(request: Request) {
 	try {
+		////////////////////////////////////////////////////////////////
+		// Step 0: Authenticate request
+		////////////////////////////////////////////////////////////////
+		const auth = process.env.CRON_SECRET
+		const header = request.headers.get('authorization')
+		if (!auth || !header?.startsWith('Bearer ') || header.split(' ')[1] !== auth) {
+			return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+		}
+
 		const client = createServiceRoleClient()
 
-		// Stage 1: Load all active series (small and simple)
+		////////////////////////////////////////////////////////////////
+		// Step 1: Load all active series
+		////////////////////////////////////////////////////////////////
 		const seriesList = await listAllActiveSeries(client)
 		let processed = 0
 		let created = 0
 
-		// Stage 2: Iterate series and extend by exactly one next occurrence
+		////////////////////////////////////////////////////////////////
+		// Step 2: Iterate series and extend by exactly one next occurrence
+		////////////////////////////////////////////////////////////////
 		for (const series of seriesList) {
 			processed += 1
 			try {
-				// 2.1 Determine next occurrence index
+				////////////////////////////////////////////////////////////////
+				// Step 2.1: Determine next occurrence index
+				////////////////////////////////////////////////////////////////
 				const maxIdx = await getSeriesMaxOccurrenceIndex(series.id, client)
 				const nextIdx = maxIdx + 1
 
-				// 2.2 Compute the local window anchored at nextIdx
+				////////////////////////////////////////////////////////////////
+				// Step 2.2: Compute the local window anchored at nextIdx
+				////////////////////////////////////////////////////////////////
 				const anchor = parseISO(series.dtstart_local)
 				const nextLocalStart = addWeeks(anchor, series.interval_weeks * nextIdx)
 				const windowStartLocal = toLocalIsoNoZ(nextLocalStart)
 				const windowEndLocal = toLocalIsoNoZ(addDays(nextLocalStart, 7))
 
-				// 2.3 Generate exactly one occurrence for this window
+				////////////////////////////////////////////////////////////////
+				// Step 2.3: Generate exactly one occurrence for this window
+				////////////////////////////////////////////////////////////////
 				const occs = generateOccurrences(
 					{
 						userId: series.user_id,
@@ -87,7 +106,9 @@ export async function GET() {
 				if (occs.length === 0) continue
 				const occ = occs[0]
 
-				// 2.4 Resolve billing settings and amount
+				////////////////////////////////////////////////////////////////
+				// Step 2.4: Resolve billing settings and amount
+				////////////////////////////////////////////////////////////////
 				const clientSettings = await getClientBillingSettings(series.user_id, series.client_id, client)
 				const userDefault = clientSettings ? null : await getUserDefaultBillingSettings(series.user_id, client)
 				const fallbackAmount = clientSettings?.billing_amount ?? userDefault?.billing_amount ?? 0
@@ -97,7 +118,11 @@ export async function GET() {
 						: Number(fallbackAmount)
 				const billing = mapBillingFromSettings(clientSettings || userDefault, amount)
 
-				// 2.5 Create booking via orchestrator to reuse emails/calendar/payment logic
+				////////////////////////////////////////////////////////////////
+				// Step 2.5: Create booking via orchestrator
+				// V2: Suppress calendar if master event exists (to avoid duplicate Google events)
+				////////////////////////////////////////////////////////////////
+				const hasMasterEvent = Boolean(series.google_master_event_id)
 				const result = await orchestrateBookingCreation(
 					{
 						userId: series.user_id,
@@ -109,10 +134,13 @@ export async function GET() {
 						locationText: (series as any).location_text || null
 					},
 					billing as any,
-					client
+					client,
+					{ suppressCalendar: hasMasterEvent }
 				)
 
-				// 2.6 Tag the booking with series linkage
+				////////////////////////////////////////////////////////////////
+				// Step 2.6: Tag the booking with series linkage
+				////////////////////////////////////////////////////////////////
 				await tagBookingWithSeries(result.booking.id, series.id, occ.occurrenceIndex, client)
 				created += 1
 			} catch (e) {
@@ -121,6 +149,9 @@ export async function GET() {
 			}
 		}
 
+		////////////////////////////////////////////////////////////////
+		// Step 3: Return results
+		////////////////////////////////////////////////////////////////
 		return NextResponse.json({ processed, created })
 	} catch (error: any) {
 		console.error('[cron series extend] fatal', error)

@@ -1,5 +1,5 @@
 import { addWeeks, addMinutes, addDays, format, parseISO, isAfter, isBefore } from 'date-fns'
-import { fromZonedTime } from 'date-fns-tz'
+import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 
 export type WeeklyRule = {
 	recurrenceKind: 'WEEKLY'
@@ -99,6 +99,35 @@ export function generateOccurrences(
 	}
 
 	return results
+}
+
+/**
+ * V2: Converts UTC ISO string to local date string (YYYY-MM-DD) in given timezone.
+ * Used for EXDATE tracking - we only care about the date, not the time.
+ */
+export function toLocalDateString(utcIso: string, timezone: string): string {
+	const utcDate = parseISO(utcIso)
+	const localDate = toZonedTime(utcDate, timezone)
+	return format(localDate, 'yyyy-MM-dd')
+}
+
+/**
+ * V2: Formats date string (YYYY-MM-DD) for EXDATE in RRULE format (YYYYMMDD).
+ * Google Calendar EXDATE format is YYYYMMDD (no separators).
+ */
+export function formatExdate(dateString: string): string {
+	// Input: '2025-11-18' -> Output: '20251118'
+	return dateString.replace(/-/g, '')
+}
+
+/**
+ * V2: Formats multiple date strings for EXDATE in RRULE format.
+ * Returns a single EXDATE line: "EXDATE;TZID=Europe/Madrid:20251118,20251125"
+ */
+export function formatExdateRule(excludedDates: string[], timezone: string): string {
+	if (excludedDates.length === 0) return ''
+	const formattedDates = excludedDates.map(formatExdate).join(',')
+	return `EXDATE;TZID=${timezone}:${formattedDates}`
 }
 
 
