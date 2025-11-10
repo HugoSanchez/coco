@@ -904,6 +904,52 @@ export async function cancelFutureBookingsForSeries(
 }
 
 /**
+ * Deletes future bookings for a series that are safe to remove:
+ * - start_time >= nowIsoUtc
+ * - no related bill(s)
+ * - no related payment session
+ *
+ * Returns the number of rows deleted.
+ */
+export async function deleteEligibleFutureBookingsForSeries(
+	seriesId: string,
+	nowIsoUtc: string,
+	supabaseClient?: SupabaseClient
+): Promise<number> {
+	const client = supabaseClient || supabase
+
+	// Select candidates with minimal relations for safety checks
+	const { data: candidates, error: selectErr } = await client
+		.from('bookings')
+		.select(
+			`
+			id,
+			bills:bills(id),
+			payment_sessions:payment_sessions(id)
+		`
+		)
+		.eq('series_id', seriesId)
+		.gte('start_time', nowIsoUtc)
+
+	if (selectErr) throw selectErr
+	const rows = (candidates as any[]) || []
+
+	const eligibleIds = rows
+		.filter((r) => {
+			const hasBills = Array.isArray(r.bills) && r.bills.length > 0
+			const hasPayment = Array.isArray(r.payment_sessions) && r.payment_sessions.length > 0
+			return !hasBills && !hasPayment
+		})
+		.map((r) => r.id as string)
+
+	if (eligibleIds.length === 0) return 0
+
+	const { data: deleted, error: delErr } = await client.from('bookings').delete().in('id', eligibleIds).select('id')
+	if (delErr) throw delErr
+	return ((deleted as any[]) || []).length
+}
+
+/**
  * Returns the maximum occurrence_index for a series, or -1 if none.
  */
 export async function getSeriesMaxOccurrenceIndex(

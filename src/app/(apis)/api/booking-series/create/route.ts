@@ -21,11 +21,14 @@
 import { NextResponse } from 'next/server'
 import { addMonths, format, parseISO } from 'date-fns'
 import { createServiceRoleClient } from '@/lib/supabase/server'
-import { createBookingSeries } from '@/lib/db/booking-series'
+import { createBookingSeries, setBookingSeriesMasterEventId } from '@/lib/db/booking-series'
 import { getClientBillingSettings, getUserDefaultBillingSettings } from '@/lib/db/billing-settings'
 import { orchestrateBookingCreation } from '@/lib/bookings/booking-orchestration-service'
 import { tagBookingWithSeries, getExistingSeriesBookings } from '@/lib/db/bookings'
 import { generateOccurrences } from '@/lib/dates/recurrence'
+import { createMasterRecurringEvent } from '@/lib/calendar/master-recurring'
+import { getClientById } from '@/lib/db/clients'
+import { getProfileById } from '@/lib/db/profiles'
 
 /**
  * TYPES
@@ -157,13 +160,43 @@ export async function POST(req: Request) {
           locationText: body.location_text ?? null
         },
         billing as any,
-        client
+        client,
+        { suppressCalendar: true }
       )
 
       bookingIds.push(result.booking.id)
 
       // Tag booking with series linkage
       await tagBookingWithSeries(result.booking.id, seriesId, occ.occurrenceIndex, client)
+    }
+
+    // Create single master recurring Google event and save id
+    try {
+      const [clientRow, profile] = await Promise.all([
+        getClientById(body.client_id, client),
+        getProfileById(body.user_id, client)
+      ])
+      if (clientRow) {
+        const master = await createMasterRecurringEvent({
+          userId: body.user_id,
+          clientName: clientRow.name,
+          clientEmail: clientRow.email,
+          practitionerName: profile?.name || null,
+          practitionerEmail: profile?.email || undefined,
+          dtstartLocal: body.dtstart_local,
+          timezone: body.timezone,
+          durationMin: body.duration_min,
+          intervalWeeks: body.rule.interval_weeks,
+          byWeekday: body.rule.by_weekday as any,
+          mode: (body.mode as any) || 'online',
+          locationText: body.location_text || null,
+          supabaseClient: client
+        })
+        await setBookingSeriesMasterEventId(client, seriesId, master.googleEventId)
+      }
+    } catch (e) {
+      console.error('[series master] failed to create master event', e)
+      // Non-fatal; proceed without master
     }
 
     return NextResponse.json({ series_id: seriesId, created_count: bookingIds.length, booking_ids: bookingIds })

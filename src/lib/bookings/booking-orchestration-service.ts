@@ -98,7 +98,8 @@ export interface CreateBookingResult {
 export async function orchestrateBookingCreation(
 	request: CreateBookingRequest,
 	billing: any,
-	supabaseClient?: SupabaseClient
+	supabaseClient?: SupabaseClient,
+	options?: { suppressCalendar?: boolean }
 ): Promise<CreateBookingResult> {
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////// Pre-validate inputs (time window + billing payload)
@@ -169,7 +170,7 @@ export async function orchestrateBookingCreation(
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////// Step 6: Calendar events (single helper, preserves earlier behavior by variant)
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
-	if (normalizedType === 'per_booking') {
+	if (!options?.suppressCalendar && normalizedType === 'per_booking') {
 		// New behavior: right-after bookings should behave like monthly for invites.
 		// If paymentEmailLeadHours === -1 (after session), create CONFIRMED event now (when future),
 		// so the client receives an invite immediately.
@@ -239,7 +240,7 @@ export async function orchestrateBookingCreation(
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////// Step 8: Monthly flow — no payment email; create calendar invite if future; cron emails invoice
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
-	if (normalizedType === 'monthly') {
+	if (!options?.suppressCalendar && normalizedType === 'monthly') {
 		if (!isPast) {
 			await createCalendarEventForBooking({
 				variant: 'confirmed',

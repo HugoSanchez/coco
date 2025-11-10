@@ -26,6 +26,7 @@ export interface BookingSeriesRow {
 	consultation_type: string | null
 	status: 'active' | 'paused' | 'ended'
 	until: string | null
+	google_master_event_id?: string | null
 	created_at: string
 	updated_at: string
 }
@@ -97,6 +98,18 @@ export async function listActiveSeriesForUser(
 
 	if (error) throw error
 	return (data as BookingSeriesRow[]) || []
+}
+
+/**
+ * Sets/updates the google_master_event_id on booking_series.
+ */
+export async function setBookingSeriesMasterEventId(
+	client: SupabaseClient,
+	id: string,
+	googleEventId: string | null
+): Promise<void> {
+	const { error } = await client.from('booking_series').update({ google_master_event_id: googleEventId }).eq('id', id)
+	if (error) throw error
 }
 
 /**

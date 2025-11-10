@@ -74,7 +74,11 @@ export async function GET() {
 						dtstartLocal: series.dtstart_local,
 						timezone: series.timezone,
 						durationMin: series.duration_min,
-						rule: { recurrenceKind: 'WEEKLY', intervalWeeks: series.interval_weeks, byWeekday: series.by_weekday }
+						rule: {
+							recurrenceKind: 'WEEKLY',
+							intervalWeeks: series.interval_weeks,
+							byWeekday: series.by_weekday
+						}
 					},
 					windowStartLocal,
 					windowEndLocal,
@@ -87,9 +91,10 @@ export async function GET() {
 				const clientSettings = await getClientBillingSettings(series.user_id, series.client_id, client)
 				const userDefault = clientSettings ? null : await getUserDefaultBillingSettings(series.user_id, client)
 				const fallbackAmount = clientSettings?.billing_amount ?? userDefault?.billing_amount ?? 0
-				const amount = occ.occurrenceIndex === 0 && clientSettings?.first_consultation_amount != null
-					? Number(clientSettings.first_consultation_amount)
-					: Number(fallbackAmount)
+				const amount =
+					occ.occurrenceIndex === 0 && clientSettings?.first_consultation_amount != null
+						? Number(clientSettings.first_consultation_amount)
+						: Number(fallbackAmount)
 				const billing = mapBillingFromSettings(clientSettings || userDefault, amount)
 
 				// 2.5 Create booking via orchestrator to reuse emails/calendar/payment logic
