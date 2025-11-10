@@ -1,21 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import {
-	ChevronLeft,
-	ChevronRight,
-	Calendar,
-	List,
-	SlidersHorizontal,
-	Settings,
-	Check,
-	Clock,
-	X,
-	User
-} from 'lucide-react'
+import { ChevronLeft, ChevronRight, Calendar, List, SlidersHorizontal, Settings, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+
+import { Spinner } from '@/components/ui/spinner'
+import { WeeklyAgendaBookingCard } from '@/components/WeeklyAgendaBookingCard'
+
+type PaymentStatus = 'scheduled' | 'pending' | 'paid' | 'disputed' | 'canceled' | 'refunded' | 'na'
 
 interface Booking {
 	id: string
@@ -26,214 +18,23 @@ interface Booking {
 	endTime: string
 	date: string
 	status: 'completed' | 'scheduled' | 'canceled' | 'waiting'
+	consultation_type?: 'first' | 'followup' | null
+	payment_status?: PaymentStatus
 }
 
-const mockBookings: Booking[] = [
-	{
-		id: '1',
-		type: 'booking',
-		patientName: 'Tony Hack',
-		appointmentType: 'General Check-up',
-		startTime: '09:00',
-		endTime: '10:00',
-		date: '2025-04-21',
-		status: 'completed'
-	},
-	{
-		id: '2',
-		type: 'booking',
-		patientName: 'James Wong',
-		appointmentType: 'Blood Pressure Check',
-		startTime: '09:30',
-		endTime: '10:30',
-		date: '2025-04-22',
-		status: 'completed'
-	},
-	{
-		id: 'busy-1',
-		type: 'busy',
-		patientName: '',
-		appointmentType: '',
-		startTime: '08:00',
-		endTime: '09:00',
-		date: '2025-04-22',
-		status: 'scheduled'
-	},
-	{
-		id: '3',
-		type: 'booking',
-		patientName: 'Jamie Ulric',
-		appointmentType: 'Follow-up Consultation',
-		startTime: '10:30',
-		endTime: '11:30',
-		date: '2025-04-21',
-		status: 'canceled'
-	},
-	{
-		id: '4',
-		type: 'booking',
-		patientName: 'Henderson Kai',
-		appointmentType: 'Prescription Refill',
-		startTime: '10:30',
-		endTime: '11:30',
-		date: '2025-04-23',
-		status: 'scheduled'
-	},
-	{
-		id: '5',
-		type: 'booking',
-		patientName: 'Emily Watford',
-		appointmentType: 'Headache',
-		startTime: '11:00',
-		endTime: '12:00',
-		date: '2025-04-22',
-		status: 'waiting'
-	},
-	{
-		id: 'busy-2',
-		type: 'busy',
-		patientName: '',
-		appointmentType: '',
-		startTime: '12:00',
-		endTime: '13:00',
-		date: '2025-04-23',
-		status: 'scheduled'
-	},
-	{
-		id: '6',
-		type: 'booking',
-		patientName: 'Leo Wildheart',
-		appointmentType: 'Chronic Condition Review',
-		startTime: '09:00',
-		endTime: '10:00',
-		date: '2025-04-24',
-		status: 'scheduled'
-	},
-	{
-		id: '7',
-		type: 'booking',
-		patientName: 'Thomas Andre',
-		appointmentType: 'General Check-up',
-		startTime: '09:30',
-		endTime: '10:30',
-		date: '2025-04-25',
-		status: 'scheduled'
-	},
-	{
-		id: '8',
-		type: 'booking',
-		patientName: 'Tannia Burg',
-		appointmentType: 'Mental Health Consultation',
-		startTime: '10:00',
-		endTime: '11:00',
-		date: '2025-04-24',
-		status: 'canceled'
-	},
-	{
-		id: 'busy-3',
-		type: 'busy',
-		patientName: '',
-		appointmentType: '',
-		startTime: '14:00',
-		endTime: '15:30',
-		date: '2025-04-24',
-		status: 'scheduled'
-	},
-	{
-		id: '9',
-		type: 'booking',
-		patientName: 'Ling Ling Ben',
-		appointmentType: 'Lab Results Discussion',
-		startTime: '11:00',
-		endTime: '12:00',
-		date: '2025-04-25',
-		status: 'scheduled'
-	},
-	{
-		id: '10',
-		type: 'booking',
-		patientName: 'Lee Sung Yin',
-		appointmentType: 'Blood Test',
-		startTime: '13:00',
-		endTime: '14:00',
-		date: '2025-04-21',
-		status: 'completed'
-	},
-	{
-		id: '11',
-		type: 'booking',
-		patientName: 'Lina Garcia',
-		appointmentType: 'Skin Rash',
-		startTime: '13:00',
-		endTime: '14:00',
-		date: '2025-04-22',
-		status: 'scheduled'
-	},
-	{
-		id: '12',
-		type: 'booking',
-		patientName: 'Ryo Kzuhaki',
-		appointmentType: 'Injury Evaluation',
-		startTime: '13:00',
-		endTime: '14:00',
-		date: '2025-04-24',
-		status: 'scheduled'
-	},
-	{
-		id: '13',
-		type: 'booking',
-		patientName: 'Emily Walts',
-		appointmentType: 'Routine Check',
-		startTime: '13:30',
-		endTime: '14:30',
-		date: '2025-04-23',
-		status: 'scheduled'
-	},
-	{
-		id: '14',
-		type: 'booking',
-		patientName: 'Lily Chen',
-		appointmentType: 'Vaccination',
-		startTime: '13:30',
-		endTime: '14:30',
-		date: '2025-04-25',
-		status: 'scheduled'
-	},
-	{
-		id: 'busy-4',
-		type: 'busy',
-		patientName: '',
-		appointmentType: '',
-		startTime: '15:00',
-		endTime: '16:00',
-		date: '2025-04-25',
-		status: 'scheduled'
+// Generate 15-minute time slots from 08:00 to 18:00
+const generateTimeSlots = (): string[] => {
+	const slots: string[] = []
+	for (let hour = 8; hour <= 18; hour++) {
+		for (let minute = 0; minute < 60; minute += 15) {
+			const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+			slots.push(timeStr)
+		}
 	}
-]
+	return slots
+}
 
-const timeSlots = [
-	'08:00',
-	'08:30',
-	'09:00',
-	'09:30',
-	'10:00',
-	'10:30',
-	'11:00',
-	'11:30',
-	'12:00',
-	'12:30',
-	'13:00',
-	'13:30',
-	'14:00',
-	'14:30',
-	'15:00',
-	'15:30',
-	'16:00',
-	'16:30',
-	'17:00',
-	'17:30',
-	'18:00'
-]
+const timeSlots = generateTimeSlots()
 
 const dayNames = ['MON', 'TUE', 'WED', 'THR', 'FRI', 'SAT', 'SUN']
 const weekdayNames = ['MON', 'TUE', 'WED', 'THR', 'FRI']
@@ -261,8 +62,10 @@ export function WeeklyAgenda() {
 		startTime: '',
 		endTime: ''
 	})
-	const [bookings, setBookings] = useState<Booking[]>(mockBookings)
+	const [bookings, setBookings] = useState<Booking[]>([])
+	const [loadingBookings, setLoadingBookings] = useState(true)
 	const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar')
+	const [hoveredSlot, setHoveredSlot] = useState<{ day: number; slot: number } | null>(null)
 
 	const getWeekDays = () => {
 		const days = []
@@ -277,22 +80,55 @@ export function WeeklyAgenda() {
 
 	const weekDays = getWeekDays()
 
-	// Fetch events for each day in the visible week and map to component format
+	// Fetch events for the entire visible week in a single API call
 	useEffect(() => {
-		const toUtcDayBounds = (day: Date) => {
-			const start = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0))
-			const end = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59, 999))
-			return { startIso: start.toISOString(), endIso: end.toISOString() }
-		}
-
 		const formatHHmm = (iso: string) => {
 			const d = new Date(iso)
-			return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
+			// Convert to CET timezone (Europe/Madrid)
+			return d.toLocaleTimeString('en-GB', {
+				hour: '2-digit',
+				minute: '2-digit',
+				hour12: false,
+				timeZone: 'Europe/Madrid'
+			})
 		}
 
 		const mapEventsToBookings = (events: any[]): Booking[] => {
 			return events.map((ev: any) => {
+				// Extract date in CET timezone
+				const getDateInCET = (isoString: string): string => {
+					const d = new Date(isoString)
+					// Format date parts in CET timezone
+					const year = d.toLocaleString('en-US', { timeZone: 'Europe/Madrid', year: 'numeric' })
+					const month = d.toLocaleString('en-US', { timeZone: 'Europe/Madrid', month: '2-digit' })
+					const day = d.toLocaleString('en-US', { timeZone: 'Europe/Madrid', day: '2-digit' })
+					return `${year}-${month}-${day}`
+				}
+
 				if (ev.type === 'system') {
+					// Map payment_status to PaymentStatus format (same logic as BookingsTable)
+					let displayPaymentStatus: PaymentStatus = 'na'
+
+					// Always use payment_status from API, handle 'not_applicable' case
+					if (ev.payment_status !== undefined && ev.payment_status !== null) {
+						// Handle the case where payment_status might be 'not_applicable' but billing_status is 'pending'
+						if (ev.payment_status === 'not_applicable' && ev.billing_status === 'pending') {
+							displayPaymentStatus = 'scheduled'
+						} else if (ev.payment_status === 'not_applicable') {
+							displayPaymentStatus = 'na'
+						} else {
+							// Map API payment_status values to PaymentStatus type
+							const statusMap: Record<string, PaymentStatus> = {
+								pending: 'pending',
+								paid: 'paid',
+								disputed: 'disputed',
+								canceled: 'canceled',
+								refunded: 'refunded'
+							}
+							displayPaymentStatus = statusMap[ev.payment_status] || 'na'
+						}
+					}
+
 					return {
 						id: ev.bookingId ? String(ev.bookingId) : `sys-${ev.start}-${ev.end}`,
 						type: 'booking',
@@ -300,8 +136,10 @@ export function WeeklyAgenda() {
 						appointmentType: '',
 						startTime: formatHHmm(ev.start),
 						endTime: formatHHmm(ev.end),
-						date: String(ev.start).split('T')[0],
-						status: ev.status === 'canceled' ? 'canceled' : 'scheduled'
+						date: getDateInCET(ev.start),
+						status: ev.status === 'canceled' ? 'canceled' : 'scheduled',
+						consultation_type: ev.consultation_type || null,
+						payment_status: displayPaymentStatus
 					}
 				}
 				return {
@@ -311,27 +149,44 @@ export function WeeklyAgenda() {
 					appointmentType: '',
 					startTime: formatHHmm(ev.start),
 					endTime: formatHHmm(ev.end),
-					date: String(ev.start).split('T')[0],
+					date: getDateInCET(ev.start),
 					status: 'scheduled'
 				}
 			})
 		}
 
 		const fetchWeek = async () => {
+			setLoadingBookings(true)
 			try {
-				const requests = weekDays.map((day) => {
-					const { startIso, endIso } = toUtcDayBounds(day)
-					return fetch(
-						`/api/calendar/events?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`
-					)
-				})
-				const responses = await Promise.all(requests)
-				const jsons = await Promise.all(responses.map(async (res) => (res.ok ? res.json() : { events: [] })))
-				const combined = jsons.flatMap((j: any) => j.events || [])
-				const mapped = mapEventsToBookings(combined)
+				// Calculate week bounds: start of first day to end of last day
+				const firstDay = weekDays[0]
+				const lastDay = weekDays[weekDays.length - 1]
+
+				const weekStart = new Date(
+					Date.UTC(firstDay.getFullYear(), firstDay.getMonth(), firstDay.getDate(), 0, 0, 0, 0)
+				)
+				const weekEnd = new Date(
+					Date.UTC(lastDay.getFullYear(), lastDay.getMonth(), lastDay.getDate(), 23, 59, 59, 999)
+				)
+
+				// Single API call for the entire week
+				const response = await fetch(
+					`/api/calendar/events?start=${encodeURIComponent(weekStart.toISOString())}&end=${encodeURIComponent(weekEnd.toISOString())}`
+				)
+
+				if (!response.ok) {
+					throw new Error('Failed to fetch calendar events')
+				}
+
+				const data = await response.json()
+				const mapped = mapEventsToBookings(data.events || [])
 				setBookings(mapped)
 			} catch (e) {
-				// On error, keep existing bookings (could add toast/logging later)
+				console.error('Error fetching week bookings:', e)
+				// On error, clear bookings to show empty state
+				setBookings([])
+			} finally {
+				setLoadingBookings(false)
 			}
 		}
 
@@ -352,23 +207,32 @@ export function WeeklyAgenda() {
 	}
 
 	const getBookingsForDay = (date: Date) => {
-		const dateStr = date.toISOString().split('T')[0]
+		// Convert date to CET timezone for comparison
+		const year = date.toLocaleString('en-US', { timeZone: 'Europe/Madrid', year: 'numeric' })
+		const month = date.toLocaleString('en-US', { timeZone: 'Europe/Madrid', month: '2-digit' })
+		const day = date.toLocaleString('en-US', { timeZone: 'Europe/Madrid', day: '2-digit' })
+		const dateStr = `${year}-${month}-${day}`
 		return bookings.filter((booking) => booking.date === dateStr)
 	}
 
 	const getTodayAppointments = () => {
-		const today = new Date().toISOString().split('T')[0]
-		return bookings.filter((booking) => booking.date === today).length
+		// Get today's date in CET timezone
+		const today = new Date()
+		const year = today.toLocaleString('en-US', { timeZone: 'Europe/Madrid', year: 'numeric' })
+		const month = today.toLocaleString('en-US', { timeZone: 'Europe/Madrid', month: '2-digit' })
+		const day = today.toLocaleString('en-US', { timeZone: 'Europe/Madrid', day: '2-digit' })
+		const todayStr = `${year}-${month}-${day}`
+		return bookings.filter((booking) => booking.date === todayStr).length
 	}
 
 	const getBookingPosition = (startTime: string, endTime: string) => {
-		// Grid window from first slot to last slot + 30min
+		// Grid window from first slot to last slot + 15min
 		const parseHm = (hm: string) => {
 			const [h, m] = hm.split(':').map((v) => Number.parseInt(v))
 			return h * 60 + m
 		}
 		const gridStartMin = parseHm(timeSlots[0])
-		const gridEndMin = parseHm(timeSlots[timeSlots.length - 1]) + 30
+		const gridEndMin = parseHm(timeSlots[timeSlots.length - 1]) + 15
 
 		const startMin = parseHm(startTime)
 		const endMin = parseHm(endTime)
@@ -379,7 +243,7 @@ export function WeeklyAgenda() {
 		// Clamp to visible window
 		const visibleStart = Math.max(startMin, gridStartMin)
 		const visibleEnd = Math.min(endMin, gridEndMin)
-		const pxPerMin = 50 / 30 // 50px per 30 minutes
+		const pxPerMin = 25 / 15 // 25px per 15 minutes (same visual density)
 
 		return {
 			top: `${(visibleStart - gridStartMin) * pxPerMin}px`,
@@ -394,9 +258,16 @@ export function WeeklyAgenda() {
 	}
 
 	const handleMouseEnter = (dayIndex: number, slotIndex: number) => {
+		if (!isDragging) {
+			setHoveredSlot({ day: dayIndex, slot: slotIndex })
+		}
 		if (isDragging && dragStart && dragStart.day === dayIndex) {
 			setDragEnd({ day: dayIndex, slot: slotIndex })
 		}
+	}
+
+	const handleMouseLeave = () => {
+		setHoveredSlot(null)
 	}
 
 	const handleMouseUp = () => {
@@ -410,7 +281,7 @@ export function WeeklyAgenda() {
 				appointmentType: '',
 				date: selectedDay.toISOString().split('T')[0],
 				startTime: timeSlots[startSlot],
-				endTime: timeSlots[endSlot + 1] || '18:30'
+				endTime: timeSlots[endSlot + 1] || '18:15'
 			})
 			setShowBookingDialog(true)
 		}
@@ -443,52 +314,6 @@ export function WeeklyAgenda() {
 		const minSlot = Math.min(dragStart.slot, dragEnd.slot)
 		const maxSlot = Math.max(dragStart.slot, dragEnd.slot)
 		return slotIndex >= minSlot && slotIndex <= maxSlot
-	}
-
-	const getStatusBadge = (status: Booking['status']) => {
-		switch (status) {
-			case 'completed':
-				return {
-					bg: 'bg-teal-50',
-					text: 'text-teal-700',
-					icon: <Check className="h-3 w-3" />,
-					label: 'Completed'
-				}
-			case 'scheduled':
-				return {
-					bg: '',
-					text: 'text-teal-700',
-					icon: <Check className="h-3 w-3" />,
-					label: 'Pagada'
-				}
-			case 'canceled':
-				return {
-					bg: 'bg-red-50',
-					text: 'text-red-700',
-					icon: <X className="h-3 w-3" />,
-					label: 'Canceled'
-				}
-			case 'waiting':
-				return {
-					bg: 'bg-amber-50',
-					text: 'text-amber-700',
-					icon: <User className="h-3 w-3" />,
-					label: 'Patient is waiting'
-				}
-		}
-	}
-
-	const getBorderColor = (status: Booking['status']) => {
-		switch (status) {
-			case 'completed':
-				return 'border-l-teal-500'
-			case 'scheduled':
-				return 'border-l-teal-500'
-			case 'canceled':
-				return 'border-l-red-500'
-			case 'waiting':
-				return 'border-l-teal-200'
-		}
 	}
 
 	return (
@@ -548,13 +373,43 @@ export function WeeklyAgenda() {
 				</div>
 			</div>
 
-			<div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+			<div className="bg-white rounded-lg border border-gray-200 overflow-hidden relative">
+				{/* Loading Overlay */}
+				{loadingBookings && (
+					<div className="absolute inset-0 bg-white/80 flex items-center justify-center z-50">
+						<div className="flex flex-col items-center gap-2">
+							<Spinner size="sm" color="dark" />
+							<span className="text-sm text-gray-600">Cargando citas...</span>
+						</div>
+					</div>
+				)}
+
 				{/* Day Headers */}
 				<div className="flex border-b border-gray-200">
-					<div className="w-20 flex-shrink-0 p-3 text-xs font-medium text-gray-500">GMT +7</div>
+					<div className="w-20 flex-shrink-0 p-3 text-xs font-medium text-gray-500">CET</div>
 					<div className={`flex-1 grid ${showWeekends ? 'grid-cols-7' : 'grid-cols-5'}`}>
 						{weekDays.map((day, index) => {
-							const isToday = day.toDateString() === new Date(2025, 3, 22).toDateString()
+							// Compare dates in CET timezone
+							const today = new Date()
+							const todayYear = today.toLocaleString('en-US', {
+								timeZone: 'Europe/Madrid',
+								year: 'numeric'
+							})
+							const todayMonth = today.toLocaleString('en-US', {
+								timeZone: 'Europe/Madrid',
+								month: '2-digit'
+							})
+							const todayDay = today.toLocaleString('en-US', {
+								timeZone: 'Europe/Madrid',
+								day: '2-digit'
+							})
+							const dayYear = day.toLocaleString('en-US', { timeZone: 'Europe/Madrid', year: 'numeric' })
+							const dayMonth = day.toLocaleString('en-US', {
+								timeZone: 'Europe/Madrid',
+								month: '2-digit'
+							})
+							const dayDay = day.toLocaleString('en-US', { timeZone: 'Europe/Madrid', day: '2-digit' })
+							const isToday = todayYear === dayYear && todayMonth === dayMonth && todayDay === dayDay
 							return (
 								<div key={index} className="p-3 text-center border-l border-gray-200">
 									<div
@@ -576,14 +431,29 @@ export function WeeklyAgenda() {
 				</div>
 
 				{/* Time Grid */}
-				<div className="flex" onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+				<div
+					className="flex select-none"
+					onMouseUp={handleMouseUp}
+					onMouseLeave={() => {
+						handleMouseUp()
+						setHoveredSlot(null)
+					}}
+					onDragStart={(e) => e.preventDefault()}
+				>
 					<div className="w-20 flex-shrink-0 border-r border-gray-200">
 						{timeSlots.map((time, index) => {
 							const isHourMark = time.endsWith(':00')
+							const isHalfHourMark = time.endsWith(':30')
 							return (
 								<div
 									key={time}
-									className={`h-[50px] ${isHourMark ? 'border-t border-gray-300' : 'border-t border-gray-100'} px-2 py-1 text-xs text-gray-500`}
+									className={`h-[25px] ${
+										isHourMark
+											? 'border-t border-gray-300'
+											: isHalfHourMark
+												? 'border-t border-gray-200'
+												: ''
+									} px-2 py-1 text-xs text-gray-500`}
 								>
 									{isHourMark ? time : ''}
 								</div>
@@ -599,15 +469,53 @@ export function WeeklyAgenda() {
 								<div key={dayIndex} className="border-l border-gray-200 relative">
 									{timeSlots.map((time, slotIndex) => {
 										const isHourMark = time.endsWith(':00')
+										const isHalfHourMark = time.endsWith(':30')
+										const isHovered =
+											hoveredSlot?.day === dayIndex && hoveredSlot?.slot === slotIndex
+										const isInSelection = isSlotInDragSelection(dayIndex, slotIndex)
+										const isFirstSlotInSelection =
+											isDragging &&
+											dragStart &&
+											dragEnd &&
+											dragStart.day === dayIndex &&
+											slotIndex === Math.min(dragStart.slot, dragEnd.slot)
+
 										return (
 											<div
 												key={time}
-												className={`h-[50px] ${isHourMark ? 'border-t border-gray-300' : 'border-t border-gray-100'} cursor-pointer hover:bg-gray-50 transition-colors ${
-													isSlotInDragSelection(dayIndex, slotIndex) ? 'bg-teal-100' : ''
+												className={`h-[25px] relative select-none ${
+													isHourMark
+														? 'border-t border-gray-300'
+														: isHalfHourMark
+															? 'border-t border-gray-200'
+															: ''
+												} cursor-pointer ${!isDragging ? 'hover:bg-teal-50' : ''} transition-colors ${
+													isInSelection ? 'bg-teal-100' : ''
 												}`}
-												onMouseDown={() => handleMouseDown(dayIndex, slotIndex)}
+												onMouseDown={(e) => {
+													e.preventDefault()
+													handleMouseDown(dayIndex, slotIndex)
+												}}
 												onMouseEnter={() => handleMouseEnter(dayIndex, slotIndex)}
-											/>
+												onMouseLeave={handleMouseLeave}
+												onDragStart={(e) => e.preventDefault()}
+											>
+												{isFirstSlotInSelection && isDragging && dragStart && dragEnd && (
+													<div
+														className="absolute left-0 right-0 flex items-center justify-center text-xs text-teal-700 font-medium pointer-events-none select-none z-10"
+														style={{
+															top: 0,
+															height: `${(Math.abs(dragEnd.slot - dragStart.slot) + 1) * 25}px`,
+															userSelect: 'none',
+															WebkitUserSelect: 'none'
+														}}
+													>
+														{timeSlots[Math.min(dragStart.slot, dragEnd.slot)]} -{' '}
+														{timeSlots[Math.max(dragStart.slot, dragEnd.slot) + 1] ||
+															'18:15'}
+													</div>
+												)}
+											</div>
 										)
 									})}
 
@@ -615,64 +523,12 @@ export function WeeklyAgenda() {
 										const position = getBookingPosition(booking.startTime, booking.endTime)
 										if (!position) return null
 
-										// Render busy slots with different styling
-										if (booking.type === 'busy') {
-											return (
-												<div
-													key={booking.id}
-													className="absolute left-2 right-2 bg-gray-100 rounded border border-gray-300 border-l-4 border-l-gray-400 cursor-not-allowed z-0 overflow-hidden"
-													style={{
-														top: position.top,
-														height: position.height,
-														backgroundImage:
-															'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.03) 10px, rgba(0,0,0,0.03) 20px)'
-													}}
-												>
-													<div className="p-2 h-full flex flex-col justify-center">
-														<div className="text-xs text-gray-500">
-															{booking.startTime} - {booking.endTime}
-														</div>
-														<div className="font-medium text-sm text-gray-600 mt-0.5">
-															Busy
-														</div>
-													</div>
-												</div>
-											)
-										}
-
-										// Render regular bookings
-										const statusBadge = getStatusBadge(booking.status)
-										const borderColor = getBorderColor(booking.status)
-
 										return (
-											<div
+											<WeeklyAgendaBookingCard
 												key={booking.id}
-												className={`absolute left-2 right-2 bg-teal-50 rounded border border-gray-200 border-l-4 ${borderColor} cursor-pointer transition-all hover:shadow-md pointer-events-auto z-0 overflow-hidden`}
-												style={{
-													top: position.top,
-													height: position.height
-												}}
-											>
-												<div className="p-2 h-full flex flex-col">
-													<div className="flex-1">
-														<div className="text-xs text-gray-600">
-															{booking.startTime} - {booking.endTime}
-														</div>
-														<div className="font-semibold text-sm text-gray-900 mt-0.5">
-															{booking.patientName}
-														</div>
-														<div className="text-xs text-gray-600 mt-0.5">
-															{booking.appointmentType}
-														</div>
-													</div>
-													<div
-														className={`flex items-center gap-1.5 mt-2 py-1 rounded text-xs font-medium ${statusBadge.bg} ${statusBadge.text}`}
-													>
-														<div className="h-2 w-2 bg-teal-500 rounded-full" />
-														{statusBadge.label}
-													</div>
-												</div>
-											</div>
+												booking={booking}
+												position={position}
+											/>
 										)
 									})}
 								</div>
