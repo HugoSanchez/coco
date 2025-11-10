@@ -18,7 +18,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ClientSearchSelect } from '@/components/ClientSearchSelect'
-import { Calendar as CalendarIcon, Clock, User, ArrowLeft } from 'lucide-react'
+import { Calendar as CalendarIcon, Clock, User, ArrowLeft, ChevronRight } from 'lucide-react'
 import Calendar from '@/components/Calendar'
 import { DayViewTimeSelector } from '@/components/DayViewTimeSelector'
 import { TimeSlot } from '@/lib/calendar/calendar'
@@ -39,14 +39,8 @@ import {
 	getBillingPreferences
 } from '@/lib/db/billing-settings'
 import { hasAnyNonCanceledBookings } from '@/lib/db/bookings'
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue
-} from '@/components/ui/select'
-import { utcToZonedTime } from 'date-fns-tz'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { toZonedTime } from 'date-fns-tz'
 
 interface BookingFormProps {
 	onSuccess?: () => void // Called when booking is successfully created
@@ -61,11 +55,7 @@ interface Client {
 	email: string // Client's email address
 }
 
-export function BookingForm({
-	onSuccess,
-	onCancel,
-	clients
-}: BookingFormProps) {
+export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) {
 	// Step management state
 	const [currentStep, setCurrentStep] = useState(1) // Tracks which step user is on (1, 2, or 3)
 	const [loading, setLoading] = useState(false) // Loading state for booking creation
@@ -77,9 +67,7 @@ export function BookingForm({
 		end: string
 	} | null>(null) // Time slot selected in step 2
 	const [selectedClient, setSelectedClient] = useState<string>('') // Client ID selected in step 3
-	const [clientOptions, setClientOptions] = useState<DbClient[]>(
-		clients as any
-	)
+	const [clientOptions, setClientOptions] = useState<DbClient[]>(clients as any)
 	const [clientMode, setClientMode] = useState<'select' | 'create'>('select')
 	const [notes, setNotes] = useState('') // Optional notes for the booking
 	const [customPrice, setCustomPrice] = useState('') // Optional custom price (EUR)
@@ -95,41 +83,27 @@ export function BookingForm({
 	>([])
 	const [loadingBookings, setLoadingBookings] = useState(false) // Loading state for fetching day bookings
 	const [isPriceDirty, setIsPriceDirty] = useState(false)
-	const [priceSource, setPriceSource] = useState<
-		'default' | 'client' | 'custom' | 'first' | null
-	>(null)
-	const [resolvedClientPrice, setResolvedClientPrice] = useState<
-		number | null
-	>(null)
-	const [resolvedDefaultPrice, setResolvedDefaultPrice] = useState<
-		number | null
-	>(null)
-	const [firstConsultationAmount, setFirstConsultationAmount] =
-		useState<string>('')
-	const [consultationType, setConsultationType] = useState<
-		'first' | 'followup'
-	>('followup')
-	const [showConsultationType, setShowConsultationType] =
-		useState<boolean>(false)
+	const [priceSource, setPriceSource] = useState<'default' | 'client' | 'custom' | 'first' | null>(null)
+	const [resolvedClientPrice, setResolvedClientPrice] = useState<number | null>(null)
+	const [resolvedDefaultPrice, setResolvedDefaultPrice] = useState<number | null>(null)
+	const [firstConsultationAmount, setFirstConsultationAmount] = useState<string>('')
+	const [consultationType, setConsultationType] = useState<'first' | 'followup'>('followup')
+	const [showConsultationType, setShowConsultationType] = useState<boolean>(false)
 
 	// New: appointment mode and location fields
 	const [mode, setMode] = useState<'online' | 'in_person'>('online')
 	const [locationText, setLocationText] = useState<string>('')
 	const [savingDefault, setSavingDefault] = useState<boolean>(false)
 	const [savedDefault, setSavedDefault] = useState<boolean>(false)
-	const [resolvedLeadHours, setResolvedLeadHours] = useState<number | null>(
-		null
-	)
+	const [resolvedLeadHours, setResolvedLeadHours] = useState<number | null>(null)
 
 	// Recurrence (V1 minimal): checkbox + interval weeks (1 or 2)
 	const [isRecurring, setIsRecurring] = useState<boolean>(false)
 	const [intervalWeeks, setIntervalWeeks] = useState<1 | 2>(1)
 
 	// Billing timing selection (per-booking lead hours or monthly)
-	const [billingTimingSelection, setBillingTimingSelection] =
-		useState<string>('0') // '0' | '24' | '72' | '168' | '-1' | 'monthly'
-	const [isBillingTimingDirty, setIsBillingTimingDirty] =
-		useState<boolean>(false)
+	const [billingTimingSelection, setBillingTimingSelection] = useState<string>('0') // '0' | '24' | '72' | '168' | '-1' | 'monthly'
+	const [isBillingTimingDirty, setIsBillingTimingDirty] = useState<boolean>(false)
 
 	// When recurrence is ON, restrict billing options to monthly, 24h before, after.
 	useEffect(() => {
@@ -159,11 +133,7 @@ export function BookingForm({
 
 	// Re-fetch existing bookings when returning to step 2 if date is already selected
 	useEffect(() => {
-		if (
-			currentStep === 2 &&
-			selectedDate &&
-			existingBookings.length === 0
-		) {
+		if (currentStep === 2 && selectedDate && existingBookings.length === 0) {
 			fetchExistingBookings(selectedDate)
 		}
 	}, [currentStep, selectedDate])
@@ -215,21 +185,16 @@ export function BookingForm({
 
 			if (selectedClient) {
 				// Full resolution when a client is selected
-				const [clientSettings, userDefault, prefs, hasPrev] =
-					await Promise.all([
-						getClientBillingSettings(user.id, selectedClient),
-						getUserDefaultBillingSettings(user.id),
-						getBillingPreferences(user.id),
-						hasAnyNonCanceledBookings(user.id, selectedClient)
-					])
+				const [clientSettings, userDefault, prefs, hasPrev] = await Promise.all([
+					getClientBillingSettings(user.id, selectedClient),
+					getUserDefaultBillingSettings(user.id),
+					getBillingPreferences(user.id),
+					hasAnyNonCanceledBookings(user.id, selectedClient)
+				])
 
-				const firstAmount = prefs?.firstConsultationAmount
-					? Number(prefs.firstConsultationAmount)
-					: null
+				const firstAmount = prefs?.firstConsultationAmount ? Number(prefs.firstConsultationAmount) : null
 				const clientAmount =
-					clientSettings?.billing_amount != null
-						? Number(clientSettings.billing_amount)
-						: null
+					clientSettings?.billing_amount != null ? Number(clientSettings.billing_amount) : null
 				const defaultAmount = Number(userDefault?.billing_amount || 0)
 
 				// Persist resolved amounts for later interactions (e.g., switching to follow-up)
@@ -238,13 +203,9 @@ export function BookingForm({
 
 				// Resolve email lead hours preference (client overrides user default)
 				const leadRaw =
-					clientSettings?.payment_email_lead_hours ??
-					userDefault?.payment_email_lead_hours ??
-					null
+					clientSettings?.payment_email_lead_hours ?? userDefault?.payment_email_lead_hours ?? null
 				const normalizedLead =
-					leadRaw == null || Number.isNaN(Number(leadRaw))
-						? null
-						: Math.trunc(Number(leadRaw))
+					leadRaw == null || Number.isNaN(Number(leadRaw)) ? null : Math.trunc(Number(leadRaw))
 				setResolvedLeadHours(normalizedLead)
 
 				// Resolve default billing timing selection (monthly vs per booking lead hours)
@@ -256,8 +217,7 @@ export function BookingForm({
 						setBillingTimingSelection('monthly')
 					} else {
 						const sel =
-							normalizedLead == null ||
-							Number.isNaN(Number(normalizedLead))
+							normalizedLead == null || Number.isNaN(Number(normalizedLead))
 								? '0'
 								: String(normalizedLead)
 						setBillingTimingSelection(sel)
@@ -280,9 +240,7 @@ export function BookingForm({
 				setConsultationType(type as 'first' | 'followup')
 				if (!isPriceDirty) {
 					setCustomPrice(String(price))
-					setPriceSource(
-						source as 'default' | 'first' | 'client' | 'custom'
-					)
+					setPriceSource(source as 'default' | 'first' | 'client' | 'custom')
 				}
 			} else {
 				// No client selected: show user's default price
@@ -292,17 +250,14 @@ export function BookingForm({
 				setResolvedDefaultPrice(defaultAmount)
 				const leadRaw = userDefault?.payment_email_lead_hours ?? null
 				const normalizedLead =
-					leadRaw == null || Number.isNaN(Number(leadRaw))
-						? null
-						: Math.trunc(Number(leadRaw))
+					leadRaw == null || Number.isNaN(Number(leadRaw)) ? null : Math.trunc(Number(leadRaw))
 				setResolvedLeadHours(normalizedLead)
 				if (!isBillingTimingDirty) {
 					if ((userDefault?.billing_type as any) === 'monthly') {
 						setBillingTimingSelection('monthly')
 					} else {
 						const sel =
-							normalizedLead == null ||
-							Number.isNaN(Number(normalizedLead))
+							normalizedLead == null || Number.isNaN(Number(normalizedLead))
 								? '0'
 								: String(normalizedLead)
 						setBillingTimingSelection(sel)
@@ -322,12 +277,7 @@ export function BookingForm({
 
 	// When first price arrives while 'first' is selected, apply it once (if user hasn't edited)
 	useEffect(() => {
-		if (
-			currentStep === 3 &&
-			consultationType === 'first' &&
-			firstConsultationAmount &&
-			!isPriceDirty
-		) {
+		if (currentStep === 3 && consultationType === 'first' && firstConsultationAmount && !isPriceDirty) {
 			setCustomPrice(String(Number(firstConsultationAmount)))
 			setIsPriceDirty(false)
 			setPriceSource('first')
@@ -345,24 +295,13 @@ export function BookingForm({
 	}, [mode, profile?.default_in_person_location_text])
 
 	// ===== Helpers for default in-person address =====
-	const isAddressEqualToDefault = useCallback(
-		(address: string, defaultAddress?: string | null) => {
-			return address.trim() === (defaultAddress || '').trim()
-		},
-		[]
-	)
+	const isAddressEqualToDefault = useCallback((address: string, defaultAddress?: string | null) => {
+		return address.trim() === (defaultAddress || '').trim()
+	}, [])
 
 	const isDefaultAddress = useMemo(
-		() =>
-			isAddressEqualToDefault(
-				locationText,
-				profile?.default_in_person_location_text
-			),
-		[
-			isAddressEqualToDefault,
-			locationText,
-			profile?.default_in_person_location_text
-		]
+		() => isAddressEqualToDefault(locationText, profile?.default_in_person_location_text),
+		[isAddressEqualToDefault, locationText, profile?.default_in_person_location_text]
 	)
 
 	const handleSaveAddressAsDefault = useCallback(async () => {
@@ -400,28 +339,8 @@ export function BookingForm({
 		try {
 			// Get start and end of the selected day in UTC
 			// The date parameter is already a Date object representing the selected day
-			const startOfDay = new Date(
-				Date.UTC(
-					date.getFullYear(),
-					date.getMonth(),
-					date.getDate(),
-					0,
-					0,
-					0,
-					0
-				)
-			)
-			const endOfDay = new Date(
-				Date.UTC(
-					date.getFullYear(),
-					date.getMonth(),
-					date.getDate(),
-					23,
-					59,
-					59,
-					999
-				)
-			)
+			const startOfDay = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0))
+			const endOfDay = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999))
 
 			// Call our API endpoint to get combined events
 			const response = await fetch(
@@ -544,7 +463,7 @@ export function BookingForm({
 				const tz = 'Europe/Madrid'
 				const startUtc = new Date(selectedSlot.start)
 				const endUtc = new Date(selectedSlot.end)
-				const localStart = utcToZonedTime(startUtc, tz)
+				const localStart = toZonedTime(startUtc, tz)
 				const durationMin = Math.max(1, Math.round((endUtc.getTime() - startUtc.getTime()) / 60000))
 				const byWeekday = localStart.getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6
 				const dtstartLocal = format(localStart, "yyyy-MM-dd'T'HH:mm:ss")
@@ -566,7 +485,7 @@ export function BookingForm({
 					rule: { interval_weeks: intervalWeeks, by_weekday: byWeekday },
 					billing_policy: billingPolicy,
 					mode,
-					location_text: mode === 'in_person' ? (locationText || null) : null,
+					location_text: mode === 'in_person' ? locationText || null : null,
 					consultation_type: consultationType
 				}
 
@@ -600,8 +519,7 @@ export function BookingForm({
 					setLoading(false)
 					return toast({
 						title: 'Precio inválido',
-						description:
-							'El precio debe ser un número mayor o igual a 0.',
+						description: 'El precio debe ser un número mayor o igual a 0.',
 						variant: 'destructive',
 						color: 'error'
 					})
@@ -614,8 +532,7 @@ export function BookingForm({
 					setLoading(false)
 					return toast({
 						title: 'Precio inválido',
-						description:
-							'El precio debe ser un número mayor o igual a 0.',
+						description: 'El precio debe ser un número mayor o igual a 0.',
 						variant: 'destructive',
 						color: 'error'
 					})
@@ -632,14 +549,10 @@ export function BookingForm({
 					notes,
 					consultationType,
 					mode,
-					locationText:
-						mode === 'in_person' ? locationText || null : null
+					locationText: mode === 'in_person' ? locationText || null : null
 				},
 				billing: {
-					type:
-						billingTimingSelection === 'monthly'
-							? 'monthly'
-							: 'per_booking',
+					type: billingTimingSelection === 'monthly' ? 'monthly' : 'per_booking',
 					amount: finalAmount,
 					currency: 'EUR',
 					paymentEmailLeadHours:
@@ -660,11 +573,7 @@ export function BookingForm({
 
 			if (!response.ok) {
 				const errorData = await response.json()
-				throw new Error(
-					errorData.details ||
-						errorData.error ||
-						'Failed to create booking'
-				)
+				throw new Error(errorData.details || errorData.error || 'Failed to create booking')
 			}
 
 			const result = await response.json()
@@ -692,8 +601,7 @@ export function BookingForm({
 
 			if (isEmailError) {
 				title = 'Error al enviar email de confirmación'
-				description =
-					'Por favor revisa que la dirección de email sea correcta.'
+				description = 'Por favor revisa que la dirección de email sea correcta.'
 			}
 
 			toast({
@@ -766,11 +674,7 @@ export function BookingForm({
 									</Button>
 								)}
 
-								<Button
-									variant="ghost"
-									onClick={handleBack}
-									className="w-full"
-								>
+								<Button variant="ghost" onClick={handleBack} className="w-full">
 									Atrás
 								</Button>
 							</div>
@@ -785,9 +689,7 @@ export function BookingForm({
 					{clientMode === 'create' ? (
 						<div className="space-y-2">
 							<div className="flex items-center justify-between">
-								<Label className="text-md font-normal text-gray-700">
-									Paciente
-								</Label>
+								<Label className="text-md font-normal text-gray-700">Paciente</Label>
 								<button
 									type="button"
 									onClick={() => setClientMode('select')}
@@ -802,12 +704,8 @@ export function BookingForm({
 										setClientMode('select')
 										if (created) {
 											setClientOptions((prev) => {
-												const exists = prev.some(
-													(c) => c.id === created.id
-												)
-												return exists
-													? prev
-													: [created as any, ...prev]
+												const exists = prev.some((c) => c.id === created.id)
+												return exists ? prev : [created as any, ...prev]
 											})
 											setSelectedClient(created.id)
 										}
@@ -822,9 +720,7 @@ export function BookingForm({
 							{/* Client Selection Dropdown */}
 							<div className="space-y-2">
 								<div className="flex items-center justify-between">
-									<Label className="text-md font-normal text-gray-700">
-										Paciente
-									</Label>
+									<Label className="text-md font-normal text-gray-700">Paciente</Label>
 									<button
 										type="button"
 										onClick={() => setClientMode('create')}
@@ -836,9 +732,7 @@ export function BookingForm({
 								<ClientSearchSelect
 									clients={clientOptions as any}
 									value={selectedClient}
-									onValueChange={(val) =>
-										setSelectedClient(val)
-									}
+									onValueChange={(val) => setSelectedClient(val)}
 									placeholder="Buscar paciente..."
 								/>
 							</div>
@@ -846,9 +740,7 @@ export function BookingForm({
 							{/* Consultation Type - only if first price exists */}
 							{showConsultationType && (
 								<div className="space-y-2">
-									<Label className="text-md font-normal text-gray-700">
-										Tipo de consulta
-									</Label>
+									<Label className="text-md font-normal text-gray-700">Tipo de consulta</Label>
 									<Select
 										value={consultationType}
 										onValueChange={(val) => {
@@ -856,39 +748,17 @@ export function BookingForm({
 											if (val === 'first') {
 												setPriceSource('first')
 												if (firstConsultationAmount) {
-													setCustomPrice(
-														String(
-															Number(
-																firstConsultationAmount
-															)
-														)
-													)
+													setCustomPrice(String(Number(firstConsultationAmount)))
 													setIsPriceDirty(false)
 												}
 											} else {
 												if (!isPriceDirty) {
-													if (
-														resolvedClientPrice !=
-														null
-													) {
-														setCustomPrice(
-															String(
-																resolvedClientPrice
-															)
-														)
+													if (resolvedClientPrice != null) {
+														setCustomPrice(String(resolvedClientPrice))
 														setPriceSource('client')
-													} else if (
-														resolvedDefaultPrice !=
-														null
-													) {
-														setCustomPrice(
-															String(
-																resolvedDefaultPrice
-															)
-														)
-														setPriceSource(
-															'default'
-														)
+													} else if (resolvedDefaultPrice != null) {
+														setCustomPrice(String(resolvedDefaultPrice))
+														setPriceSource('default')
 													}
 												}
 											}
@@ -898,12 +768,8 @@ export function BookingForm({
 											<SelectValue placeholder="Selecciona tipo de consulta" />
 										</SelectTrigger>
 										<SelectContent>
-											<SelectItem value="first">
-												Primera consulta
-											</SelectItem>
-											<SelectItem value="followup">
-												Consulta de seguimiento
-											</SelectItem>
+											<SelectItem value="first">Primera consulta</SelectItem>
+											<SelectItem value="followup">Consulta de seguimiento</SelectItem>
 										</SelectContent>
 									</Select>
 								</div>
@@ -911,9 +777,7 @@ export function BookingForm({
 
 							{/* Price Field (always visible) */}
 							<div className="space-y-2">
-								<Label className="text-md font-normal text-gray-700">
-									Precio
-								</Label>
+								<Label className="text-md font-normal text-gray-700">Precio</Label>
 								<div className="relative">
 									<span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
 										€
@@ -929,24 +793,14 @@ export function BookingForm({
 											setCustomPrice(val)
 
 											// Compare against known client/default amounts to decide source dynamically
-											const normalized = val.replace(
-												',',
-												'.'
-											)
-											const parsed =
-												parseFloat(normalized)
-											const approxEq = (
-												a: number,
-												b: number
-											) => Math.abs(a - b) < 0.005
+											const normalized = val.replace(',', '.')
+											const parsed = parseFloat(normalized)
+											const approxEq = (a: number, b: number) => Math.abs(a - b) < 0.005
 
 											if (
 												!Number.isNaN(parsed) &&
 												resolvedClientPrice != null &&
-												approxEq(
-													parsed,
-													resolvedClientPrice
-												)
+												approxEq(parsed, resolvedClientPrice)
 											) {
 												setIsPriceDirty(false)
 												setPriceSource('client')
@@ -956,10 +810,7 @@ export function BookingForm({
 											if (
 												!Number.isNaN(parsed) &&
 												resolvedDefaultPrice != null &&
-												approxEq(
-													parsed,
-													resolvedDefaultPrice
-												)
+												approxEq(parsed, resolvedDefaultPrice)
 											) {
 												setIsPriceDirty(false)
 												setPriceSource('default')
@@ -987,23 +838,14 @@ export function BookingForm({
 
 							{/* Mode select: Online or Presencial - Step 3 */}
 							<div className="space-y-2">
-								<Label className="text-md font-normal text-gray-700">
-									Formato de cita
-								</Label>
-								<Select
-									value={mode}
-									onValueChange={(val) => setMode(val as any)}
-								>
+								<Label className="text-md font-normal text-gray-700">Formato de cita</Label>
+								<Select value={mode} onValueChange={(val) => setMode(val as any)}>
 									<SelectTrigger className="h-12">
 										<SelectValue placeholder="Selecciona modalidad" />
 									</SelectTrigger>
 									<SelectContent>
-										<SelectItem value="online">
-											Online
-										</SelectItem>
-										<SelectItem value="in_person">
-											Presencial
-										</SelectItem>
+										<SelectItem value="online">Online</SelectItem>
+										<SelectItem value="in_person">Presencial</SelectItem>
 									</SelectContent>
 								</Select>
 							</div>
@@ -1012,10 +854,7 @@ export function BookingForm({
 							{mode === 'in_person' && (
 								<div className="space-y-2">
 									<Label className="text-md font-normal text-gray-700">
-										Dirección{' '}
-										<span className="text-xs text-gray-500 font-normal">
-											(opcional)
-										</span>
+										Dirección <span className="text-xs text-gray-500 font-normal">(opcional)</span>
 									</Label>
 									<div className="relative flex flex-row">
 										<Input
@@ -1041,15 +880,11 @@ export function BookingForm({
 											) : (
 												<button
 													type="button"
-													onClick={
-														handleSaveAddressAsDefault
-													}
+													onClick={handleSaveAddressAsDefault}
 													className="text-teal-600 hover:text-teal-700 text-sm font-medium"
 													disabled={savingDefault}
 												>
-													{savingDefault
-														? 'Guardando...'
-														: 'Guardar'}
+													{savingDefault ? 'Guardando...' : 'Guardar'}
 												</button>
 											)}
 										</div>
@@ -1059,88 +894,80 @@ export function BookingForm({
 
 							{/* Billing type/timing selector */}
 							<div className="space-y-2">
-								<Label className="text-md font-normal text-gray-700">
-									Tipo de facturación
-								</Label>
-				{(() => {
-					const timingValue = billingTimingSelection
-					return (
-						<Select
-							value={timingValue}
-							onValueChange={(value) => {
-								setIsBillingTimingDirty(true)
-								setBillingTimingSelection(value)
-							}}
-						>
-							<SelectTrigger className="h-12">
-								<SelectValue placeholder="Selecciona el tipo de facturación" />
-							</SelectTrigger>
-							<SelectContent>
-								{!isRecurring && (
-									<>
-										<SelectItem value="0">Inmediata</SelectItem>
-										<SelectItem value="168">1 semana antes</SelectItem>
-									</>
-								)}
-								<SelectItem value="24">24 horas antes</SelectItem>
-								<SelectItem value="-1">Después de la consulta</SelectItem>
-								<SelectItem value="monthly">Mensual</SelectItem>
-							</SelectContent>
-						</Select>
-					)
-				})()}
+								<Label className="text-md font-normal text-gray-700">Tipo de facturación</Label>
+								{(() => {
+									const timingValue = billingTimingSelection
+									return (
+										<Select
+											value={timingValue}
+											onValueChange={(value) => {
+												setIsBillingTimingDirty(true)
+												setBillingTimingSelection(value)
+											}}
+										>
+											<SelectTrigger className="h-12">
+												<SelectValue placeholder="Selecciona el tipo de facturación" />
+											</SelectTrigger>
+											<SelectContent>
+												{!isRecurring && (
+													<>
+														<SelectItem value="0">Inmediata</SelectItem>
+														<SelectItem value="168">1 semana antes</SelectItem>
+													</>
+												)}
+												<SelectItem value="24">24 horas antes</SelectItem>
+												<SelectItem value="-1">Después de la consulta</SelectItem>
+												<SelectItem value="monthly">Mensual</SelectItem>
+											</SelectContent>
+										</Select>
+									)
+								})()}
 							</div>
 
-			{/* ===== Recurrence (V1 minimal) ===== */}
-			<div className="space-y-3 pt-2">
-				<div className="flex items-center justify-between">
-					<Label className="text-md font-normal text-gray-700">Programar recurrencia</Label>
-					<input
-						type="checkbox"
-						checked={isRecurring}
-						onChange={(e) => setIsRecurring(e.target.checked)}
-						className="h-4 w-4"
-					/>
-				</div>
+							{/* ===== Recurrence (V1 minimal) ===== */}
+							<div className="space-y-3 pt-2">
+								<button
+									type="button"
+									onClick={() => setIsRecurring((prev) => !prev)}
+									className="flex items-center justify-between w-full"
+								>
+									<Label className="text-md font-normal text-gray-700">Programar recurrencia</Label>
+									<ChevronRight
+										className={`h-5 w-5 text-gray-600 transition-transform duration-200 ${
+											isRecurring ? 'rotate-90' : ''
+										}`}
+									/>
+								</button>
 
-				{isRecurring && (
-					<div className="space-y-2">
-						<Label className="text-md font-normal text-gray-700">Repetir</Label>
-						<Select
-							value={String(intervalWeeks)}
-							onValueChange={(v) => setIntervalWeeks((Number(v) as 1 | 2) || 1)}
-						>
-							<SelectTrigger className="h-12">
-								<SelectValue placeholder="Frecuencia" />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="1">Cada semana</SelectItem>
-								<SelectItem value="2">Cada 2 semanas</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
-				)}
-			</div>
+								<div
+									className={`overflow-hidden transition-all duration-200 ${
+										isRecurring ? 'max-h-40 opacity-100 mt-2' : 'max-h-0 opacity-0'
+									}`}
+								>
+									<div className="space-y-2">
+										<Select
+											value={String(intervalWeeks)}
+											onValueChange={(v) => setIntervalWeeks((Number(v) as 1 | 2) || 1)}
+										>
+											<SelectTrigger className="h-12">
+												<SelectValue placeholder="Frecuencia" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="1">Cada semana</SelectItem>
+												<SelectItem value="2">Cada 2 semanas</SelectItem>
+											</SelectContent>
+										</Select>
+									</div>
+								</div>
+							</div>
 
 							{/* Booking Summary */}
 							<div>
 								<h3 className="text-sm mt-10">
-									{format(
-										selectedDate!,
-										"EEEE, d 'de' MMMM 'de' yyyy",
-										{ locale: es }
-									)
+									{format(selectedDate!, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })
 										.replace(/^./, (c) => c.toUpperCase())
-										.replace(
-											/ de ([a-z])/,
-											(match, p1) =>
-												` de ${p1.toUpperCase()}`
-										)}{' '}
-									a las{' '}
-									{format(
-										new Date(selectedSlot.start),
-										'HH:mm'
-									)}
+										.replace(/ de ([a-z])/, (match, p1) => ` de ${p1.toUpperCase()}`)}{' '}
+									a las {format(new Date(selectedSlot.start), 'HH:mm')}
 									{'h'}
 								</h3>
 							</div>

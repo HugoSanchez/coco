@@ -170,6 +170,10 @@ export async function orchestrateBookingCreation(
 	////// Step 6: Calendar events (single helper, preserves earlier behavior by variant)
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	if (normalizedType === 'per_booking') {
+		// New behavior: right-after bookings should behave like monthly for invites.
+		// If paymentEmailLeadHours === -1 (after session), create CONFIRMED event now (when future),
+		// so the client receives an invite immediately.
+		const rightAfter = billing && typeof billing === 'object' && (billing as any).paymentEmailLeadHours === -1
 		// If patient-created, append manage links using the REAL bookingId now
 		const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 		const suffix =
@@ -196,6 +200,16 @@ export async function orchestrateBookingCreation(
 		} else if (isPast) {
 			await createCalendarEventForBooking({
 				variant: 'internal_confirmed',
+				request: requestWithSuffix,
+				bookingId: booking.id,
+				client,
+				practitioner,
+				supabaseClient
+			})
+		} else if (rightAfter) {
+			// Right-after: confirm now so invite is sent immediately
+			await createCalendarEventForBooking({
+				variant: 'confirmed',
 				request: requestWithSuffix,
 				bookingId: booking.id,
 				client,
