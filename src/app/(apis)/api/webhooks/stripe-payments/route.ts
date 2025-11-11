@@ -240,12 +240,12 @@ export async function POST(request: NextRequest) {
 				// Skip calendar promotion for recurring bookings - they use master recurring events
 				// that send invites immediately, not individual pending events
 				const booking = await getBookingById(bookingId as string, supabase)
-				// Check if booking is part of a recurring series (series_id field exists in DB but may not be in type)
-				const isRecurringBooking = booking && 'series_id' in booking && (booking as any).series_id != null
+				// Check if booking is part of a recurring series
+				const isRecurringBooking = booking && booking.series_id != null
 				if (isRecurringBooking) {
 					logger.logInfo('skip_recurring_calendar', 'Skipping calendar promotion for recurring booking', {
 						bookingId,
-						seriesId: (booking as any).series_id
+						seriesId: booking.series_id
 					})
 					// Recurring bookings already have invites sent via master recurring event
 					// No need to promote pending events that don't exist
