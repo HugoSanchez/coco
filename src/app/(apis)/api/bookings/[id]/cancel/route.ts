@@ -99,7 +99,7 @@ export async function POST(
 		try {
 			if (isSeriesBooking) {
 				// V2: SERIES BOOKING - Handle via EXDATE
-				const series = await getBookingSeriesById(supabase, booking.series_id)
+				const series = await getBookingSeriesById(supabase, booking.series_id!)
 				if (!series) {
 					console.warn(`Series ${booking.series_id} not found for booking ${bookingId}`)
 				} else {
@@ -107,10 +107,10 @@ export async function POST(
 					const localDate = toLocalDateString(booking.start_time, series.timezone)
 
 					// Add to excluded dates
-					await addExcludedDateToSeries(supabase, booking.series_id, localDate)
+					await addExcludedDateToSeries(supabase, booking.series_id!, localDate)
 
 					// Get all excluded dates and update master event
-					const allExcluded = await getExcludedDatesForSeries(supabase, booking.series_id)
+					const allExcluded = await getExcludedDatesForSeries(supabase, booking.series_id!)
 					if (series.google_master_event_id) {
 						const updateResult = await updateMasterRecurringEventWithExdates({
 							userId: user.id,
