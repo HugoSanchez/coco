@@ -530,6 +530,63 @@ export async function cancelBill(billId: string, notes?: string): Promise<Bill> 
 }
 
 /**
+ * Cancels all bills for one or more bookings
+ * Only cancels bills that aren't already paid or canceled (best-effort, non-throwing)
+ * Used when cancelling bookings to ensure payment status is properly updated
+ *
+ * @param bookingIds - Single booking ID or array of booking IDs
+ * @param supabaseClient - Optional Supabase client for database operations
+ * @returns Promise<{ cancelled: number; skipped: number }> - Count of cancelled and skipped bills
+ */
+export async function cancelBillsForBookings(
+	bookingIds: string | string[],
+	supabaseClient?: SupabaseClient
+): Promise<{ cancelled: number; skipped: number }> {
+	const client = supabaseClient || supabase
+	const ids = Array.isArray(bookingIds) ? bookingIds : [bookingIds]
+
+	let cancelled = 0
+	let skipped = 0
+
+	try {
+		// Get all bills for the given booking IDs
+		const { data: bills, error } = await client
+			.from('bills')
+			.select('id, status')
+			.in('booking_id', ids)
+
+		if (error) {
+			console.error(`Failed to fetch bills for bookings:`, error)
+			return { cancelled, skipped }
+		}
+
+		if (!bills || bills.length === 0) {
+			return { cancelled, skipped }
+		}
+
+		// Cancel bills that aren't already paid or canceled
+		for (const bill of bills) {
+			if (bill.status !== 'paid' && bill.status !== 'canceled') {
+				try {
+					await updateBillStatus(bill.id, 'canceled', supabaseClient)
+					cancelled++
+				} catch (updateError) {
+					console.error(`Failed to cancel bill ${bill.id}:`, updateError)
+					// Continue with other bills even if one fails
+				}
+			} else {
+				skipped++
+			}
+		}
+	} catch (error) {
+		console.error(`Failed to cancel bills for bookings:`, error)
+		// Return partial results even if there was an error
+	}
+
+	return { cancelled, skipped }
+}
+
+/**
  * Updates bill notes
  *
  * @param billId - The UUID of the bill to update

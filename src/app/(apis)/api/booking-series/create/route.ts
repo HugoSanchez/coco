@@ -161,7 +161,7 @@ export async function POST(req: Request) {
         },
         billing as any,
         client,
-        { suppressCalendar: true }
+        { suppressCalendar: true, suppressEmail: true }
       )
 
       bookingIds.push(result.booking.id)

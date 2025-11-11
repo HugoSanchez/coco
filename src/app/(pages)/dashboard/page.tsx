@@ -546,6 +546,10 @@ export default function Dashboard() {
 	const handleConfirmCancelSeries = async () => {
 		if (!cancelingSeriesId) return
 
+		// Close dialog immediately since we show loading toast
+		const seriesIdToCancel = cancelingSeriesId
+		setCancelingSeriesId(null)
+
 		try {
 			// Show immediate feedback
 			toast({
@@ -562,7 +566,7 @@ export default function Dashboard() {
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
-					series_id: cancelingSeriesId,
+					series_id: seriesIdToCancel,
 					cancel_future: true, // Cancel all future bookings
 					delete_future: true // Delete eligible future bookings (no financial artifacts)
 				})
@@ -576,7 +580,7 @@ export default function Dashboard() {
 			const cancelResult = await response.json()
 
 			// Remove all bookings from this series from local state
-			setBookings((prev) => prev.filter((booking) => booking.series_id !== cancelingSeriesId))
+			setBookings((prev) => prev.filter((booking) => booking.series_id !== seriesIdToCancel))
 
 			toast({
 				title: 'Evento recurrente cancelado',
@@ -611,8 +615,6 @@ export default function Dashboard() {
 				description: error instanceof Error ? error.message : 'Failed to cancel series. Please try again.',
 				variant: 'destructive'
 			})
-		} finally {
-			setCancelingSeriesId(null)
 		}
 	}
 

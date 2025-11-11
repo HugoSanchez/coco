@@ -135,7 +135,7 @@ export async function GET(request: Request) {
 					},
 					billing as any,
 					client,
-					{ suppressCalendar: hasMasterEvent }
+					{ suppressCalendar: hasMasterEvent, suppressEmail: true }
 				)
 
 				////////////////////////////////////////////////////////////////

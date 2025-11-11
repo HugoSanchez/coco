@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { markPaymentSessionCompleted } from '@/lib/db/payment-sessions'
-import { updateBookingStatus } from '@/lib/db/bookings'
+import { updateBookingStatus, getBookingById } from '@/lib/db/bookings'
 import { getBillForBookingAndMarkAsPaid } from '@/lib/db/bills'
 import { updatePendingCalendarEventToConfirmed } from '@/lib/calendar/calendar-orchestration'
 import { createClient } from '@supabase/supabase-js'
@@ -225,37 +225,51 @@ export async function POST(request: NextRequest) {
 			///// STEP 8: Promote pending calendar event to confirmed
 			///////////////////////////////////////////////////////////
 			try {
-				// Extract all needed data from session metadata (no database calls needed!)
-				const clientName = session.metadata?.client_name
-				const clientEmail = session.customer_email
-				const practitionerName = session.metadata?.practitioner_name
-				const practitionerEmail = session.metadata?.practitioner_email
-				const practitionerUserId = session.metadata?.practitioner_user_id
-				const startTime = session.metadata?.start_time
-				const endTime = session.metadata?.end_time
+				// Skip calendar promotion for recurring bookings - they use master recurring events
+				// that send invites immediately, not individual pending events
+				const booking = await getBookingById(bookingId as string, supabase)
+				// Check if booking is part of a recurring series (series_id field exists in DB but may not be in type)
+				const isRecurringBooking = booking && 'series_id' in booking && (booking as any).series_id != null
+				if (isRecurringBooking) {
+					logger.logInfo('skip_recurring_calendar', 'Skipping calendar promotion for recurring booking', {
+						bookingId,
+						seriesId: (booking as any).series_id
+					})
+					// Recurring bookings already have invites sent via master recurring event
+					// No need to promote pending events that don't exist
+				} else {
+					// Extract all needed data from session metadata (no database calls needed!)
+					const clientName = session.metadata?.client_name
+					const clientEmail = session.customer_email
+					const practitionerName = session.metadata?.practitioner_name
+					const practitionerEmail = session.metadata?.practitioner_email
+					const practitionerUserId = session.metadata?.practitioner_user_id
+					const startTime = session.metadata?.start_time
+					const endTime = session.metadata?.end_time
 
-				// Validate we have all required data
-				if (
-					!clientName ||
-					!clientEmail ||
-					!practitionerName ||
-					!practitionerEmail ||
-					!practitionerUserId ||
-					!startTime ||
-					!endTime
-				) {
-					logger.logWarn('missing_metadata', 'webhooks:stripe-payments missing metadata', { bookingId })
-					return NextResponse.json({ received: true })
+					// Validate we have all required data
+					if (
+						!clientName ||
+						!clientEmail ||
+						!practitionerName ||
+						!practitionerEmail ||
+						!practitionerUserId ||
+						!startTime ||
+						!endTime
+					) {
+						logger.logWarn('missing_metadata', 'webhooks:stripe-payments missing metadata', { bookingId })
+						return NextResponse.json({ received: true })
+					}
+
+					await updatePendingCalendarEventToConfirmed({
+						bookingId: bookingId as string,
+						practitionerUserId,
+						clientEmail,
+						practitionerName,
+						practitionerEmail,
+						supabaseClient: supabase
+					})
 				}
-
-				await updatePendingCalendarEventToConfirmed({
-					bookingId: bookingId as string,
-					practitionerUserId,
-					clientEmail,
-					practitionerName,
-					practitionerEmail,
-					supabaseClient: supabase
-				})
 			} catch (calendarError) {
 				// Don't fail the webhook if calendar update fails
 				logger.logError('calendar', calendarError, { bookingId })

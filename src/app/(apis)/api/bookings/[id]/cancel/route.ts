@@ -219,30 +219,65 @@ export async function POST(
 			// Don't fail the booking cancellation if calendar update fails
 		}
 
-		// 3. Cancel payments if booking is pending
-		if (booking.status === 'pending') {
-			try {
-				const paymentResult =
-					await paymentOrchestrationService.cancelPaymentForBooking(
-						bookingId,
-						supabase
-					)
+		// 3. Cancel payments and bills for non-recurring bookings
+		// Cancel payment sessions (Stripe) and bills for bookings with pending/scheduled bills
+		if (!isSeriesBooking) {
+			// Check if booking has bills that need cancellation (scheduled or pending)
+			const bookingBills = await getBillsForBooking(bookingId, supabase)
+			const hasUnpaidBills = bookingBills.some(
+				(b) => b.status === 'pending' || b.status === 'scheduled'
+			)
 
-				if (paymentResult.success) {
-					console.log(`Payment cancelled for booking ${bookingId}`)
-				} else {
+			if (hasUnpaidBills) {
+				try {
+					// Cancel payment sessions (only if booking status is pending - has active sessions)
+					if (booking.status === 'pending') {
+						const paymentResult =
+							await paymentOrchestrationService.cancelPaymentForBooking(
+								bookingId,
+								supabase
+							)
+
+						if (paymentResult.success) {
+							console.log(`Payment cancelled for booking ${bookingId}`)
+						} else {
+							console.error(
+								`Failed to cancel payment for booking ${bookingId}:`,
+								paymentResult.error
+							)
+							// Don't fail the booking cancellation if payment cancellation fails
+						}
+					} else {
+						// Booking status is 'scheduled' but bills are 'scheduled' or 'pending'
+						// Cancel bills directly without payment session cancellation
+						const { cancelBillsForBookings } = await import('@/lib/db/bills')
+						const result = await cancelBillsForBookings(bookingId, supabase)
+						console.log(`Cancelled ${result.cancelled} bills for scheduled booking ${bookingId} (skipped ${result.skipped})`)
+					}
+				} catch (paymentError) {
 					console.error(
-						`Failed to cancel payment for booking ${bookingId}:`,
-						paymentResult.error
+						`Payment cancellation error for booking ${bookingId}:`,
+						paymentError
 					)
-					// Don't fail the booking cancellation if payment cancellation fails
+					// Continue with booking cancellation even if payment cancellation fails
 				}
-			} catch (paymentError) {
+			}
+		}
+
+		// 3B. Cancel bills for recurring bookings (regardless of booking status)
+		// For recurring bookings, we need to cancel bills even if booking status is 'scheduled'
+		// since they don't go through the pending -> confirmed flow
+		if (isSeriesBooking) {
+			try {
+				const { cancelBillsForBookings } = await import('@/lib/db/bills')
+				const result = await cancelBillsForBookings(bookingId, supabase)
+				console.log(`Cancelled ${result.cancelled} bills for recurring booking ${bookingId} (skipped ${result.skipped})`)
+			} catch (billError) {
 				console.error(
-					`Payment cancellation error for booking ${bookingId}:`,
-					paymentError
+					`Failed to cancel bills for recurring booking ${bookingId}:`,
+					billError
 				)
-				// Continue with booking cancellation even if payment cancellation fails
+				// Don't fail the booking cancellation if bill cancellation fails
 			}
 		}
 

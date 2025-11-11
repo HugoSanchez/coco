@@ -402,14 +402,8 @@ export class PaymentOrchestrationService {
 			// ===============================
 			// Find and cancel all bills associated with this booking
 			try {
-				const bills = await getBillsForBooking(bookingId, supabaseClient)
-
-				for (const bill of bills) {
-					// Only cancel bills that aren't already paid or canceled
-					if (bill.status !== 'paid' && bill.status !== 'canceled') {
-						await updateBillStatus(bill.id, 'canceled', supabaseClient)
-					}
-				}
+				const { cancelBillsForBookings } = await import('@/lib/db/bills')
+				await cancelBillsForBookings(bookingId, supabaseClient)
 			} catch (billError) {
 				console.error(`Failed to cancel bills for booking ${bookingId}:`, billError)
 				// Don't fail the entire operation if bill cancellation fails

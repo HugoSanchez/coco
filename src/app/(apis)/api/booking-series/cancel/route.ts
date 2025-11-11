@@ -91,6 +91,31 @@ export async function POST(req: Request) {
 		let cancelled = 0
 		if (body.cancel_future) {
 			cancelled = await cancelFutureBookingsForSeries(body.series_id, nowIso, client)
+
+			// Cancel bills for all cancelled bookings
+			// Query for the bookings that were just cancelled (status = 'canceled' and future dates)
+			if (cancelled > 0) {
+				try {
+					const { data: cancelledBookings } = await client
+						.from('bookings')
+						.select('id')
+						.eq('series_id', body.series_id)
+						.eq('status', 'canceled')
+						.gte('start_time', nowIso)
+
+					if (cancelledBookings && cancelledBookings.length > 0) {
+						const cancelledBookingIds = cancelledBookings.map((b: any) => b.id)
+						const { cancelBillsForBookings } = await import('@/lib/db/bills')
+						const billResult = await cancelBillsForBookings(cancelledBookingIds, client)
+						console.log(
+							`[cancel series] Cancelled ${billResult.cancelled} bills for ${cancelledBookingIds.length} bookings (skipped ${billResult.skipped})`
+						)
+					}
+				} catch (billError) {
+					console.error('[cancel series] Failed to cancel bills for cancelled bookings:', billError)
+					// Non-fatal; continue
+				}
+			}
 		}
 
 		return NextResponse.json({ series_id: body.series_id, future_deleted: deleted, future_cancelled: cancelled })

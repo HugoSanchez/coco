@@ -99,7 +99,7 @@ export async function orchestrateBookingCreation(
 	request: CreateBookingRequest,
 	billing: any,
 	supabaseClient?: SupabaseClient,
-	options?: { suppressCalendar?: boolean }
+	options?: { suppressCalendar?: boolean; suppressEmail?: boolean }
 ): Promise<CreateBookingResult> {
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////// Pre-validate inputs (time window + billing payload)
@@ -259,6 +259,12 @@ export async function orchestrateBookingCreation(
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	const requiresPayment = true
 	const dueNow = !emailScheduledAt || new Date(emailScheduledAt) <= new Date()
+
+	// Skip email sending if suppressed (e.g., for recurring bookings during series creation)
+	if (options?.suppressEmail) {
+		return { booking, bill, requiresPayment, paymentUrl: undefined }
+	}
+
 	if (!dueNow) {
 		// Email is scheduled for the future; UI can show "Programada..."
 		return { booking, bill, requiresPayment, paymentUrl: undefined }
