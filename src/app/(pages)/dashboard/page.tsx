@@ -86,7 +86,8 @@ const transformBooking = (dbBooking: BookingWithBills): Booking => {
 		billing_status: dbBooking.billing_status,
 		payment_status: dbBooking.payment_status,
 		amount: dbBooking.bill?.amount || 0,
-		currency: dbBooking.bill?.currency || 'EUR'
+		currency: dbBooking.bill?.currency || 'EUR',
+		series_id: (dbBooking as any).series_id || undefined // V2: Include series_id for recurring bookings
 	}
 }
 
@@ -105,6 +106,7 @@ export default function Dashboard() {
 	const [refundingBookingId, setRefundingBookingId] = useState<string | null>(null)
 	const [markingAsPaidBookingId, setMarkingAsPaidBookingId] = useState<string | null>(null)
 	const [cancelingBookingId, setCancelingBookingId] = useState<string | null>(null)
+	const [cancelingSeriesId, setCancelingSeriesId] = useState<string | null>(null) // V2: Track series cancellation
 	const [isRescheduleOpen, setIsRescheduleOpen] = useState(false)
 	const [reschedulingBookingId, setReschedulingBookingId] = useState<string | null>(null)
 	const [filters, setFilters] = useState<BookingFiltersState>({
@@ -521,6 +523,85 @@ export default function Dashboard() {
 		setCancelingBookingId(bookingId)
 	}
 
+	const handleCancelSeries = (seriesId: string) => {
+		setCancelingSeriesId(seriesId)
+	}
+
+	const handleConfirmCancelSeries = async () => {
+		if (!cancelingSeriesId) return
+
+		// Close dialog immediately since we show loading toast
+		const seriesIdToCancel = cancelingSeriesId
+		setCancelingSeriesId(null)
+
+		try {
+			// Show immediate feedback
+			toast({
+				title: 'Cancelando serie...',
+				description: 'Procesando la cancelación de la serie recurrente.',
+				variant: 'default',
+				color: 'loading'
+			})
+
+			// Call series cancellation endpoint
+			const response = await fetch('/api/booking-series/cancel', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					series_id: seriesIdToCancel,
+					cancel_future: true, // Cancel all future bookings
+					delete_future: true // Delete eligible future bookings (no financial artifacts)
+				})
+			})
+
+			if (!response.ok) {
+				const errorData = await response.json()
+				throw new Error(errorData.error || 'Failed to cancel series')
+			}
+
+			const cancelResult = await response.json()
+
+			// Remove all bookings from this series from local state
+			setBookings((prev) => prev.filter((booking) => booking.series_id !== seriesIdToCancel))
+
+			toast({
+				title: 'Evento recurrente cancelado',
+				description: `Se han cancelado todas las citas futuras de este evento.`,
+				variant: 'default',
+				color: 'success'
+			})
+
+			// Refresh stats and bookings
+			fetchDashboardStats()
+			// Refresh bookings list
+			if (user) {
+				const bookingsResult = await getBookingsWithBills(
+					user.id,
+					{ limit: 10, offset: 0 },
+					{
+						customerSearch: filters.customerSearch || undefined,
+						statusFilter: filters.statusFilter,
+						startDate: filters.startDate || undefined,
+						endDate: filters.endDate || undefined
+					}
+				)
+				const transformedBookings = bookingsResult.bookings.map(transformBooking)
+				setBookings(transformedBookings)
+				setHasMore(bookingsResult.hasMore)
+				setOffset(10)
+			}
+		} catch (error) {
+			console.error('Error canceling series:', error)
+			toast({
+				title: 'Error',
+				description: error instanceof Error ? error.message : 'Failed to cancel series. Please try again.',
+				variant: 'destructive'
+			})
+		}
+	}
+
 	const handleRescheduleBooking = (bookingId: string) => {
 		console.log('Opening reschedule slidesheet for booking:', bookingId)
 		setReschedulingBookingId(bookingId)
@@ -922,6 +1003,7 @@ export default function Dashboard() {
 										onRefundBooking={handleRefundBooking}
 										onRescheduleBooking={handleRescheduleBooking}
 										onResendEmail={handleResendEmail}
+										onCancelSeries={handleCancelSeries}
 									/>
 									{hasMore && !loadingBookings && (
 										<div className="flex justify-center pt-4">
@@ -1012,6 +1094,7 @@ export default function Dashboard() {
 									onRefundBooking={handleRefundBooking}
 									onRescheduleBooking={handleRescheduleBooking}
 									onResendEmail={handleResendEmail}
+									onCancelSeries={handleCancelSeries}
 								/>
 								{hasMore && !loadingBookings && (
 									<div className="flex justify-center pt-4">
@@ -1216,6 +1299,22 @@ export default function Dashboard() {
 						/>
 					)
 				})()}
+
+			{/* V2: Cancel Series Confirmation Modal */}
+			{cancelingSeriesId && (
+				<CancelConfirmationModal
+					isOpen={!!cancelingSeriesId}
+					onOpenChange={(open) => {
+						if (!open) setCancelingSeriesId(null)
+					}}
+					onConfirm={async () => {
+						await handleConfirmCancelSeries()
+					}}
+					isPaid={false}
+					title="Cancelar evento recurrente"
+					description="Se cancelarán todas las citas futuras de esta serie recurrente. Esta acción no se puede deshacer."
+				/>
+			)}
 		</div>
 	)
 }

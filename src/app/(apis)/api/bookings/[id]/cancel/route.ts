@@ -16,6 +16,10 @@ import {
 	sendCancellationRefundNotificationEmail
 } from '@/lib/emails/email-service'
 import { getProfileById } from '@/lib/db/profiles'
+// V2: Series exception handling
+import { getBookingSeriesById, addExcludedDateToSeries, getExcludedDatesForSeries } from '@/lib/db/booking-series'
+import { updateMasterRecurringEventWithExdates } from '@/lib/calendar/master-recurring'
+import { toLocalDateString } from '@/lib/dates/recurrence'
 
 /**
  * POST /api/bookings/[id]/cancel
@@ -89,60 +93,123 @@ export async function POST(
 		}
 
 		// 2. Handle calendar event cancellation based on booking status
+		// V2: Check if this is part of a recurring series
+		const isSeriesBooking = booking.series_id != null
+
 		try {
-			// Find the calendar event for this booking
-			const calendarEvents = await getCalendarEventsForBooking(
-				bookingId,
-				supabase
-			)
-
-			const activeEvent = calendarEvents.find(
-				(event) => event.event_status !== 'cancelled'
-			)
-
-			if (activeEvent) {
-				let calendarResult
-
-				if (booking.status === 'pending') {
-					// PENDING BOOKING: Delete calendar event completely
-					// This removes the placeholder event as if it never existed
-					calendarResult = await deleteCalendarEvent(
-						activeEvent.google_event_id,
-						user.id,
-						supabase
-					)
+			if (isSeriesBooking) {
+				// V2: SERIES BOOKING - Handle via EXDATE
+				const series = await getBookingSeriesById(supabase, booking.series_id)
+				if (!series) {
+					console.warn(`Series ${booking.series_id} not found for booking ${bookingId}`)
 				} else {
-					// CONFIRMED BOOKING: Cancel calendar event with notifications
-					// This marks the event as cancelled and notifies attendees
-					calendarResult = await cancelCalendarEvent(
-						activeEvent.google_event_id,
-						user.id,
-						supabase
-					)
-				}
+					// Compute local date (YYYY-MM-DD) from booking start_time
+					const localDate = toLocalDateString(booking.start_time, series.timezone)
 
-				if (calendarResult.success) {
-					// Update calendar event status in database
-					await updateCalendarEventStatus(
-						activeEvent.id,
-						'cancelled',
-						supabase
-					)
+					// Add to excluded dates
+					await addExcludedDateToSeries(supabase, booking.series_id, localDate)
 
-					console.log(
-						`Calendar event ${booking.status === 'pending' ? 'deleted' : 'cancelled'} for booking ${bookingId}: ${activeEvent.google_event_id}`
-					)
-				} else {
-					console.error(
-						`Failed to ${booking.status === 'pending' ? 'delete' : 'cancel'} calendar event for booking ${bookingId}:`,
-						calendarResult.error
-					)
-					// Don't fail the entire cancellation if calendar update fails
+					// Get all excluded dates and update master event
+					const allExcluded = await getExcludedDatesForSeries(supabase, booking.series_id)
+					if (series.google_master_event_id) {
+						const updateResult = await updateMasterRecurringEventWithExdates({
+							userId: user.id,
+							googleEventId: series.google_master_event_id,
+							excludedDates: allExcluded,
+							timezone: series.timezone,
+							supabaseClient: supabase
+						})
+
+						if (updateResult.success) {
+							console.log(
+								`Master recurring event updated with EXDATE for booking ${bookingId} (date: ${localDate})`
+							)
+						} else {
+							console.error(
+								`Failed to update master event with EXDATE for booking ${bookingId}:`,
+								updateResult.error
+							)
+						}
+					}
+
+					// Check if this occurrence has a standalone event (was rescheduled)
+					if (booking.google_standalone_event_id) {
+						// Cancel the standalone event
+						try {
+							const standaloneResult = await cancelCalendarEvent(
+								booking.google_standalone_event_id,
+								user.id,
+								supabase
+							)
+							if (standaloneResult.success) {
+								console.log(
+									`Standalone event cancelled for rescheduled occurrence ${bookingId}`
+								)
+							}
+						} catch (standaloneError) {
+							console.warn(
+								`Failed to cancel standalone event for booking ${bookingId}:`,
+								standaloneError
+							)
+						}
+					}
 				}
 			} else {
-				console.warn(
-					`No active calendar event found for booking ${bookingId}`
+				// SINGLE BOOKING - Original logic
+				// Find the calendar event for this booking
+				const calendarEvents = await getCalendarEventsForBooking(
+					bookingId,
+					supabase
 				)
+
+				const activeEvent = calendarEvents.find(
+					(event) => event.event_status !== 'cancelled'
+				)
+
+				if (activeEvent) {
+					let calendarResult
+
+					if (booking.status === 'pending') {
+						// PENDING BOOKING: Delete calendar event completely
+						// This removes the placeholder event as if it never existed
+						calendarResult = await deleteCalendarEvent(
+							activeEvent.google_event_id,
+							user.id,
+							supabase
+						)
+					} else {
+						// CONFIRMED BOOKING: Cancel calendar event with notifications
+						// This marks the event as cancelled and notifies attendees
+						calendarResult = await cancelCalendarEvent(
+							activeEvent.google_event_id,
+							user.id,
+							supabase
+						)
+					}
+
+					if (calendarResult.success) {
+						// Update calendar event status in database
+						await updateCalendarEventStatus(
+							activeEvent.id,
+							'cancelled',
+							supabase
+						)
+
+						console.log(
+							`Calendar event ${booking.status === 'pending' ? 'deleted' : 'cancelled'} for booking ${bookingId}: ${activeEvent.google_event_id}`
+						)
+					} else {
+						console.error(
+							`Failed to ${booking.status === 'pending' ? 'delete' : 'cancel'} calendar event for booking ${bookingId}:`,
+							calendarResult.error
+						)
+						// Don't fail the entire cancellation if calendar update fails
+					}
+				} else {
+					console.warn(
+						`No active calendar event found for booking ${bookingId}`
+					)
+				}
 			}
 		} catch (calendarError) {
 			console.error(
@@ -152,30 +219,65 @@ export async function POST(
 			// Don't fail the booking cancellation if calendar update fails
 		}
 
-		// 3. Cancel payments if booking is pending
-		if (booking.status === 'pending') {
-			try {
-				const paymentResult =
-					await paymentOrchestrationService.cancelPaymentForBooking(
-						bookingId,
-						supabase
-					)
+		// 3. Cancel payments and bills for non-recurring bookings
+		// Cancel payment sessions (Stripe) and bills for bookings with pending/scheduled bills
+		if (!isSeriesBooking) {
+			// Check if booking has bills that need cancellation (scheduled or pending)
+			const bookingBills = await getBillsForBooking(bookingId, supabase)
+			const hasUnpaidBills = bookingBills.some(
+				(b) => b.status === 'pending' || b.status === 'scheduled'
+			)
 
-				if (paymentResult.success) {
-					console.log(`Payment cancelled for booking ${bookingId}`)
-				} else {
+			if (hasUnpaidBills) {
+				try {
+					// Cancel payment sessions (only if booking status is pending - has active sessions)
+					if (booking.status === 'pending') {
+						const paymentResult =
+							await paymentOrchestrationService.cancelPaymentForBooking(
+								bookingId,
+								supabase
+							)
+
+						if (paymentResult.success) {
+							console.log(`Payment cancelled for booking ${bookingId}`)
+						} else {
+							console.error(
+								`Failed to cancel payment for booking ${bookingId}:`,
+								paymentResult.error
+							)
+							// Don't fail the booking cancellation if payment cancellation fails
+						}
+					} else {
+						// Booking status is 'scheduled' but bills are 'scheduled' or 'pending'
+						// Cancel bills directly without payment session cancellation
+						const { cancelBillsForBookings } = await import('@/lib/db/bills')
+						const result = await cancelBillsForBookings(bookingId, supabase)
+						console.log(`Cancelled ${result.cancelled} bills for scheduled booking ${bookingId} (skipped ${result.skipped})`)
+					}
+				} catch (paymentError) {
 					console.error(
-						`Failed to cancel payment for booking ${bookingId}:`,
-						paymentResult.error
+						`Payment cancellation error for booking ${bookingId}:`,
+						paymentError
 					)
-					// Don't fail the booking cancellation if payment cancellation fails
+					// Continue with booking cancellation even if payment cancellation fails
 				}
-			} catch (paymentError) {
+			}
+		}
+
+		// 3B. Cancel bills for recurring bookings (regardless of booking status)
+		// For recurring bookings, we need to cancel bills even if booking status is 'scheduled'
+		// since they don't go through the pending -> confirmed flow
+		if (isSeriesBooking) {
+			try {
+				const { cancelBillsForBookings } = await import('@/lib/db/bills')
+				const result = await cancelBillsForBookings(bookingId, supabase)
+				console.log(`Cancelled ${result.cancelled} bills for recurring booking ${bookingId} (skipped ${result.skipped})`)
+			} catch (billError) {
 				console.error(
-					`Payment cancellation error for booking ${bookingId}:`,
-					paymentError
+					`Failed to cancel bills for recurring booking ${bookingId}:`,
+					billError
 				)
-				// Continue with booking cancellation even if payment cancellation fails
+				// Don't fail the booking cancellation if bill cancellation fails
 			}
 		}
 

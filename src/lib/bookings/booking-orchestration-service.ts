@@ -98,7 +98,8 @@ export interface CreateBookingResult {
 export async function orchestrateBookingCreation(
 	request: CreateBookingRequest,
 	billing: any,
-	supabaseClient?: SupabaseClient
+	supabaseClient?: SupabaseClient,
+	options?: { suppressCalendar?: boolean; suppressEmail?: boolean }
 ): Promise<CreateBookingResult> {
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////// Pre-validate inputs (time window + billing payload)
@@ -169,7 +170,11 @@ export async function orchestrateBookingCreation(
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////// Step 6: Calendar events (single helper, preserves earlier behavior by variant)
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
-	if (normalizedType === 'per_booking') {
+	if (!options?.suppressCalendar && normalizedType === 'per_booking') {
+		// New behavior: right-after bookings should behave like monthly for invites.
+		// If paymentEmailLeadHours === -1 (after session), create CONFIRMED event now (when future),
+		// so the client receives an invite immediately.
+		const rightAfter = billing && typeof billing === 'object' && (billing as any).paymentEmailLeadHours === -1
 		// If patient-created, append manage links using the REAL bookingId now
 		const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 		const suffix =
@@ -202,6 +207,16 @@ export async function orchestrateBookingCreation(
 				practitioner,
 				supabaseClient
 			})
+		} else if (rightAfter) {
+			// Right-after: confirm now so invite is sent immediately
+			await createCalendarEventForBooking({
+				variant: 'confirmed',
+				request: requestWithSuffix,
+				bookingId: booking.id,
+				client,
+				practitioner,
+				supabaseClient
+			})
 		} else {
 			await createCalendarEventForBooking({
 				variant: 'pending',
@@ -225,7 +240,7 @@ export async function orchestrateBookingCreation(
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////// Step 8: Monthly flow — no payment email; create calendar invite if future; cron emails invoice
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
-	if (normalizedType === 'monthly') {
+	if (!options?.suppressCalendar && normalizedType === 'monthly') {
 		if (!isPast) {
 			await createCalendarEventForBooking({
 				variant: 'confirmed',
@@ -244,6 +259,12 @@ export async function orchestrateBookingCreation(
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	const requiresPayment = true
 	const dueNow = !emailScheduledAt || new Date(emailScheduledAt) <= new Date()
+
+	// Skip email sending if suppressed (e.g., for recurring bookings during series creation)
+	if (options?.suppressEmail) {
+		return { booking, bill, requiresPayment, paymentUrl: undefined }
+	}
+
 	if (!dueNow) {
 		// Email is scheduled for the future; UI can show "Programada..."
 		return { booking, bill, requiresPayment, paymentUrl: undefined }

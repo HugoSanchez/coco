@@ -530,6 +530,27 @@ export async function rescheduleBooking(
 }
 
 /**
+ * V2: Updates the google_standalone_event_id for a booking (used for rescheduled occurrences).
+ */
+export async function updateBookingStandaloneEventId(
+	bookingId: string,
+	googleEventId: string | null,
+	supabaseClient?: SupabaseClient
+): Promise<void> {
+	const client = supabaseClient || supabase
+
+	const { error } = await client
+		.from('bookings')
+		.update({ google_standalone_event_id: googleEventId })
+		.eq('id', bookingId)
+
+	if (error) {
+		console.log('Error updating booking standalone event ID', error)
+		throw error
+	}
+}
+
+/**
  * Retrieves bookings for a user with complete billing information and pagination support
  * Perfect for dashboard tables that need comprehensive booking data with efficient loading
  *
@@ -820,6 +841,153 @@ export async function getBookingsForExport(
 	})
 
 	return rows
+}
+
+/**
+ * Returns existing bookings for a series (occurrence index + times) to avoid duplicates.
+ */
+export async function getExistingSeriesBookings(
+	seriesId: string,
+	supabaseClient?: SupabaseClient
+): Promise<Array<{ id: string; occurrence_index: number; start_time: string; end_time: string }>> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('bookings')
+		.select('id, occurrence_index, start_time, end_time')
+		.eq('series_id', seriesId)
+		.order('occurrence_index', { ascending: true })
+
+	if (error) throw error
+	return (data as any) || []
+}
+
+/**
+ * Bulk inserts booking drafts (from series materializer) and returns created ids.
+ * V1 assumes drafts are already validated and deduped by caller.
+ */
+export async function bulkInsertSeriesBookings(
+	drafts: Array<{
+		series_id: string
+		user_id: string
+		client_id: string
+		start_time: string
+		end_time: string
+		occurrence_index: number
+		is_conflicted?: boolean
+		mode?: string | null
+		location_text?: string | null
+		consultation_type?: string | null
+	}>,
+	supabaseClient?: SupabaseClient
+): Promise<Array<{ id: string }>> {
+	if (!drafts || drafts.length === 0) return []
+	const client = supabaseClient || supabase
+	const { data, error } = await client.from('bookings').insert(drafts).select('id')
+	if (error) throw error
+	return ((data as any) || []).map((row: any) => ({ id: row.id as string }))
+}
+
+/**
+ * Tags an existing booking with its series linkage (series_id + occurrence_index).
+ */
+export async function tagBookingWithSeries(
+	bookingId: string,
+	seriesId: string,
+	occurrenceIndex: number,
+	supabaseClient?: SupabaseClient
+): Promise<void> {
+	const client = supabaseClient || supabase
+	const { error } = await client
+		.from('bookings')
+		.update({ series_id: seriesId, occurrence_index: occurrenceIndex })
+		.eq('id', bookingId)
+	if (error) throw error
+}
+
+/**
+ * Cancels all FUTURE bookings for a series (start_time >= now UTC).
+ * NOTE: This does not touch Google Calendar events in V1.
+ */
+export async function cancelFutureBookingsForSeries(
+	seriesId: string,
+	nowIsoUtc: string,
+	supabaseClient?: SupabaseClient
+): Promise<number> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('bookings')
+		.update({ status: 'canceled', updated_at: new Date().toISOString() })
+		.eq('series_id', seriesId)
+		.gte('start_time', nowIsoUtc)
+		.select('id')
+	if (error) throw error
+	return (data as any)?.length || 0
+}
+
+/**
+ * Deletes future bookings for a series that are safe to remove:
+ * - start_time >= nowIsoUtc
+ * - no related bill(s)
+ * - no related payment session
+ *
+ * Returns the number of rows deleted.
+ */
+export async function deleteEligibleFutureBookingsForSeries(
+	seriesId: string,
+	nowIsoUtc: string,
+	supabaseClient?: SupabaseClient
+): Promise<number> {
+	const client = supabaseClient || supabase
+
+	// Select candidates with minimal relations for safety checks
+	const { data: candidates, error: selectErr } = await client
+		.from('bookings')
+		.select(
+			`
+			id,
+			bills:bills(id),
+			payment_sessions:payment_sessions(id)
+		`
+		)
+		.eq('series_id', seriesId)
+		.gte('start_time', nowIsoUtc)
+
+	if (selectErr) throw selectErr
+	const rows = (candidates as any[]) || []
+
+	const eligibleIds = rows
+		.filter((r) => {
+			const hasBills = Array.isArray(r.bills) && r.bills.length > 0
+			const hasPayment = Array.isArray(r.payment_sessions) && r.payment_sessions.length > 0
+			return !hasBills && !hasPayment
+		})
+		.map((r) => r.id as string)
+
+	if (eligibleIds.length === 0) return 0
+
+	const { data: deleted, error: delErr } = await client.from('bookings').delete().in('id', eligibleIds).select('id')
+	if (delErr) throw delErr
+	return ((deleted as any[]) || []).length
+}
+
+/**
+ * Returns the maximum occurrence_index for a series, or -1 if none.
+ */
+export async function getSeriesMaxOccurrenceIndex(
+	seriesId: string,
+	supabaseClient?: SupabaseClient
+): Promise<number> {
+	const client = supabaseClient || supabase
+	const { data, error } = await client
+		.from('bookings')
+		.select('occurrence_index')
+		.eq('series_id', seriesId)
+		.order('occurrence_index', { ascending: false })
+		.limit(1)
+	if (error) throw error
+	if (!data || data.length === 0) return -1
+	const idx = (data[0] as any).occurrence_index
+	return typeof idx === 'number' ? idx : -1
 }
 
 /**

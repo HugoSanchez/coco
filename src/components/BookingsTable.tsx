@@ -7,9 +7,11 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { SideSheet } from '@/components/SideSheet'
 import { BookingActions, type BookingActionBooking } from '@/components/BookingActions'
-import { StatusBadge, PaymentBadge } from '@/components/Badges'
+import { StatusBadge, PaymentBadge, SeriesBadge } from '@/components/Badges'
 import BookingDetailsPanel from '@/components/BookingDetailsPanel'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Repeat } from 'lucide-react'
 
 export interface Booking {
 	id: string
@@ -22,6 +24,7 @@ export interface Booking {
 	payment_status: 'not_applicable' | 'pending' | 'paid' | 'disputed' | 'canceled' | 'refunded'
 	amount: number
 	currency?: string
+	series_id?: string // V2: For recurring bookings
 }
 
 interface BookingsTableProps {
@@ -33,6 +36,7 @@ interface BookingsTableProps {
 	onRefundBooking: (bookingId: string) => void
 	onRescheduleBooking: (bookingId: string) => void
 	onResendEmail: (bookingId: string) => void
+	onCancelSeries?: (seriesId: string) => void // V2: Optional cancel series handler
 }
 
 function getStatusBadge(status: 'pending' | 'scheduled' | 'completed' | 'canceled') {
@@ -61,7 +65,8 @@ function BookingCard({
 	onRefundBooking,
 	onRescheduleBooking,
 	onResendEmail,
-	onViewDetails
+	onViewDetails,
+	onCancelSeries
 }: {
 	booking: Booking
 	onCancelBooking: (bookingId: string) => void
@@ -71,17 +76,32 @@ function BookingCard({
 	onRescheduleBooking: (bookingId: string) => void
 	onResendEmail: (bookingId: string) => void
 	onViewDetails: (booking: Booking) => void
+	onCancelSeries?: (seriesId: string) => void // V2: Optional cancel series handler
 }) {
 	return (
 		<div
-			className="bg-white border rounded-lg p-4 mb-3 hover:bg-gray-50/50 transition-colors cursor-pointer"
+			className="bg-white border rounded-lg p-4 mb-3 transition-colors cursor-pointer hover:bg-gray-50/50"
 			onClick={() => onViewDetails(booking)}
 		>
 			<div className="flex justify-between items-center">
 				<div className="flex-1 min-w-0">
 					{/* Name, Date, and Amount on same line */}
 					<div className="flex items-center mb-2">
-						<div className="text-sm font-medium text-gray-900 truncate">{booking.customerName}</div>
+						<div className="text-sm font-medium text-gray-900 truncate flex items-center gap-1.5">
+							{booking.series_id && (
+								<TooltipProvider>
+									<Tooltip>
+										<TooltipTrigger asChild>
+											<Repeat className="h-3.5 w-3.5 text-teal-500 flex-shrink-0" />
+										</TooltipTrigger>
+										<TooltipContent>
+											<p>Evento recurrente</p>
+										</TooltipContent>
+									</Tooltip>
+								</TooltipProvider>
+							)}
+							{booking.customerName}
+						</div>
 						<div className="text-sm text-gray-600 font-light flex-shrink-0 ml-2">
 							{format(booking.bookingDate, 'dd MMM yyyy', {
 								locale: es
@@ -90,7 +110,7 @@ function BookingCard({
 					</div>
 
 					{/* Status badges on same line */}
-					<div className="flex gap-2">
+					<div className="flex gap-2 flex-wrap">
 						{getStatusBadge(booking.status)}
 						{getPaymentBadge(booking)}
 					</div>
@@ -107,6 +127,7 @@ function BookingCard({
 						onRefundBooking={onRefundBooking}
 						onRescheduleBooking={onRescheduleBooking}
 						onResendEmail={onResendEmail}
+						onCancelSeries={onCancelSeries}
 					/>
 				</div>
 			</div>
@@ -122,7 +143,8 @@ export function BookingsTable({
 	onMarkAsPaid,
 	onRefundBooking,
 	onRescheduleBooking,
-	onResendEmail
+	onResendEmail,
+	onCancelSeries
 }: BookingsTableProps) {
 	const router = useRouter()
 	const [isMobile, setIsMobile] = useState(false)
@@ -221,6 +243,7 @@ export function BookingsTable({
 						onRescheduleBooking={onRescheduleBooking}
 						onResendEmail={onResendEmail}
 						onViewDetails={openDetails}
+						onCancelSeries={onCancelSeries}
 					/>
 				))}
 			</div>
@@ -263,14 +286,28 @@ export function BookingsTable({
 								</TableRow>
 							) : (
 								bookings.map((booking) => (
-									<TableRow
-										key={booking.id}
-										className="hover:bg-gray-50/50 transition-colors h-14 cursor-pointer"
-										onClick={() => openDetails(booking)}
-									>
+								<TableRow
+									key={booking.id}
+									className="transition-colors h-14 cursor-pointer hover:bg-gray-50/50"
+									onClick={() => openDetails(booking)}
+								>
 										{/* Client */}
 										<TableCell className="py-2 pr-0">
-											<div className="font-medium">{booking.customerName}</div>
+											<div className="font-medium flex items-center gap-2">
+												{booking.series_id && (
+													<TooltipProvider>
+														<Tooltip>
+															<TooltipTrigger asChild>
+																<Repeat className="h-3.5 w-3.5 text-teal-500" />
+															</TooltipTrigger>
+															<TooltipContent>
+																<p>Evento recurrente</p>
+															</TooltipContent>
+														</Tooltip>
+													</TooltipProvider>
+												)}
+												{booking.customerName}
+											</div>
 										</TableCell>
 
 										{/* Date */}
@@ -315,6 +352,7 @@ export function BookingsTable({
 												onRefundBooking={onRefundBooking}
 												onRescheduleBooking={onRescheduleBooking}
 												onResendEmail={onResendEmail}
+												onCancelSeries={onCancelSeries}
 											/>
 										</TableCell>
 									</TableRow>
