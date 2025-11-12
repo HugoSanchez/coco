@@ -27,6 +27,7 @@ export async function generateMetadata({ params }: { params: { username: string 
 	const host = hdrs.get('x-forwarded-host') || hdrs.get('host') || 'itscoco.app'
 	const proto = hdrs.get('x-forwarded-proto') || 'https'
 	const absoluteUrl = `${proto}://${host}/${params.username}`
+	const ogImageUrl = `${proto}://${host}/coco-logo-small.png`
 
 	return {
 		title,
@@ -38,12 +39,13 @@ export async function generateMetadata({ params }: { params: { username: string 
 			siteName: 'Coco App',
 			locale: 'es_ES',
 			type: 'website',
-			images: [] // Explicitly set empty array to prevent any image from being shown
+			images: [{ url: ogImageUrl }]
 		},
 		twitter: {
-			card: 'summary',
+			card: 'summary_large_image',
 			title,
-			description
+			description,
+			images: [ogImageUrl]
 		}
 	}
 }
@@ -51,4 +53,3 @@ export async function generateMetadata({ params }: { params: { username: string 
 export default function Page({ params }: { params: { username: string } }) {
 	return <BookingPageClient username={params.username} />
 }
-
