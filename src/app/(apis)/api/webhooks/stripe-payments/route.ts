@@ -236,66 +236,70 @@ export async function POST(request: NextRequest) {
 			///////////////////////////////////////////////////////////
 			///// STEP 8: Promote pending calendar event to confirmed
 			///////////////////////////////////////////////////////////
-			try {
-				// Skip calendar promotion for recurring bookings - they use master recurring events
-				// that send invites immediately, not individual pending events
-				const booking = await getBookingById(bookingId as string, supabase)
-				// Check if booking is part of a recurring series
-				const isRecurringBooking = booking && booking.series_id != null
-				if (isRecurringBooking) {
-					logger.logInfo('skip_recurring_calendar', 'Skipping calendar promotion for recurring booking', {
-						bookingId,
-						seriesId: booking.series_id
-					})
-					// Recurring bookings already have invites sent via master recurring event
-					// No need to promote pending events that don't exist
-				} else {
-					// Extract all needed data from session metadata (no database calls needed!)
-					const clientName = session.metadata?.client_name
-					const clientEmail = session.customer_email
-					const practitionerName = session.metadata?.practitioner_name
-					const practitionerEmail = session.metadata?.practitioner_email
-					const practitionerUserId = session.metadata?.practitioner_user_id
-					const startTime = session.metadata?.start_time
-					const endTime = session.metadata?.end_time
-
-					// Validate we have all required data
-					if (
-						!clientName ||
-						!clientEmail ||
-						!practitionerName ||
-						!practitionerEmail ||
-						!practitionerUserId ||
-						!startTime ||
-						!endTime
-					) {
-						logger.logWarn('missing_metadata', 'webhooks:stripe-payments missing metadata', {
+			// Only process calendar promotion for booking payments (not invoice payments)
+			if (bookingId) {
+				try {
+					// Skip calendar promotion for recurring bookings - they use master recurring events
+					// that send invites immediately, not individual pending events
+					const booking = await getBookingById(bookingId, supabase)
+					// Check if booking is part of a recurring series
+					const isRecurringBooking = booking && booking.series_id != null
+					if (isRecurringBooking) {
+						logger.logInfo('skip_recurring_calendar', 'Skipping calendar promotion for recurring booking', {
 							bookingId,
-							stripeSessionId: session.id,
-							connectedAccountId,
-							practitionerUserId
+							seriesId: booking.series_id
 						})
-						return NextResponse.json({ received: true })
-					}
+						// Recurring bookings already have invites sent via master recurring event
+						// No need to promote pending events that don't exist
+					} else {
+						// Extract all needed data from session metadata (no database calls needed!)
+						const clientName = session.metadata?.client_name
+						const clientEmail = session.customer_email
+						const practitionerName = session.metadata?.practitioner_name
+						const practitionerEmail = session.metadata?.practitioner_email
+						const practitionerUserId = session.metadata?.practitioner_user_id
+						const startTime = session.metadata?.start_time
+						const endTime = session.metadata?.end_time
 
-					await updatePendingCalendarEventToConfirmed({
-						bookingId: bookingId as string,
-						practitionerUserId,
-						clientName,
-						clientEmail,
-						practitionerName,
-						practitionerEmail,
-						supabaseClient: supabase
+						// Validate we have all required data
+						if (
+							!clientName ||
+							!clientEmail ||
+							!practitionerName ||
+							!practitionerEmail ||
+							!practitionerUserId ||
+							!startTime ||
+							!endTime
+						) {
+							logger.logWarn('missing_metadata', 'webhooks:stripe-payments missing metadata', {
+								bookingId,
+								stripeSessionId: session.id,
+								connectedAccountId,
+								practitionerUserId
+							})
+							return NextResponse.json({ received: true })
+						}
+
+						await updatePendingCalendarEventToConfirmed({
+							bookingId: bookingId as string,
+							practitionerUserId,
+							clientName,
+							clientEmail,
+							practitionerName,
+							practitionerEmail,
+							supabaseClient: supabase
+						})
+					}
+				} catch (calendarError) {
+					// Don't fail the webhook if calendar update fails
+					logger.logError('calendar', calendarError, {
+						bookingId,
+						invoiceId,
+						stripeSessionId: session.id,
+						connectedAccountId,
+						practitionerUserId: session.metadata?.practitioner_user_id
 					})
 				}
-			} catch (calendarError) {
-				// Don't fail the webhook if calendar update fails
-				logger.logError('calendar', calendarError, {
-					bookingId,
-					stripeSessionId: session.id,
-					connectedAccountId,
-					practitionerUserId: session.metadata?.practitioner_user_id
-				})
 			}
 		}
 		///////////////////////////////////////////////////////////

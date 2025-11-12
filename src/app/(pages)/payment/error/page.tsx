@@ -39,10 +39,16 @@ const errorMessages = {
 		icon: XCircle,
 		color: 'text-gray-700'
 	},
+	already_paid: {
+		title: 'Esta factura ya está pagada',
+		message:
+			'Esta factura ya ha sido pagada anteriormente. Si tienes alguna duda o necesitas el recibo, ponte en contacto con tu profesional.',
+		icon: CheckCircle,
+		color: 'text-green-600'
+	},
 	server_error: {
 		title: '¡Ups! ha habido un error',
-		message:
-			'Ocurrió un error inesperado. Por favor, inténtalo de nuevo más tarde.',
+		message: 'Ocurrió un error inesperado. Por favor, inténtalo de nuevo más tarde.',
 		icon: XCircle,
 		color: 'text-gray-900'
 	}
@@ -50,9 +56,7 @@ const errorMessages = {
 
 function PaymentErrorContent() {
 	const searchParams = useSearchParams()
-	const reason =
-		(searchParams.get('reason') as keyof typeof errorMessages) ||
-		'server_error'
+	const reason = (searchParams.get('reason') as keyof typeof errorMessages) || 'server_error'
 
 	const errorInfo = errorMessages[reason] || errorMessages.server_error
 	const IconComponent = errorInfo.icon
@@ -61,16 +65,12 @@ function PaymentErrorContent() {
 		<div className="min-h-screen flex items-center lg:max-w-3xl mx-auto px-4">
 			<div className="flex flex-col items-center justify-center mb-20">
 				<CardHeader className="text-center gap-4">
-					<h1 className="text-4xl font-black text-primary">
-						{errorInfo.title}
-					</h1>
+					<h1 className="text-4xl font-black text-primary">{errorInfo.title}</h1>
 
 					<p className="text-lg text-gray-600">{errorInfo.message}</p>
 				</CardHeader>
 
-				<p className="text-gray-600 text-sm text-normal">
-					Puedes cerrar esta página.
-				</p>
+				<p className="text-gray-600 text-sm text-normal">Puedes cerrar esta página.</p>
 			</div>
 		</div>
 	)
