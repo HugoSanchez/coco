@@ -37,7 +37,8 @@ export async function generateMetadata({ params }: { params: { username: string 
 			url: absoluteUrl,
 			siteName: 'Coco App',
 			locale: 'es_ES',
-			type: 'website'
+			type: 'website',
+			images: [] // Explicitly set empty array to prevent any image from being shown
 		},
 		twitter: {
 			card: 'summary',
