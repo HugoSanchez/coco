@@ -21,7 +21,6 @@ export async function generateMetadata({ params }: { params: { username: string 
 	const practitionerName = (profile as any)?.full_name || (profile as any)?.name || params.username
 	const description = `Utiliza este enlace para reservar tu cita con ${practitionerName}.`
 	const title = `${practitionerName} · Reserva tu cita`
-	const ogImage = (profile as any)?.profile_picture_url || '/coco-logo-small.png'
 
 	// Build absolute URL for OG tags
 	const hdrs = headers()
@@ -38,14 +37,12 @@ export async function generateMetadata({ params }: { params: { username: string 
 			url: absoluteUrl,
 			siteName: 'Coco App',
 			locale: 'es_ES',
-			type: 'website',
-			images: [{ url: ogImage }]
+			type: 'website'
 		},
 		twitter: {
-			card: 'summary_large_image',
+			card: 'summary',
 			title,
-			description,
-			images: [ogImage]
+			description
 		}
 	}
 }
@@ -53,3 +50,4 @@ export async function generateMetadata({ params }: { params: { username: string 
 export default function Page({ params }: { params: { username: string } }) {
 	return <BookingPageClient username={params.username} />
 }
+

@@ -36,7 +36,7 @@ export interface CalendarInfoStepProps {
 		initialMonth: Date
 	}
 	consultationType: 'first' | 'followup'
-	onConsultationTypeChange: (value: 'first' | 'followup') => void
+	onConsultationTypeChange?: (value: 'first' | 'followup') => void
 }
 
 export function CalendarInfoStep({
@@ -58,7 +58,7 @@ export function CalendarInfoStep({
 		<>
 			{/* Header Section */}
 			<div className="flex flex-col items-center mb-12 space-y-4">
-				{profile.profile_picture_url && typeof window !== 'undefined' && window.innerWidth < 768 && (
+				{profile.profile_picture_url && typeof window !== 'undefined' && window.innerWidth < 768 && username !== 'hugo' && (
 					<div className="flex items-center justify-center">
 						<img
 							src={profile.profile_picture_url}
@@ -84,38 +84,42 @@ export function CalendarInfoStep({
 
 			{/* Consultation type select below calendar */}
 			<div className="mt-10 space-y-2">
-				<label className="block text-sm font-medium text-gray-700">Tipo de servicio</label>
-				{showFirst ? (
-					<Select
-						value={consultationType}
-						onValueChange={(v) => onConsultationTypeChange(v as 'first' | 'followup')}
-					>
-						<SelectTrigger className="h-12">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="first">{`Primera consulta — ${new Intl.NumberFormat('es-ES', {
-								style: 'currency',
-								currency: pricing?.currency || 'EUR'
-							}).format(Number(firstAmount || 0))}`}</SelectItem>
-							<SelectItem value="followup">{`Consulta de seguimiento — ${new Intl.NumberFormat('es-ES', {
-								style: 'currency',
-								currency: pricing?.currency || 'EUR'
-							}).format(Number(baseAmount || 0))}`}</SelectItem>
-						</SelectContent>
-					</Select>
-				) : (
-					<Select value="followup">
-						<SelectTrigger className="h-12" disabled>
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="followup">{`Consulta — ${new Intl.NumberFormat('es-ES', {
-								style: 'currency',
-								currency: pricing?.currency || 'EUR'
-							}).format(Number(baseAmount || 0))}`}</SelectItem>
-						</SelectContent>
-					</Select>
+				{onConsultationTypeChange && (
+					<>
+						<label className="block text-sm font-medium text-gray-700">Tipo de servicio</label>
+						{showFirst ? (
+							<Select
+								value={consultationType}
+								onValueChange={(v) => onConsultationTypeChange(v as 'first' | 'followup')}
+							>
+								<SelectTrigger className="h-12">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="first">{`Primera consulta — ${new Intl.NumberFormat('es-ES', {
+										style: 'currency',
+										currency: pricing?.currency || 'EUR'
+									}).format(Number(firstAmount || 0))}`}</SelectItem>
+									<SelectItem value="followup">{`Consulta de seguimiento — ${new Intl.NumberFormat('es-ES', {
+										style: 'currency',
+										currency: pricing?.currency || 'EUR'
+									}).format(Number(baseAmount || 0))}`}</SelectItem>
+								</SelectContent>
+							</Select>
+						) : (
+							<Select value="followup">
+								<SelectTrigger className="h-12" disabled>
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="followup">{`Consulta — ${new Intl.NumberFormat('es-ES', {
+										style: 'currency',
+										currency: pricing?.currency || 'EUR'
+									}).format(Number(baseAmount || 0))}`}</SelectItem>
+								</SelectContent>
+							</Select>
+						)}
+					</>
 				)}
 				{(() => {
 					const followupMin = pricing?.meeting_duration_min ?? scheduleMinutes ?? 60

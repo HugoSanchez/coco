@@ -181,6 +181,14 @@ export default function BookingPageClient({ username }: { username: string }) {
 	useEffect(() => {
 		if (consultInitRef.current) return
 		if (!state.userProfile) return
+
+		// Special case: for "hugo" username, always use 'first' consultation type
+		if (username === 'hugo') {
+			setState((prev) => ({ ...prev, consultationType: 'first' }))
+			consultInitRef.current = true
+			return
+		}
+
 		const pricing = state.userProfile?.pricing
 		const firstExists =
 			pricing?.first_consultation_amount != null && !Number.isNaN(Number(pricing.first_consultation_amount))
@@ -249,7 +257,7 @@ export default function BookingPageClient({ username }: { username: string }) {
 										initialMonth: state.currentMonth
 									}}
 									consultationType={state.consultationType}
-									onConsultationTypeChange={handleConsultationTypeChange}
+									onConsultationTypeChange={username === 'hugo' ? undefined : handleConsultationTypeChange}
 								/>
 							</>
 						)}
