@@ -16,7 +16,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
 	createDraftInvoice,
-	computeInvoiceTotals,
+	computeInvoiceTotalsFromBills,
 	issueInvoice,
 	markInvoicePaid,
 	updateStripeReceiptUrl,
@@ -61,6 +61,8 @@ export async function createCreditNoteForInvoice(
 			currency: original.currency,
 			clientName: original.client_name_snapshot,
 			clientEmail: original.client_email_snapshot,
+			clientNationalId: original.client_national_id_snapshot ?? null,
+			clientAddress: original.client_address_snapshot ?? null,
 			documentKind: 'credit_note',
 			rectifiesInvoiceId: original.id,
 			reason: params.reason ?? null,
@@ -142,6 +144,8 @@ export async function ensureInvoiceForBillOnPayment(
 			clientId?: string | null
 			clientName: string
 			clientEmail: string
+			clientNationalId?: string | null
+			clientAddress?: string | null
 			amount: number
 			currency?: string
 		}
@@ -164,18 +168,19 @@ export async function ensureInvoiceForBillOnPayment(
 				currency: params.snapshot.currency ?? 'EUR',
 				clientName: params.snapshot.clientName,
 				clientEmail: params.snapshot.clientEmail,
+				clientNationalId: params.snapshot.clientNationalId ?? null,
+				clientAddress: params.snapshot.clientAddress ?? null,
 				dueDate: null,
 				legacyBillId: params.billId
 			},
 			db
 		)
-		await db
-			.from('invoices')
-			.update({ subtotal: params.snapshot.amount, tax_total: 0, total: params.snapshot.amount })
-			.eq('id', invoice.id)
 
 		// Link the bill to the invoice for traceability
 		await db.from('bills').update({ invoice_id: invoice.id }).eq('id', params.billId)
+
+		// Compute invoice totals from linked bill (includes tax)
+		await computeInvoiceTotalsFromBills(invoice.id, db)
 	}
 
 	// 3) Issue if still draft
@@ -225,12 +230,16 @@ export async function ensureMonthlyDraftAndLinkBills(
 	// Resolve client snapshots for email sending (monthly email requires a recipient)
 	let clientNameSnap = ''
 	let clientEmailSnap = ''
+	let clientNationalIdSnap: string | null = null
+	let clientAddressSnap: string | null = null
 	if (params.clientId) {
 		try {
 			const clientRow = await getClientById(params.clientId, db)
 			if (clientRow) {
 				clientNameSnap = ((clientRow as any).full_name_search || clientRow.name || '').trim()
 				clientEmailSnap = (clientRow as any).email || ''
+				clientNationalIdSnap = (clientRow as any).national_id || null
+				clientAddressSnap = (clientRow as any).address || null
 			}
 		} catch (_) {}
 	}
@@ -241,6 +250,8 @@ export async function ensureMonthlyDraftAndLinkBills(
 			clientId: params.clientId,
 			clientName: clientNameSnap,
 			clientEmail: clientEmailSnap,
+			clientNationalId: clientNationalIdSnap,
+			clientAddress: clientAddressSnap,
 			currency: params.currency || 'EUR',
 			periodStart: params.periodStart,
 			periodEnd: params.periodEnd
@@ -281,9 +292,8 @@ export async function ensureMonthlyDraftAndLinkBills(
 
 	await linkBillsToInvoice(billIds, invoice.id, db)
 
-	// 4) Set invoice totals from desired candidates only
-	const totalAmount = candidates.reduce((acc: number, row: any) => acc + Number(row.amount || 0), 0)
-	await db.from('invoices').update({ subtotal: totalAmount, tax_total: 0, total: totalAmount }).eq('id', invoice.id)
+	// 4) Compute invoice totals from linked bills (includes tax)
+	await computeInvoiceTotalsFromBills(invoice.id, db)
 
 	return { invoiceId: invoice.id, linkedBillIds: billIds }
 }

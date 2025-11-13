@@ -39,14 +39,17 @@ export async function generateAndStoreInvoicePdf(invoiceId: string): Promise<{ s
 
 	// Resolve client info (prefer fresh client row over snapshots)
 	let clientName = invoice.client_name_snapshot
-	let clientEmail = invoice.client_email_snapshot
+	let clientNationalId = invoice.client_national_id_snapshot
+	let clientAddress = invoice.client_address_snapshot
 	if (invoice.client_id) {
 		try {
 			const fresh = await getClientById(invoice.client_id, supabase)
 			if (fresh) {
 				clientName =
 					[fresh.name || '', (fresh as any).last_name || ''].filter(Boolean).join(' ').trim() || clientName
-				clientEmail = (fresh as any).email || clientEmail
+				// Use fresh data if available, otherwise fall back to snapshot
+				clientNationalId = (fresh as any).national_id || clientNationalId
+				clientAddress = (fresh as any).address || clientAddress
 			}
 		} catch (_) {}
 	}
@@ -67,6 +70,7 @@ export async function generateAndStoreInvoicePdf(invoiceId: string): Promise<{ s
 		tax_rate_percent?: number | null
 		tax_amount?: number | null
 	}> = []
+	let allItemsHaveZeroVat = true
 	try {
 		const bills = await getBillsForInvoice(invoice.id, supabase)
 		items = bills.map((b: any) => {
@@ -75,26 +79,41 @@ export async function generateAndStoreInvoicePdf(invoiceId: string): Promise<{ s
 			const display = when
 				? `Consulta – ${formatInTimeZone(when, 'Europe/Madrid', 'dd/MM/yyyy', { locale: es })}`
 				: 'Consulta'
+			const taxRate = Number(b.tax_rate_percent || 0)
+			const taxAmount = Number(b.tax_amount || 0)
+			const totalAmount = Number(b.amount || 0)
+
+			// Track if any item has VAT > 0
+			if (taxRate > 0) {
+				allItemsHaveZeroVat = false
+			}
+
+			// When VAT is applied, the "Importe" (base amount) should be amount - vat_amount
+			// The booking amount is the total including VAT
+			const baseAmount = taxAmount > 0 ? totalAmount - taxAmount : totalAmount
+
 			return {
 				description: display,
 				qty: 1,
-				unit_price: Number(b.amount || 0),
-				amount: Number(b.amount || 0),
-				tax_rate_percent: 0,
-				tax_amount: 0
+				unit_price: baseAmount,
+				amount: baseAmount,
+				tax_rate_percent: taxRate,
+				tax_amount: taxAmount
 			}
 		})
 	} catch (_) {
+		// Fallback: use invoice totals (shouldn't happen in normal flow)
 		items = [
 			{
 				description: 'Consulta',
 				qty: 1,
 				unit_price: invoice.subtotal,
 				amount: invoice.subtotal,
-				tax_rate_percent: 0,
+				tax_rate_percent: invoice.tax_total > 0 ? null : 0, // Unknown rate if tax exists
 				tax_amount: invoice.tax_total
 			}
 		]
+		allItemsHaveZeroVat = invoice.tax_total === 0
 	}
 
 	const pdfElement = (
@@ -110,7 +129,8 @@ export async function generateAndStoreInvoicePdf(invoiceId: string): Promise<{ s
 				province: practitionerProfile?.fiscal_province || null
 			}}
 			clientName={clientName}
-			clientEmail={clientEmail}
+			clientNationalId={clientNationalId}
+			clientAddress={clientAddress}
 			invoiceId={invoice.id}
 			series={invoice.series}
 			number={invoice.number}
@@ -122,6 +142,7 @@ export async function generateAndStoreInvoicePdf(invoiceId: string): Promise<{ s
 			kind={(invoice as any).document_kind}
 			rectifiesDisplay={rectifiesDisplay}
 			items={items}
+			showVatExemptNote={allItemsHaveZeroVat}
 		/>
 	)
 

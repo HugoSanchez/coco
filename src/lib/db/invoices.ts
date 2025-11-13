@@ -47,6 +47,8 @@ export interface InvoiceRow {
 	pdf_sha256: string | null
 	client_name_snapshot: string
 	client_email_snapshot: string
+	client_national_id_snapshot: string | null
+	client_address_snapshot: string | null
 	stripe_receipt_url: string | null
 	billing_period_start: string | null
 	billing_period_end: string | null
@@ -77,6 +79,8 @@ export async function createDraftInvoice(
 		currency?: string
 		clientName: string
 		clientEmail: string
+		clientNationalId?: string | null
+		clientAddress?: string | null
 		dueDate?: string | null
 		billingPeriodStart?: string | null
 		billingPeriodEnd?: string | null
@@ -101,6 +105,8 @@ export async function createDraftInvoice(
 				currency: params.currency ?? 'EUR',
 				client_name_snapshot: params.clientName,
 				client_email_snapshot: params.clientEmail,
+				client_national_id_snapshot: params.clientNationalId ?? null,
+				client_address_snapshot: params.clientAddress ?? null,
 				due_date: params.dueDate ?? null,
 				billing_period_start: params.billingPeriodStart ?? null,
 				billing_period_end: params.billingPeriodEnd ?? null,
@@ -152,27 +158,52 @@ export async function setInvoicePdfInfo(
 }
 
 /**
- * computeInvoiceTotals
+ * computeInvoiceTotalsFromBills
  * ----------------------------------------------
- * Sums `invoice_items` for an invoice and persists the header totals.
+ * Sums linked bills for an invoice and persists the header totals.
  * Returns the computed numbers for convenience.
+ *
+ * This is the current implementation since invoice_items table was removed.
  */
-export async function computeInvoiceTotals(
+export async function computeInvoiceTotalsFromBills(
 	invoiceId: string,
 	supabase?: SupabaseClient
 ): Promise<{ subtotal: number; tax_total: number; total: number }> {
 	const db = getClient(supabase)
-	// Summation on items
-	const { data, error } = await db.from('invoice_items').select('amount, tax_amount').eq('invoice_id', invoiceId)
+	// Summation on linked bills
+	const { data, error } = await db.from('bills').select('amount, tax_amount').eq('invoice_id', invoiceId)
 
 	if (error) throw error
-	const subtotal = (data || []).reduce((acc: number, it: any) => acc + Number(it.amount || 0), 0)
-	const tax_total = (data || []).reduce((acc: number, it: any) => acc + Number(it.tax_amount || 0), 0)
+	// When VAT is applied, the booking amount is the total including VAT
+	// So the base amount (subtotal) should be amount - tax_amount
+	const subtotal = (data || []).reduce((acc: number, bill: any) => {
+		const totalAmount = Number(bill.amount || 0)
+		const taxAmount = Number(bill.tax_amount || 0)
+		const baseAmount = taxAmount > 0 ? totalAmount - taxAmount : totalAmount
+		return acc + baseAmount
+	}, 0)
+	const tax_total = (data || []).reduce((acc: number, bill: any) => acc + Number(bill.tax_amount || 0), 0)
 	const total = Math.round((subtotal + tax_total) * 100) / 100
 
 	const { error: updErr } = await db.from('invoices').update({ subtotal, tax_total, total }).eq('id', invoiceId)
 	if (updErr) throw updErr
 	return { subtotal, tax_total, total }
+}
+
+/**
+ * computeInvoiceTotals
+ * ----------------------------------------------
+ * DEPRECATED: This function references invoice_items table which no longer exists.
+ * Use computeInvoiceTotalsFromBills instead.
+ *
+ * Kept for backwards compatibility but will throw an error if invoice_items doesn't exist.
+ */
+export async function computeInvoiceTotals(
+	invoiceId: string,
+	supabase?: SupabaseClient
+): Promise<{ subtotal: number; tax_total: number; total: number }> {
+	// Delegate to the bills-based implementation
+	return computeInvoiceTotalsFromBills(invoiceId, supabase)
 }
 
 /**
@@ -421,6 +452,8 @@ export async function findOrCreateMonthlyInvoice(
 		clientId: string | null
 		clientName: string
 		clientEmail: string
+		clientNationalId?: string | null
+		clientAddress?: string | null
 		currency?: string
 		periodStart: string
 		periodEnd: string
@@ -448,6 +481,8 @@ export async function findOrCreateMonthlyInvoice(
 			currency: params.currency || 'EUR',
 			clientName: params.clientName,
 			clientEmail: params.clientEmail,
+			clientNationalId: params.clientNationalId ?? null,
+			clientAddress: params.clientAddress ?? null,
 			dueDate: null,
 			billingPeriodStart: params.periodStart,
 			billingPeriodEnd: params.periodEnd
@@ -460,14 +495,14 @@ export async function findOrCreateMonthlyInvoice(
 /**
  * deleteEmptyDraftInvoices
  * ----------------------------------------------
- * Deletes draft invoices that currently have zero items.
+ * Deletes draft invoices that currently have zero linked bills.
  */
 export async function deleteEmptyDraftInvoices(invoiceIds: string[], supabase?: SupabaseClient): Promise<number> {
 	if (!invoiceIds || invoiceIds.length === 0) return 0
 	const db = getClient(supabase)
-	// Find invoices with no items
+	// Find invoices with no linked bills
 	const { data: counts, error: countErr } = await db
-		.from('invoice_items')
+		.from('bills')
 		.select('invoice_id, count:id', { count: 'exact', head: false })
 		.in('invoice_id', invoiceIds)
 	if (countErr) throw countErr

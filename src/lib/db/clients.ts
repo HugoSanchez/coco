@@ -94,6 +94,10 @@ export async function getClientById(clientId: string, supabaseClient?: SupabaseC
  * @property last_name - Last name of the client (optional)
  * @property email - Contact email for the client
  * @property description - Optional notes about the client
+ * @property phone - Client phone number (optional)
+ * @property national_id - Client national ID (e.g., DNI, SSN, NIN) (optional)
+ * @property date_of_birth - Client date of birth (optional)
+ * @property address - Client address (optional)
  */
 export interface CreateClientPayload {
 	user_id: string
@@ -101,6 +105,10 @@ export interface CreateClientPayload {
 	last_name?: string | null
 	email: string
 	description?: string | null
+	phone?: string | null
+	national_id?: string | null
+	date_of_birth?: string | null
+	address?: string | null
 }
 
 /**
@@ -121,6 +129,7 @@ export interface ClientBillingSettingsPayload {
 	billing_type: string
 	currency?: string
 	payment_email_lead_hours?: number | null
+	vat_rate_percent?: number | null
 }
 
 /**
@@ -134,6 +143,10 @@ export interface ClientBillingSettingsPayload {
  * @property last_name - Last name of the client (optional)
  * @property email - Contact email for the client
  * @property description - Optional notes about the client
+ * @property phone - Client phone number (optional)
+ * @property national_id - Client national ID (e.g., DNI, SSN, NIN) (optional)
+ * @property date_of_birth - Client date of birth (optional)
+ * @property address - Client address (optional)
  */
 export interface UpsertClientPayload {
 	id?: string
@@ -142,6 +155,10 @@ export interface UpsertClientPayload {
 	last_name?: string | null
 	email: string
 	description?: string | null
+	phone?: string | null
+	national_id?: string | null
+	date_of_birth?: string | null
+	address?: string | null
 }
 
 /**
@@ -158,6 +175,7 @@ export interface UpsertBillingPayload {
 	billing_type?: BillingType
 	currency?: string
 	payment_email_lead_hours?: number | null
+	vat_rate_percent?: number | null
 }
 
 /**
@@ -197,7 +215,8 @@ export async function createClientBillingSettings(payload: ClientBillingSettings
 		billing_amount: payload.billing_amount,
 		billing_type: payload.billing_type,
 		currency: payload.currency || 'EUR', // Default to EUR if not specified
-		payment_email_lead_hours: payload.payment_email_lead_hours ?? null
+		payment_email_lead_hours: payload.payment_email_lead_hours ?? null,
+		vat_rate_percent: payload.vat_rate_percent ?? null
 	}
 
 	const { data, error } = await supabase.from('billing_settings').insert([billingData]).select().single()
@@ -308,7 +327,8 @@ export async function upsertClientWithBilling(
 				billing_amount: billingPayload.billing_amount || null,
 				billing_type: billingPayload.billing_type || 'in-advance',
 				currency: billingPayload.currency || 'EUR',
-				payment_email_lead_hours: billingPayload.payment_email_lead_hours ?? null
+				payment_email_lead_hours: billingPayload.payment_email_lead_hours ?? null,
+				vat_rate_percent: billingPayload.vat_rate_percent ?? null
 			}
 
 			if (existingBillingSettings) {
@@ -333,7 +353,8 @@ export async function upsertClientWithBilling(
 				billing_amount: billingPayload.billing_amount || null,
 				billing_type: billingPayload.billing_type || 'in-advance',
 				currency: billingPayload.currency || 'EUR',
-				payment_email_lead_hours: billingPayload.payment_email_lead_hours ?? null
+				payment_email_lead_hours: billingPayload.payment_email_lead_hours ?? null,
+				vat_rate_percent: billingPayload.vat_rate_percent ?? null
 			})
 		}
 	}

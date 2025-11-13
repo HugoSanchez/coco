@@ -41,6 +41,7 @@ import {
 import { hasAnyNonCanceledBookings } from '@/lib/db/bookings'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toZonedTime } from 'date-fns-tz'
+import { CollapsibleSection } from '@/components/ui/collapsible-section'
 
 interface BookingFormProps {
 	onSuccess?: () => void // Called when booking is successfully created
@@ -925,41 +926,26 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 							</div>
 
 							{/* ===== Recurrence (V1 minimal) ===== */}
-							<div className="space-y-3 pt-2">
-								<button
-									type="button"
-									onClick={() => setIsRecurring((prev) => !prev)}
-									className="flex items-center justify-between w-full"
+							<CollapsibleSection
+								title="Programar recurrencia"
+								open={isRecurring}
+								onOpenChange={setIsRecurring}
+								className="pt-2"
+								contentClassName="space-y-2"
+							>
+								<Select
+									value={String(intervalWeeks)}
+									onValueChange={(v) => setIntervalWeeks((Number(v) as 1 | 2) || 1)}
 								>
-									<Label className="text-md font-normal text-gray-700">Programar recurrencia</Label>
-									<ChevronRight
-										className={`h-5 w-5 text-gray-600 transition-transform duration-200 ${
-											isRecurring ? 'rotate-90' : ''
-										}`}
-									/>
-								</button>
-
-								<div
-									className={`overflow-hidden transition-all duration-200 ${
-										isRecurring ? 'max-h-40 opacity-100 mt-2' : 'max-h-0 opacity-0'
-									}`}
-								>
-									<div className="space-y-2">
-										<Select
-											value={String(intervalWeeks)}
-											onValueChange={(v) => setIntervalWeeks((Number(v) as 1 | 2) || 1)}
-										>
-											<SelectTrigger className="h-12">
-												<SelectValue placeholder="Frecuencia" />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectItem value="1">Cada semana</SelectItem>
-												<SelectItem value="2">Cada 2 semanas</SelectItem>
-											</SelectContent>
-										</Select>
-									</div>
-								</div>
-							</div>
+									<SelectTrigger className="h-12">
+										<SelectValue placeholder="Frecuencia" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="1">Cada semana</SelectItem>
+										<SelectItem value="2">Cada 2 semanas</SelectItem>
+									</SelectContent>
+								</Select>
+							</CollapsibleSection>
 
 							{/* Booking Summary */}
 							<div>

@@ -153,6 +153,8 @@ export async function POST(request: NextRequest) {
 								clientId: bill.client_id ?? null,
 								clientName: bill.client_name,
 								clientEmail: bill.client_email,
+								clientNationalId: bill.client_national_id_snapshot ?? null,
+								clientAddress: bill.client_address_snapshot ?? null,
 								amount: bill.amount,
 								currency: bill.currency
 							},

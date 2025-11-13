@@ -133,6 +133,8 @@ export interface BookingExportRow {
 	client_first_name: string | null
 	client_last_name: string | null
 	client_email: string | null
+	client_national_id: string | null
+	client_address: string | null
 	booking_start_time_iso: string
 	booking_end_time_iso: string
 	booking_status: 'pending' | 'scheduled' | 'completed' | 'canceled'
@@ -705,7 +707,7 @@ export async function getBookingsForExport(
 			start_time,
 			end_time,
 			status,
-			client:clients(id, name, last_name, email, full_name_search),
+			client:clients(id, name, last_name, email, full_name_search, national_id, address),
 			bill:bills(
 				id,
 				amount,
@@ -820,6 +822,8 @@ export async function getBookingsForExport(
 			client_first_name: b.client?.name ?? null,
 			client_last_name: b.client?.last_name ?? null,
 			client_email: b.client?.email ?? null,
+			client_national_id: b.client?.national_id ?? null,
+			client_address: b.client?.address ?? null,
 			booking_start_time_iso: b.start_time,
 			booking_end_time_iso: b.end_time,
 			booking_status: (b.status as any) || 'pending',

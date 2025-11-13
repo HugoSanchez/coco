@@ -25,6 +25,10 @@ import { createEmailCommunication } from '@/lib/db/email-communications'
 import { createBookingCalendarEvent } from '@/lib/calendar/calendar-orchestration'
 import { computeEmailScheduledAt } from '@/lib/utils'
 import { buildManageUrl } from '@/lib/crypto'
+import {
+	getClientBillingSettings,
+	getUserDefaultBillingSettings
+} from '@/lib/db/billing-settings'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import * as Sentry from '@sentry/nextjs'
 
@@ -367,20 +371,55 @@ async function createBillForBooking(
 		(client as any).full_name_search ||
 		[String((client as any).name || ''), String((client as any).last_name || '')].filter(Boolean).join(' ').trim()
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////
+	////// Step 2: Look up VAT rate from billing_settings (client-specific, then user default)
+	////////////////////////////////////////////////////////////////////////////////////////////////////////
+	let vatRatePercent: number | null = null
+	if ((client as any).id) {
+		try {
+			// Try client-specific billing settings first
+			const clientSettings = await getClientBillingSettings(booking.user_id, (client as any).id, supabaseClient)
+			if (clientSettings?.vat_rate_percent != null) {
+				vatRatePercent = Number(clientSettings.vat_rate_percent)
+			} else {
+				// Fall back to user default billing settings
+				const userDefaults = await getUserDefaultBillingSettings(booking.user_id, supabaseClient)
+				if (userDefaults?.vat_rate_percent != null) {
+					vatRatePercent = Number(userDefaults.vat_rate_percent)
+				}
+			}
+		} catch (error) {
+			console.error('Error looking up VAT rate for bill:', error)
+			// Continue with vatRatePercent = null (no VAT)
+		}
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////
+	////// Step 3: Calculate tax amount if VAT applies
+	////////////////////////////////////////////////////////////////////////////////////////////////////////
+	const taxAmount =
+		vatRatePercent != null && vatRatePercent > 0 && billing.amount > 0
+			? Math.round((billing.amount * (vatRatePercent / 100)) * 100) / 100
+			: 0
+
 	const billPayload: CreateBillPayload = {
 		booking_id: booking.id,
 		user_id: booking.user_id,
 		client_id: (client as any).id,
 		client_name: clientDisplayName,
 		client_email: (client as any).email,
+		client_national_id: (client as any).national_id || null,
+		client_address: (client as any).address || null,
 		amount: billing.amount,
 		currency: billing.currency,
 		billing_type: normalizedBillingType,
-		email_scheduled_at: billing.email_scheduled_at || null
+		email_scheduled_at: billing.email_scheduled_at || null,
+		tax_rate_percent: vatRatePercent ?? 0,
+		tax_amount: taxAmount
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
-	////// Step 2: Persist bill and return
+	////// Step 4: Persist bill and return
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	const bill = await createBill(billPayload, supabaseClient)
 	return bill

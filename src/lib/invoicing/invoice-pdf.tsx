@@ -14,7 +14,8 @@ export interface InvoicePdfProps {
 		province?: string | null
 	} | null
 	clientName: string
-	clientEmail?: string | null
+	clientNationalId?: string | null
+	clientAddress?: string | null
 	invoiceId: string
 	series?: string | null
 	number?: number | null
@@ -25,6 +26,7 @@ export interface InvoicePdfProps {
 	total: number
 	kind?: 'invoice' | 'credit_note'
 	rectifiesDisplay?: string | null
+	showVatExemptNote?: boolean
 	items: Array<{
 		description: string
 		qty?: number | null
@@ -49,12 +51,12 @@ const styles = StyleSheet.create({
 	tr: { flexDirection: 'row', borderBottom: '0.5 solid #ccc', paddingVertical: 6 },
 	td: { flex: 1 },
 	tdRight: { flex: 1, textAlign: 'right' },
-	// Narrow, right-aligned column for quantity to avoid visual merging with the amount column
-	qtyCol: { width: 40, textAlign: 'center' },
-	// Fixed widths for numeric columns to ensure perfect alignment with headers
-	amountCol: { width: 120, textAlign: 'center' },
-	ivaPctCol: { width: 80, textAlign: 'center' },
-	ivaCol: { width: 100, textAlign: 'center' },
+	// Fixed widths for numeric columns - all right-aligned for proper number alignment
+	qtyCol: { width: 40, textAlign: 'right', paddingRight: 0 },
+	amountCol: { width: 100, textAlign: 'right', paddingLeft: 16 },
+	ivaPctCol: { width: 75, textAlign: 'center', paddingLeft: 16 },
+	ivaCol: { width: 95, textAlign: 'center', paddingLeft: 16 },
+	totalCol: { width: 100, textAlign: 'right', paddingRight: 0 },
 	totals: { marginTop: 10, alignSelf: 'flex-start', width: 240 },
 	totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 2 },
 	rectifiesBox: { backgroundColor: '#FFF9C4', padding: 6, borderRadius: 2 },
@@ -69,7 +71,8 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
 		practitionerTaxId,
 		practitionerAddress,
 		clientName,
-		clientEmail,
+		clientNationalId,
+		clientAddress,
 		invoiceId,
 		series,
 		number,
@@ -129,34 +132,40 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
 				<View style={styles.section}>
 					<Text style={styles.label}>Cliente</Text>
 					<Text style={styles.infoLine}>{clientName}</Text>
-					{clientEmail ? <Text style={styles.infoLine}>{clientEmail}</Text> : null}
+					{clientNationalId ? <Text style={styles.infoLine}>NIF: {clientNationalId}</Text> : null}
+					{clientAddress ? <Text style={styles.infoLine}>{clientAddress}</Text> : null}
 				</View>
 
 				<View style={styles.section}>
 					<View style={styles.tableHeader}>
 						<Text style={styles.th}>Concepto</Text>
-						<Text style={[styles.th, { width: 40, textAlign: 'right' }]}>Cantidad</Text>
-						<Text style={[styles.th, { width: 100, textAlign: 'right' }]}>Importe</Text>
-						<Text style={[styles.th, { width: 80, textAlign: 'right' }]}>IVA %</Text>
-						<Text style={[styles.th, { width: 100, textAlign: 'right' }]}>IVA</Text>
+						<Text style={[styles.th, styles.qtyCol]}>Cantidad</Text>
+						<Text style={[styles.th, styles.amountCol]}>Importe</Text>
+						<Text style={[styles.th, styles.ivaPctCol]}>IVA %</Text>
+						<Text style={[styles.th, styles.ivaCol]}>IVA</Text>
+						<Text style={[styles.th, styles.totalCol]}>Total</Text>
 					</View>
-					{items.map((it, idx) => (
-						<View key={idx} style={styles.tr}>
-							<Text style={styles.td}>{it.description}</Text>
-							<Text style={[styles.qtyCol, { width: 40, textAlign: 'center' }]}>
-								{(it.qty ?? 1).toString()}
-							</Text>
-							<Text style={[styles.amountCol, { width: 120, textAlign: 'center' }]}>
-								{(it.amount ?? 0).toFixed(2)} {currency}
-							</Text>
-							<Text style={[styles.ivaPctCol, { width: 80, textAlign: 'right' }]}>
-								{(it.tax_rate_percent ?? 0).toFixed(2)}%
-							</Text>
-							<Text style={[styles.ivaCol, { width: 100, textAlign: 'right' }]}>
-								{(it.tax_amount ?? 0).toFixed(2)} {currency}
-							</Text>
-						</View>
-					))}
+					{items.map((it, idx) => {
+						const itemAmount = Number(it.amount ?? 0)
+						const itemTax = Number(it.tax_amount ?? 0)
+						const itemTotal = itemAmount + itemTax
+						return (
+							<View key={idx} style={styles.tr}>
+								<Text style={styles.td}>{it.description}</Text>
+								<Text style={styles.qtyCol}>{(it.qty ?? 1).toString()}</Text>
+								<Text style={styles.amountCol}>
+									{itemAmount.toFixed(2)} {currency}
+								</Text>
+								<Text style={styles.ivaPctCol}>{(it.tax_rate_percent ?? 0).toFixed(2)}%</Text>
+								<Text style={styles.ivaCol}>
+									{itemTax.toFixed(2)} {currency}
+								</Text>
+								<Text style={styles.totalCol}>
+									{itemTotal.toFixed(2)} {currency}
+								</Text>
+							</View>
+						)
+					})}
 				</View>
 
 				<View style={styles.totals}>
@@ -180,10 +189,12 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
 					</View>
 				</View>
 
-				{/* Nota legal IVA (España) */}
-				<View style={styles.legalNote}>
-					<Text>IVA exento según art. 20.Uno.3 Ley 37/1992</Text>
-				</View>
+				{/* Nota legal IVA (España) - Only show if all items have 0% VAT */}
+				{props.showVatExemptNote !== false && (
+					<View style={styles.legalNote}>
+						<Text>IVA exento según art. 20.Uno.3 Ley 37/1992</Text>
+					</View>
+				)}
 
 				{/* Pie de página discreto */}
 				<View>

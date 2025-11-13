@@ -60,9 +60,13 @@ export interface CreateBillPayload {
 	currency?: string
 	client_name: string
 	client_email: string
+	client_national_id?: string | null
+	client_address?: string | null
 	billing_type: 'per_booking' | 'monthly'
 	email_scheduled_at?: string | null
 	notes?: string
+	tax_rate_percent?: number | null
+	tax_amount?: number | null
 }
 
 /**
@@ -109,9 +113,13 @@ export async function createBill(payload: CreateBillPayload, supabaseClient?: Su
 		currency: payload.currency || 'EUR',
 		client_name: payload.client_name,
 		client_email: payload.client_email,
+		client_national_id_snapshot: payload.client_national_id || null,
+		client_address_snapshot: payload.client_address || null,
 		billing_type: payload.billing_type,
 		email_scheduled_at: payload.email_scheduled_at || null,
 		notes: payload.notes || null,
+		tax_rate_percent: payload.tax_rate_percent ?? 0,
+		tax_amount: payload.tax_amount ?? 0,
 		status: (shouldStartScheduled ? 'scheduled' : 'pending') as 'scheduled' | 'pending'
 	}
 
@@ -258,16 +266,25 @@ export async function linkBillsToInvoice(
 }
 
 /**
- * Returns bills linked to a specific invoice, including booking start_time for display purposes.
+ * Returns bills linked to a specific invoice, including booking start_time and tax information for display purposes.
  */
 export async function getBillsForInvoice(
 	invoiceId: string,
 	supabaseClient?: SupabaseClient
-): Promise<Array<{ id: string; amount: number; currency?: string | null; booking?: { start_time: string } }>> {
+): Promise<
+	Array<{
+		id: string
+		amount: number
+		currency?: string | null
+		tax_rate_percent?: number | null
+		tax_amount?: number | null
+		booking?: { start_time: string }
+	}>
+> {
 	const client = supabaseClient || supabase
 	const { data, error } = await client
 		.from('bills')
-		.select(`id, amount, currency, booking:bookings(start_time)`)
+		.select(`id, amount, currency, tax_rate_percent, tax_amount, booking:bookings(start_time)`)
 		.eq('invoice_id', invoiceId)
 
 	if (error) throw error

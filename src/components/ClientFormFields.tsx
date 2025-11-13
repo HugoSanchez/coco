@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useUser } from '@/contexts/UserContext'
 import { useToast } from '@/components/ui/use-toast'
+import { CollapsibleSection } from '@/components/ui/collapsible-section'
 import {
 	createClientWithBilling,
 	upsertClientWithBilling,
@@ -16,7 +17,11 @@ import {
 	type Client,
 	clientEmailExists
 } from '@/lib/db/clients'
-import { getClientBillingSettings } from '@/lib/db/billing-settings'
+import {
+	getClientBillingSettings,
+	getUserDefaultBillingSettings,
+	getBillingPreferences
+} from '@/lib/db/billing-settings'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { UserPlus, Save } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
@@ -50,16 +55,71 @@ export function ClientFormFields({
 	const { user } = useUser()
 	const { toast } = useToast()
 
+	// Helper function to convert YYYY-MM-DD to DD/MM/YYYY for display
+	const formatDateForDisplay = (dateString: string | null | undefined): string => {
+		if (!dateString) return ''
+		// If already in DD/MM/YYYY format, return as is
+		if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) return dateString
+		// Convert YYYY-MM-DD to DD/MM/YYYY
+		const parts = dateString.split('-')
+		if (parts.length === 3) {
+			return `${parts[2]}/${parts[1]}/${parts[0]}`
+		}
+		return dateString
+	}
+
+	// Helper function to convert DD/MM/YYYY to YYYY-MM-DD for database
+	const formatDateForDatabase = (dateString: string): string | null => {
+		if (!dateString || !dateString.trim()) return null
+		// If already in YYYY-MM-DD format, return as is
+		if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return dateString
+		// Convert DD/MM/YYYY to YYYY-MM-DD
+		const parts = dateString.split('/')
+		if (parts.length === 3) {
+			const day = parts[0].padStart(2, '0')
+			const month = parts[1].padStart(2, '0')
+			const year = parts[2]
+			// Basic validation
+			if (day.length === 2 && month.length === 2 && year.length === 4) {
+				return `${year}-${month}-${day}`
+			}
+		}
+		return null
+	}
+
+	// Helper function to format date input as user types (DD/MM/YYYY)
+	const formatDateInput = (value: string): string => {
+		// Remove all non-digits
+		const digits = value.replace(/\D/g, '')
+
+		// Limit to 8 digits (DDMMYYYY)
+		const limited = digits.slice(0, 8)
+
+		// Add slashes automatically
+		if (limited.length <= 2) {
+			return limited
+		} else if (limited.length <= 4) {
+			return `${limited.slice(0, 2)}/${limited.slice(2)}`
+		} else {
+			return `${limited.slice(0, 2)}/${limited.slice(2, 4)}/${limited.slice(4)}`
+		}
+	}
+
 	// Initialize form data with either initial data (edit mode) or empty values (create mode)
 	const [formData, setFormData] = useState({
 		name: initialData?.name || '',
 		lastName: initialData?.last_name || '',
 		email: initialData?.email || '',
 		description: initialData?.description || '',
+		phone: (initialData as any)?.phone || '',
+		nationalId: (initialData as any)?.national_id || '',
+		dateOfBirth: formatDateForDisplay((initialData as any)?.date_of_birth),
+		address: (initialData as any)?.address || '',
 		shouldBill: false, // We'll load this from billing settings separately
 		billingAmount: '', // We'll load this from billing settings separately
 		paymentEmailLeadHours: '0',
-		billingType: 'in-advance' as 'in-advance' | 'right-after' | 'monthly'
+		billingType: 'in-advance' as 'in-advance' | 'right-after' | 'monthly',
+		applyVat: false // VAT checkbox state
 	})
 
 	// Duplicate email detection state
@@ -77,6 +137,54 @@ export function ClientFormFields({
 	const emailDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 	const lastRequestIdRef = useRef<number>(0)
 
+	// Track if defaults have been applied (to avoid re-applying when user edits)
+	const defaultsAppliedRef = useRef(false)
+	const [userDefaults, setUserDefaults] = useState<{
+		billingAmount: string
+		billingType: 'in-advance' | 'right-after' | 'monthly'
+		paymentEmailLeadHours: string
+		applyVat: boolean
+	} | null>(null)
+
+	// Load user default billing settings on mount (for create mode)
+	useEffect(() => {
+		const loadUserDefaults = async () => {
+			if (!editMode && user?.id) {
+				try {
+					const defaultSettings = await getUserDefaultBillingSettings(user.id)
+					const prefs = await getBillingPreferences(user.id)
+
+					if (defaultSettings || prefs) {
+						const amountString = defaultSettings?.billing_amount?.toString() || prefs?.billingAmount || ''
+						const billingType =
+							(defaultSettings?.billing_type as 'in-advance' | 'right-after' | 'monthly') ||
+							(prefs?.billingType as 'in-advance' | 'right-after' | 'monthly') ||
+							'in-advance'
+						const leadHours =
+							defaultSettings?.payment_email_lead_hours != null
+								? String(defaultSettings.payment_email_lead_hours)
+								: prefs?.paymentEmailLeadHours || '0'
+						const vatRate =
+							defaultSettings?.vat_rate_percent ??
+							(prefs?.vatRatePercent ? parseFloat(prefs.vatRatePercent) : null)
+
+						setUserDefaults({
+							billingAmount: amountString,
+							billingType,
+							paymentEmailLeadHours: leadHours,
+							applyVat: vatRate != null && vatRate > 0
+						})
+					}
+				} catch (error) {
+					console.error('Error loading user default billing settings:', error)
+					// Don't show error toast, just continue without defaults
+				}
+			}
+		}
+
+		loadUserDefaults()
+	}, [editMode, user?.id])
+
 	// Load existing billing settings when in edit mode
 	useEffect(() => {
 		const loadBillingSettings = async () => {
@@ -86,6 +194,7 @@ export function ClientFormFields({
 
 					if (billingSettings) {
 						const amountString = billingSettings.billing_amount?.toString() || ''
+						const vatRate = (billingSettings as any).vat_rate_percent
 
 						setFormData((prev) => ({
 							...prev,
@@ -95,8 +204,10 @@ export function ClientFormFields({
 							paymentEmailLeadHours:
 								(billingSettings as any).payment_email_lead_hours != null
 									? String((billingSettings as any).payment_email_lead_hours)
-									: '0'
+									: '0',
+							applyVat: vatRate != null && vatRate > 0
 						}))
+						defaultsAppliedRef.current = true // Mark as applied so we don't overwrite
 					}
 				} catch (error) {
 					console.error('Error loading billing settings:', error)
@@ -107,6 +218,20 @@ export function ClientFormFields({
 
 		loadBillingSettings()
 	}, [editMode, initialData, user])
+
+	// Apply defaults when billing section is opened (for create mode only)
+	useEffect(() => {
+		if (!editMode && formData.shouldBill && userDefaults && !defaultsAppliedRef.current) {
+			setFormData((prev) => ({
+				...prev,
+				billingAmount: userDefaults.billingAmount,
+				billingType: userDefaults.billingType,
+				paymentEmailLeadHours: userDefaults.paymentEmailLeadHours,
+				applyVat: userDefaults.applyVat
+			}))
+			defaultsAppliedRef.current = true
+		}
+	}, [formData.shouldBill, userDefaults, editMode])
 
 	const submitForm = useCallback(async () => {
 		setLoading(true)
@@ -142,7 +267,11 @@ export function ClientFormFields({
 				name: formData.name,
 				last_name: formData.lastName || null,
 				email: formData.email,
-				description: formData.description || null
+				description: formData.description || null,
+				phone: formData.phone || null,
+				national_id: formData.nationalId || null,
+				date_of_birth: formatDateForDatabase(formData.dateOfBirth),
+				address: formData.address || null
 			}
 
 			// Prepare billing data if billing is enabled
@@ -154,7 +283,8 @@ export function ClientFormFields({
 					billing_type: formData.billingType,
 					currency: 'EUR', // Default currency
 					payment_email_lead_hours:
-						formData.paymentEmailLeadHours !== '' ? parseInt(formData.paymentEmailLeadHours, 10) : null
+						formData.paymentEmailLeadHours !== '' ? parseInt(formData.paymentEmailLeadHours, 10) : null,
+					vat_rate_percent: formData.applyVat ? 21.0 : null
 				}
 			}
 
@@ -175,11 +305,17 @@ export function ClientFormFields({
 					lastName: '',
 					email: '',
 					description: '',
+					phone: '',
+					nationalId: '',
+					dateOfBirth: '',
+					address: '',
 					shouldBill: false,
 					billingAmount: '',
 					paymentEmailLeadHours: '0',
-					billingType: 'in-advance'
+					billingType: 'in-advance',
+					applyVat: false
 				})
+				defaultsAppliedRef.current = false // Reset so defaults can be applied again for next client
 			}
 
 			onSuccess(createdClient)
@@ -319,7 +455,7 @@ export function ClientFormFields({
 	}, [formData.email, isValidEmail, checkDuplicateEmailValue, isEditing, emailChanged])
 
 	return (
-		<form onSubmit={handleSubmit} className="space-y-6 mt-6">
+		<form onSubmit={handleSubmit} className="mt-6">
 			{/* Basic Information */}
 			<div className="space-y-6">
 				<div className="space-y-2">
@@ -367,122 +503,205 @@ export function ClientFormFields({
 						</div>
 					)}
 				</div>
-				<div className="space-y-2">
-					<Label htmlFor="description">Notas opcionales</Label>
-					<Textarea
-						id="description"
-						value={formData.description}
-						onChange={(e) => handleInputChange('description', e.target.value)}
-						placeholder="Cualquier información relevante que quieras recordar."
-						className="min-h-12"
-						rows={3}
-					/>
-				</div>
 			</div>
+
+			{/* Notes Section */}
+			<div className="space-y-4 mt-6">
+				<CollapsibleSection
+					title="Notas opcionales"
+					defaultOpen={false}
+					className="pt-2"
+					contentClassName="space-y-4 pt-4 pb-4"
+					showBackground={true}
+				>
+					<div className="space-y-2">
+						<Label htmlFor="description">Notas</Label>
+						<Textarea
+							id="description"
+							value={formData.description}
+							onChange={(e) => handleInputChange('description', e.target.value)}
+							placeholder="Cualquier información relevante que quieras recordar."
+							className="min-h-12"
+							rows={3}
+						/>
+					</div>
+				</CollapsibleSection>
+			</div>
+
+			{/* Additional Fields */}
+			<div className="space-y-4">
+				<CollapsibleSection
+					title="Campos adicionales"
+					defaultOpen={false}
+					className="pt-2"
+					contentClassName="space-y-4 pt-4 pb-4"
+					showBackground={true}
+				>
+					<div className="space-y-2">
+						<Label htmlFor="phone">Teléfono</Label>
+						<Input
+							id="phone"
+							type="tel"
+							value={formData.phone}
+							onChange={(e) => handleInputChange('phone', e.target.value)}
+							placeholder="+34 123 456 789"
+							className="h-12"
+						/>
+					</div>
+					<div className="space-y-2">
+						<Label htmlFor="nationalId">DNI</Label>
+						<Input
+							id="nationalId"
+							value={formData.nationalId}
+							onChange={(e) => handleInputChange('nationalId', e.target.value)}
+							placeholder="12345678A"
+							className="h-12"
+						/>
+					</div>
+					<div className="space-y-2">
+						<Label htmlFor="dateOfBirth">Fecha de nacimiento</Label>
+						<Input
+							id="dateOfBirth"
+							type="text"
+							value={formData.dateOfBirth}
+							onChange={(e) => {
+								const formatted = formatDateInput(e.target.value)
+								handleInputChange('dateOfBirth', formatted)
+							}}
+							placeholder="DD/MM/YYYY"
+							className="h-12"
+							maxLength={10}
+						/>
+					</div>
+					<div className="space-y-2">
+						<Label htmlFor="address">Dirección</Label>
+						<Textarea
+							id="address"
+							value={formData.address}
+							onChange={(e) => handleInputChange('address', e.target.value)}
+							placeholder="Calle, número, ciudad, código postal"
+							className="min-h-12"
+							rows={3}
+						/>
+					</div>
+				</CollapsibleSection>
+			</div>
+
 			{/* Billing Configuration */}
 			<div className="space-y-4">
-				<div className="space-y-6 mt-8">
-					<div className="space-y-4">
+				<CollapsibleSection
+					title="Condiciones de facturación"
+					open={formData.shouldBill}
+					onOpenChange={(open) => handleInputChange('shouldBill', open)}
+					className="pt-2"
+					contentClassName="space-y-2 pt-4"
+					showBackground={true}
+				>
+					<div>
+						<label htmlFor="billingAmount" className="block text-md font-medium text-gray-700">
+							Precio de la consulta
+						</label>
+						<p className="text-sm text-gray-500 mb-2">Honorarios a aplicar por defecto en tus consultas.</p>
+					</div>
+					<div className="relative">
+						<Input
+							id="billingAmount"
+							type="number"
+							step="0.01"
+							min={1}
+							value={formData.billingAmount}
+							onChange={(e) => {
+								handleInputChange('billingAmount', e.target.value)
+								handleInputChange('shouldBill', true)
+							}}
+							onBlur={(e) => {
+								const v = e.target.value
+								if (!v) return
+								const n = parseFloat(v)
+								if (!isNaN(n) && n < 1) {
+									handleInputChange('billingAmount', '1')
+								}
+							}}
+							placeholder="0.00"
+							className="pr-8 h-12"
+						/>
+						<span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500">€</span>
+					</div>
+
+					{/* Per-patient email timing */}
+					<div className="space-y-2 pt-4">
+						<div>
+							<label className="block text-md font-medium text-gray-700">
+								Cuándo enviar el email de pago
+							</label>
+							<p className="text-sm text-gray-500 mb-2">Solo para este paciente.</p>
+						</div>
+						{(() => {
+							const timingValue =
+								(formData.billingType === 'monthly' ? 'monthly' : formData.paymentEmailLeadHours) || '0'
+							return (
+								<Select
+									value={timingValue}
+									onValueChange={(val) => {
+										handleInputChange('shouldBill', true)
+										if (val === 'monthly') {
+											setFormData((prev) => ({
+												...prev,
+												billingType: 'monthly',
+												paymentEmailLeadHours: ''
+											}))
+										} else {
+											setFormData((prev) => ({
+												...prev,
+												paymentEmailLeadHours: val,
+												billingType: val === '-1' ? 'right-after' : 'in-advance'
+											}))
+										}
+									}}
+								>
+									<SelectTrigger className="h-12">
+										<SelectValue placeholder="Selecciona cuándo enviar el email" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="0">Inmediatamente</SelectItem>
+										<SelectItem value="24">24 horas antes</SelectItem>
+										<SelectItem value="72">72 horas antes</SelectItem>
+										<SelectItem value="168">1 semana antes</SelectItem>
+										<SelectItem value="-1">Después de la consulta</SelectItem>
+										<SelectItem value="monthly">Mensualmente</SelectItem>
+									</SelectContent>
+								</Select>
+							)
+						})()}
+					</div>
+
+					{/* VAT Checkbox */}
+					<div className="space-y-1 pt-6">
 						<div className="flex items-center space-x-2">
 							<Checkbox
-								id="shouldBill"
-								checked={formData.shouldBill}
+								id="applyVat"
+								checked={formData.applyVat}
 								className="h-4 w-4"
-								onCheckedChange={(checked) => handleInputChange('shouldBill', checked === true)}
+								onCheckedChange={(checked) => {
+									handleInputChange('applyVat', checked === true)
+									handleInputChange('shouldBill', true)
+								}}
 							/>
 							<Label
-								htmlFor="shouldBill"
+								htmlFor="applyVat"
 								className="text-sm text-gray-700 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
 							>
-								Crear condiciones de facturación para este cliente
+								Aplicar IVA
 							</Label>
 						</div>
-
-						{formData.shouldBill && (
-							<div className="space-y-2">
-								<div>
-									<label htmlFor="billingAmount" className="block text-md font-medium text-gray-700">
-										Precio de la consulta
-									</label>
-									<p className="text-sm text-gray-500 mb-2">
-										Honorarios a aplicar por defecto en tus consultas.
-									</p>
-								</div>
-								<div className="relative">
-									<Input
-										id="billingAmount"
-										type="number"
-										step="0.01"
-										min={1}
-										value={formData.billingAmount}
-										onChange={(e) => handleInputChange('billingAmount', e.target.value)}
-										onBlur={(e) => {
-											const v = e.target.value
-											if (!v) return
-											const n = parseFloat(v)
-											if (!isNaN(n) && n < 1) {
-												handleInputChange('billingAmount', '1')
-											}
-										}}
-										placeholder="0.00"
-										className="pr-8 h-12"
-									/>
-									<span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500">
-										€
-									</span>
-								</div>
-
-								{/* Per-patient email timing */}
-								<div className="space-y-2">
-									<div>
-										<label className="block text-md font-medium text-gray-700">
-											Cuándo enviar el email de pago
-										</label>
-										<p className="text-sm text-gray-500 mb-2">Solo para este paciente.</p>
-									</div>
-									{(() => {
-										const timingValue =
-											(formData.billingType === 'monthly'
-												? 'monthly'
-												: formData.paymentEmailLeadHours) || '0'
-										return (
-											<Select
-												value={timingValue}
-												onValueChange={(val) => {
-													if (val === 'monthly') {
-														setFormData((prev) => ({
-															...prev,
-															billingType: 'monthly',
-															paymentEmailLeadHours: ''
-														}))
-													} else {
-														setFormData((prev) => ({
-															...prev,
-															paymentEmailLeadHours: val,
-															billingType: val === '-1' ? 'right-after' : 'in-advance'
-														}))
-													}
-												}}
-											>
-												<SelectTrigger className="h-12">
-													<SelectValue placeholder="Selecciona cuándo enviar el email" />
-												</SelectTrigger>
-												<SelectContent>
-													<SelectItem value="0">Inmediatamente</SelectItem>
-													<SelectItem value="24">24 horas antes</SelectItem>
-													<SelectItem value="72">72 horas antes</SelectItem>
-													<SelectItem value="168">1 semana antes</SelectItem>
-													<SelectItem value="-1">Después de la consulta</SelectItem>
-													<SelectItem value="monthly">Mensualmente</SelectItem>
-												</SelectContent>
-											</Select>
-										)
-									})()}
-								</div>
-							</div>
+						{formData.applyVat && (
+							<p className="text-xs text-gray-500 ml-6">
+								Se aplicará automáticamente el IVA del 21% a todas las facturas que se generen para este
+								paciente.
+							</p>
 						)}
 					</div>
-				</div>
+				</CollapsibleSection>
 			</div>
 			{/* Actions */}
 			{!hideSubmitButton && (

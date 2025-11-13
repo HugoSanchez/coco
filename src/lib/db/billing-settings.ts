@@ -42,6 +42,12 @@ export interface BillingSettings {
 	 * NULL or 0 => immediate; positive hours => that many hours before start_time; -1 => after at end_time
 	 */
 	payment_email_lead_hours?: number | null
+	/**
+	 * VAT/IVA rate as percentage (e.g., 21.00 for 21%).
+	 * NULL means no VAT applies.
+	 * Can be set per client or as user default.
+	 */
+	vat_rate_percent?: number | null
 }
 
 /**
@@ -55,6 +61,7 @@ export interface BillingPreferences {
 	meetingDurationMin?: string
 	firstMeetingDurationMin?: string
 	paymentEmailLeadHours?: string
+	vatRatePercent?: string
 }
 
 /**
@@ -93,7 +100,9 @@ export async function getBillingPreferences(userId: string): Promise<BillingPref
 					? String((data as any).first_meeting_duration_min)
 					: '',
 			paymentEmailLeadHours:
-				(data as any).payment_email_lead_hours != null ? String((data as any).payment_email_lead_hours) : '0'
+				(data as any).payment_email_lead_hours != null ? String((data as any).payment_email_lead_hours) : '0',
+			vatRatePercent:
+				(data as any).vat_rate_percent != null ? String((data as any).vat_rate_percent) : undefined
 		}
 	} catch (error) {
 		console.error('Error in getBillingPreferences:', error)
@@ -143,6 +152,14 @@ export async function saveBillingPreferences(
 			billingData.first_meeting_duration_min = Number.isNaN(parsedFirst) ? null : parsedFirst
 		} else {
 			billingData.first_meeting_duration_min = null
+		}
+
+		// Optional VAT rate
+		if (preferences.vatRatePercent != null && preferences.vatRatePercent !== '') {
+			const parsedVat = parseFloat(preferences.vatRatePercent)
+			billingData.vat_rate_percent = isNaN(parsedVat) ? null : parsedVat
+		} else {
+			billingData.vat_rate_percent = null
 		}
 
 		// First, attempt to update existing default settings
@@ -277,7 +294,8 @@ export async function upsertClientBillingSettings(
 	billingType: BillingType,
 	billingAmount: number,
 	currency: string = 'EUR',
-	paymentEmailLeadHours?: number | null
+	paymentEmailLeadHours?: number | null,
+	vatRatePercent?: number | null
 ): Promise<BillingSettings> {
 	const payload: any = {
 		user_id: userId,
@@ -291,6 +309,9 @@ export async function upsertClientBillingSettings(
 	// Allow explicit null to clear the value
 	if (paymentEmailLeadHours !== undefined) {
 		payload.payment_email_lead_hours = paymentEmailLeadHours
+	}
+	if (vatRatePercent !== undefined) {
+		payload.vat_rate_percent = vatRatePercent
 	}
 
 	const { data, error } = await supabase
@@ -317,6 +338,7 @@ export async function getClientBillingPreferences(
 	billingType?: BillingType
 	billingAmount?: string
 	paymentEmailLeadHours?: string
+	vatRatePercent?: string
 } | null> {
 	const client = supabaseClient || supabase
 	const { data, error } = await client
@@ -335,6 +357,8 @@ export async function getClientBillingPreferences(
 		billingType: data.billing_type as BillingType,
 		billingAmount: data.billing_amount != null ? String(data.billing_amount) : undefined,
 		paymentEmailLeadHours:
-			(data as any).payment_email_lead_hours != null ? String((data as any).payment_email_lead_hours) : undefined
+			(data as any).payment_email_lead_hours != null ? String((data as any).payment_email_lead_hours) : undefined,
+		vatRatePercent:
+			(data as any).vat_rate_percent != null ? String((data as any).vat_rate_percent) : undefined
 	}
 }
