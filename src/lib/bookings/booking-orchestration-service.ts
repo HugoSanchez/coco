@@ -155,9 +155,11 @@ export async function orchestrateBookingCreation(
 	////// Step 4: Compute when to send the payment email (per-booking only)
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	const emailScheduledAt =
-		normalizedType === 'per_booking' && amount > 0
-			? computeEmailScheduledAt(billing.paymentEmailLeadHours, request.startTime, request.endTime)
-			: null
+		options?.suppressEmail
+			? null
+			: normalizedType === 'per_booking' && amount > 0
+				? computeEmailScheduledAt(billing.paymentEmailLeadHours, request.startTime, request.endTime)
+				: null
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////// Step 5: Create the bill (single write) and copy normalized type
@@ -203,8 +205,22 @@ export async function orchestrateBookingCreation(
 				supabaseClient
 			})
 		} else if (isPast) {
+			// Past bookings: only create calendar event if not suppressing email
+			// (when suppressEmail is true, skip calendar for past bookings)
+			if (!options?.suppressEmail) {
+				await createCalendarEventForBooking({
+					variant: 'internal_confirmed',
+					request: requestWithSuffix,
+					bookingId: booking.id,
+					client,
+					practitioner,
+					supabaseClient
+				})
+			}
+		} else if (options?.suppressEmail) {
+			// Future bookings with suppressEmail: create confirmed event (calendar invite only, no payment email)
 			await createCalendarEventForBooking({
-				variant: 'internal_confirmed',
+				variant: 'confirmed',
 				request: requestWithSuffix,
 				bookingId: booking.id,
 				client,

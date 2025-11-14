@@ -501,11 +501,11 @@ export default function LandingPage() {
 							</div>
 							<div className="p-6">
 								<h3 className="text-lg font-semibold text-gray-900 mb-2">
-									Dashboard sencillo y funcional
+									Generación automática de facturas
 								</h3>
 								<p className="text-gray-600 text-sm font-light leading-relaxed">
-									En un único dashboard tendrás visibilidad sobre toda tu agenda y estado de
-									facturación de cada una de tus consultas
+									Para cada cita que creas, Coco se encarga de generar las correspondientes facturas
+									de forma automática.
 								</p>
 							</div>
 						</motion.div>

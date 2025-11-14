@@ -106,10 +106,10 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 	const [billingTimingSelection, setBillingTimingSelection] = useState<string>('0') // '0' | '24' | '72' | '168' | '-1' | 'monthly'
 	const [isBillingTimingDirty, setIsBillingTimingDirty] = useState<boolean>(false)
 
-	// When recurrence is ON, restrict billing options to monthly, 24h before, after.
+	// When recurrence is ON, restrict billing options to monthly, 24h before, after, or no email.
 	useEffect(() => {
 		if (!isRecurring) return
-		const allowed = new Set(['monthly', '24', '-1'])
+		const allowed = new Set(['monthly', '24', '-1', 'no_email'])
 		if (!allowed.has(billingTimingSelection)) {
 			setBillingTimingSelection('24')
 		}
@@ -470,10 +470,12 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 				const dtstartLocal = format(localStart, "yyyy-MM-dd'T'HH:mm:ss")
 
 				// 2) Map billing policy from existing selector (restricted when isRecurring)
+				// Note: "no_email" maps to "right_after" but emails are suppressed in series creation
 				let billingPolicy: 'monthly' | 'right_after' | '24h_before'
 				if (billingTimingSelection === 'monthly') billingPolicy = 'monthly'
 				else if (billingTimingSelection === '24') billingPolicy = '24h_before'
 				else if (billingTimingSelection === '-1') billingPolicy = 'right_after'
+				else if (billingTimingSelection === 'no_email') billingPolicy = 'right_after'
 				else billingPolicy = 'right_after'
 
 				// 3) Build payload and call series endpoint
@@ -542,6 +544,7 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 			}
 
 			// Build payload for unified API contract
+			const suppressEmail = billingTimingSelection === 'no_email'
 			const payload = {
 				booking: {
 					clientId: selectedClient,
@@ -556,12 +559,14 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 					type: billingTimingSelection === 'monthly' ? 'monthly' : 'per_booking',
 					amount: finalAmount,
 					currency: 'EUR',
-					paymentEmailLeadHours:
-						billingTimingSelection === 'monthly'
+					paymentEmailLeadHours: suppressEmail
+						? null
+						: billingTimingSelection === 'monthly'
 							? null
 							: Number.isNaN(Number(billingTimingSelection))
 								? 0
-								: Number(billingTimingSelection)
+								: Number(billingTimingSelection),
+					suppressEmail
 				}
 			}
 
@@ -910,15 +915,47 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 												<SelectValue placeholder="Selecciona el tipo de facturación" />
 											</SelectTrigger>
 											<SelectContent>
+												<SelectItem value="no_email">
+													Manual{' '}
+													<span className="text-xs text-gray-500 font-normal">
+														- No se enviará email de facturación al paciente
+													</span>
+												</SelectItem>
+
 												{!isRecurring && (
 													<>
-														<SelectItem value="0">Inmediata</SelectItem>
-														<SelectItem value="168">1 semana antes</SelectItem>
+														<SelectItem value="0">
+															Inmediata{' '}
+															<span className="text-xs text-gray-500 font-normal">
+																- El email de confirmación se enviará al crear la cita
+															</span>
+														</SelectItem>
+														<SelectItem value="168">
+															1 semana antes{' '}
+															<span className="text-xs text-gray-500 font-normal">
+																- Se facturará al paciente 7 dias antes de la cita
+															</span>
+														</SelectItem>
 													</>
 												)}
-												<SelectItem value="24">24 horas antes</SelectItem>
-												<SelectItem value="-1">Después de la consulta</SelectItem>
-												<SelectItem value="monthly">Mensual</SelectItem>
+												<SelectItem value="24">
+													24 horas antes{' '}
+													<span className="text-xs text-gray-500 font-normal">
+														- Se facturará al paciente 24h antes de la cita
+													</span>
+												</SelectItem>
+												<SelectItem value="-1">
+													Después de la cita{' '}
+													<span className="text-xs text-gray-500 font-normal">
+														- Se facturará al paciente al acabar la cita
+													</span>
+												</SelectItem>
+												<SelectItem value="monthly">
+													Mensual{' '}
+													<span className="text-xs text-gray-500 font-normal">
+														- El paciente recibirá una factura agregada mensualmente
+													</span>
+												</SelectItem>
 											</SelectContent>
 										</Select>
 									)
