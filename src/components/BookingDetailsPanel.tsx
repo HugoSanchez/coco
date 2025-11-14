@@ -218,6 +218,12 @@ export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelPro
 						<Clock className="h-4 w-4 text-gray-600 ml-2" />
 					) : Number(bill?.amount) === 0 && bill?.status === 'paid' ? (
 						<Check className="h-4 w-4 text-teal-500 ml-2" />
+					) : details?.status === 'scheduled' &&
+					  !bill?.sent_at &&
+					  !bill?.email_scheduled_at &&
+					  bill?.billing_type !== 'monthly' &&
+					  Number(bill?.amount) > 0 ? (
+						<Check className="h-4 w-4 text-teal-500 ml-2" />
 					) : (
 						<AlertCircle className="h-4 w-4 ml-2" />
 					)}
@@ -244,6 +250,16 @@ export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelPro
 					) : Number(bill?.amount) === 0 && bill?.status === 'paid' ? (
 						<div className="flex items-start">
 							<span className="text-gray-600 text-sm">Invitación de calendario enviada.</span>
+						</div>
+					) : details?.status === 'scheduled' &&
+					  !bill?.sent_at &&
+					  !bill?.email_scheduled_at &&
+					  bill?.billing_type !== 'monthly' &&
+					  Number(bill?.amount) > 0 ? (
+						<div className="flex items-start">
+							<span className="text-gray-600 text-sm">
+								Invitación de calendario enviada. Email de facturación omitido (configuración manual).
+							</span>
 						</div>
 					) : (
 						<div className="flex items-start text-red-700">
