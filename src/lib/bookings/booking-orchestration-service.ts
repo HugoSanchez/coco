@@ -60,12 +60,14 @@ export interface CreateBookingRequest {
  * - amount: number (>= 0). 0 allowed; null/undefined not allowed
  * - currency: currently 'EUR' only (kept explicit for future-proofing)
  * - paymentEmailLeadHours: integer hours (nullable); 0 means immediate
+ * - suppressEmail: when true, payment emails will not be sent
  */
 export type BillingInput = {
 	type: 'per_booking' | 'monthly'
 	amount: number
 	currency: 'EUR'
 	paymentEmailLeadHours?: number | null
+	suppressEmail?: boolean
 }
 
 /**
