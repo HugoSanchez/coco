@@ -131,8 +131,19 @@ export async function orchestrateBookingCreation(
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////// Step 2: Decide which booking.status to persist (preserves prior behavior)
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// When suppressEmail is true, mark as confirmed (scheduled) since we're not waiting for payment
 	const bookingStatus: 'completed' | 'scheduled' | 'pending' =
-		normalizedType === 'per_booking' ? (amount > 0 ? (isPast ? 'completed' : 'pending') : 'scheduled') : 'scheduled'
+		options?.suppressEmail
+			? isPast
+				? 'completed'
+				: 'scheduled'
+			: normalizedType === 'per_booking'
+				? amount > 0
+					? isPast
+						? 'completed'
+						: 'pending'
+					: 'scheduled'
+				: 'scheduled'
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////// Step 3: Create the booking (single write)

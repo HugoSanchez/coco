@@ -48,6 +48,12 @@ export interface BillingSettings {
 	 * Can be set per client or as user default.
 	 */
 	vat_rate_percent?: number | null
+	/**
+	 * When true, payment emails will not be sent to the patient.
+	 * Calendar invites may still be sent for future bookings.
+	 * Defaults to false.
+	 */
+	suppress_email?: boolean
 }
 
 /**
@@ -62,6 +68,7 @@ export interface BillingPreferences {
 	firstMeetingDurationMin?: string
 	paymentEmailLeadHours?: string
 	vatRatePercent?: string
+	suppressEmail?: string // 'true' | 'false' | undefined (form value as string)
 }
 
 /**
@@ -102,7 +109,9 @@ export async function getBillingPreferences(userId: string): Promise<BillingPref
 			paymentEmailLeadHours:
 				(data as any).payment_email_lead_hours != null ? String((data as any).payment_email_lead_hours) : '0',
 			vatRatePercent:
-				(data as any).vat_rate_percent != null ? String((data as any).vat_rate_percent) : undefined
+				(data as any).vat_rate_percent != null ? String((data as any).vat_rate_percent) : undefined,
+			suppressEmail:
+				(data as any).suppress_email === true ? 'true' : (data as any).suppress_email === false ? 'false' : undefined
 		}
 	} catch (error) {
 		console.error('Error in getBillingPreferences:', error)
@@ -160,6 +169,13 @@ export async function saveBillingPreferences(
 			billingData.vat_rate_percent = isNaN(parsedVat) ? null : parsedVat
 		} else {
 			billingData.vat_rate_percent = null
+		}
+
+		// Optional suppress_email flag
+		if (preferences.suppressEmail != null && preferences.suppressEmail !== '') {
+			billingData.suppress_email = preferences.suppressEmail === 'true'
+		} else {
+			billingData.suppress_email = false
 		}
 
 		// First, attempt to update existing default settings
@@ -295,7 +311,8 @@ export async function upsertClientBillingSettings(
 	billingAmount: number,
 	currency: string = 'EUR',
 	paymentEmailLeadHours?: number | null,
-	vatRatePercent?: number | null
+	vatRatePercent?: number | null,
+	suppressEmail?: boolean
 ): Promise<BillingSettings> {
 	const payload: any = {
 		user_id: userId,
@@ -312,6 +329,9 @@ export async function upsertClientBillingSettings(
 	}
 	if (vatRatePercent !== undefined) {
 		payload.vat_rate_percent = vatRatePercent
+	}
+	if (suppressEmail !== undefined) {
+		payload.suppress_email = suppressEmail
 	}
 
 	const { data, error } = await supabase
@@ -339,6 +359,7 @@ export async function getClientBillingPreferences(
 	billingAmount?: string
 	paymentEmailLeadHours?: string
 	vatRatePercent?: string
+	suppressEmail?: string
 } | null> {
 	const client = supabaseClient || supabase
 	const { data, error } = await client
@@ -359,6 +380,12 @@ export async function getClientBillingPreferences(
 		paymentEmailLeadHours:
 			(data as any).payment_email_lead_hours != null ? String((data as any).payment_email_lead_hours) : undefined,
 		vatRatePercent:
-			(data as any).vat_rate_percent != null ? String((data as any).vat_rate_percent) : undefined
+			(data as any).vat_rate_percent != null ? String((data as any).vat_rate_percent) : undefined,
+		suppressEmail:
+			(data as any).suppress_email === true
+				? 'true'
+				: (data as any).suppress_email === false
+					? 'false'
+					: undefined
 	}
 }

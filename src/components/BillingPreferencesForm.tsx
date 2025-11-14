@@ -14,6 +14,11 @@ export interface BillingPreferences {
 	 * For monthly billing, this field is ignored.
 	 */
 	paymentEmailLeadHours?: string
+	/**
+	 * When 'true', payment emails will not be sent to the patient.
+	 * Calendar invites may still be sent for future bookings.
+	 */
+	suppressEmail?: string
 }
 
 // Legacy helper kept for compatibility (no longer rendered as a separate selector)
@@ -36,6 +41,7 @@ export function BillingPreferencesForm({ values, onChange, disabled }: BillingPr
 
 	// Human-readable description for when the payment email will be sent
 	const getPaymentTimingText = (): string => {
+		if (values.suppressEmail === 'true') return 'no se enviará email de facturación al paciente.'
 		if (values.billingType === 'monthly') return 'de forma consolidada el primer día de cada mes.'
 		const lead = values.paymentEmailLeadHours ?? '0'
 		if (lead === '-1') return 'pocos minutos después de la cita.'
@@ -194,22 +200,35 @@ export function BillingPreferencesForm({ values, onChange, disabled }: BillingPr
 					</div>
 					{(() => {
 						const timingValue =
-							values.billingType === 'monthly' ? 'monthly' : (values.paymentEmailLeadHours ?? '0')
+							values.suppressEmail === 'true'
+								? 'no_email'
+								: values.billingType === 'monthly'
+									? 'monthly'
+									: (values.paymentEmailLeadHours ?? '0')
 						return (
 							<Select
 								value={timingValue}
 								onValueChange={(value) => {
-									if (value === 'monthly') {
+									if (value === 'no_email') {
+										onChange({
+											...values,
+											suppressEmail: 'true',
+											paymentEmailLeadHours: '',
+											billingType: 'in-advance'
+										})
+									} else if (value === 'monthly') {
 										onChange({
 											...values,
 											billingType: 'monthly',
-											paymentEmailLeadHours: ''
+											paymentEmailLeadHours: '',
+											suppressEmail: 'false'
 										})
 									} else {
 										onChange({
 											...values,
 											paymentEmailLeadHours: value,
-											billingType: value === '-1' ? 'right-after' : 'in-advance'
+											billingType: value === '-1' ? 'right-after' : 'in-advance',
+											suppressEmail: 'false'
 										})
 									}
 								}}
@@ -219,6 +238,7 @@ export function BillingPreferencesForm({ values, onChange, disabled }: BillingPr
 									<SelectValue placeholder="Selecciona cuándo enviar el email" />
 								</SelectTrigger>
 								<SelectContent>
+									<SelectItem value="no_email">No enviar email</SelectItem>
 									<SelectItem value="0">Inmediatamente</SelectItem>
 									<SelectItem value="24">24 horas antes</SelectItem>
 									<SelectItem value="72">72 horas antes</SelectItem>

@@ -119,7 +119,8 @@ export function ClientFormFields({
 		billingAmount: '', // We'll load this from billing settings separately
 		paymentEmailLeadHours: '0',
 		billingType: 'in-advance' as 'in-advance' | 'right-after' | 'monthly',
-		applyVat: false // VAT checkbox state
+		applyVat: false, // VAT checkbox state
+		suppressEmail: 'false' // suppress_email flag as string
 	})
 
 	// Duplicate email detection state
@@ -144,6 +145,7 @@ export function ClientFormFields({
 		billingType: 'in-advance' | 'right-after' | 'monthly'
 		paymentEmailLeadHours: string
 		applyVat: boolean
+		suppressEmail: string
 	} | null>(null)
 
 	// Load user default billing settings on mount (for create mode)
@@ -167,12 +169,19 @@ export function ClientFormFields({
 						const vatRate =
 							defaultSettings?.vat_rate_percent ??
 							(prefs?.vatRatePercent ? parseFloat(prefs.vatRatePercent) : null)
+						const suppressEmail =
+							(defaultSettings as any)?.suppress_email === true
+								? 'true'
+								: prefs?.suppressEmail === 'true'
+									? 'true'
+									: 'false'
 
 						setUserDefaults({
 							billingAmount: amountString,
 							billingType,
 							paymentEmailLeadHours: leadHours,
-							applyVat: vatRate != null && vatRate > 0
+							applyVat: vatRate != null && vatRate > 0,
+							suppressEmail
 						})
 					}
 				} catch (error) {
@@ -195,6 +204,7 @@ export function ClientFormFields({
 					if (billingSettings) {
 						const amountString = billingSettings.billing_amount?.toString() || ''
 						const vatRate = (billingSettings as any).vat_rate_percent
+						const suppressEmail = (billingSettings as any).suppress_email === true ? 'true' : 'false'
 
 						setFormData((prev) => ({
 							...prev,
@@ -205,7 +215,8 @@ export function ClientFormFields({
 								(billingSettings as any).payment_email_lead_hours != null
 									? String((billingSettings as any).payment_email_lead_hours)
 									: '0',
-							applyVat: vatRate != null && vatRate > 0
+							applyVat: vatRate != null && vatRate > 0,
+							suppressEmail
 						}))
 						defaultsAppliedRef.current = true // Mark as applied so we don't overwrite
 					}
@@ -227,7 +238,8 @@ export function ClientFormFields({
 				billingAmount: userDefaults.billingAmount,
 				billingType: userDefaults.billingType,
 				paymentEmailLeadHours: userDefaults.paymentEmailLeadHours,
-				applyVat: userDefaults.applyVat
+				applyVat: userDefaults.applyVat,
+				suppressEmail: userDefaults.suppressEmail
 			}))
 			defaultsAppliedRef.current = true
 		}
@@ -283,9 +295,14 @@ export function ClientFormFields({
 					billing_type: formData.billingType,
 					currency: 'EUR', // Default currency
 					payment_email_lead_hours:
-						formData.paymentEmailLeadHours !== '' ? parseInt(formData.paymentEmailLeadHours, 10) : null,
-					vat_rate_percent: formData.applyVat ? 21.0 : null
-				}
+						formData.suppressEmail === 'true'
+							? null
+							: formData.paymentEmailLeadHours !== ''
+								? parseInt(formData.paymentEmailLeadHours, 10)
+								: null,
+					vat_rate_percent: formData.applyVat ? 21.0 : null,
+					suppress_email: formData.suppressEmail === 'true'
+				} as any
 			}
 
 			// Upsert client with optional billing settings (works for both create and update)
@@ -313,7 +330,8 @@ export function ClientFormFields({
 					billingAmount: '',
 					paymentEmailLeadHours: '0',
 					billingType: 'in-advance',
-					applyVat: false
+					applyVat: false,
+					suppressEmail: 'false'
 				})
 				defaultsAppliedRef.current = false // Reset so defaults can be applied again for next client
 			}
@@ -638,23 +656,36 @@ export function ClientFormFields({
 						</div>
 						{(() => {
 							const timingValue =
-								(formData.billingType === 'monthly' ? 'monthly' : formData.paymentEmailLeadHours) || '0'
+								formData.suppressEmail === 'true'
+									? 'no_email'
+									: formData.billingType === 'monthly'
+										? 'monthly'
+										: formData.paymentEmailLeadHours || '0'
 							return (
 								<Select
 									value={timingValue}
 									onValueChange={(val) => {
 										handleInputChange('shouldBill', true)
-										if (val === 'monthly') {
+										if (val === 'no_email') {
+											setFormData((prev) => ({
+												...prev,
+												suppressEmail: 'true',
+												paymentEmailLeadHours: '',
+												billingType: 'in-advance'
+											}))
+										} else if (val === 'monthly') {
 											setFormData((prev) => ({
 												...prev,
 												billingType: 'monthly',
-												paymentEmailLeadHours: ''
+												paymentEmailLeadHours: '',
+												suppressEmail: 'false'
 											}))
 										} else {
 											setFormData((prev) => ({
 												...prev,
 												paymentEmailLeadHours: val,
-												billingType: val === '-1' ? 'right-after' : 'in-advance'
+												billingType: val === '-1' ? 'right-after' : 'in-advance',
+												suppressEmail: 'false'
 											}))
 										}
 									}}
@@ -663,6 +694,7 @@ export function ClientFormFields({
 										<SelectValue placeholder="Selecciona cuándo enviar el email" />
 									</SelectTrigger>
 									<SelectContent>
+										<SelectItem value="no_email">No enviar email</SelectItem>
 										<SelectItem value="0">Inmediatamente</SelectItem>
 										<SelectItem value="24">24 horas antes</SelectItem>
 										<SelectItem value="72">72 horas antes</SelectItem>

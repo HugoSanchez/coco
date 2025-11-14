@@ -130,6 +130,7 @@ export interface ClientBillingSettingsPayload {
 	currency?: string
 	payment_email_lead_hours?: number | null
 	vat_rate_percent?: number | null
+	suppress_email?: boolean
 }
 
 /**
@@ -207,7 +208,7 @@ export async function createClient(payload: CreateClientPayload): Promise<Client
  */
 export async function createClientBillingSettings(payload: ClientBillingSettingsPayload) {
 	// Prepare the billing data with the correct structure for the billing_settings table
-	const billingData = {
+	const billingData: any = {
 		user_id: payload.user_id,
 		client_id: payload.client_id,
 		booking_id: null, // Client-specific settings (not booking-specific)
@@ -217,6 +218,9 @@ export async function createClientBillingSettings(payload: ClientBillingSettings
 		currency: payload.currency || 'EUR', // Default to EUR if not specified
 		payment_email_lead_hours: payload.payment_email_lead_hours ?? null,
 		vat_rate_percent: payload.vat_rate_percent ?? null
+	}
+	if (payload.suppress_email !== undefined) {
+		billingData.suppress_email = payload.suppress_email
 	}
 
 	const { data, error } = await supabase.from('billing_settings').insert([billingData]).select().single()
@@ -319,7 +323,7 @@ export async function upsertClientWithBilling(
 			// First check if billing settings exist for this client
 			const existingBillingSettings = await getClientBillingSettings(clientPayload.user_id, clientData.id)
 
-			const billingData = {
+			const billingData: any = {
 				user_id: clientPayload.user_id,
 				client_id: clientData.id,
 				booking_id: null,
@@ -329,6 +333,9 @@ export async function upsertClientWithBilling(
 				currency: billingPayload.currency || 'EUR',
 				payment_email_lead_hours: billingPayload.payment_email_lead_hours ?? null,
 				vat_rate_percent: billingPayload.vat_rate_percent ?? null
+			}
+			if ((billingPayload as any).suppress_email !== undefined) {
+				billingData.suppress_email = (billingPayload as any).suppress_email
 			}
 
 			if (existingBillingSettings) {
@@ -347,7 +354,7 @@ export async function upsertClientWithBilling(
 			}
 		} else {
 			// CREATE: Use the original create function for new client billing settings
-			await createClientBillingSettings({
+			const createPayload: ClientBillingSettingsPayload = {
 				user_id: clientPayload.user_id,
 				client_id: clientData.id,
 				billing_amount: billingPayload.billing_amount || null,
@@ -355,7 +362,11 @@ export async function upsertClientWithBilling(
 				currency: billingPayload.currency || 'EUR',
 				payment_email_lead_hours: billingPayload.payment_email_lead_hours ?? null,
 				vat_rate_percent: billingPayload.vat_rate_percent ?? null
-			})
+			}
+			if ((billingPayload as any).suppress_email !== undefined) {
+				createPayload.suppress_email = (billingPayload as any).suppress_email
+			}
+			await createClientBillingSettings(createPayload)
 		}
 	}
 

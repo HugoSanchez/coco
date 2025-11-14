@@ -202,6 +202,10 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 				setResolvedClientPrice(clientAmount)
 				setResolvedDefaultPrice(defaultAmount)
 
+				// Check suppress_email flag (client overrides user default)
+				const suppressEmail =
+					(clientSettings as any)?.suppress_email ?? (userDefault as any)?.suppress_email ?? false
+
 				// Resolve email lead hours preference (client overrides user default)
 				const leadRaw =
 					clientSettings?.payment_email_lead_hours ?? userDefault?.payment_email_lead_hours ?? null
@@ -214,7 +218,9 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 					userDefault?.billing_type ||
 					'in-advance') as 'in-advance' | 'right-after' | 'monthly'
 				if (!isBillingTimingDirty) {
-					if (effectiveBillingType === 'monthly') {
+					if (suppressEmail) {
+						setBillingTimingSelection('no_email')
+					} else if (effectiveBillingType === 'monthly') {
 						setBillingTimingSelection('monthly')
 					} else {
 						const sel =
@@ -249,12 +255,15 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 				const defaultAmount = Number(userDefault?.billing_amount || 0)
 				setResolvedClientPrice(null)
 				setResolvedDefaultPrice(defaultAmount)
+				const suppressEmail = (userDefault as any)?.suppress_email ?? false
 				const leadRaw = userDefault?.payment_email_lead_hours ?? null
 				const normalizedLead =
 					leadRaw == null || Number.isNaN(Number(leadRaw)) ? null : Math.trunc(Number(leadRaw))
 				setResolvedLeadHours(normalizedLead)
 				if (!isBillingTimingDirty) {
-					if ((userDefault?.billing_type as any) === 'monthly') {
+					if (suppressEmail) {
+						setBillingTimingSelection('no_email')
+					} else if ((userDefault?.billing_type as any) === 'monthly') {
 						setBillingTimingSelection('monthly')
 					} else {
 						const sel =
