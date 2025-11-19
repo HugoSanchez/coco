@@ -1,5 +1,7 @@
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import { Info } from 'lucide-react'
 
 export interface BillingPreferences {
@@ -19,6 +21,11 @@ export interface BillingPreferences {
 	 * Calendar invites may still be sent for future bookings.
 	 */
 	suppressEmail?: string
+	/**
+	 * VAT rate percentage (e.g., '21.0' for 21% VAT).
+	 * When set, VAT will be applied to invoices.
+	 */
+	vatRatePercent?: string
 }
 
 // Legacy helper kept for compatibility (no longer rendered as a separate selector)
@@ -257,6 +264,36 @@ export function BillingPreferencesForm({ values, onChange, disabled }: BillingPr
 						<strong>{getPaymentTimingText()}</strong>
 					</span>
 				</p>
+
+				{/* VAT Checkbox */}
+				<div className="space-y-1 pt-6">
+					<div className="flex items-center space-x-2">
+						<Checkbox
+							id="applyVat"
+							checked={values.vatRatePercent != null && parseFloat(values.vatRatePercent) > 0}
+							className="h-4 w-4"
+							onCheckedChange={(checked) => {
+								onChange({
+									...values,
+									vatRatePercent: checked === true ? '21.0' : undefined
+								})
+							}}
+							disabled={disabled}
+						/>
+						<Label
+							htmlFor="applyVat"
+							className="text-sm text-gray-700 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+						>
+							Aplicar IVA
+						</Label>
+					</div>
+					{values.vatRatePercent != null && parseFloat(values.vatRatePercent) > 0 && (
+						<p className="text-xs text-gray-500 ml-6">
+							Se aplicará automáticamente el IVA del 21% a todas las facturas que se generen con esta
+							configuración por defecto.
+						</p>
+					)}
+				</div>
 			</div>
 		</div>
 	)
