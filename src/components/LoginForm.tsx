@@ -111,7 +111,7 @@ export default function LoginForm() {
 					<h1 className="text-3xl font-black mb-3 text-center">¡Revisa tu correo!</h1>
 					<p className="mt-3 text-base md:text-lg text-gray-600 font-light">
 						Si no lo encuentras en tu bandeja de entrada,
-						<span className="font-bold text-primary"> asegúrate de mirar en tu bandeja de spam.</span>
+						<span className="font-bold text-primary"> mira en tu bandeja de spam.</span>
 					</p>
 					<Button variant="link" onClick={handleReset} className="mt-2 text-teal-500 hover:text-teal-600">
 						Volver a introducir mi email
