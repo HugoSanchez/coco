@@ -373,7 +373,7 @@ export function WeeklyAgenda() {
 				</div>
 			</div>
 
-			<div className="bg-white rounded-lg border border-gray-200 overflow-hidden relative">
+			<div className="rounded-lg border border-gray-200 overflow-hidden relative">
 				{/* Loading Overlay */}
 				{loadingBookings && (
 					<div className="absolute inset-0 bg-white/80 flex items-center justify-center z-50">
@@ -385,7 +385,7 @@ export function WeeklyAgenda() {
 				)}
 
 				{/* Day Headers */}
-				<div className="flex border-b border-gray-200">
+				<div className="flex border-b border-gray-200 bg-white">
 					<div className="w-20 flex-shrink-0 p-3 text-xs font-medium text-gray-500">CET</div>
 					<div className={`flex-1 grid ${showWeekends ? 'grid-cols-7' : 'grid-cols-5'}`}>
 						{weekDays.map((day, index) => {
@@ -413,14 +413,14 @@ export function WeeklyAgenda() {
 							return (
 								<div key={index} className="p-3 text-center border-l border-gray-200">
 									<div
-										className={`text-xs font-medium uppercase ${isToday ? 'text-blue-600' : 'text-gray-500'}`}
+										className={`text-xs font-medium uppercase ${isToday ? 'text-teal-700' : 'text-gray-500'}`}
 									>
 										{showWeekends
 											? dayNames[day.getDay() === 0 ? 6 : day.getDay() - 1]
 											: weekdayNames[index]}
 									</div>
 									<div
-										className={`text-xl font-normal mt-1 ${isToday ? 'text-blue-600' : 'text-gray-900'}`}
+										className={`text-xl font-normal mt-1 ${isToday ? 'text-teal-700' : 'text-gray-900'}`}
 									>
 										{day.getDate()}
 									</div>
@@ -440,7 +440,7 @@ export function WeeklyAgenda() {
 					}}
 					onDragStart={(e) => e.preventDefault()}
 				>
-					<div className="w-20 flex-shrink-0 border-r border-gray-200">
+					<div className="w-20 flex-shrink-0 border-r border-gray-200 bg-white">
 						{timeSlots.map((time, index) => {
 							const isHourMark = time.endsWith(':00')
 							const isHalfHourMark = time.endsWith(':30')
@@ -453,7 +453,7 @@ export function WeeklyAgenda() {
 											: isHalfHourMark
 												? 'border-t border-gray-200'
 												: ''
-									} px-2 py-1 text-xs text-gray-500`}
+									} px-2 py-1 text-xs text-gray-800 font-medium`}
 								>
 									{isHourMark ? time : ''}
 								</div>
@@ -466,7 +466,7 @@ export function WeeklyAgenda() {
 						{weekDays.map((day, dayIndex) => {
 							const dayBookings = getBookingsForDay(day)
 							return (
-								<div key={dayIndex} className="border-l border-gray-200 relative">
+								<div key={dayIndex} className="border-l border-gray-200 bg-[#ffffff] relative">
 									{timeSlots.map((time, slotIndex) => {
 										const isHourMark = time.endsWith(':00')
 										const isHalfHourMark = time.endsWith(':30')

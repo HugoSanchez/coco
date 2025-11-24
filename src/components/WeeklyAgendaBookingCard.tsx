@@ -26,48 +26,43 @@ const getPaymentBadge = (status: PaymentStatus) => {
 	switch (status) {
 		case 'paid':
 			return {
-				bg: 'bg-teal-50',
+				bg: 'border-teal-300 border border-dashed',
 				text: 'text-teal-700',
-				icon: <Check className="h-3 w-3" />,
 				label: 'Pagada',
-				dotColor: 'bg-teal-500',
-				borderColor: 'border-l-teal-500'
+				icon: <Check className="h-3 w-3 text-teal-700" />,
+				borderColor: 'border-l-teal-500 border-l-8 bg-[#fdfdfd] border border-gray-300'
 			}
 		case 'pending':
 			return {
-				bg: 'bg-orange-50',
-				text: 'text-orange-700',
-				icon: <Loader className="h-3 w-3" />,
-				label: 'Pendiente',
-				dotColor: 'bg-orange-500',
-				borderColor: 'border-l-orange-500'
+				bg: 'border-gray-300 border border-dashed',
+				text: 'text-gray-800',
+				icon: <Loader className="h-3 w-3 text-black" />,
+				label: 'Pago pendiente',
+				borderColor: 'border-l-gray-400 border-l-8 bg-[#fdfdfd] border border-gray-300'
 			}
 		case 'scheduled':
 			return {
-				bg: 'bg-blue-50',
-				text: 'text-blue-700',
-				icon: <Clock className="h-3 w-3" />,
-				label: 'Programado',
-				dotColor: 'bg-blue-500',
-				borderColor: 'border-l-blue-500'
+				bg: 'border-blue-300 border border-dashed',
+				text: 'text-blue-800',
+				icon: <Clock className="h-3 w-3 text-blue-800" />,
+				label: 'Pago programado',
+				borderColor: 'border-l-blue-400 border-l-8 bg-[#fdfdfd] border border-gray-300'
 			}
 		case 'canceled':
 			return {
-				bg: 'bg-red-50',
+				bg: 'border-red-300 border border-dashed',
 				text: 'text-red-700',
-				icon: <X className="h-3 w-3" />,
-				label: 'Cancelado',
-				dotColor: 'bg-red-500',
-				borderColor: 'border-l-red-500'
+				icon: <X className="h-3 w-3 text-red-700" />,
+				label: 'Pago cancelado',
+				borderColor: 'border-l-red-400 border-l-8 bg-[#fdfdfd] border border-gray-300'
 			}
 		case 'refunded':
 			return {
-				bg: 'bg-red-50',
-				text: 'text-red-700',
+				bg: 'border-rose-300 border border-dashed',
+				text: 'text-rose-700',
 				icon: <RefreshCcw className="h-3 w-3" />,
 				label: 'Reembolsado',
-				dotColor: 'bg-red-500',
-				borderColor: 'border-l-red-500'
+				borderColor: 'border-l-rose-400 border-l-8 bg-[#fdfdfd] border border-gray-300'
 			}
 		case 'disputed':
 			return {
@@ -75,7 +70,6 @@ const getPaymentBadge = (status: PaymentStatus) => {
 				text: 'text-red-700',
 				icon: <RefreshCcw className="h-3 w-3" />,
 				label: 'Disputado',
-				dotColor: 'bg-red-500',
 				borderColor: 'border-l-red-500'
 			}
 		case 'na':
@@ -85,7 +79,6 @@ const getPaymentBadge = (status: PaymentStatus) => {
 				text: 'text-gray-700',
 				icon: null,
 				label: 'N/A',
-				dotColor: 'bg-gray-500',
 				borderColor: 'border-l-gray-500'
 			}
 	}
@@ -111,9 +104,7 @@ export function WeeklyAgendaBookingCard({ booking, position }: BookingCardProps)
 					</div>
 					<div className="font-medium text-sm text-gray-600 mt-0.5">
 						Ocupado
-						<p className="text-xs text-gray-400 font-light">
-							Espacio ocupado en tu Google Calendar.
-						</p>
+						<p className="text-xs text-gray-400 font-light">Espacio ocupado en tu Google Calendar.</p>
 					</div>
 				</div>
 			</div>
@@ -138,7 +129,7 @@ export function WeeklyAgendaBookingCard({ booking, position }: BookingCardProps)
 	return (
 		<div
 			key={booking.id}
-			className={`absolute left-2 right-2 bg-white rounded border border-gray-200 border-l-4 ${borderColor} cursor-pointer transition-all hover:shadow-md pointer-events-auto z-0 overflow-hidden`}
+			className={`absolute left-2 right-2 rounded border border-gray-200 border-l-4 ${borderColor} cursor-pointer transition-all hover:shadow-md pointer-events-auto z-0 overflow-hidden`}
 			style={{
 				top: position.top,
 				height: position.height
@@ -147,34 +138,18 @@ export function WeeklyAgendaBookingCard({ booking, position }: BookingCardProps)
 			<div className="p-2 h-full flex flex-col">
 				<div className="flex-1">
 					<div className="text-xs text-gray-600">
-						{booking.startTime} - {booking.endTime}
+						{booking.startTime}h - {booking.endTime}h
 					</div>
-					<div className="font-semibold text-sm text-gray-900 mt-0.5">
-						{booking.patientName}
-					</div>
-					{consultationTypeLabel && (
-						<div className="text-xs text-gray-600 mt-0.5">
-							{consultationTypeLabel}
-						</div>
-					)}
-					{booking.appointmentType && (
-						<div className="text-xs text-gray-600 mt-0.5">
-							{booking.appointmentType}
-						</div>
-					)}
+					<div className="font-semibold text-sm text-gray-800">{booking.patientName}</div>
+					{consultationTypeLabel && <div className="text-xs text-gray-600">{consultationTypeLabel}</div>}
 				</div>
 				<div
-					className={`flex items-center gap-1.5 mt-2 py-1 pl-2 rounded text-xs font-medium ${paymentBadge.bg} ${paymentBadge.text}`}
+					className={`flex items-center gap-1.5 py-1 pl-2 rounded text-xs font-medium ${paymentBadge.bg} ${paymentBadge.text}`}
 				>
-					{paymentBadge.icon ? (
-						paymentBadge.icon
-					) : (
-						<div className={`h-2 w-2 ${paymentBadge.dotColor} rounded-full`} />
-					)}
+					{paymentBadge.icon}
 					{paymentBadge.label}
 				</div>
 			</div>
 		</div>
 	)
 }
-
