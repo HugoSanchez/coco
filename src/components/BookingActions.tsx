@@ -33,7 +33,9 @@ export function BookingActions({
 	onRefundBooking,
 	onRescheduleBooking,
 	onResendEmail,
-	onCancelSeries
+	onCancelSeries,
+	open,
+	onOpenChange
 }: {
 	isMobile: boolean
 	booking: BookingActionBooking
@@ -44,6 +46,8 @@ export function BookingActions({
 	onRescheduleBooking: (bookingId: string) => void
 	onResendEmail: (bookingId: string) => void
 	onCancelSeries?: (seriesId: string) => void // V2: Optional cancel series handler
+	open?: boolean // Controlled open state
+	onOpenChange?: (open: boolean) => void // Callback when open state changes
 }) {
 	const { toast } = useToast()
 	const [isResending, setIsResending] = useState(false)
@@ -82,13 +86,18 @@ export function BookingActions({
 	}
 
 	return (
-		<DropdownMenu>
+		<DropdownMenu open={open} onOpenChange={onOpenChange}>
 			<DropdownMenuTrigger asChild>
 				<Button variant="ghost" className="h-8 w-8 p-0 hover:bg-gray-100">
 					{isMobile ? <MoreVertical className="h-4 w-4" /> : <MoreHorizontal className="h-4 w-4" />}
 				</Button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end" className="space-y-1 p-2 border border-gray-300 rounded-lg">
+			<DropdownMenuContent
+				side="right"
+				align="start"
+				sideOffset={4}
+				className="space-y-1 p-2 border border-gray-300 rounded-lg"
+			>
 				{booking.payment_status === 'paid' && (
 					<DropdownMenuItem onClick={() => onRefundBooking(booking.id)} className="flex items-center gap-3">
 						<RotateCcw className="h-3 w-3" />

@@ -47,6 +47,9 @@ interface BookingFormProps {
 	onSuccess?: () => void // Called when booking is successfully created
 	onCancel?: () => void // Called when user cancels the booking process
 	clients: Client[] // List of available clients to select from
+	initialDate?: Date // Optional: Pre-select a date and skip to step 3
+	initialSlot?: { start: string; end: string } // Optional: Pre-select a time slot and skip to step 3
+	initialStep?: 1 | 2 | 3 // Optional: Start at a specific step (defaults to 1)
 }
 
 interface Client {
@@ -56,17 +59,24 @@ interface Client {
 	email: string // Client's email address
 }
 
-export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) {
+export function BookingForm({
+	onSuccess,
+	onCancel,
+	clients,
+	initialDate,
+	initialSlot,
+	initialStep = 1
+}: BookingFormProps) {
 	// Step management state
-	const [currentStep, setCurrentStep] = useState(1) // Tracks which step user is on (1, 2, or 3)
+	const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(initialStep) // Tracks which step user is on (1, 2, or 3)
 	const [loading, setLoading] = useState(false) // Loading state for booking creation
 
 	// Booking data state
-	const [selectedDate, setSelectedDate] = useState<Date | null>(null) // Date selected in step 1
+	const [selectedDate, setSelectedDate] = useState<Date | null>(initialDate || null) // Date selected in step 1
 	const [selectedSlot, setSelectedSlot] = useState<{
 		start: string
 		end: string
-	} | null>(null) // Time slot selected in step 2
+	} | null>(initialSlot || null) // Time slot selected in step 2
 	const [selectedClient, setSelectedClient] = useState<string>('') // Client ID selected in step 3
 	const [clientOptions, setClientOptions] = useState<DbClient[]>(clients as any)
 	const [clientMode, setClientMode] = useState<'select' | 'create'>('select')
@@ -132,12 +142,15 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 		loadFirstAmount()
 	}, [user?.id])
 
-	// Re-fetch existing bookings when returning to step 2 if date is already selected
+	// Fetch existing bookings when initial date is provided or when returning to step 2
 	useEffect(() => {
-		if (currentStep === 2 && selectedDate && existingBookings.length === 0) {
-			fetchExistingBookings(selectedDate)
+		if (selectedDate && existingBookings.length === 0) {
+			// Fetch if we have an initial date (starting at step 3) or if we're on step 2
+			if (initialDate || currentStep === 2) {
+				fetchExistingBookings(selectedDate)
+			}
 		}
-	}, [currentStep, selectedDate])
+	}, [currentStep, selectedDate, initialDate])
 
 	// Derive pricing and dropdown visibility in a single place to avoid races
 	function derivePricing({
@@ -434,7 +447,7 @@ export function BookingForm({ onSuccess, onCancel, clients }: BookingFormProps) 
 	 */
 	const handleBack = () => {
 		if (currentStep > 1) {
-			setCurrentStep(currentStep - 1)
+			setCurrentStep((currentStep - 1) as 1 | 2 | 3)
 		}
 	}
 

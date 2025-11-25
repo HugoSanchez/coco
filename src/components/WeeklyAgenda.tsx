@@ -6,6 +6,20 @@ import { Button } from '@/components/ui/button'
 
 import { Spinner } from '@/components/ui/spinner'
 import { WeeklyAgendaBookingCard } from '@/components/WeeklyAgendaBookingCard'
+import { useBookingActions } from '@/hooks/useBookingActions'
+import { useBookingModals } from '@/hooks/useBookingModals'
+import { useBookingCreation } from '@/hooks/useBookingCreation'
+import { useClientManagement } from '@/hooks/useClientManagement'
+import { useBookingDetails } from '@/hooks/useBookingDetails'
+import { RefundConfirmationModal } from '@/components/RefundConfirmationModal'
+import { MarkAsPaidConfirmationModal } from '@/components/MarkAsPaidConfirmationModal'
+import { CancelConfirmationModal } from '@/components/CancelConfirmationModal'
+import { RescheduleForm } from '@/components/RescheduleForm'
+import { BookingForm } from '@/components/BookingForm'
+import BookingDetailsPanel from '@/components/BookingDetailsPanel'
+import { SideSheetHeadless } from '@/components/SideSheetHeadless'
+import { format } from 'date-fns'
+import { es } from 'date-fns/locale'
 
 type PaymentStatus = 'scheduled' | 'pending' | 'paid' | 'disputed' | 'canceled' | 'refunded' | 'na'
 
@@ -54,18 +68,247 @@ export function WeeklyAgenda() {
 	const [isDragging, setIsDragging] = useState(false)
 	const [dragStart, setDragStart] = useState<{ day: number; slot: number } | null>(null)
 	const [dragEnd, setDragEnd] = useState<{ day: number; slot: number } | null>(null)
-	const [showBookingDialog, setShowBookingDialog] = useState(false)
-	const [newBooking, setNewBooking] = useState({
-		patientName: '',
-		appointmentType: '',
-		date: '',
-		startTime: '',
-		endTime: ''
-	})
 	const [bookings, setBookings] = useState<Booking[]>([])
 	const [loadingBookings, setLoadingBookings] = useState(true)
 	const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar')
 	const [hoveredSlot, setHoveredSlot] = useState<{ day: number; slot: number } | null>(null)
+	const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null)
+	const [selectedSlotForBooking, setSelectedSlotForBooking] = useState<{
+		date: Date
+		startTime: string
+		endTime: string
+	} | null>(null)
+
+	// Initialize client management hook
+	const { clients } = useClientManagement({
+		// Auto-fetch is enabled by default
+	})
+
+	// Initialize booking creation hook
+	const {
+		isFormOpen: isNewBookingOpen,
+		openForm: openNewBookingForm,
+		closeForm: closeNewBookingForm,
+		handleBookingCreated
+	} = useBookingCreation({
+		onBookingCreated: async () => {
+			// Refresh bookings after successful creation
+			await refreshBookings()
+		}
+	})
+
+	// Initialize booking details hook
+	const {
+		details: bookingDetails,
+		isLoading: detailsLoading,
+		isOpen: isDetailsOpen,
+		open: openDetails,
+		close: closeDetails
+	} = useBookingDetails({
+		onClose: () => {
+			// Refresh bookings when details panel closes (in case actions were performed)
+			refreshBookings()
+		}
+	})
+
+	// Initialize booking actions hook
+	const { cancelBooking, confirmBooking, markAsPaid, processRefund, resendEmail, cancelSeries } = useBookingActions({
+		onBookingUpdated: (bookingId, updates) => {
+			// Refresh bookings after update
+			refreshBookings()
+		},
+		onBookingsRemoved: () => {
+			// Refresh bookings after removal
+			refreshBookings()
+		}
+	})
+
+	// Initialize booking modals hook
+	const {
+		refundingBookingId,
+		markingAsPaidBookingId,
+		cancelingBookingId,
+		cancelingSeriesId,
+		isRescheduleOpen,
+		reschedulingBookingId,
+		openRefundModal,
+		closeRefundModal,
+		openMarkAsPaidModal,
+		closeMarkAsPaidModal,
+		openCancelBookingModal,
+		closeCancelBookingModal,
+		openCancelSeriesModal,
+		closeCancelSeriesModal,
+		openRescheduleModal,
+		closeRescheduleModal
+	} = useBookingModals()
+
+	// Helper function to refresh bookings
+	const refreshBookings = async () => {
+		// Trigger re-fetch by updating a dependency that the useEffect watches
+		// The useEffect will automatically refetch when currentWeekStart or showWeekends change
+		// For now, we'll just trigger a manual refetch by calling the same logic
+		const days = getWeekDays()
+		const firstDay = days[0]
+		const lastDay = days[days.length - 1]
+		const weekStart = new Date(
+			Date.UTC(firstDay.getFullYear(), firstDay.getMonth(), firstDay.getDate(), 0, 0, 0, 0)
+		)
+		const weekEnd = new Date(
+			Date.UTC(lastDay.getFullYear(), lastDay.getMonth(), lastDay.getDate(), 23, 59, 59, 999)
+		)
+
+		try {
+			const response = await fetch(
+				`/api/calendar/events?start=${encodeURIComponent(weekStart.toISOString())}&end=${encodeURIComponent(weekEnd.toISOString())}`
+			)
+
+			if (!response.ok) {
+				throw new Error('Failed to fetch calendar events')
+			}
+
+			const data = await response.json()
+
+			// Use the same mapping logic from useEffect
+			const formatHHmm = (iso: string) => {
+				const d = new Date(iso)
+				return d.toLocaleTimeString('en-GB', {
+					hour: '2-digit',
+					minute: '2-digit',
+					hour12: false,
+					timeZone: 'Europe/Madrid'
+				})
+			}
+
+			const mapEventsToBookings = (events: any[]): Booking[] => {
+				return events.map((ev: any) => {
+					const getDateInCET = (isoString: string): string => {
+						const d = new Date(isoString)
+						const year = d.toLocaleString('en-US', { timeZone: 'Europe/Madrid', year: 'numeric' })
+						const month = d.toLocaleString('en-US', { timeZone: 'Europe/Madrid', month: '2-digit' })
+						const day = d.toLocaleString('en-US', { timeZone: 'Europe/Madrid', day: '2-digit' })
+						return `${year}-${month}-${day}`
+					}
+
+					if (ev.type === 'system') {
+						let displayPaymentStatus: PaymentStatus = 'na'
+						if (ev.payment_status !== undefined && ev.payment_status !== null) {
+							if (ev.payment_status === 'not_applicable' && ev.billing_status === 'pending') {
+								displayPaymentStatus = 'scheduled'
+							} else if (ev.payment_status === 'not_applicable') {
+								displayPaymentStatus = 'na'
+							} else {
+								const statusMap: Record<string, PaymentStatus> = {
+									pending: 'pending',
+									paid: 'paid',
+									disputed: 'disputed',
+									canceled: 'canceled',
+									refunded: 'refunded'
+								}
+								displayPaymentStatus = statusMap[ev.payment_status] || 'na'
+							}
+						}
+
+						return {
+							id: ev.bookingId ? String(ev.bookingId) : `sys-${ev.start}-${ev.end}`,
+							type: 'booking',
+							patientName: ev.title || 'Cliente',
+							appointmentType: '',
+							startTime: formatHHmm(ev.start),
+							endTime: formatHHmm(ev.end),
+							date: getDateInCET(ev.start),
+							status: ev.status === 'canceled' ? 'canceled' : 'scheduled',
+							consultation_type: ev.consultation_type || null,
+							payment_status: displayPaymentStatus
+						}
+					}
+					return {
+						id: `busy-${ev.start}-${ev.end}`,
+						type: 'busy',
+						patientName: '',
+						appointmentType: '',
+						startTime: formatHHmm(ev.start),
+						endTime: formatHHmm(ev.end),
+						date: getDateInCET(ev.start),
+						status: 'scheduled'
+					}
+				})
+			}
+
+			const mapped = mapEventsToBookings(data.events || [])
+			setBookings(mapped)
+		} catch (e) {
+			console.error('Error refreshing bookings:', e)
+			setBookings([])
+		}
+	}
+
+	// Action handlers that open modals and close the action menu
+	const handleCancelBooking = (bookingId: string) => {
+		setOpenActionMenuId(null) // Close action menu
+		openCancelBookingModal(bookingId)
+	}
+
+	const handleMarkAsPaid = (bookingId: string) => {
+		setOpenActionMenuId(null) // Close action menu
+		openMarkAsPaidModal(bookingId)
+	}
+
+	const handleRefundBooking = (bookingId: string) => {
+		setOpenActionMenuId(null) // Close action menu
+		openRefundModal(bookingId)
+	}
+
+	const handleRescheduleBooking = (bookingId: string) => {
+		setOpenActionMenuId(null) // Close action menu
+		openRescheduleModal(bookingId)
+	}
+
+	const handleCancelSeries = (seriesId: string) => {
+		setOpenActionMenuId(null) // Close action menu
+		openCancelSeriesModal(seriesId)
+	}
+
+	const handleConfirmBooking = (bookingId: string) => {
+		setOpenActionMenuId(null) // Close action menu
+		confirmBooking(bookingId)
+	}
+
+	const handleResendEmail = (bookingId: string) => {
+		setOpenActionMenuId(null) // Close action menu
+		resendEmail(bookingId)
+	}
+
+	// Wrapper functions that handle modal confirmations
+	const handleMarkAsPaidConfirm = async (bookingId: string) => {
+		try {
+			await markAsPaid(bookingId)
+			closeMarkAsPaidModal()
+		} catch (error) {
+			closeMarkAsPaidModal()
+		}
+	}
+
+	const handleRefundConfirm = async (bookingId: string, reason?: string) => {
+		try {
+			await processRefund(bookingId, reason)
+			closeRefundModal()
+		} catch (error) {
+			// Modal stays open on error so user can retry
+		}
+	}
+
+	const handleCancelBookingConfirm = async (bookingId: string) => {
+		closeCancelBookingModal()
+		await cancelBooking(bookingId)
+	}
+
+	const handleConfirmCancelSeries = async () => {
+		if (!cancelingSeriesId) return
+		const seriesIdToCancel = cancelingSeriesId
+		closeCancelSeriesModal()
+		await cancelSeries(seriesIdToCancel)
+	}
 
 	const getWeekDays = () => {
 		const days = []
@@ -276,36 +519,30 @@ export function WeeklyAgenda() {
 			const endSlot = Math.max(dragStart.slot, dragEnd.slot)
 			const selectedDay = weekDays[dragStart.day]
 
-			setNewBooking({
-				patientName: '',
-				appointmentType: '',
-				date: selectedDay.toISOString().split('T')[0],
-				startTime: timeSlots[startSlot],
-				endTime: timeSlots[endSlot + 1] || '18:15'
+			// Parse time strings (e.g., "09:00") and combine with selected date
+			const startTimeStr = timeSlots[startSlot]
+			const endTimeStr = timeSlots[endSlot + 1] || '18:15'
+			const [startHour, startMinute] = startTimeStr.split(':').map(Number)
+			const [endHour, endMinute] = endTimeStr.split(':').map(Number)
+
+			// Create Date objects - use the selected day's year/month/date with the selected time
+			// The date is already in local timezone, so we create dates in that timezone
+			const startDate = new Date(selectedDay)
+			startDate.setHours(startHour, startMinute, 0, 0)
+			const endDate = new Date(selectedDay)
+			endDate.setHours(endHour, endMinute, 0, 0)
+
+			// Convert to ISO strings for BookingForm (these will be in UTC)
+			setSelectedSlotForBooking({
+				date: selectedDay,
+				startTime: startDate.toISOString(),
+				endTime: endDate.toISOString()
 			})
-			setShowBookingDialog(true)
+			openNewBookingForm()
 		}
 		setIsDragging(false)
 		setDragStart(null)
 		setDragEnd(null)
-	}
-
-	const handleCreateBooking = () => {
-		if (newBooking.patientName.trim()) {
-			const booking: Booking = {
-				id: Date.now().toString(),
-				type: 'booking',
-				patientName: newBooking.patientName,
-				appointmentType: newBooking.appointmentType || 'General Consultation',
-				startTime: newBooking.startTime,
-				endTime: newBooking.endTime,
-				date: newBooking.date,
-				status: 'scheduled'
-			}
-			setBookings([...bookings, booking])
-			setShowBookingDialog(false)
-			setNewBooking({ patientName: '', appointmentType: '', date: '', startTime: '', endTime: '' })
-		}
 	}
 
 	const isSlotInDragSelection = (dayIndex: number, slotIndex: number) => {
@@ -528,6 +765,23 @@ export function WeeklyAgenda() {
 												key={booking.id}
 												booking={booking}
 												position={position}
+												onCancelBooking={handleCancelBooking}
+												onConfirmBooking={handleConfirmBooking}
+												onMarkAsPaid={handleMarkAsPaid}
+												onRefundBooking={handleRefundBooking}
+												onRescheduleBooking={handleRescheduleBooking}
+												onResendEmail={handleResendEmail}
+												onCancelSeries={handleCancelSeries}
+												actionMenuOpen={openActionMenuId === booking.id}
+												onActionMenuOpenChange={(open) => {
+													setOpenActionMenuId(open ? booking.id : null)
+												}}
+												onClick={(bookingId) => {
+													// Only open details for booking type (not busy slots)
+													if (booking.type === 'booking') {
+														openDetails(bookingId)
+													}
+												}}
 											/>
 										)
 									})}
@@ -537,6 +791,152 @@ export function WeeklyAgenda() {
 					</div>
 				</div>
 			</div>
+
+			{/* Refund Confirmation Modal */}
+			{refundingBookingId &&
+				(() => {
+					const booking = bookings.find((b) => b.id === refundingBookingId)
+					return (
+						<RefundConfirmationModal
+							isOpen={!!refundingBookingId}
+							onOpenChange={(open) => !open && closeRefundModal()}
+							onConfirm={(reason) => handleRefundConfirm(refundingBookingId, reason)}
+							bookingDetails={{
+								id: refundingBookingId,
+								customerName: booking?.patientName || 'Cliente',
+								customerEmail: '',
+								amount: 0,
+								currency: 'EUR',
+								date: booking?.date
+									? format(new Date(booking.date + 'T12:00:00'), 'dd MMM yyyy', { locale: es })
+									: ''
+							}}
+						/>
+					)
+				})()}
+
+			{/* Mark As Paid Confirmation Modal */}
+			{markingAsPaidBookingId &&
+				(() => {
+					const booking = bookings.find((b) => b.id === markingAsPaidBookingId)
+					return (
+						<MarkAsPaidConfirmationModal
+							key={markingAsPaidBookingId}
+							isOpen={!!markingAsPaidBookingId}
+							onOpenChange={(open) => !open && closeMarkAsPaidModal()}
+							onConfirm={() => {
+								handleMarkAsPaidConfirm(markingAsPaidBookingId)
+							}}
+							bookingDetails={{
+								id: markingAsPaidBookingId,
+								customerName: booking?.patientName || 'Cliente',
+								customerEmail: '',
+								amount: 0,
+								currency: 'EUR',
+								date: booking?.date
+									? format(new Date(booking.date + 'T12:00:00'), 'dd MMM yyyy', { locale: es })
+									: ''
+							}}
+						/>
+					)
+				})()}
+
+			{/* Cancel Confirmation Modal */}
+			{cancelingBookingId &&
+				(() => {
+					const booking = bookings.find((b) => b.id === cancelingBookingId)
+					const isPaid = booking?.payment_status === 'paid'
+					return (
+						<CancelConfirmationModal
+							isOpen={!!cancelingBookingId}
+							onOpenChange={(open) => {
+								if (!open) closeCancelBookingModal()
+							}}
+							onConfirm={async () => {
+								await handleCancelBookingConfirm(cancelingBookingId)
+							}}
+							isPaid={!!isPaid}
+						/>
+					)
+				})()}
+
+			{/* Cancel Series Confirmation Modal */}
+			{cancelingSeriesId && (
+				<CancelConfirmationModal
+					isOpen={!!cancelingSeriesId}
+					onOpenChange={(open) => {
+						if (!open) closeCancelSeriesModal()
+					}}
+					onConfirm={async () => {
+						await handleConfirmCancelSeries()
+					}}
+					isPaid={false}
+					title="Cancelar evento recurrente"
+					description="Se cancelarán todas las citas futuras de esta serie recurrente. Esta acción no se puede deshacer."
+				/>
+			)}
+
+			{/* Reschedule Sidebar */}
+			<SideSheetHeadless
+				isOpen={isRescheduleOpen}
+				onClose={() => {
+					closeRescheduleModal()
+				}}
+				title="Reprogramar Cita"
+				description="Selecciona una nueva fecha y hora para la cita"
+			>
+				{reschedulingBookingId && (
+					<RescheduleForm
+						bookingId={reschedulingBookingId}
+						customerName={bookings.find((b) => b.id === reschedulingBookingId)?.patientName || 'Cliente'}
+						onSuccess={() => {
+							closeRescheduleModal()
+							refreshBookings()
+						}}
+						onCancel={() => {
+							closeRescheduleModal()
+						}}
+					/>
+				)}
+			</SideSheetHeadless>
+
+			{/* New Booking Sidebar */}
+			<SideSheetHeadless
+				isOpen={isNewBookingOpen}
+				onClose={() => {
+					closeNewBookingForm()
+					setSelectedSlotForBooking(null)
+				}}
+				title="Nueva Cita"
+				description="Completa los detalles de la cita"
+			>
+				{selectedSlotForBooking && (
+					<BookingForm
+						clients={clients as any[]}
+						initialDate={selectedSlotForBooking.date}
+						initialSlot={{
+							start: selectedSlotForBooking.startTime,
+							end: selectedSlotForBooking.endTime
+						}}
+						initialStep={3}
+						onSuccess={handleBookingCreated}
+						onCancel={() => {
+							closeNewBookingForm()
+							setSelectedSlotForBooking(null)
+						}}
+					/>
+				)}
+			</SideSheetHeadless>
+
+			{/* Booking Details SideSheet */}
+			<SideSheetHeadless
+				isOpen={isDetailsOpen}
+				onClose={closeDetails}
+				title="Detalles de la cita"
+				description={undefined}
+			>
+				<BookingDetailsPanel details={bookingDetails} onClose={closeDetails} isLoading={detailsLoading} />
+			</SideSheetHeadless>
 		</div>
 	)
 }

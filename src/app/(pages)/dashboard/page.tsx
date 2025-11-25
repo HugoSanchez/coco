@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import { useToast } from '@/components/ui/use-toast'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { ClientList } from '@/components/ClientList'
 import { BookingsTable, Booking } from '@/components/BookingsTable'
 import { SideSheetHeadless } from '@/components/SideSheetHeadless'
@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatCard } from '@/components/StatCard'
-import { getClientsForUser, Client, getClientFullName } from '@/lib/db/clients'
+import { Client, getClientFullName } from '@/lib/db/clients'
 import { getBookingsWithBills, BookingWithBills } from '@/lib/db/bookings'
 import { BookingForm } from '@/components/BookingForm'
 import { Spinner } from '@/components/ui/spinner'
@@ -28,6 +28,9 @@ import { getCurrentMonthNameCapitalized } from '@/lib/utils'
 import { CancelConfirmationModal } from '@/components/CancelConfirmationModal'
 import { X } from 'lucide-react'
 import { useBookingActions } from '@/hooks/useBookingActions'
+import { useClientManagement } from '@/hooks/useClientManagement'
+import { useBookingModals } from '@/hooks/useBookingModals'
+import { useBookingCreation } from '@/hooks/useBookingCreation'
 
 /**
  * Interface for dashboard statistics API response
@@ -94,22 +97,75 @@ const transformBooking = (dbBooking: BookingWithBills): Booking => {
 
 export default function Dashboard() {
 	const { user, profile, loading, stripeOnboardingCompleted, calendarConnected } = useUser()
-	const [clients, setClients] = useState<Client[]>([])
-	const [loadingClients, setLoadingClients] = useState(true)
+
+	// Initialize client management hook
+	const {
+		clients,
+		loading: loadingClients,
+		refreshClients
+	} = useClientManagement({
+		// Auto-fetch is enabled by default, so clients will load on mount
+	})
+
 	const [bookings, setBookings] = useState<Booking[]>([])
 	const [loadingBookings, setLoadingBookings] = useState(false)
 	const [loadingMore, setLoadingMore] = useState(false)
 	const [hasMore, setHasMore] = useState(false)
 	const [offset, setOffset] = useState(0)
 	const [isFilterOpen, setIsFilterOpen] = useState(false)
-	const [isNewBookingOpen, setIsNewBookingOpen] = useState(false)
 	const [showStripeConfigModal, setShowStripeConfigModal] = useState(false)
-	const [refundingBookingId, setRefundingBookingId] = useState<string | null>(null)
-	const [markingAsPaidBookingId, setMarkingAsPaidBookingId] = useState<string | null>(null)
-	const [cancelingBookingId, setCancelingBookingId] = useState<string | null>(null)
-	const [cancelingSeriesId, setCancelingSeriesId] = useState<string | null>(null) // V2: Track series cancellation
-	const [isRescheduleOpen, setIsRescheduleOpen] = useState(false)
-	const [reschedulingBookingId, setReschedulingBookingId] = useState<string | null>(null)
+
+	// Initialize booking creation hook
+	const {
+		isFormOpen: isNewBookingOpen,
+		openForm: openNewBookingForm,
+		closeForm: closeNewBookingForm,
+		handleBookingCreated
+	} = useBookingCreation({
+		onBookingCreated: async () => {
+			// Refresh bookings list after successful creation
+			if (user) {
+				try {
+					const result = await getBookingsWithBills(
+						user.id,
+						{ limit: 10, offset: 0 },
+						{
+							customerSearch: filters.customerSearch || undefined,
+							statusFilter: filters.statusFilter,
+							startDate: filters.startDate || undefined,
+							endDate: filters.endDate || undefined
+						}
+					)
+					const transformedBookings = result.bookings.map(transformBooking)
+					setBookings(transformedBookings)
+					setHasMore(result.hasMore)
+					setOffset(10)
+				} catch (error) {
+					console.error('Error refreshing bookings:', error)
+				}
+			}
+		}
+	})
+
+	// Initialize booking modals hook
+	const {
+		refundingBookingId,
+		markingAsPaidBookingId,
+		cancelingBookingId,
+		cancelingSeriesId,
+		isRescheduleOpen,
+		reschedulingBookingId,
+		openRefundModal,
+		closeRefundModal,
+		openMarkAsPaidModal,
+		closeMarkAsPaidModal,
+		openCancelBookingModal,
+		closeCancelBookingModal,
+		openCancelSeriesModal,
+		closeCancelSeriesModal,
+		openRescheduleModal,
+		closeRescheduleModal
+	} = useBookingModals()
 	const [filters, setFilters] = useState<BookingFiltersState>({
 		customerSearch: '',
 		statusFilter: 'all',
@@ -299,37 +355,8 @@ export default function Dashboard() {
 		}
 	}, [user, filters, toast])
 
-	useEffect(() => {
-		const fetchClients = async () => {
-			if (!user) return
-			setLoadingClients(true)
-			try {
-				const data = await getClientsForUser(user.id)
-				setClients(data as Client[])
-			} catch (e) {
-				// handle error
-			} finally {
-				setLoadingClients(false)
-			}
-		}
-		if (user) {
-			fetchClients()
-		}
-	}, [user])
-
-	const handleClientCreated = async () => {
-		// Refresh the client list when a new client is created
-		if (!user) return
-		setLoadingClients(true)
-		try {
-			const data = await getClientsForUser(user.id)
-			setClients(data as Client[])
-		} catch (e) {
-			console.error('Error refreshing clients:', e)
-		} finally {
-			setLoadingClients(false)
-		}
-	}
+	// Client management is now handled by useClientManagement hook
+	// No need for manual fetching or handleClientCreated - the hook handles it
 
 	// Initialize booking actions hook with callbacks for state updates
 	const { cancelBooking, confirmBooking, markAsPaid, processRefund, resendEmail, cancelSeries } = useBookingActions({
@@ -347,27 +374,15 @@ export default function Dashboard() {
 		onStatsRefresh: fetchDashboardStats
 	})
 
-	// Modal state handlers (these just open/close modals, not actual actions)
-	const handleRefundBooking = (bookingId: string) => {
-		setRefundingBookingId(bookingId)
-	}
-
-	const handleShowMarkAsPaidDialog = (bookingId: string) => {
-		setMarkingAsPaidBookingId(bookingId)
-	}
-
-	const handleShowCancelDialog = (bookingId: string) => {
-		setCancelingBookingId(bookingId)
-	}
-
-	const handleCancelSeries = (seriesId: string) => {
-		setCancelingSeriesId(seriesId)
-	}
-
+	// Modal handlers are now provided by useBookingModals hook
+	// We create wrapper functions that combine modal actions with booking actions
+	const handleRefundBooking = openRefundModal
+	const handleShowMarkAsPaidDialog = openMarkAsPaidModal
+	const handleShowCancelDialog = openCancelBookingModal
+	const handleCancelSeries = openCancelSeriesModal
 	const handleRescheduleBooking = (bookingId: string) => {
 		console.log('Opening reschedule slidesheet for booking:', bookingId)
-		setReschedulingBookingId(bookingId)
-		setIsRescheduleOpen(true)
+		openRescheduleModal(bookingId)
 	}
 
 	// Wrapper for cancel booking that handles the modal confirmation
@@ -380,10 +395,10 @@ export default function Dashboard() {
 		try {
 			await markAsPaid(bookingId)
 			// Close the modal after successful operation
-			setMarkingAsPaidBookingId(null)
+			closeMarkAsPaidModal()
 		} catch (error) {
 			// Close the modal even on error
-			setMarkingAsPaidBookingId(null)
+			closeMarkAsPaidModal()
 		}
 	}
 
@@ -392,7 +407,7 @@ export default function Dashboard() {
 		try {
 			await processRefund(bookingId, reason)
 			// Close the modal after successful operation
-			setRefundingBookingId(null)
+			closeRefundModal()
 		} catch (error) {
 			// Modal stays open on error so user can retry
 		}
@@ -404,7 +419,7 @@ export default function Dashboard() {
 
 		// Close dialog immediately since we show loading toast
 		const seriesIdToCancel = cancelingSeriesId
-		setCancelingSeriesId(null)
+		closeCancelSeriesModal()
 
 		try {
 			await cancelSeries(seriesIdToCancel)
@@ -534,7 +549,7 @@ export default function Dashboard() {
 							if (stripeOnboardingCompleted === false) {
 								setShowStripeConfigModal(true)
 							} else {
-								setIsNewBookingOpen(true)
+								openNewBookingForm()
 							}
 						}}
 					>
@@ -757,7 +772,7 @@ export default function Dashboard() {
 								<ClientList
 									clients={clients as Client[]}
 									loading={loadingClients}
-									onClientCreated={handleClientCreated}
+									onClientCreated={refreshClients}
 								/>
 							</div>
 						)}
@@ -845,7 +860,7 @@ export default function Dashboard() {
 							<ClientList
 								clients={clients as Client[]}
 								loading={loadingClients}
-								onClientCreated={handleClientCreated}
+								onClientCreated={refreshClients}
 							/>
 						</div>
 					</div>
@@ -870,28 +885,14 @@ export default function Dashboard() {
 			{/* New Booking Sidebar */}
 			<SideSheetHeadless
 				isOpen={isNewBookingOpen}
-				onClose={() => setIsNewBookingOpen(false)}
+				onClose={closeNewBookingForm}
 				title="Nueva Cita"
 				description="Crea una nueva cita para uno de tus pacientes."
 			>
 				<BookingForm
 					clients={clients as any[]}
-					onSuccess={async () => {
-						setIsNewBookingOpen(false)
-						// Refresh bookings list
-						if (user) {
-							try {
-								const result = await getBookingsWithBills(user.id, { limit: 10, offset: 0 })
-								const transformedBookings = result.bookings.map(transformBooking)
-								setBookings(transformedBookings)
-								setHasMore(result.hasMore)
-								setOffset(10)
-							} catch (error) {
-								console.error('Error refreshing bookings:', error)
-							}
-						}
-					}}
-					onCancel={() => setIsNewBookingOpen(false)}
+					onSuccess={handleBookingCreated}
+					onCancel={closeNewBookingForm}
 				/>
 			</SideSheetHeadless>
 
@@ -900,8 +901,7 @@ export default function Dashboard() {
 				isOpen={isRescheduleOpen}
 				onClose={() => {
 					console.log('Closing reschedule slidesheet')
-					setIsRescheduleOpen(false)
-					setReschedulingBookingId(null)
+					closeRescheduleModal()
 				}}
 				title="Reprogramar Cita"
 				description="Selecciona una nueva fecha y hora para la cita"
@@ -912,13 +912,11 @@ export default function Dashboard() {
 						customerName={bookings.find((b) => b.id === reschedulingBookingId)?.customerName || 'Cliente'}
 						onSuccess={() => {
 							console.log('Reschedule successful')
-							setIsRescheduleOpen(false)
-							setReschedulingBookingId(null)
+							closeRescheduleModal()
 						}}
 						onCancel={() => {
 							console.log('Reschedule cancelled')
-							setIsRescheduleOpen(false)
-							setReschedulingBookingId(null)
+							closeRescheduleModal()
 						}}
 					/>
 				)}
@@ -942,7 +940,7 @@ export default function Dashboard() {
 					return (
 						<RefundConfirmationModal
 							isOpen={!!refundingBookingId}
-							onOpenChange={(open) => !open && setRefundingBookingId(null)}
+							onOpenChange={(open) => !open && closeRefundModal()}
 							onConfirm={(reason) => handleRefundConfirm(refundingBookingId, reason)}
 							bookingDetails={{
 								id: booking.id,
@@ -975,7 +973,7 @@ export default function Dashboard() {
 						<MarkAsPaidConfirmationModal
 							key={markingAsPaidBookingId}
 							isOpen={!!markingAsPaidBookingId}
-							onOpenChange={(open) => !open && setMarkingAsPaidBookingId(null)}
+							onOpenChange={(open) => !open && closeMarkAsPaidModal()}
 							onConfirm={() => {
 								handleMarkAsPaid(markingAsPaidBookingId)
 							}}
@@ -1010,11 +1008,11 @@ export default function Dashboard() {
 						<CancelConfirmationModal
 							isOpen={!!cancelingBookingId}
 							onOpenChange={(open) => {
-								if (!open) setCancelingBookingId(null)
+								if (!open) closeCancelBookingModal()
 							}}
 							onConfirm={async () => {
 								const id = cancelingBookingId
-								setCancelingBookingId(null)
+								closeCancelBookingModal()
 								if (id) {
 									await handleCancelBooking(id)
 								}
@@ -1029,7 +1027,7 @@ export default function Dashboard() {
 				<CancelConfirmationModal
 					isOpen={!!cancelingSeriesId}
 					onOpenChange={(open) => {
-						if (!open) setCancelingSeriesId(null)
+						if (!open) closeCancelSeriesModal()
 					}}
 					onConfirm={async () => {
 						await handleConfirmCancelSeries()
