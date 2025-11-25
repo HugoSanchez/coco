@@ -9,9 +9,14 @@ import { useEffect } from 'react'
 interface BookingDetailsPanelProps {
 	details: any
 	onClose?: () => void
+	/**
+	 * Whether the booking details are currently being loaded
+	 * When true, shows a loading spinner instead of the details content
+	 */
+	isLoading?: boolean
 }
 
-export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelProps) {
+export function BookingDetailsPanel({ details, onClose, isLoading = false }: BookingDetailsPanelProps) {
 	const bill = details?.bill
 
 	useEffect(() => {
@@ -131,7 +136,7 @@ export function BookingDetailsPanel({ details, onClose }: BookingDetailsPanelPro
 		return 'not_applicable'
 	}
 
-	if (!details) {
+	if (isLoading || !details) {
 		return (
 			<div className="h-full w-full flex items-center justify-center">
 				<Spinner size="sm" color="dark" />

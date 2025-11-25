@@ -93,8 +93,19 @@ interface UseBookingDetailsReturn {
 
 	/**
 	 * Whether the details are currently being fetched
+	 * This is the raw loading state from the API call
 	 */
 	loading: boolean
+
+	/**
+	 * Computed loading state that should be used for rendering spinners.
+	 * Returns true when:
+	 * - The panel is open AND details are null (initial state or after clearing)
+	 * - OR actively loading (loading === true)
+	 *
+	 * This ensures the spinner always shows when the panel is open but no data is available yet.
+	 */
+	isLoading: boolean
 
 	/**
 	 * Whether the details panel is open
@@ -291,10 +302,23 @@ export function useBookingDetails(options: UseBookingDetailsOptions = {}): UseBo
 		}
 	}, [selectedBookingId, fetchDetails, onDetailsFetched, onError])
 
+	/**
+	 * Computed loading state for rendering spinners
+	 *
+	 * Returns true when:
+	 * - Actively loading (loading === true), OR
+	 * - Panel is open but no details available yet (isOpen && !details)
+	 *
+	 * This ensures the spinner always shows when the panel is open but data hasn't loaded yet,
+	 * even if there's a timing issue with React state batching.
+	 */
+	const isLoading = loading || (isOpen && !details)
+
 	// Return all state and control functions
 	return {
 		details,
 		loading,
+		isLoading,
 		isOpen,
 		selectedBookingId,
 		open,

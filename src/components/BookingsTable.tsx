@@ -154,7 +154,7 @@ export function BookingsTable({
 	// Initialize booking details hook with URL sync callbacks
 	const {
 		details,
-		loading: detailsLoading,
+		isLoading: detailsLoading,
 		isOpen,
 		open,
 		close
@@ -164,7 +164,7 @@ export function BookingsTable({
 			try {
 				const path = window.location.pathname
 				const base = `${path}?panel=booking&id=${bookingId}`
-				router.replace(base)
+				router.replace(base, { scroll: false })
 			} catch (_) {
 				// Ignore errors
 			}
@@ -172,7 +172,7 @@ export function BookingsTable({
 		onClose: () => {
 			// Clear URL when closing
 			try {
-				router.replace(window.location.pathname)
+				router.replace(window.location.pathname, { scroll: false })
 			} catch (_) {
 				// Ignore errors
 			}
@@ -358,13 +358,7 @@ export function BookingsTable({
 				</div>
 			</div>
 			<SideSheet isOpen={isOpen} onClose={close} title="Detalles de la cita" description={undefined}>
-				{detailsLoading ? (
-					<div className="flex justify-center items-center py-8">
-						<Spinner size="sm" />
-					</div>
-				) : (
-					<BookingDetailsPanel details={details} onClose={close} />
-				)}
+				<BookingDetailsPanel details={details} onClose={close} isLoading={detailsLoading} />
 			</SideSheet>
 		</div>
 	)
