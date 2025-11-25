@@ -12,6 +12,7 @@ import BookingDetailsPanel from '@/components/BookingDetailsPanel'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Repeat } from 'lucide-react'
+import { useBookingDetails } from '@/hooks/useBookingDetails'
 
 export interface Booking {
 	id: string
@@ -149,13 +150,34 @@ export function BookingsTable({
 	const router = useRouter()
 	const [isMobile, setIsMobile] = useState(false)
 	const searchParams = useSearchParams()
-	const [detailsOpen, setDetailsOpen] = useState(() => {
-		if (typeof window === 'undefined') return false
-		const sp = new URLSearchParams(window.location.search)
-		return sp.get('panel') === 'booking' && !!sp.get('id')
+
+	// Initialize booking details hook with URL sync callbacks
+	const {
+		details,
+		loading: detailsLoading,
+		isOpen,
+		open,
+		close
+	} = useBookingDetails({
+		onOpen: (bookingId) => {
+			// Reflect open state in URL for persistence across tab switches / reloads
+			try {
+				const path = window.location.pathname
+				const base = `${path}?panel=booking&id=${bookingId}`
+				router.replace(base)
+			} catch (_) {
+				// Ignore errors
+			}
+		},
+		onClose: () => {
+			// Clear URL when closing
+			try {
+				router.replace(window.location.pathname)
+			} catch (_) {
+				// Ignore errors
+			}
+		}
 	})
-	const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
-	const [details, setDetails] = useState<any>(null)
 
 	useEffect(() => {
 		const onResize = () => setIsMobile(window.innerWidth < 768)
@@ -164,23 +186,9 @@ export function BookingsTable({
 		return () => window.removeEventListener('resize', onResize)
 	}, [])
 
+	// Open details for a booking
 	const openDetails = async (b: Booking) => {
-		setSelectedBooking(b)
-		setDetails(null)
-		setDetailsOpen(true)
-		// Reflect open state in URL for persistence across tab switches / reloads
-		try {
-			const path = window.location.pathname
-			const base = `${path}?panel=booking&id=${b.id}`
-			router.replace(base)
-		} catch (_) {}
-		try {
-			const res = await fetch(`/api/bookings/${b.id}`)
-			if (res.ok) {
-				const data = await res.json()
-				setDetails(data)
-			}
-		} catch (_) {}
+		await open(b.id)
 	}
 
 	// Sync opening from URL (deep-link / back-forward)
@@ -188,32 +196,19 @@ export function BookingsTable({
 		try {
 			const paramPanel = searchParams.get('panel')
 			const paramId = searchParams.get('id')
-			if (paramPanel === 'booking' && paramId) {
-				setDetailsOpen(true)
-				if (!selectedBooking || selectedBooking.id !== paramId) {
-					setSelectedBooking({
-						id: paramId,
-						customerName: '',
-						customerEmail: '',
-						bookingDate: new Date(),
-						status: 'pending',
-						billing_status: 'pending',
-						payment_status: 'pending',
-						amount: 0,
-						currency: 'EUR'
-					} as any)
-					;(async () => {
-						try {
-							const res = await fetch(`/api/bookings/${paramId}`)
-							if (res.ok) {
-								const data = await res.json()
-								setDetails(data)
-							}
-						} catch (_) {}
-					})()
-				}
+			if (paramPanel === 'booking' && paramId && !isOpen) {
+				// Only open if not already open for this booking
+				// The hook will handle fetching details
+				open(paramId).catch(() => {
+					// Silently handle errors - URL might have invalid booking ID
+				})
+			} else if (paramPanel !== 'booking' && isOpen) {
+				// Close if URL doesn't have panel=booking but panel is open
+				close()
 			}
-		} catch (_) {}
+		} catch (_) {
+			// Ignore errors
+		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [searchParams])
 	if (loading) {
@@ -286,11 +281,11 @@ export function BookingsTable({
 								</TableRow>
 							) : (
 								bookings.map((booking) => (
-								<TableRow
-									key={booking.id}
-									className="transition-colors h-14 cursor-pointer hover:bg-gray-50/50"
-									onClick={() => openDetails(booking)}
-								>
+									<TableRow
+										key={booking.id}
+										className="transition-colors h-14 cursor-pointer hover:bg-gray-50/50"
+										onClick={() => openDetails(booking)}
+									>
 										{/* Client */}
 										<TableCell className="py-2 pr-0">
 											<div className="font-medium flex items-center gap-2">
@@ -362,26 +357,14 @@ export function BookingsTable({
 					</Table>
 				</div>
 			</div>
-			<SideSheet
-				isOpen={detailsOpen}
-				onClose={() => {
-					setDetailsOpen(false)
-					try {
-						router.replace(window.location.pathname)
-					} catch (_) {}
-				}}
-				title="Detalles de la cita"
-				description={undefined}
-			>
-				<BookingDetailsPanel
-					details={details}
-					onClose={() => {
-						setDetailsOpen(false)
-						try {
-							router.replace(window.location.pathname)
-						} catch (_) {}
-					}}
-				/>
+			<SideSheet isOpen={isOpen} onClose={close} title="Detalles de la cita" description={undefined}>
+				{detailsLoading ? (
+					<div className="flex justify-center items-center py-8">
+						<Spinner size="sm" />
+					</div>
+				) : (
+					<BookingDetailsPanel details={details} onClose={close} />
+				)}
 			</SideSheet>
 		</div>
 	)

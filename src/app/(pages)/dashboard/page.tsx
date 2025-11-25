@@ -27,6 +27,7 @@ import { es } from 'date-fns/locale'
 import { getCurrentMonthNameCapitalized } from '@/lib/utils'
 import { CancelConfirmationModal } from '@/components/CancelConfirmationModal'
 import { X } from 'lucide-react'
+import { useBookingActions } from '@/hooks/useBookingActions'
 
 /**
  * Interface for dashboard statistics API response
@@ -330,187 +331,23 @@ export default function Dashboard() {
 		}
 	}
 
-	const handleCancelBooking = async (bookingId: string) => {
-		try {
-			// Show immediate feedback with spinner
-			toast({
-				title: 'Cancelando cita...',
-				description: 'Procesando la cancelación de la cita.',
-				variant: 'default',
-				color: 'loading'
-			})
-
-			// Call our comprehensive cancellation API endpoint
-			const response = await fetch(`/api/bookings/${bookingId}/cancel`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				}
-			})
-
-			if (!response.ok) {
-				const errorData = await response.json()
-				throw new Error(errorData.error || 'Failed to cancel booking')
-			}
-
-			const result = await response.json()
-
-			// Update local state after successful API response
-			// Update booking status to canceled and payment status if not already paid
+	// Initialize booking actions hook with callbacks for state updates
+	const { cancelBooking, confirmBooking, markAsPaid, processRefund, resendEmail, cancelSeries } = useBookingActions({
+		// Callback to update a single booking in local state
+		onBookingUpdated: (bookingId, updates) => {
 			setBookings((prev) =>
-				prev.map((booking) => {
-					if (booking.id === bookingId) {
-						const updatedBooking: any = {
-							...booking,
-							status: 'canceled' as const
-						}
-
-						// If server indicates a refund occurred/will occur, reflect immediately
-						if (result?.willRefund) {
-							updatedBooking.payment_status = 'refunded' as const
-						} else if (
-							booking.payment_status === 'pending' ||
-							booking.payment_status === 'not_applicable'
-						) {
-							// Otherwise, if payment was pending or N/A, mark as canceled
-							updatedBooking.payment_status = 'canceled' as const
-						}
-
-						return updatedBooking
-					}
-					return booking
-				})
+				prev.map((booking) => (booking.id === bookingId ? { ...booking, ...updates } : booking))
 			)
+		},
+		// Callback to remove bookings from local state (used for series cancellations)
+		onBookingsRemoved: (predicate) => {
+			setBookings((prev) => prev.filter(predicate))
+		},
+		// Callback to refresh dashboard statistics after major state changes
+		onStatsRefresh: fetchDashboardStats
+	})
 
-			toast({
-				title: 'Cita cancelada',
-				description: 'La cita ha sido cancelada correctamente.',
-				variant: 'default',
-				color: 'success'
-			})
-			// Refresh stats after major state change
-			fetchDashboardStats()
-		} catch (error) {
-			toast({
-				title: 'Error',
-				description: 'Failed to cancel booking. Please try again.',
-				variant: 'destructive'
-			})
-		}
-	}
-
-	const handleConfirmBooking = async (bookingId: string) => {
-		try {
-			// Show immediate feedback with spinner
-			toast({
-				title: 'Confirmando cita...',
-				description: 'Procesando la confirmación de la cita.',
-				variant: 'default',
-				color: 'loading'
-			})
-
-			// Call our confirmation API endpoint
-			const response = await fetch(`/api/bookings/${bookingId}/confirm`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				}
-			})
-
-			if (!response.ok) {
-				const errorData = await response.json()
-				throw new Error(errorData.error || 'Failed to confirm booking')
-			}
-
-			const result = await response.json()
-
-			// Update local state after successful API response
-			setBookings((prev) =>
-				prev.map((booking) =>
-					booking.id === bookingId
-						? {
-								...booking,
-								status: 'scheduled' as const
-							}
-						: booking
-				)
-			)
-
-			toast({
-				title: 'Cita marcada como confirmada',
-				description: 'Hemos enviado la invitación al paciente por correo.',
-				variant: 'default',
-				color: 'success'
-			})
-			fetchDashboardStats()
-		} catch (error) {
-			toast({
-				title: 'Error',
-				description: 'Failed to confirm booking. Please try again.',
-				variant: 'destructive'
-			})
-		}
-	}
-
-	const handleMarkAsPaid = async (bookingId: string) => {
-		try {
-			// Show immediate feedback with spinner
-			toast({
-				title: 'Marcando como pagada...',
-				description: 'Procesando el registro de pago.',
-				variant: 'default',
-				color: 'loading'
-			})
-
-			// Call our mark as paid API endpoint
-			const response = await fetch(`/api/bookings/${bookingId}/mark-paid`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				}
-			})
-
-			if (!response.ok) {
-				const errorData = await response.json()
-				throw new Error(errorData.error || 'Failed to mark as paid')
-			}
-
-			const result = await response.json()
-
-			// Update local state after successful API response
-			setBookings((prev) =>
-				prev.map((booking) =>
-					booking.id === bookingId
-						? {
-								...booking,
-								payment_status: 'paid' as const
-							}
-						: booking
-				)
-			)
-
-			// Close the modal
-			setMarkingAsPaidBookingId(null)
-
-			toast({
-				title: 'Pago registrado',
-				description: 'La factura ha sido marcada como pagada.',
-				variant: 'default',
-				color: 'success'
-			})
-			fetchDashboardStats()
-		} catch (error) {
-			// Close the modal even on error
-			setMarkingAsPaidBookingId(null)
-
-			toast({
-				title: 'Error',
-				description: 'Failed to mark as paid. Please try again.',
-				variant: 'destructive'
-			})
-		}
-	}
-
+	// Modal state handlers (these just open/close modals, not actual actions)
 	const handleRefundBooking = (bookingId: string) => {
 		setRefundingBookingId(bookingId)
 	}
@@ -527,6 +364,41 @@ export default function Dashboard() {
 		setCancelingSeriesId(seriesId)
 	}
 
+	const handleRescheduleBooking = (bookingId: string) => {
+		console.log('Opening reschedule slidesheet for booking:', bookingId)
+		setReschedulingBookingId(bookingId)
+		setIsRescheduleOpen(true)
+	}
+
+	// Wrapper for cancel booking that handles the modal confirmation
+	const handleCancelBooking = async (bookingId: string) => {
+		await cancelBooking(bookingId)
+	}
+
+	// Wrapper for mark as paid that closes the modal after success
+	const handleMarkAsPaid = async (bookingId: string) => {
+		try {
+			await markAsPaid(bookingId)
+			// Close the modal after successful operation
+			setMarkingAsPaidBookingId(null)
+		} catch (error) {
+			// Close the modal even on error
+			setMarkingAsPaidBookingId(null)
+		}
+	}
+
+	// Wrapper for refund confirmation that closes the modal after success
+	const handleRefundConfirm = async (bookingId: string, reason?: string) => {
+		try {
+			await processRefund(bookingId, reason)
+			// Close the modal after successful operation
+			setRefundingBookingId(null)
+		} catch (error) {
+			// Modal stays open on error so user can retry
+		}
+	}
+
+	// Wrapper for cancel series that refreshes bookings list after cancellation
 	const handleConfirmCancelSeries = async () => {
 		if (!cancelingSeriesId) return
 
@@ -535,47 +407,9 @@ export default function Dashboard() {
 		setCancelingSeriesId(null)
 
 		try {
-			// Show immediate feedback
-			toast({
-				title: 'Cancelando serie...',
-				description: 'Procesando la cancelación de la serie recurrente.',
-				variant: 'default',
-				color: 'loading'
-			})
+			await cancelSeries(seriesIdToCancel)
 
-			// Call series cancellation endpoint
-			const response = await fetch('/api/booking-series/cancel', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					series_id: seriesIdToCancel,
-					cancel_future: true, // Cancel all future bookings
-					delete_future: true // Delete eligible future bookings (no financial artifacts)
-				})
-			})
-
-			if (!response.ok) {
-				const errorData = await response.json()
-				throw new Error(errorData.error || 'Failed to cancel series')
-			}
-
-			const cancelResult = await response.json()
-
-			// Remove all bookings from this series from local state
-			setBookings((prev) => prev.filter((booking) => booking.series_id !== seriesIdToCancel))
-
-			toast({
-				title: 'Evento recurrente cancelado',
-				description: `Se han cancelado todas las citas futuras de este evento.`,
-				variant: 'default',
-				color: 'success'
-			})
-
-			// Refresh stats and bookings
-			fetchDashboardStats()
-			// Refresh bookings list
+			// Refresh bookings list after series cancellation
 			if (user) {
 				const bookingsResult = await getBookingsWithBills(
 					user.id,
@@ -593,117 +427,7 @@ export default function Dashboard() {
 				setOffset(10)
 			}
 		} catch (error) {
-			console.error('Error canceling series:', error)
-			toast({
-				title: 'Error',
-				description: error instanceof Error ? error.message : 'Failed to cancel series. Please try again.',
-				variant: 'destructive'
-			})
-		}
-	}
-
-	const handleRescheduleBooking = (bookingId: string) => {
-		console.log('Opening reschedule slidesheet for booking:', bookingId)
-		setReschedulingBookingId(bookingId)
-		setIsRescheduleOpen(true)
-	}
-
-	const handleResendEmail = async (bookingId: string) => {
-		try {
-			// Show immediate feedback with spinner
-			toast({
-				title: 'Reenviando email...',
-				description: 'Enviando email de confirmación con nuevo enlace de pago.',
-				variant: 'default',
-				color: 'loading'
-			})
-
-			// Call our resend email API endpoint
-			const response = await fetch(`/api/bookings/${bookingId}/resend-email`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				}
-			})
-
-			if (!response.ok) {
-				const errorData = await response.json()
-				throw new Error(errorData.error || 'Failed to resend email')
-			}
-
-			const result = await response.json()
-
-			toast({
-				title: 'Email reenviado',
-				description: 'El email de pago ha sido enviado correctamente.',
-				variant: 'default',
-				color: 'success'
-			})
-		} catch (error) {
-			console.error('Error resending email:', error)
-			toast({
-				title: 'Error al reenviar email',
-				description:
-					error instanceof Error ? error.message : 'No se pudo reenviar el email. Inténtalo de nuevo.',
-				variant: 'destructive'
-			})
-		}
-	}
-
-	const handleRefundConfirm = async (bookingId: string, reason?: string) => {
-		try {
-			// Show immediate feedback with spinner
-			toast({
-				title: 'Procesando reembolso...',
-				description: 'Enviando solicitud de reembolso a Stripe.',
-				variant: 'default',
-				color: 'loading'
-			})
-
-			// Call our refund API endpoint
-			const response = await fetch(`/api/bookings/${bookingId}/refund`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({ reason })
-			})
-
-			if (!response.ok) {
-				const errorData = await response.json()
-				throw new Error(errorData.error || 'Failed to process refund')
-			}
-
-			const result = await response.json()
-
-			// Update local state - mark payment as refunded
-			setBookings((prev) =>
-				prev.map((booking) =>
-					booking.id === bookingId
-						? {
-								...booking,
-								payment_status: 'refunded' as const
-							}
-						: booking
-				)
-			)
-
-			// Close the modal
-			setRefundingBookingId(null)
-
-			toast({
-				title: 'Reembolso procesado',
-				description: 'El reembolso se ha procesado correctamente.',
-				variant: 'default',
-				color: 'success'
-			})
-			fetchDashboardStats()
-		} catch (error) {
-			toast({
-				title: 'Error',
-				description: 'Failed to process refund. Please try again.',
-				variant: 'destructive'
-			})
+			// Error handling is done in the hook
 		}
 	}
 
@@ -998,11 +722,11 @@ export default function Dashboard() {
 										bookings={bookings}
 										loading={loadingBookings}
 										onCancelBooking={handleShowCancelDialog}
-										onConfirmBooking={handleConfirmBooking}
+										onConfirmBooking={confirmBooking}
 										onMarkAsPaid={handleShowMarkAsPaidDialog}
 										onRefundBooking={handleRefundBooking}
 										onRescheduleBooking={handleRescheduleBooking}
-										onResendEmail={handleResendEmail}
+										onResendEmail={resendEmail}
 										onCancelSeries={handleCancelSeries}
 									/>
 									{hasMore && !loadingBookings && (
@@ -1089,11 +813,11 @@ export default function Dashboard() {
 									bookings={bookings}
 									loading={loadingBookings}
 									onCancelBooking={handleShowCancelDialog}
-									onConfirmBooking={handleConfirmBooking}
+									onConfirmBooking={confirmBooking}
 									onMarkAsPaid={handleShowMarkAsPaidDialog}
 									onRefundBooking={handleRefundBooking}
 									onRescheduleBooking={handleRescheduleBooking}
-									onResendEmail={handleResendEmail}
+									onResendEmail={resendEmail}
 									onCancelSeries={handleCancelSeries}
 								/>
 								{hasMore && !loadingBookings && (
