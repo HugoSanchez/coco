@@ -551,9 +551,17 @@ export function WeeklyAgenda() {
 		const visibleEnd = Math.min(endMin, gridEndMin)
 		const pxPerMin = 25 / 15 // 25px per 15 minutes (same visual density)
 
+		const rawTop = (visibleStart - gridStartMin) * pxPerMin
+		const rawHeight = Math.max(1, (visibleEnd - visibleStart) * pxPerMin)
+
+		// Add tiny vertical spacing between stacked events
+		const gap = 6 // px
+		const adjustedTop = rawTop + gap / 2
+		const adjustedHeight = Math.max(4, rawHeight - gap)
+
 		return {
-			top: `${(visibleStart - gridStartMin) * pxPerMin}px`,
-			height: `${Math.max(1, (visibleEnd - visibleStart) * pxPerMin)}px`
+			top: `${adjustedTop}px`,
+			height: `${adjustedHeight}px`
 		}
 	}
 
@@ -628,11 +636,11 @@ export function WeeklyAgenda() {
 					document.body
 				)}
 			<div className="isolate space-y-4">
-				<div className="p-4 px-6 bg-white rounded-2xl border-4 border-teal-100/40">
+				<div className="p-4 px-6 bg-white rounded-2xl border border-gray-200">
 					<div className="grid grid-cols-3 items-center">
 						{/* Left: View Toggle */}
 						<div className="flex items-center">
-							<h1 className="text-2xl font-bold">Agenda semanal</h1>
+							<h1 className="text-lg font-light">Agenda semanal</h1>
 						</div>
 
 						{/* Center: Date Navigation and Appointment Count */}
@@ -690,7 +698,7 @@ export function WeeklyAgenda() {
 					</div>
 				</div>
 
-				<div className="rounded-b-lg border-8 border-teal-200/10 rounded-2xl overflow-hidden relative">
+				<div className="rounded-b-lg border border-gray-200 rounded-2xl overflow-hidden relative">
 					{/* Loading Spinner */}
 					{loadingBookings && (
 						<div className="absolute inset-0 flex items-center justify-center z-50">

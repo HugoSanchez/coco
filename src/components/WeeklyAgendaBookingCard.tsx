@@ -174,7 +174,7 @@ export function WeeklyAgendaBookingCard({
 	return (
 		<div
 			key={booking.id}
-			className={`absolute left-2 right-2 rounded border border-gray-200 border-l-4 ${borderColor} cursor-pointer transition-all hover:shadow-md pointer-events-auto z-0 overflow-hidden`}
+			className={`absolute left-2 right-2 rounded  border-l-4 ${borderColor} cursor-pointer transition-all hover:shadow-md pointer-events-auto z-0 overflow-hidden`}
 			style={{
 				top: position.top,
 				height: position.height
@@ -228,7 +228,7 @@ export function WeeklyAgendaBookingCard({
 							</TooltipProvider>
 						)}
 					</div>
-					<div className="font-semibold text-sm text-gray-800">{booking.patientName}</div>
+					<div className="font-medium text-sm text-gray-800">{booking.patientName}</div>
 					{consultationTypeLabel && <div className="text-xs text-gray-600">{consultationTypeLabel}</div>}
 				</div>
 				<div
