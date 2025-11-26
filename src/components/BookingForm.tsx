@@ -476,6 +476,33 @@ export function BookingForm({
 		setLoading(true)
 
 		try {
+			const normalizedPrice = customPrice.replace(',', '.')
+			const parsedPrice = parseFloat(normalizedPrice)
+			if (Number.isNaN(parsedPrice) || parsedPrice < 0) {
+				setLoading(false)
+				return toast({
+					title: 'Precio inválido',
+					description: 'El precio debe ser un número mayor o igual a 0.',
+					variant: 'destructive',
+					color: 'error'
+				})
+			}
+			const finalAmount = Math.round(parsedPrice * 100) / 100
+
+			console.log('booking-form::submit-state', {
+				isRecurring,
+				customPrice,
+				priceSource,
+				isPriceDirty,
+				selectedClient,
+				resolvedClientPrice,
+				resolvedDefaultPrice,
+				selectedSlot,
+				selectedDate,
+				consultationType,
+				finalAmount
+			})
+
 			// Branch: recurring series vs single booking
 			if (isRecurring) {
 				// --------- Recurring Flow (V1 minimal) ---------
@@ -511,8 +538,12 @@ export function BookingForm({
 					billing_policy: billingPolicy,
 					mode,
 					location_text: mode === 'in_person' ? locationText || null : null,
-					consultation_type: consultationType
+					consultation_type: consultationType,
+					amount: finalAmount,
+					currency: 'EUR'
 				}
+
+				console.log('booking-form::series-payload', seriesPayload)
 
 				const response = await fetch('/api/booking-series/create', {
 					method: 'POST',
@@ -533,36 +564,6 @@ export function BookingForm({
 				})
 				onSuccess?.()
 				return
-			}
-
-			// Resolve final amount (>= 0, 0 allowed)
-			let finalAmount: number
-			if (isPriceDirty && customPrice.trim() !== '') {
-				const normalized = customPrice.replace(',', '.')
-				const parsed = parseFloat(normalized)
-				if (Number.isNaN(parsed) || parsed < 0) {
-					setLoading(false)
-					return toast({
-						title: 'Precio inválido',
-						description: 'El precio debe ser un número mayor o igual a 0.',
-						variant: 'destructive',
-						color: 'error'
-					})
-				}
-				finalAmount = Math.round(parsed * 100) / 100
-			} else {
-				const normalized = customPrice.replace(',', '.')
-				const parsed = parseFloat(normalized)
-				if (Number.isNaN(parsed) || parsed < 0) {
-					setLoading(false)
-					return toast({
-						title: 'Precio inválido',
-						description: 'El precio debe ser un número mayor o igual a 0.',
-						variant: 'destructive',
-						color: 'error'
-					})
-				}
-				finalAmount = Math.round(parsed * 100) / 100
 			}
 
 			// Build payload for unified API contract
@@ -591,6 +592,8 @@ export function BookingForm({
 					suppressEmail
 				}
 			}
+
+			console.log('booking-form::single-booking-payload', payload)
 
 			// Send request to create booking (one-off)
 			const response = await fetch('/api/bookings/create', {

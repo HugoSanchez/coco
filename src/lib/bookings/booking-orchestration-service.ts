@@ -171,8 +171,8 @@ export async function orchestrateBookingCreation(
 		options?.suppressEmail
 			? null
 			: normalizedType === 'per_booking' && amount > 0
-				? computeEmailScheduledAt(billing.paymentEmailLeadHours, request.startTime, request.endTime)
-				: null
+			? computeEmailScheduledAt(billing.paymentEmailLeadHours, request.startTime, request.endTime)
+			: null
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////// Step 5: Create the bill (single write) and copy normalized type

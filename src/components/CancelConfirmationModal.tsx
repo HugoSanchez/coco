@@ -1,7 +1,8 @@
 'use client'
 
 import { AlertTriangle } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 
 interface CancelConfirmationModalProps {
@@ -23,6 +24,12 @@ export function CancelConfirmationModal({
 	title,
 	description
 }: CancelConfirmationModalProps) {
+	const [isMounted, setIsMounted] = useState(false)
+
+	useEffect(() => {
+		setIsMounted(true)
+	}, [])
+
 	// Compute defaults based on payment status when custom text is not provided
 	const computedTitle =
 		title ??
@@ -56,9 +63,9 @@ export function CancelConfirmationModal({
 		}
 	}
 
-	if (!isOpen) return null
+	if (!isOpen || !isMounted) return null
 
-	return (
+	return createPortal(
 		<div
 			className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
 			onClick={handleBackdropClick}
@@ -102,5 +109,7 @@ export function CancelConfirmationModal({
 				</div>
 			</div>
 		</div>
+	,
+		document.body
 	)
 }

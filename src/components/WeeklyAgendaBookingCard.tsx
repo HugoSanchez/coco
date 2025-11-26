@@ -1,7 +1,8 @@
 'use client'
 
-import { Check, Clock, X, Loader, RefreshCcw } from 'lucide-react'
+import { Check, Clock, X, Loader, RefreshCcw, Repeat } from 'lucide-react'
 import { BookingActions } from '@/components/BookingActions'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 type PaymentStatus = 'scheduled' | 'pending' | 'paid' | 'disputed' | 'canceled' | 'refunded' | 'na'
 
@@ -210,8 +211,22 @@ export function WeeklyAgendaBookingCard({
 					</div>
 				)}
 				<div className="flex-1">
-					<div className="text-xs text-gray-600">
-						{booking.startTime}h - {booking.endTime}h
+					<div className="text-xs text-gray-600 flex items-center gap-1.5">
+						<span>
+							{booking.startTime}h - {booking.endTime}h
+						</span>
+						{booking.series_id && (
+							<TooltipProvider>
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<Repeat className="h-3 w-3 ml-1 text-teal-600 flex-shrink-0" />
+									</TooltipTrigger>
+									<TooltipContent>
+										<p>Evento recurrente</p>
+									</TooltipContent>
+								</Tooltip>
+							</TooltipProvider>
+						)}
 					</div>
 					<div className="font-semibold text-sm text-gray-800">{booking.patientName}</div>
 					{consultationTypeLabel && <div className="text-xs text-gray-600">{consultationTypeLabel}</div>}

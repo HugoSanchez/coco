@@ -141,7 +141,8 @@ export async function GET(request: NextRequest) {
 				bookingId: booking.id,
 				consultation_type: booking.consultation_type || null,
 				payment_status,
-				billing_status
+				billing_status,
+				series_id: booking.series_id || undefined
 			}
 		})
 

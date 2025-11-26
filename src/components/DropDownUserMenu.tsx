@@ -21,11 +21,7 @@ export default function DropDownUserMenu(props: any) {
 		<DropdownMenu>
 			{/* User avatar trigger button */}
 			<DropdownMenuTrigger asChild>
-				<Button
-					variant="ghost"
-					size="icon"
-					className="rounded-full h-8 w-8 p-0 hover:bg-transparent"
-				>
+				<Button variant="ghost" size="icon" className="rounded-full h-8 w-8 p-0 hover:bg-transparent">
 					{/* Show profile picture if available, otherwise show default icon */}
 					{profile?.profile_picture_url ? (
 						<img
@@ -45,37 +41,24 @@ export default function DropDownUserMenu(props: any) {
 				{/* User info section */}
 				<DropdownMenuLabel>
 					{profile?.name || 'My Account'}
-					{profile?.email && (
-						<p className="text-xs text-gray-500 font-normal mt-1">
-							{profile.email}
-						</p>
-					)}
+					{profile?.email && <p className="text-xs text-gray-500 font-normal mt-1">{profile.email}</p>}
 				</DropdownMenuLabel>
 				<DropdownMenuSeparator />
 
 				{/* Navigation menu items */}
-				<DropdownMenuItem
-					className="cursor-pointer"
-					onClick={() => router.push('/dashboard')}
-				>
+				<DropdownMenuItem className="cursor-pointer" onClick={() => router.push('/dashboard')}>
 					Dashboard
 				</DropdownMenuItem>
-				<DropdownMenuItem
-					className="cursor-pointer"
-					onClick={() => router.push('/settings')}
-				>
-					Settings
+				<DropdownMenuItem className="cursor-pointer" onClick={() => router.push('/calendar')}>
+					Agenda Semanal
 				</DropdownMenuItem>
-				<DropdownMenuItem className="cursor-pointer">
-					Support
+				<DropdownMenuItem className="cursor-pointer" onClick={() => router.push('/settings')}>
+					Ajustes
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
 
 				{/* Sign out option */}
-				<DropdownMenuItem
-					className="cursor-pointer"
-					onClick={handleSignOut}
-				>
+				<DropdownMenuItem className="cursor-pointer" onClick={handleSignOut}>
 					<LogOut className="mr-2 h-4 w-4" />
 					<span>Logout</span>
 				</DropdownMenuItem>

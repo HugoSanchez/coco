@@ -14,15 +14,14 @@
  * NOTES
  * - Overlaps/conflicts are ignored by design in V1 (always create)
  * - Billing policy is provided in the request and mapped to orchestrator
- * - Amount/currency come from client-specific billing settings if present,
- *   otherwise from user default billing settings
+ * - Amount/currency are provided by the caller (same contract as single bookings)
+ *   and requests without a valid amount are rejected
  */
 
 import { NextResponse } from 'next/server'
 import { addMonths, format, parseISO } from 'date-fns'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { createBookingSeries, setBookingSeriesMasterEventId } from '@/lib/db/booking-series'
-import { getClientBillingSettings, getUserDefaultBillingSettings } from '@/lib/db/billing-settings'
 import { orchestrateBookingCreation } from '@/lib/bookings/booking-orchestration-service'
 import { tagBookingWithSeries, getExistingSeriesBookings } from '@/lib/db/bookings'
 import { generateOccurrences } from '@/lib/dates/recurrence'
@@ -44,6 +43,8 @@ type CreateSeriesPayload = {
   duration_min: number
   rule: { interval_weeks: 1 | 2; by_weekday: 0 | 1 | 2 | 3 | 4 | 5 | 6 }
   billing_policy: BillingPolicy
+  amount: number
+  currency?: 'EUR'
   // Optional booking metadata
   mode?: 'online' | 'in_person'
   location_text?: string | null
@@ -86,6 +87,14 @@ export async function POST(req: Request) {
     if (body.rule.by_weekday < 0 || body.rule.by_weekday > 6) {
       return NextResponse.json({ error: 'invalid rule.by_weekday' }, { status: 400 })
     }
+    if (typeof body.amount !== 'number' || Number.isNaN(body.amount) || body.amount < 0) {
+      return NextResponse.json({ error: 'invalid amount' }, { status: 400 })
+    }
+    const currency: 'EUR' = body.currency ?? 'EUR'
+    if (currency !== 'EUR') {
+      return NextResponse.json({ error: 'unsupported currency' }, { status: 400 })
+    }
+    const normalizedAmount = Math.round(body.amount * 100) / 100
 
     const maxOccurrences = body.max_occurrences && body.max_occurrences > 0 ? body.max_occurrences : 20
 
@@ -130,24 +139,12 @@ export async function POST(req: Request) {
     const existing = await getExistingSeriesBookings(seriesId, client)
     const existingIdx = new Set(existing.map((b) => b.occurrence_index))
 
-    // 6) Resolve amount & currency from client-specific settings or user default
-    //    - V1 assumes currency 'EUR' across the app
-    const clientSettings = await getClientBillingSettings(body.user_id, body.client_id, client)
-    const userDefault = clientSettings ? null : await getUserDefaultBillingSettings(body.user_id, client)
-    const fallbackAmount = clientSettings?.billing_amount ?? userDefault?.billing_amount ?? 0
-    const currency: 'EUR' = 'EUR'
-
-    // 7) Create bookings per occurrence using the existing orchestrator
+    // 6) Create bookings per occurrence using the existing orchestrator
     const bookingIds: string[] = []
     for (const occ of occurrences) {
       if (existingIdx.has(occ.occurrenceIndex)) continue
 
-      // Amount: first occurrence may use first_consultation_amount when available
-      const amount = occ.occurrenceIndex === 0 && clientSettings?.first_consultation_amount != null
-        ? Number(clientSettings.first_consultation_amount)
-        : Number(fallbackAmount)
-
-      const billing = mapPolicyToBilling(body.billing_policy, amount, currency)
+      const billing = mapPolicyToBilling(body.billing_policy, normalizedAmount, currency)
 
       const result = await orchestrateBookingCreation(
         {
