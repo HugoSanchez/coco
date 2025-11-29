@@ -46,11 +46,26 @@ export async function GET(
 		}
 
 		const bills = await getBillsForBooking(bookingId, supabase)
+		console.log('[payments][route] bills_lookup', {
+			bookingId,
+			count: bills.length,
+			bills: bills.map((bill) => ({
+				id: bill.id,
+				status: bill.status,
+				sent_at: bill.sent_at,
+				paid_at: bill.paid_at,
+				updated_at: bill.updated_at
+			}))
+		})
 		const payableBill = bills.find(
 			(bill) => bill.status === 'pending' || bill.status === 'sent'
 		)
 
 		if (!payableBill) {
+			console.warn('[payments][route] no_payable_bill', {
+				bookingId,
+				statuses: bills.map((bill) => bill.status)
+			})
 			return NextResponse.redirect(
 				new URL(`/payment/success?booking_id=${bookingId}`, request.url)
 			)
