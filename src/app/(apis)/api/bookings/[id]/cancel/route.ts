@@ -220,13 +220,12 @@ export async function POST(
 		}
 
 		// 3. Cancel payments and bills for non-recurring bookings
-		// Cancel payment sessions (Stripe) and bills for bookings with pending/scheduled bills
+		// Cancel payment sessions (Stripe) and bills for bookings with unpaid bills (pending/scheduled/sent/disputed)
 		if (!isSeriesBooking) {
 			// Check if booking has bills that need cancellation (scheduled or pending)
 			const bookingBills = await getBillsForBooking(bookingId, supabase)
-			const hasUnpaidBills = bookingBills.some(
-				(b) => b.status === 'pending' || b.status === 'scheduled'
-			)
+			const cancellableStatuses = new Set(['pending', 'scheduled', 'sent', 'disputed'])
+			const hasUnpaidBills = bookingBills.some((b) => cancellableStatuses.has(b.status))
 
 			if (hasUnpaidBills) {
 				try {

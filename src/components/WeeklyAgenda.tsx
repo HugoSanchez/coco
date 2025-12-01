@@ -62,25 +62,6 @@ const generateTimeSlots = (): string[] => {
 
 const timeSlots = generateTimeSlots()
 
-// Generate Spanish weekday names
-const getSpanishDayNames = () => {
-	// Create a date for each day of the week (Monday = 1, Sunday = 0)
-	// We'll use a reference date and format each weekday
-	const referenceDate = new Date(2024, 0, 1) // January 1, 2024 is a Monday
-	const dayNames: string[] = []
-	for (let i = 0; i < 7; i++) {
-		const date = new Date(referenceDate)
-		date.setDate(referenceDate.getDate() + i)
-		// Format as abbreviated weekday name in Spanish (LUN, MAR, MIE, etc.)
-		const dayName = format(date, 'EEE', { locale: es }).toUpperCase()
-		dayNames.push(dayName)
-	}
-	return dayNames
-}
-
-const dayNames = getSpanishDayNames()
-const weekdayNames = dayNames.slice(0, 5) // First 5 days (Monday to Friday)
-
 export function WeeklyAgenda() {
 	const getCurrentWeekStart = () => {
 		const now = new Date()
@@ -122,12 +103,36 @@ export function WeeklyAgenda() {
 		endTime: string
 	} | null>(null)
 	const [calendarOpen, setCalendarOpen] = useState(false)
+	const [mobileCalendarOpen, setMobileCalendarOpen] = useState(false)
 	const [isMounted, setIsMounted] = useState(false)
+	const [viewportMode, setViewportMode] = useState<'single' | 'triple' | 'full'>('full')
+	const [visibleDayStartIndex, setVisibleDayStartIndex] = useState(0)
 
 	const scrollContainerRef = useRef<HTMLDivElement>(null)
 
 	useEffect(() => {
 		setIsMounted(true)
+	}, [])
+
+	useEffect(() => {
+		const resolveMode = () => {
+			const width = window.innerWidth
+			if (width < 640) {
+				return 'single'
+			}
+			if (width < 1024) {
+				return 'triple'
+			}
+			return 'full'
+		}
+
+		const updateMode = () => {
+			setViewportMode(resolveMode())
+		}
+
+		updateMode()
+		window.addEventListener('resize', updateMode)
+		return () => window.removeEventListener('resize', updateMode)
 	}, [])
 
 	// Initialize client management hook
@@ -374,6 +379,62 @@ export function WeeklyAgenda() {
 	}
 
 	const weekDays = getWeekDays()
+	const targetDays =
+		viewportMode === 'single' ? 1 : viewportMode === 'triple' ? Math.min(3, weekDays.length) : weekDays.length
+	const showingAllDays = targetDays >= weekDays.length
+	const daysPerView = showingAllDays ? weekDays.length : targetDays
+	const visibleDays = showingAllDays
+		? weekDays
+		: weekDays.slice(visibleDayStartIndex, visibleDayStartIndex + daysPerView)
+
+	useEffect(() => {
+		setVisibleDayStartIndex(0)
+	}, [currentWeekStart, showWeekends, viewportMode])
+
+	useEffect(() => {
+		setVisibleDayStartIndex((prev) => {
+			if (showingAllDays) return 0
+			const maxStart = Math.max(0, weekDays.length - daysPerView)
+			return Math.min(prev, maxStart)
+		})
+	}, [weekDays.length, daysPerView, showingAllDays])
+
+	const canSlidePrev = !showingAllDays
+	const canSlideNext = !showingAllDays
+	const slideWindow = (direction: 'prev' | 'next') => {
+		if (direction === 'prev' && canSlidePrev) {
+			if (visibleDayStartIndex === 0) {
+				const newDate = new Date(currentWeekStart)
+				newDate.setDate(newDate.getDate() - 7)
+				setCurrentWeekStart(newDate)
+				setVisibleDayStartIndex(Math.max(0, weekDays.length - daysPerView))
+			} else {
+				setVisibleDayStartIndex((prev) => Math.max(0, prev - 1))
+			}
+		}
+		if (direction === 'next' && canSlideNext) {
+			if (visibleDayStartIndex + daysPerView >= weekDays.length) {
+				const newDate = new Date(currentWeekStart)
+				newDate.setDate(newDate.getDate() + 7)
+				setCurrentWeekStart(newDate)
+				setVisibleDayStartIndex(0)
+			} else {
+				const maxStart = Math.max(0, weekDays.length - daysPerView)
+				setVisibleDayStartIndex((prev) => Math.min(maxStart, prev + 1))
+			}
+		}
+	}
+
+	const gridColsClassMap: Record<number, string> = {
+		1: 'grid-cols-1',
+		2: 'grid-cols-2',
+		3: 'grid-cols-3',
+		4: 'grid-cols-4',
+		5: 'grid-cols-5',
+		6: 'grid-cols-6',
+		7: 'grid-cols-7'
+	}
+	const gridColsClass = gridColsClassMap[visibleDays.length] || 'grid-cols-1'
 
 	// Fetch events for the entire visible week in a single API call
 	useEffect(() => {
@@ -588,7 +649,13 @@ export function WeeklyAgenda() {
 		if (isDragging && dragStart && dragEnd) {
 			const startSlot = Math.min(dragStart.slot, dragEnd.slot)
 			const endSlot = Math.max(dragStart.slot, dragEnd.slot)
-			const selectedDay = weekDays[dragStart.day]
+			const selectedDay = visibleDays[dragStart.day]
+			if (!selectedDay) {
+				setIsDragging(false)
+				setDragStart(null)
+				setDragEnd(null)
+				return
+			}
 
 			// Parse time strings (e.g., "09:00") and combine with selected date
 			const startTimeStr = timeSlots[startSlot]
@@ -636,7 +703,7 @@ export function WeeklyAgenda() {
 					document.body
 				)}
 			<div className="isolate space-y-4">
-				<div className="p-4 px-6 bg-white rounded-2xl border border-gray-200">
+				<div className="hidden md:block p-4 px-6 bg-white rounded-2xl border border-gray-200">
 					<div className="grid grid-cols-3 items-center">
 						{/* Left: View Toggle */}
 						<div className="flex items-center">
@@ -698,6 +765,74 @@ export function WeeklyAgenda() {
 					</div>
 				</div>
 
+				{!showingAllDays && (
+					<div className="px-3 flex flex-col gap-2">
+						<div className="flex items-center justify-between text-lg font-medium text-gray-800">
+							<span>
+								{visibleDays.length > 0
+									? visibleDays[0]
+											.toLocaleDateString('es-ES', {
+												month: 'long',
+												year: 'numeric'
+											})
+											.replace(/^\w/, (c) => c.toUpperCase())
+									: ''}
+							</span>
+							<Popover open={mobileCalendarOpen} onOpenChange={setMobileCalendarOpen}>
+								<PopoverTrigger asChild>
+									<Button variant="ghost" size="icon" className="h-8 w-8">
+										<CalendarIcon className="h-4 w-4" />
+									</Button>
+								</PopoverTrigger>
+								<PopoverContent
+									className="w-auto p-0 rounded-2xl border border-gray-100 shadow-lg"
+									align="end"
+									sideOffset={12}
+								>
+									<Calendar
+										mode="single"
+										selected={currentWeekStart}
+										onSelect={(date) => {
+											handleCalendarDateSelect(date)
+											setMobileCalendarOpen(false)
+										}}
+										defaultMonth={currentWeekStart}
+										initialFocus
+										locale={es}
+										weekStartsOn={1}
+										className="rounded-md border-0"
+									/>
+								</PopoverContent>
+							</Popover>
+						</div>
+						<div className="flex items-center justify-between text-sm text-gray-600">
+							<span>
+								Mostrando {daysPerView} {daysPerView === 1 ? 'día' : 'días'}
+							</span>
+							<div className="flex items-center gap-2">
+								<Button
+									variant="outline"
+									size="icon"
+									className="h-8 w-8"
+									onClick={() => slideWindow('prev')}
+									disabled={!canSlidePrev}
+								>
+									<ChevronLeft className="h-4 w-4" />
+								</Button>
+								<Button
+									variant="outline"
+									size="icon"
+									className="h-8 w-8"
+									onClick={() => slideWindow('next')}
+									disabled={!canSlideNext}
+								>
+									<ChevronRight className="h-4 w-4" />
+								</Button>
+							</div>
+						</div>
+					</div>
+				)}
+
 				<div className="rounded-b-lg border border-gray-200 rounded-2xl overflow-hidden relative">
 					{/* Loading Spinner */}
 					{loadingBookings && (
@@ -711,8 +846,8 @@ export function WeeklyAgenda() {
 					{/* Day Headers */}
 					<div className="flex border-b border-gray-100 bg-white">
 						<div className="w-20 flex-shrink-0 p-3 text-xs font-medium text-gray-500">CET</div>
-						<div className={`flex-1 grid ${showWeekends ? 'grid-cols-7' : 'grid-cols-5'}`}>
-							{weekDays.map((day, index) => {
+						<div className={`flex-1 grid ${gridColsClass}`}>
+							{visibleDays.map((day, index) => {
 								// Compare dates in CET timezone
 								const today = new Date()
 								const todayYear = today.toLocaleString('en-US', {
@@ -740,14 +875,13 @@ export function WeeklyAgenda() {
 									day: '2-digit'
 								})
 								const isToday = todayYear === dayYear && todayMonth === dayMonth && todayDay === dayDay
+								const label = format(day, 'EEE', { locale: es }).toUpperCase()
 								return (
 									<div key={index} className="p-3 text-center border-l border-gray-200">
 										<div
 											className={`text-xs font-medium uppercase ${isToday ? 'text-teal-700' : 'text-gray-500'}`}
 										>
-											{showWeekends
-												? dayNames[day.getDay() === 0 ? 6 : day.getDay() - 1]
-												: weekdayNames[index]}
+											{label}
 										</div>
 										<div
 											className={`text-xl font-normal mt-1 ${isToday ? 'text-teal-700' : 'text-gray-900'}`}
@@ -796,8 +930,8 @@ export function WeeklyAgenda() {
 							</div>
 
 							{/* Day Columns */}
-							<div className={`flex-1 grid ${showWeekends ? 'grid-cols-7' : 'grid-cols-5'}`}>
-								{weekDays.map((day, dayIndex) => {
+							<div className={`flex-1 grid ${gridColsClass}`}>
+								{visibleDays.map((day, dayIndex) => {
 									const dayBookings = getBookingsForDay(day)
 									return (
 										<div key={dayIndex} className="border-l border-gray-200 bg-[#ffffff] relative">

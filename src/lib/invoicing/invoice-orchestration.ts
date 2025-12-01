@@ -25,7 +25,7 @@ import {
 	findOrCreateMonthlyInvoice
 } from '@/lib/db/invoices'
 import { linkPaymentSessionToInvoice } from '@/lib/db/payment-sessions'
-import { getUnlinkedMonthlyBillsForUserClient, linkBillsToInvoice } from '@/lib/db/bills'
+import { getUnlinkedMonthlyBillsForUserClient, linkBillsToInvoice, type Bill } from '@/lib/db/bills'
 import { getClientById } from '@/lib/db/clients'
 import { getInvoiceById } from '@/lib/db/invoices'
 import { generateAndStoreInvoicePdf } from '@/lib/invoicing/pdf-service'
@@ -262,10 +262,13 @@ export async function ensureMonthlyDraftAndLinkBills(
 	// 2) Fetch monthly bills not yet linked to any invoice within the period
 	const billsToLinkRaw = await getUnlinkedMonthlyBillsForUserClient(params.userId, params.clientId, db)
 
+	const allowedBillStatuses = new Set<Bill['status']>(['scheduled', 'pending', 'sent'])
 	const candidates = (billsToLinkRaw || []).filter((row: any) => {
-		const st = Array.isArray(row?.booking)
-			? (row.booking[0]?.start_time as string | undefined)
-			: (row?.booking?.start_time as string | undefined)
+		if (!row || !allowedBillStatuses.has(row.status)) return false
+		const bookingRecord = Array.isArray(row?.booking) ? row.booking[0] : row?.booking
+		if (!bookingRecord) return false
+		if (bookingRecord.status === 'canceled') return false
+		const st = bookingRecord.start_time as string | undefined
 		if (!st) return false
 		return st >= params.periodStart && st < params.periodEnd
 	})

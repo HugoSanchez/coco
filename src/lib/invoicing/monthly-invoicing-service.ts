@@ -5,6 +5,7 @@ import { getProfileById } from '@/lib/db/profiles'
 import { getClientById } from '@/lib/db/clients'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ensureMonthlyDraftAndLinkBills } from '@/lib/invoicing/invoice-orchestration'
+import type { Bill } from '@/lib/db/bills'
 
 /**
  * Monthly Invoicing Service
@@ -76,6 +77,8 @@ function spanishMonthLabelFromPeriodStart(periodStartIso: string) {
  * - Deletes empty drafts
  * - Sends email with payment link
  */
+const ELIGIBLE_BILL_STATUSES: Bill['status'][] = ['scheduled', 'pending', 'sent']
+
 export async function runMonthlyConsolidation(params: {
 	periodLabel: string // YYYY-MM
 	dryRun?: boolean
@@ -89,16 +92,26 @@ export async function runMonthlyConsolidation(params: {
 	// 1) Collect candidate monthly bills not yet linked to an invoice
 	const { data: bills } = await db
 		.from('bills')
-		.select(`id, user_id, client_id, amount, currency, billing_type, invoice_id, booking:bookings(start_time)`) // embed start_time for period filter
+		.select(
+			`id, user_id, client_id, amount, currency, billing_type, invoice_id, status, booking:bookings(start_time,status)`
+		) // embed start_time/status for later filters
 		.eq('billing_type', 'monthly')
 		.is('invoice_id', null)
+		.in('status', ELIGIBLE_BILL_STATUSES)
 
 	// Debug removed: fetched candidate bills count
 
 	// Group by (user_id, client_id)
 	type GroupKey = string
 	const groups = new Map<GroupKey, any[]>()
-	for (const row of (bills as any[]) || []) {
+	const eligibleBills = ((bills as any[]) || []).filter((row) => {
+		const bookingRecord = Array.isArray(row?.booking) ? row.booking[0] : row?.booking
+		if (!bookingRecord) return false
+		if (bookingRecord.status === 'canceled') return false
+		return true
+	})
+
+	for (const row of eligibleBills) {
 		const key = `${row.user_id}::${row.client_id || 'null'}`
 		if (!groups.has(key)) groups.set(key, [])
 		groups.get(key)!.push(row)

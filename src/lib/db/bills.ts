@@ -233,15 +233,23 @@ export async function getUnlinkedMonthlyBillsForUserClient(
 	clientId: string | null,
 	supabaseClient?: SupabaseClient
 ): Promise<
-	Array<{ id: string; amount: number; user_id: string; client_id: string | null; booking?: { start_time: string } }>
+	Array<{
+		id: string
+		amount: number
+		user_id: string
+		client_id: string | null
+		status: Bill['status']
+		booking?: { start_time: string; status: string }
+	}>
 > {
 	const client = supabaseClient || supabase
 	let query = client
 		.from('bills')
-		.select(`id, amount, user_id, client_id, invoice_id, billing_type, booking:bookings(start_time)`)
+		.select(`id, amount, user_id, client_id, invoice_id, billing_type, status, booking:bookings(start_time,status)`)
 		.eq('user_id', userId)
 		.eq('billing_type', 'monthly')
-		.is('invoice_id', null) as any
+		.is('invoice_id', null)
+		.in('status', ['scheduled', 'pending', 'sent'] as Bill['status'][]) as any
 
 	query = clientId == null ? query.is('client_id', null) : query.eq('client_id', clientId)
 
