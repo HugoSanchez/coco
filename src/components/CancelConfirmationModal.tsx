@@ -1,9 +1,11 @@
 'use client'
 
 import { AlertTriangle } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useId } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 
 interface CancelConfirmationModalProps {
 	isOpen: boolean
@@ -13,6 +15,9 @@ interface CancelConfirmationModalProps {
 	isPaid?: boolean
 	title?: string
 	description?: string
+	allowEmailChoice?: boolean
+	sendEmailSelected?: boolean
+	onSendEmailChange?: (checked: boolean) => void
 }
 
 export function CancelConfirmationModal({
@@ -22,9 +27,13 @@ export function CancelConfirmationModal({
 	isLoading = false,
 	isPaid = false,
 	title,
-	description
+	description,
+	allowEmailChoice = false,
+	sendEmailSelected = false,
+	onSendEmailChange
 }: CancelConfirmationModalProps) {
 	const [isMounted, setIsMounted] = useState(false)
+	const emailCheckboxId = useId()
 
 	useEffect(() => {
 		setIsMounted(true)
@@ -39,6 +48,7 @@ export function CancelConfirmationModal({
 		(isPaid
 			? 'Al cancelar una cita confirmada, también se procederá a reembolsar al paciente. Ninguna de estas acciones se puede deshacer.'
 			: 'Esta acción no se puede deshacer.')
+	const showEmailChoice = allowEmailChoice && !!onSendEmailChange
 
 	// Handle escape key + scroll lock
 	useEffect(() => {
@@ -89,7 +99,29 @@ export function CancelConfirmationModal({
 						</div>
 					</div>
 
-					<div className="flex gap-3 mt-4">
+					{showEmailChoice && (
+						<div className="mt-6 flex items-start gap-3 rounded-lg border border-gray-200  px-4 py-3">
+							<Checkbox
+								id={emailCheckboxId}
+								checked={sendEmailSelected}
+								onCheckedChange={(checked) => onSendEmailChange?.(checked === true)}
+								className="mt-1 border-gray-400 data-[state=checked]:bg-gray-800 data-[state=checked]:border-gray-800"
+							/>
+							<div>
+								<Label
+									htmlFor={emailCheckboxId}
+									className="text-sm font-medium text-gray-900 leading-tight"
+								>
+									Notificar al paciente por email
+								</Label>
+								<p className="text-xs text-gray-500">
+									Envía un correo con la cancelación. Por defecto no se notificará.
+								</p>
+							</div>
+						</div>
+					)}
+
+					<div className="flex gap-3 mt-6">
 						<Button
 							onClick={() => onOpenChange(false)}
 							disabled={isLoading}

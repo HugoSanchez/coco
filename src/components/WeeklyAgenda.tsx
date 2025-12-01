@@ -97,6 +97,7 @@ export function WeeklyAgenda() {
 	const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar')
 	const [hoveredSlot, setHoveredSlot] = useState<{ day: number; slot: number } | null>(null)
 	const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null)
+	const [shouldSendCancelEmail, setShouldSendCancelEmail] = useState(false)
 	const [selectedSlotForBooking, setSelectedSlotForBooking] = useState<{
 		date: Date
 		startTime: string
@@ -105,7 +106,7 @@ export function WeeklyAgenda() {
 	const [calendarOpen, setCalendarOpen] = useState(false)
 	const [mobileCalendarOpen, setMobileCalendarOpen] = useState(false)
 	const [isMounted, setIsMounted] = useState(false)
-	const [viewportMode, setViewportMode] = useState<'single' | 'triple' | 'full'>('full')
+	const [viewportMode, setViewportMode] = useState<'single' | 'triple' | 'full' | null>(null)
 	const [visibleDayStartIndex, setVisibleDayStartIndex] = useState(0)
 
 	const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -302,6 +303,8 @@ export function WeeklyAgenda() {
 
 	// Action handlers that open modals and close the action menu
 	const handleCancelBooking = (bookingId: string) => {
+		const booking = bookings.find((b) => b.id === bookingId)
+		setShouldSendCancelEmail(booking?.payment_status === 'paid')
 		setOpenActionMenuId(null) // Close action menu
 		openCancelBookingModal(bookingId)
 	}
@@ -355,9 +358,15 @@ export function WeeklyAgenda() {
 		}
 	}
 
-	const handleCancelBookingConfirm = async (bookingId: string) => {
+	useEffect(() => {
+		if (!cancelingBookingId) {
+			setShouldSendCancelEmail(false)
+		}
+	}, [cancelingBookingId])
+
+	const handleCancelBookingConfirm = async (bookingId: string, sendEmail: boolean) => {
 		closeCancelBookingModal()
-		await cancelBooking(bookingId)
+		await cancelBooking(bookingId, { sendEmail })
 	}
 
 	const handleConfirmCancelSeries = async () => {
@@ -379,50 +388,37 @@ export function WeeklyAgenda() {
 	}
 
 	const weekDays = getWeekDays()
+	const isViewportReady = viewportMode !== null
 	const targetDays =
 		viewportMode === 'single' ? 1 : viewportMode === 'triple' ? Math.min(3, weekDays.length) : weekDays.length
-	const showingAllDays = targetDays >= weekDays.length
+	const showingAllDays = !isViewportReady || targetDays >= weekDays.length
 	const daysPerView = showingAllDays ? weekDays.length : targetDays
 	const visibleDays = showingAllDays
 		? weekDays
 		: weekDays.slice(visibleDayStartIndex, visibleDayStartIndex + daysPerView)
 
 	useEffect(() => {
+		if (!isViewportReady) return
 		setVisibleDayStartIndex(0)
-	}, [currentWeekStart, showWeekends, viewportMode])
+	}, [currentWeekStart, showWeekends, viewportMode, isViewportReady])
 
 	useEffect(() => {
+		if (!isViewportReady) return
 		setVisibleDayStartIndex((prev) => {
 			if (showingAllDays) return 0
 			const maxStart = Math.max(0, weekDays.length - daysPerView)
 			return Math.min(prev, maxStart)
 		})
-	}, [weekDays.length, daysPerView, showingAllDays])
+	}, [weekDays.length, daysPerView, showingAllDays, isViewportReady])
 
-	const canSlidePrev = !showingAllDays
-	const canSlideNext = !showingAllDays
+	const canSlidePrev = isViewportReady && !showingAllDays
+	const canSlideNext = isViewportReady && !showingAllDays
 	const slideWindow = (direction: 'prev' | 'next') => {
-		if (direction === 'prev' && canSlidePrev) {
-			if (visibleDayStartIndex === 0) {
-				const newDate = new Date(currentWeekStart)
-				newDate.setDate(newDate.getDate() - 7)
-				setCurrentWeekStart(newDate)
-				setVisibleDayStartIndex(Math.max(0, weekDays.length - daysPerView))
-			} else {
-				setVisibleDayStartIndex((prev) => Math.max(0, prev - 1))
-			}
-		}
-		if (direction === 'next' && canSlideNext) {
-			if (visibleDayStartIndex + daysPerView >= weekDays.length) {
-				const newDate = new Date(currentWeekStart)
-				newDate.setDate(newDate.getDate() + 7)
-				setCurrentWeekStart(newDate)
-				setVisibleDayStartIndex(0)
-			} else {
-				const maxStart = Math.max(0, weekDays.length - daysPerView)
-				setVisibleDayStartIndex((prev) => Math.min(maxStart, prev + 1))
-			}
-		}
+		if (!isViewportReady) return
+		const offsetDays = direction === 'next' ? daysPerView : -daysPerView
+		const newDate = new Date(currentWeekStart)
+		newDate.setDate(newDate.getDate() + offsetDays)
+		setCurrentWeekStart(newDate)
 	}
 
 	const gridColsClassMap: Record<number, string> = {
@@ -553,13 +549,11 @@ export function WeeklyAgenda() {
 
 	// Scroll to 8:55am on mount and when week changes
 	useEffect(() => {
-		if (scrollContainerRef.current) {
-			const minutesFromMidnight = 8 * 60 + 40 // 8:55am
-			const pxPerMinute = 25 / 15 // 25px per 15-minute slot
-			const scrollPosition = minutesFromMidnight * pxPerMinute
-			scrollContainerRef.current.scrollTop = scrollPosition
-		}
-	}, [currentWeekStart, showWeekends])
+		if (!isViewportReady || !scrollContainerRef.current) return
+		const minutesFromMidnight = 8 * 60 + 40 // 8:40am
+		const pxPerMinute = 25 / 15 // 25px per 15-minute slot
+		scrollContainerRef.current.scrollTop = minutesFromMidnight * pxPerMinute
+	}, [currentWeekStart, showWeekends, isViewportReady])
 
 	const previousWeek = () => {
 		const newDate = new Date(currentWeekStart)
@@ -689,6 +683,10 @@ export function WeeklyAgenda() {
 		const minSlot = Math.min(dragStart.slot, dragEnd.slot)
 		const maxSlot = Math.max(dragStart.slot, dragEnd.slot)
 		return slotIndex >= minSlot && slotIndex <= maxSlot
+	}
+
+	if (!isViewportReady) {
+		return null
 	}
 
 	return (
@@ -1083,6 +1081,7 @@ export function WeeklyAgenda() {
 					(() => {
 						const booking = bookings.find((b) => b.id === cancelingBookingId)
 						const isPaid = booking?.payment_status === 'paid'
+						const sendEmailValue = isPaid ? true : shouldSendCancelEmail
 						return (
 							<CancelConfirmationModal
 								isOpen={!!cancelingBookingId}
@@ -1090,9 +1089,12 @@ export function WeeklyAgenda() {
 									if (!open) closeCancelBookingModal()
 								}}
 								onConfirm={async () => {
-									await handleCancelBookingConfirm(cancelingBookingId)
+									await handleCancelBookingConfirm(cancelingBookingId, sendEmailValue)
 								}}
 								isPaid={!!isPaid}
+								allowEmailChoice={!isPaid}
+								sendEmailSelected={sendEmailValue}
+								onSendEmailChange={(checked) => setShouldSendCancelEmail(!!checked)}
 							/>
 						)
 					})()}

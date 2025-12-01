@@ -62,6 +62,16 @@ export async function POST(
 
 		const bookingId = params.id
 
+		let sendEmailPreference = false
+		try {
+			if (request.headers.get('content-type')?.includes('application/json')) {
+				const body = await request.json()
+				sendEmailPreference = Boolean(body?.sendEmail)
+			}
+		} catch (parseError) {
+			console.warn('Failed to parse cancellation request body:', parseError)
+		}
+
 		// 1. Get the booking to verify ownership and current status
 		const booking = await getBookingById(bookingId, supabase)
 
@@ -338,7 +348,7 @@ export async function POST(
 						refundId,
 						consultationDate: booking.start_time
 					})
-				} else {
+				} else if (sendEmailPreference) {
 					await sendCancellationNotificationEmail({
 						to: clientEmail,
 						clientName,
@@ -353,7 +363,7 @@ export async function POST(
 
 		// 5. Return success with appropriate message
 		const isPending = booking.status === 'pending'
-		return NextResponse.json({
+			return NextResponse.json({
 			success: true,
 			message: isPending
 				? 'Booking canceled and payment link invalidated'
@@ -364,7 +374,8 @@ export async function POST(
 				wasReservation: isPending
 			},
 			willRefund,
-			refundId
+			refundId,
+			emailSent: willRefund ? !!refundId : sendEmailPreference
 		})
 	} catch (error) {
 		console.error('Booking cancellation error:', error)

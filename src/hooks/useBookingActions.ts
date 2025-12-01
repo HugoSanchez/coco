@@ -72,6 +72,14 @@ interface UseBookingActionsOptions {
 	onStatsRefresh?: () => void
 }
 
+interface CancelBookingOptions {
+	/**
+	 * Whether a cancellation email should be sent when the booking is not paid.
+	 * Defaults to false, and paid bookings always send their refund notification.
+	 */
+	sendEmail?: boolean
+}
+
 /**
  * Return type for useBookingActions hook
  */
@@ -88,8 +96,9 @@ interface UseBookingActionsReturn {
 	 * 5. Refresh stats if callback provided
 	 *
 	 * @param bookingId - The ID of the booking to cancel
+	 * @param options - Additional cancellation behavior (email preference)
 	 */
-	cancelBooking: (bookingId: string) => Promise<void>
+	cancelBooking: (bookingId: string, options?: CancelBookingOptions) => Promise<void>
 
 	/**
 	 * Confirms a pending booking, sending calendar invite to patient.
@@ -186,7 +195,7 @@ export function useBookingActions(
 	 * - State updates for booking status and payment status
 	 * - Handling refunds if applicable
 	 */
-	const cancelBooking = async (bookingId: string): Promise<void> => {
+	const cancelBooking = async (bookingId: string, options?: CancelBookingOptions): Promise<void> => {
 		try {
 			// Step 1: Show immediate feedback to user
 			toast({
@@ -201,7 +210,10 @@ export function useBookingActions(
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
-				}
+				},
+				body: JSON.stringify({
+					sendEmail: options?.sendEmail ?? false
+				})
 			})
 
 			// Step 3: Handle API errors

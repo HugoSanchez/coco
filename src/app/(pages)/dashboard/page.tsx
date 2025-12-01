@@ -316,6 +316,7 @@ export default function Dashboard() {
 		if (statsInitRef.current) return
 		statsInitRef.current = true
 		fetchDashboardStats()
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [user])
 
 	useEffect(() => {
@@ -376,9 +377,15 @@ export default function Dashboard() {
 
 	// Modal handlers are now provided by useBookingModals hook
 	// We create wrapper functions that combine modal actions with booking actions
+	const [shouldSendCancelEmail, setShouldSendCancelEmail] = useState(false)
+
 	const handleRefundBooking = openRefundModal
 	const handleShowMarkAsPaidDialog = openMarkAsPaidModal
-	const handleShowCancelDialog = openCancelBookingModal
+	const handleShowCancelDialog = (bookingId: string) => {
+		const booking = bookings.find((b) => b.id === bookingId)
+		setShouldSendCancelEmail(booking?.payment_status === 'paid')
+		openCancelBookingModal(bookingId)
+	}
 	const handleCancelSeries = openCancelSeriesModal
 	const handleRescheduleBooking = (bookingId: string) => {
 		console.log('Opening reschedule slidesheet for booking:', bookingId)
@@ -386,8 +393,14 @@ export default function Dashboard() {
 	}
 
 	// Wrapper for cancel booking that handles the modal confirmation
-	const handleCancelBooking = async (bookingId: string) => {
-		await cancelBooking(bookingId)
+	useEffect(() => {
+		if (!cancelingBookingId) {
+			setShouldSendCancelEmail(false)
+		}
+	}, [cancelingBookingId])
+
+	const handleCancelBooking = async (bookingId: string, options?: { sendEmail: boolean }) => {
+		await cancelBooking(bookingId, options)
 	}
 
 	// Wrapper for mark as paid that closes the modal after success
@@ -1004,6 +1017,7 @@ export default function Dashboard() {
 				(() => {
 					const booking = bookings.find((b) => b.id === cancelingBookingId)
 					const isPaid = booking?.payment_status === 'paid'
+					const sendEmailValue = isPaid ? true : shouldSendCancelEmail
 					return (
 						<CancelConfirmationModal
 							isOpen={!!cancelingBookingId}
@@ -1014,10 +1028,13 @@ export default function Dashboard() {
 								const id = cancelingBookingId
 								closeCancelBookingModal()
 								if (id) {
-									await handleCancelBooking(id)
+									await handleCancelBooking(id, { sendEmail: sendEmailValue })
 								}
 							}}
 							isPaid={!!isPaid}
+							allowEmailChoice={!isPaid}
+							sendEmailSelected={sendEmailValue}
+							onSendEmailChange={(checked) => setShouldSendCancelEmail(!!checked)}
 						/>
 					)
 				})()}
