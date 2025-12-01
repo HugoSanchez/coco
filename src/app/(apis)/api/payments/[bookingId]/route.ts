@@ -51,8 +51,12 @@ export async function GET(
 		const payableBill = bills.find(
 			(bill) => bill.status === 'scheduled' || bill.status === 'pending' || bill.status === 'sent'
 		)
+		const nonPayableBill = bills.find((bill) => bill.status === 'canceled' || bill.status === 'refunded')
 
 		if (!payableBill) {
+			if (nonPayableBill) {
+				return NextResponse.redirect(new URL(`/payment/error?reason=not_payable`, request.url))
+			}
 			return NextResponse.redirect(
 				new URL(`/payment/success?booking_id=${bookingId}`, request.url)
 			)

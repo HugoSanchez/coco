@@ -714,8 +714,7 @@ export async function getBookingsForExport(
 				currency,
 				status,
 				paid_at,
-				refunded_amount,
-				stripe_receipt_url
+				refunded_amount
 			)
 		`
 		)
@@ -750,7 +749,7 @@ export async function getBookingsForExport(
 	if (billIds.length > 0) {
 		const { data: invoicesData } = await client
 			.from('invoices')
-			.select('id, legacy_bill_id, series, number, pdf_url')
+			.select('id, legacy_bill_id, series, number, pdf_url, stripe_receipt_url')
 			.in('legacy_bill_id', billIds)
 		billIdToInvoice = Object.fromEntries(
 			(invoicesData || []).map((inv: any) => [inv.legacy_bill_id as string, inv])
@@ -832,7 +831,7 @@ export async function getBookingsForExport(
 			currency: bill?.currency ?? 'EUR',
 			paid_at_iso: bill?.paid_at ?? null,
 			refund_amount: bill?.refunded_amount ?? 0,
-			receipt_url: bill?.stripe_receipt_url ?? null,
+			receipt_url: invoice?.stripe_receipt_url ?? null,
 			service_name: 'consulta',
 			timezone: 'UTC',
 			invoice_series: invoice?.series ?? null,
