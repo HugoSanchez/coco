@@ -337,22 +337,28 @@ export class PaymentOrchestrationService {
 				totalSentToStripe: lineItems.reduce((sum, li) => sum + li.unitAmountEur, 0)
 			})
 
-			// Track or update a payment_session for this invoice (idempotent-ish)
+			// Track or update a payment_session for this invoice
+			// Strategy: Only update if there's an active (pending) session; otherwise create new
 			try {
-				const existing = await getPaymentSessionsForInvoice(invoice.id, serviceClient)
+				const allSessions = await getPaymentSessionsForInvoice(invoice.id, serviceClient)
+				const activeSessions = (allSessions || []).filter((s) => s.status === 'pending')
+
 				console.log('[orchestrateInvoiceCheckout] Existing payment sessions found:', {
 					invoiceId,
-					sessionCount: existing?.length || 0,
-					sessions: existing?.map((s) => ({
+					totalSessionCount: allSessions?.length || 0,
+					activePendingCount: activeSessions.length,
+					allSessions: allSessions?.map((s) => ({
 						id: s.id,
 						status: s.status,
 						stripe_session_id: s.stripe_session_id,
 						amount: s.amount
 					}))
 				})
-				if (existing && existing.length > 0) {
+
+				if (activeSessions.length > 0) {
+					// Update the first active pending session (idempotency: multiple clicks reuse same row)
 					await updatePaymentSession(
-						existing[0].id,
+						activeSessions[0].id,
 						{
 							stripe_session_id: sessionId,
 							amount: invoice.total,
@@ -362,27 +368,56 @@ export class PaymentOrchestrationService {
 						},
 						serviceClient
 					)
-					console.log('[orchestrateInvoiceCheckout] Updated existing payment session:', {
-						sessionId: existing[0].id,
+					console.log('[orchestrateInvoiceCheckout] Updated existing pending payment session:', {
+						sessionId: activeSessions[0].id,
 						newStripeSessionId: sessionId
 					})
 				} else {
-					await createPaymentSession(
-						{
-							invoice_id: invoice.id,
-							stripe_session_id: sessionId,
-							amount: invoice.total,
-							status: 'pending'
-						},
-						serviceClient
-					)
-					console.log('[orchestrateInvoiceCheckout] Created new payment session:', {
-						invoiceId,
-						stripeSessionId: sessionId
-					})
+					// No active pending sessions - check if this stripe_session_id already exists (duplicate key prevention)
+					const { data: duplicateCheck } = await serviceClient
+						.from('payment_sessions')
+						.select('id, status, invoice_id')
+						.eq('stripe_session_id', sessionId)
+						.single()
+
+					if (duplicateCheck) {
+						// Stripe session ID already exists - update that row instead of creating duplicate
+						await updatePaymentSession(
+							duplicateCheck.id,
+							{
+								invoice_id: invoice.id,
+								amount: invoice.total,
+								status: 'pending',
+								stripe_payment_intent_id: null,
+								completed_at: null
+							},
+							serviceClient
+						)
+						console.log('[orchestrateInvoiceCheckout] Updated existing payment session (duplicate stripe_session_id):', {
+							sessionId: duplicateCheck.id,
+							previousStatus: duplicateCheck.status,
+							previousInvoiceId: duplicateCheck.invoice_id
+						})
+					} else {
+						// Create brand new payment session row
+						await createPaymentSession(
+							{
+								invoice_id: invoice.id,
+								stripe_session_id: sessionId,
+								amount: invoice.total,
+								status: 'pending'
+							},
+							serviceClient
+						)
+						console.log('[orchestrateInvoiceCheckout] Created new payment session:', {
+							invoiceId,
+							stripeSessionId: sessionId
+						})
+					}
 				}
 			} catch (err) {
 				console.error('[orchestrateInvoiceCheckout] Failed to track payment session:', err)
+				// Non-fatal: continue even if session tracking fails
 			}
 
 			return { success: true, checkoutUrl }
