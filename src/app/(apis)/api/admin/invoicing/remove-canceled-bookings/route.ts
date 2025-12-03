@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
 
 		const invoiceSummaries: Array<{ invoiceId: string; remainingBills: number; status: string }> = []
 		if (!dryRun && affectedInvoices.size > 0) {
-			for (const invoiceId of affectedInvoices) {
+			for (const invoiceId of Array.from(affectedInvoices)) {
 				const { data: remaining, error: remainingError } = await supabase
 					.from('bills')
 					.select('id')
@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
 				}
 			}
 		} else if (dryRun) {
-			for (const invoiceId of affectedInvoices) {
+			for (const invoiceId of Array.from(affectedInvoices)) {
 				invoiceSummaries.push({ invoiceId, remainingBills: NaN, status: 'pending-update' })
 			}
 		}
