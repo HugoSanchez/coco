@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { SideSheetHeadless } from './SideSheetHeadless'
 import { ClientFormFields } from './ClientFormFields'
 import type { Client } from '@/lib/db/clients'
+import type { ClientFormDraft } from '@/hooks/useClientFormPersistence'
 
 /**
  * Props interface for the ClientForm component
@@ -20,6 +22,10 @@ interface ClientFormProps {
 	onClientCreated: (client?: Client) => void
 	editMode?: boolean
 	initialData?: Client
+	persistKey?: string
+	saveDraft?: (draft: ClientFormDraft) => void
+	loadDraft?: () => ClientFormDraft | null
+	clearPersistedDraft?: () => void
 }
 
 /**
@@ -63,8 +69,14 @@ export function ClientForm({
 	onClose,
 	onClientCreated,
 	editMode = false,
-	initialData
+	initialData,
+	persistKey,
+	saveDraft,
+	loadDraft,
+	clearPersistedDraft
 }: ClientFormProps) {
+	const [scrollableRef, setScrollableRef] = useState<HTMLDivElement | null>(null)
+	const fallbackKey = editMode && initialData?.id ? `client-form-${initialData.id}` : 'client-form'
 	return (
 		<SideSheetHeadless
 			isOpen={isOpen}
@@ -85,12 +97,19 @@ export function ClientForm({
 					</>
 				)
 			}
+			onScrollableRef={setScrollableRef}
 		>
 			<ClientFormFields
+				key={persistKey ?? fallbackKey}
 				onSuccess={onClientCreated}
 				onCancel={onClose}
 				editMode={editMode}
 				initialData={initialData}
+				persistKey={persistKey}
+				saveDraft={saveDraft}
+				loadDraft={loadDraft}
+				clearPersistedDraft={clearPersistedDraft}
+				scrollableRef={scrollableRef}
 			/>
 		</SideSheetHeadless>
 	)

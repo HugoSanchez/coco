@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { Plus, MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -27,6 +26,7 @@ import {
 import { ClientForm } from './ClientForm'
 import { Tables } from '@/types/database.types'
 import { getClientFullName } from '@/lib/db/clients'
+import { useClientFormPersistence } from '@/hooks/useClientFormPersistence'
 
 /**
  * Type alias for Client data from the database
@@ -62,10 +62,22 @@ export function ClientList({
 	onClientCreated,
 	onEditClient
 }: ClientListProps) {
-	// State to control the client form modal visibility
-	const [isFormOpen, setIsFormOpen] = useState(false)
-	// State to track which client is being edited
-	const [editingClient, setEditingClient] = useState<Client | null>(null)
+	const {
+		state,
+		persistKey,
+		openCreateForm,
+		openEditForm,
+		closeForm,
+		resetFormState,
+		clearPersistedDraft,
+		saveDraft,
+		loadDraft
+	} = useClientFormPersistence()
+
+	const editingClient = state.editingClientId
+		? clients.find((client) => client.id === state.editingClientId) || null
+		: null
+	const isEditMode = state.mode === 'edit' && !!editingClient
 
 	/**
 	 * Handles successful client creation
@@ -74,9 +86,8 @@ export function ClientList({
 	 * by calling the parent component's refresh callback.
 	 */
 	const handleClientCreated = () => {
-		setIsFormOpen(false)
-		setEditingClient(null) // Clear editing state
-		// Call parent callback to refresh the client list
+		clearPersistedDraft()
+		resetFormState()
 		onClientCreated?.()
 	}
 
@@ -85,9 +96,7 @@ export function ClientList({
 	 * Opens the form modal in edit mode with the selected client data
 	 */
 	const handleEditClient = (client: Client) => {
-		setEditingClient(client)
-		setIsFormOpen(true)
-		// Optionally notify parent component
+		openEditForm(client.id)
 		onEditClient?.(client)
 	}
 
@@ -96,8 +105,8 @@ export function ClientList({
 	 * Resets both form and editing state
 	 */
 	const handleCloseForm = () => {
-		setIsFormOpen(false)
-		setEditingClient(null)
+		clearPersistedDraft()
+		closeForm()
 	}
 
 	// Show loading state while clients are being fetched
@@ -120,7 +129,7 @@ export function ClientList({
 
 					{/* Add new client button */}
 					<Button
-						onClick={() => setIsFormOpen(true)}
+						onClick={openCreateForm}
 						size="sm"
 						className="ml-auto gap-1 bg-gray-100 text-gray-800 hover:bg-gray-200"
 					>
@@ -192,11 +201,15 @@ export function ClientList({
 
 			{/* Client form modal for adding new clients or editing existing ones */}
 			<ClientForm
-				isOpen={isFormOpen}
+				isOpen={state.isOpen}
 				onClose={handleCloseForm}
 				onClientCreated={handleClientCreated}
-				editMode={!!editingClient}
-				initialData={editingClient || undefined}
+				editMode={isEditMode}
+				initialData={isEditMode ? editingClient || undefined : undefined}
+				persistKey={persistKey || undefined}
+				saveDraft={saveDraft}
+				loadDraft={loadDraft}
+				clearPersistedDraft={clearPersistedDraft}
 			/>
 		</div>
 	)

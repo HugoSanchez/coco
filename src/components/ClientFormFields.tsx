@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import type { ClientFormDraft } from '@/hooks/useClientFormPersistence'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -38,6 +39,11 @@ interface ClientFormFieldsProps {
 	// New props for edit mode
 	editMode?: boolean
 	initialData?: Client
+	persistKey?: string
+	saveDraft?: (draft: ClientFormDraft) => void
+	loadDraft?: () => ClientFormDraft | null
+	clearPersistedDraft?: () => void
+	scrollableRef?: HTMLDivElement | null
 }
 
 export function ClientFormFields({
@@ -49,7 +55,12 @@ export function ClientFormFields({
 	onSubmitFunction,
 	onLoadingChange,
 	editMode = false,
-	initialData
+	initialData,
+	persistKey,
+	saveDraft,
+	loadDraft,
+	clearPersistedDraft,
+	scrollableRef
 }: ClientFormFieldsProps) {
 	const [loading, setLoading] = useState(false)
 	const { user } = useUser()
@@ -105,8 +116,9 @@ export function ClientFormFields({
 		}
 	}
 
-	// Initialize form data with either initial data (edit mode) or empty values (create mode)
-	const [formData, setFormData] = useState({
+	// Initialize form data with initialData or empty values
+	// Draft will be loaded in useEffect to avoid race conditions
+	const getInitialFormData = (): ClientFormDraft => ({
 		name: initialData?.name || '',
 		lastName: initialData?.last_name || '',
 		email: initialData?.email || '',
@@ -119,9 +131,117 @@ export function ClientFormFields({
 		billingAmount: '', // We'll load this from billing settings separately
 		paymentEmailLeadHours: '0',
 		billingType: 'in-advance' as 'in-advance' | 'right-after' | 'monthly',
-		applyVat: false, // VAT checkbox state
-		suppressEmail: 'false' // suppress_email flag as string
+		applyVat: false,
+		suppressEmail: 'false',
+		// Collapsible section states (default to false)
+		notesOpen: false,
+		additionalFieldsOpen: false,
+		billingOpen: false,
+		// Scroll position (default to 0)
+		scrollPosition: 0
 	})
+
+	const [formData, setFormData] = useState<ClientFormDraft>(getInitialFormData)
+	const draftLoadedRef = useRef(false)
+
+	// Load draft on mount if available (only in create mode, or edit mode without initialData)
+	useEffect(() => {
+		if (draftLoadedRef.current) return
+		if (!persistKey || !loadDraft) {
+			draftLoadedRef.current = true
+			return
+		}
+		// In edit mode with initialData, don't load draft (use actual client data)
+		if (editMode && initialData) {
+			draftLoadedRef.current = true
+			return
+		}
+
+		const draft = loadDraft()
+		if (draft) {
+			setFormData(draft)
+		}
+		draftLoadedRef.current = true
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []) // Only run on mount
+
+	// Restore scroll position when draft loads or scrollableRef becomes available
+	const scrollRestoredRef = useRef(false)
+	useEffect(() => {
+		// Reset restoration flag when scrollableRef changes (form reopened)
+		if (!scrollableRef) {
+			scrollRestoredRef.current = false
+			return
+		}
+		if (scrollRestoredRef.current) return
+
+		if (formData.scrollPosition && formData.scrollPosition > 0) {
+			// Wait a bit for the DOM to settle, then restore scroll
+			const timeout = setTimeout(() => {
+				if (scrollableRef) {
+					scrollableRef.scrollTop = formData.scrollPosition || 0
+					scrollRestoredRef.current = true
+				}
+			}, 100)
+			return () => clearTimeout(timeout)
+		} else {
+			scrollRestoredRef.current = true // Mark as restored even if no scroll position
+		}
+	}, [scrollableRef, formData.scrollPosition])
+
+	// Track scroll position and save it to draft
+	const scrollSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+	useEffect(() => {
+		if (!scrollableRef || !persistKey || !saveDraft) return
+		if (editMode && initialData) return
+
+		const handleScroll = () => {
+			if (!scrollableRef) return
+
+			// Clear existing timeout
+			if (scrollSaveTimeoutRef.current) {
+				clearTimeout(scrollSaveTimeoutRef.current)
+			}
+
+			// Debounce scroll saves
+			scrollSaveTimeoutRef.current = setTimeout(() => {
+				const scrollTop = scrollableRef.scrollTop
+				setFormData((prev) => ({ ...prev, scrollPosition: scrollTop }))
+			}, 200) // 200ms debounce for scroll
+		}
+
+		scrollableRef.addEventListener('scroll', handleScroll, { passive: true })
+		return () => {
+			scrollableRef.removeEventListener('scroll', handleScroll)
+			if (scrollSaveTimeoutRef.current) {
+				clearTimeout(scrollSaveTimeoutRef.current)
+			}
+		}
+	}, [scrollableRef, persistKey, saveDraft, editMode, initialData])
+
+	// Debounced save to sessionStorage whenever formData changes
+	const saveDraftTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+	useEffect(() => {
+		if (!persistKey || !saveDraft) return
+		// Don't save if we're in edit mode with initialData (we want to use actual client data)
+		if (editMode && initialData) return
+
+		// Clear existing timeout
+		if (saveDraftTimeoutRef.current) {
+			clearTimeout(saveDraftTimeoutRef.current)
+		}
+
+		// Debounce saves to avoid too many writes
+		saveDraftTimeoutRef.current = setTimeout(() => {
+			saveDraft(formData)
+		}, 300) // 300ms debounce
+
+		return () => {
+			if (saveDraftTimeoutRef.current) {
+				clearTimeout(saveDraftTimeoutRef.current)
+			}
+		}
+	}, [formData, persistKey, saveDraft, editMode, initialData])
 
 	// Duplicate email detection state
 	const [checkingDuplicate, setCheckingDuplicate] = useState(false)
@@ -315,6 +435,11 @@ export function ClientFormFields({
 				createdClient = (list as Client[]).find((c) => c.email?.toLowerCase() === formData.email.toLowerCase())
 			} catch {}
 
+			// Clear persisted draft on successful submission
+			if (clearPersistedDraft) {
+				clearPersistedDraft()
+			}
+
 			// Reset form only in create mode (in edit mode, keep the form populated)
 			if (!editMode) {
 				setFormData({
@@ -331,7 +456,11 @@ export function ClientFormFields({
 					paymentEmailLeadHours: '0',
 					billingType: 'in-advance',
 					applyVat: false,
-					suppressEmail: 'false'
+					suppressEmail: 'false',
+					notesOpen: false,
+					additionalFieldsOpen: false,
+					billingOpen: false,
+					scrollPosition: 0
 				})
 				defaultsAppliedRef.current = false // Reset so defaults can be applied again for next client
 			}
@@ -360,7 +489,7 @@ export function ClientFormFields({
 			setLoading(false)
 			if (onLoadingChange) onLoadingChange(false)
 		}
-	}, [user, formData, onSuccess, onLoadingChange, toast, editMode, initialData, confirmingDuplicate])
+	}, [user, formData, onSuccess, onLoadingChange, toast, editMode, initialData, confirmingDuplicate, clearPersistedDraft])
 
 	// Expose the submit function to parent
 	useEffect(() => {
@@ -527,7 +656,8 @@ export function ClientFormFields({
 			<div className="space-y-4 mt-6">
 				<CollapsibleSection
 					title="Notas opcionales"
-					defaultOpen={false}
+					open={formData.notesOpen ?? false}
+					onOpenChange={(open) => handleInputChange('notesOpen', open)}
 					className="pt-2"
 					contentClassName="space-y-4 pt-4 pb-4"
 					showBackground={true}
@@ -550,7 +680,8 @@ export function ClientFormFields({
 			<div className="space-y-4">
 				<CollapsibleSection
 					title="Campos adicionales"
-					defaultOpen={false}
+					open={formData.additionalFieldsOpen ?? false}
+					onOpenChange={(open) => handleInputChange('additionalFieldsOpen', open)}
 					className="pt-2"
 					contentClassName="space-y-4 pt-4 pb-4"
 					showBackground={true}
@@ -609,8 +740,14 @@ export function ClientFormFields({
 			<div className="space-y-4">
 				<CollapsibleSection
 					title="Condiciones de facturación"
-					open={formData.shouldBill}
-					onOpenChange={(open) => handleInputChange('shouldBill', open)}
+					open={formData.billingOpen ?? formData.shouldBill}
+					onOpenChange={(open) => {
+						handleInputChange('billingOpen', open)
+						// Also update shouldBill if opening (for backward compatibility)
+						if (open && !formData.shouldBill) {
+							handleInputChange('shouldBill', true)
+						}
+					}}
 					className="pt-2"
 					contentClassName="space-y-2 pt-4"
 					showBackground={true}
@@ -631,6 +768,7 @@ export function ClientFormFields({
 							onChange={(e) => {
 								handleInputChange('billingAmount', e.target.value)
 								handleInputChange('shouldBill', true)
+								handleInputChange('billingOpen', true)
 							}}
 							onBlur={(e) => {
 								const v = e.target.value
@@ -666,6 +804,7 @@ export function ClientFormFields({
 									value={timingValue}
 									onValueChange={(val) => {
 										handleInputChange('shouldBill', true)
+										handleInputChange('billingOpen', true)
 										if (val === 'no_email') {
 											setFormData((prev) => ({
 												...prev,
@@ -717,6 +856,7 @@ export function ClientFormFields({
 								onCheckedChange={(checked) => {
 									handleInputChange('applyVat', checked === true)
 									handleInputChange('shouldBill', true)
+									handleInputChange('billingOpen', true)
 								}}
 							/>
 							<Label

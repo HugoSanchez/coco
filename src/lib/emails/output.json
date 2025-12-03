@@ -1,0 +1,74 @@
+{
+	"dryRun": false,
+	"cancelledBills": 9,
+	"invoicesTouched": [
+		"09185ea2-0dce-414b-a7ba-0a443b96bdce",
+		"b6a0148f-53a8-41f4-9bfe-d47e34d01606",
+		"ecdd9d19-38e6-4a55-a74a-028df4880995",
+		"9220b631-46ef-4df3-bc72-254f11300a57",
+		"69df764c-98a7-4fd5-b91e-3bf11a3fbfba",
+		"52f99c69-8ef9-4930-8d0e-cf1ee270129d",
+		"7bdbbbb1-8ca8-41f4-b8e4-766172ea7bf9",
+		"13decf83-26f4-4f50-bb8e-829aeaaeb560"
+	],
+	"affectedInvoices": [
+		{
+			"invoiceId": "09185ea2-0dce-414b-a7ba-0a443b96bdce",
+			"status": "draft",
+			"billIds": ["d7e212de-e506-4eb7-a1e7-093b26e560b1", "214e4a32-19b0-4a6c-814f-9ae0928171c7"],
+			"clients": ["prueba"]
+		},
+		{
+			"invoiceId": "b6a0148f-53a8-41f4-9bfe-d47e34d01606",
+			"status": "draft",
+			"billIds": ["03eeb64d-ca05-42c5-b759-b6cb387015de"],
+			"clients": ["Enrique Calvo"]
+		},
+		{
+			"invoiceId": "ecdd9d19-38e6-4a55-a74a-028df4880995",
+			"status": "draft",
+			"billIds": ["a05b8bbc-00e8-4c5c-8515-3902019179fd"],
+			"clients": ["David"]
+		},
+		{
+			"invoiceId": "9220b631-46ef-4df3-bc72-254f11300a57",
+			"status": "draft",
+			"billIds": ["94a6475a-4a15-4a9c-944b-34b137992152"],
+			"clients": ["Neo"]
+		},
+		{
+			"invoiceId": "69df764c-98a7-4fd5-b91e-3bf11a3fbfba",
+			"status": "draft",
+			"billIds": ["19bb8318-4c6e-44fb-8b98-cc2cee291dba"],
+			"clients": ["Monica  Ponce de Leon Valderrama"]
+		},
+		{
+			"invoiceId": "52f99c69-8ef9-4930-8d0e-cf1ee270129d",
+			"status": "draft",
+			"billIds": ["8d0a4c8a-f3b2-42fb-8bf7-3d2d85064271"],
+			"clients": ["Pablo"]
+		},
+		{
+			"invoiceId": "7bdbbbb1-8ca8-41f4-b8e4-766172ea7bf9",
+			"status": "draft",
+			"billIds": ["ecb0dabd-5151-47bd-9963-e6ea0ff61b2e"],
+			"clients": ["Hector"]
+		},
+		{
+			"invoiceId": "13decf83-26f4-4f50-bb8e-829aeaaeb560",
+			"status": "draft",
+			"billIds": ["00817df2-7938-4876-a4f6-bd98f93fffe7"],
+			"clients": ["Adrian Subirana"]
+		}
+	],
+	"updatedInvoices": [
+		"09185ea2-0dce-414b-a7ba-0a443b96bdce",
+		"b6a0148f-53a8-41f4-9bfe-d47e34d01606",
+		"ecdd9d19-38e6-4a55-a74a-028df4880995",
+		"9220b631-46ef-4df3-bc72-254f11300a57",
+		"69df764c-98a7-4fd5-b91e-3bf11a3fbfba",
+		"52f99c69-8ef9-4930-8d0e-cf1ee270129d",
+		"7bdbbbb1-8ca8-41f4-b8e4-766172ea7bf9",
+		"13decf83-26f4-4f50-bb8e-829aeaaeb560"
+	]
+}

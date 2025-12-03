@@ -7,6 +7,7 @@ import CancellationNotificationEmail from './cancellation-notification'
 import CancellationRefundNotificationEmail from './cancellation-refund-notification'
 import PaymentReceiptEmail from './payment-receipt'
 import PractitionerBookingNotificationEmail from './practitioner-booking-notification'
+import InvoiceAdjustmentNotificationEmail from './invoice-adjustment-notification'
 
 /**
  * Get Resend client instance
@@ -155,6 +156,98 @@ export async function sendMonthlyBillEmail({
 	} catch (error) {
 		console.error('Monthly bill email failed:', error)
 		return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+	}
+}
+
+export async function sendInvoiceAdjustmentEmail({
+	to,
+	clientName,
+	practitionerName,
+	monthLabel,
+	paymentUrl,
+	amount,
+	currency = 'EUR',
+	notes
+}: {
+	to: string
+	clientName: string
+	practitionerName?: string
+	monthLabel?: string
+	paymentUrl?: string
+	amount?: number
+	currency?: string
+	notes?: string
+}) {
+	try {
+		const html = await render(
+			InvoiceAdjustmentNotificationEmail({
+				clientName,
+				practitionerName,
+				monthLabel,
+				paymentUrl,
+				amount,
+				currency,
+				notes
+			})
+		)
+
+		const subject = monthLabel ? `Actualización de tu factura de ${monthLabel}` : 'Actualización de tu factura'
+		const resend = getResendClient()
+		const result = await resend.emails.send({
+			from: EMAIL_CONFIG.from,
+			replyTo: EMAIL_CONFIG.replyTo,
+			to: [to],
+			subject,
+			html
+		})
+		if (result.error) throw new Error(result.error.message)
+		return { success: true, emailId: result.data?.id }
+	} catch (error) {
+		console.error('Invoice adjustment email failed:', error)
+		return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+	}
+}
+
+export async function sendBulkInvoiceAdjustments(
+	notifications: Array<{
+		to: string
+		clientName: string
+		practitionerName?: string
+		monthLabel?: string
+		paymentUrl?: string
+		amount?: number
+		currency?: string
+		notes?: string
+	}>
+) {
+	console.log(`📧 [EMAIL] Starting bulk send for ${notifications.length} invoice adjustments`)
+
+	const results: Array<{ to: string; emailId?: string }> = []
+	const errors: Array<{ to: string; error?: string }> = []
+
+	for (const notification of notifications) {
+		const outcome = await sendInvoiceAdjustmentEmail(notification)
+		if (outcome.success) {
+			results.push({ to: notification.to, emailId: outcome.emailId })
+		} else {
+			errors.push({ to: notification.to, error: outcome.error })
+		}
+
+		await new Promise((resolve) => setTimeout(resolve, 100))
+	}
+
+	console.log(`📧 [EMAIL] Invoice adjustment send completed`, {
+		total: notifications.length,
+		successful: results.length,
+		failed: errors.length
+	})
+
+	return {
+		total: notifications.length,
+		successful: results.length,
+		failed: errors.length,
+		results,
+		errors
 	}
 }
 

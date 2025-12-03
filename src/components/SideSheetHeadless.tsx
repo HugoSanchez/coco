@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect } from 'react'
+import { Fragment, useEffect, useRef } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 
 interface SideSheetHeadlessProps {
@@ -10,6 +10,7 @@ interface SideSheetHeadlessProps {
 	description?: React.ReactNode
 	children: React.ReactNode
 	width?: string
+	onScrollableRef?: (ref: HTMLDivElement | null) => void
 }
 
 export function SideSheetHeadless({
@@ -18,8 +19,18 @@ export function SideSheetHeadless({
 	title,
 	description,
 	children,
-	width
+	width,
+	onScrollableRef
 }: SideSheetHeadlessProps) {
+	const scrollableRef = useRef<HTMLDivElement>(null)
+
+	// Expose scrollable ref to parent
+	useEffect(() => {
+		if (onScrollableRef) {
+			onScrollableRef(scrollableRef.current)
+		}
+	}, [onScrollableRef, isOpen])
+
 	// Lock body scroll while the sheet is open to prevent background scroll
 	useEffect(() => {
 		if (isOpen) {
@@ -71,7 +82,7 @@ export function SideSheetHeadless({
 												</p>
 											)}
 										</div>
-										<div className="flex-1 overflow-y-auto scrollbar-hide">
+										<div ref={scrollableRef} className="flex-1 overflow-y-auto scrollbar-hide">
 											{children}
 										</div>
 									</div>
