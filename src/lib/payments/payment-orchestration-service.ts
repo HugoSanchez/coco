@@ -244,6 +244,14 @@ export class PaymentOrchestrationService {
 			const invoice = await getInvoiceById(invoiceId, serviceClient)
 			if (!invoice) return { success: false, error: 'Invoice not found' }
 
+			console.log('[orchestrateInvoiceCheckout] Invoice loaded:', {
+				invoiceId,
+				status: invoice.status,
+				total: invoice.total,
+				subtotal: invoice.subtotal,
+				tax_total: invoice.tax_total
+			})
+
 			// Allowed statuses: if draft, we still allow payment, but prefer issued (numbers assigned)
 			// Block if canceled or paid
 			if (invoice.status === 'paid' || invoice.status === 'canceled') {
@@ -262,6 +270,15 @@ export class PaymentOrchestrationService {
 			try {
 				const { getBillsForInvoice } = await import('@/lib/db/bills')
 				const bills = await getBillsForInvoice(invoice.id, serviceClient)
+				console.log('[orchestrateInvoiceCheckout] Bills fetched:', {
+					invoiceId,
+					billCount: bills.length,
+					bills: bills.map((b: any) => ({
+						id: b.id,
+						amount: b.amount,
+						bookingStartTime: Array.isArray(b?.booking) ? b.booking[0]?.start_time : b?.booking?.start_time
+					}))
+				})
 				lineItems = bills.map((b: any) => {
 					const iso = Array.isArray(b?.booking) ? b.booking[0]?.start_time : b?.booking?.start_time
 					const when = iso ? new Date(iso) : null
@@ -275,7 +292,18 @@ export class PaymentOrchestrationService {
 						quantity: 1
 					}
 				})
-			} catch (_) {
+				console.log('[orchestrateInvoiceCheckout] Line items built:', {
+					invoiceId,
+					lineItemCount: lineItems.length,
+					lineItems: lineItems.map((li) => ({
+						name: li.name,
+						amount: li.unitAmountEur,
+						description: li.description
+					})),
+					totalFromLineItems: lineItems.reduce((sum, li) => sum + li.unitAmountEur, 0)
+				})
+			} catch (err) {
+				console.error('[orchestrateInvoiceCheckout] Failed to fetch bills, using fallback:', err)
 				// Fallback to one consolidated line if retrieval fails
 				lineItems = [
 					{ name: 'Consulta(s)', unitAmountEur: Number(invoice.total || 0), quantity: 1, description: null }
@@ -301,9 +329,27 @@ export class PaymentOrchestrationService {
 				lineItems
 			})
 
+			console.log('[orchestrateInvoiceCheckout] Stripe session created:', {
+				invoiceId,
+				stripeSessionId: sessionId,
+				checkoutUrl,
+				lineItemsSentToStripe: lineItems.length,
+				totalSentToStripe: lineItems.reduce((sum, li) => sum + li.unitAmountEur, 0)
+			})
+
 			// Track or update a payment_session for this invoice (idempotent-ish)
 			try {
 				const existing = await getPaymentSessionsForInvoice(invoice.id, serviceClient)
+				console.log('[orchestrateInvoiceCheckout] Existing payment sessions found:', {
+					invoiceId,
+					sessionCount: existing?.length || 0,
+					sessions: existing?.map((s) => ({
+						id: s.id,
+						status: s.status,
+						stripe_session_id: s.stripe_session_id,
+						amount: s.amount
+					}))
+				})
 				if (existing && existing.length > 0) {
 					await updatePaymentSession(
 						existing[0].id,
@@ -316,6 +362,10 @@ export class PaymentOrchestrationService {
 						},
 						serviceClient
 					)
+					console.log('[orchestrateInvoiceCheckout] Updated existing payment session:', {
+						sessionId: existing[0].id,
+						newStripeSessionId: sessionId
+					})
 				} else {
 					await createPaymentSession(
 						{
@@ -326,8 +376,14 @@ export class PaymentOrchestrationService {
 						},
 						serviceClient
 					)
+					console.log('[orchestrateInvoiceCheckout] Created new payment session:', {
+						invoiceId,
+						stripeSessionId: sessionId
+					})
 				}
-			} catch (_) {}
+			} catch (err) {
+				console.error('[orchestrateInvoiceCheckout] Failed to track payment session:', err)
+			}
 
 			return { success: true, checkoutUrl }
 		} catch (error) {
