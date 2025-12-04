@@ -10,19 +10,31 @@ import {
 	Target,
 	CheckCircle,
 	ChevronDown,
-	ChevronUp
+	ChevronUp,
+	Play,
+	Pause,
+	Maximize,
+	Minimize
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { captureClientEvent } from '@/lib/posthog/client'
 
 export default function LandingPage() {
 	const router = useRouter()
 	const [isMobile, setIsMobile] = useState<boolean | null>(false)
 	const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 	const [expandedStep, setExpandedStep] = useState<number | null>(null)
+	const [isVideoPlaying, setIsVideoPlaying] = useState(false)
+	const [isVideoPaused, setIsVideoPaused] = useState(false)
+	const [isFullscreen, setIsFullscreen] = useState(false)
+	const [showPauseButton, setShowPauseButton] = useState(false)
+	const videoRef = useRef<HTMLVideoElement>(null)
+	const videoContainerRef = useRef<HTMLDivElement>(null)
+	const pauseButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
 	useEffect(() => {
 		// Set initial value
@@ -77,6 +89,129 @@ export default function LandingPage() {
 	const toggleStep = (index: number) => {
 		setExpandedStep(expandedStep === index ? null : index)
 	}
+
+	const handlePlayVideo = () => {
+		if (videoRef.current) {
+			videoRef.current.play()
+			setIsVideoPlaying(true)
+			setIsVideoPaused(false)
+			// Track PostHog event
+			captureClientEvent('landing_page_video_play', {
+				source: 'play_button'
+			})
+		}
+	}
+
+	const handlePauseVideo = () => {
+		if (videoRef.current) {
+			videoRef.current.pause()
+			setIsVideoPaused(true)
+		}
+	}
+
+	const handleTogglePlayPause = () => {
+		if (videoRef.current) {
+			if (videoRef.current.paused) {
+				videoRef.current.play()
+				setIsVideoPlaying(true)
+				setIsVideoPaused(false)
+			} else {
+				videoRef.current.pause()
+				setIsVideoPaused(true)
+			}
+		}
+	}
+
+	const handleVideoEnded = () => {
+		if (videoRef.current) {
+			videoRef.current.currentTime = 0
+			videoRef.current.load() // Reload video to show poster
+		}
+		setIsVideoPlaying(false)
+		setIsVideoPaused(false)
+		setShowPauseButton(false)
+		if (pauseButtonTimeoutRef.current) {
+			clearTimeout(pauseButtonTimeoutRef.current)
+		}
+		// Track PostHog event
+		captureClientEvent('landing_page_video_completed', {
+			video_duration: videoRef.current?.duration || 0
+		})
+	}
+
+	const handleVideoPlay = () => {
+		setIsVideoPlaying(true)
+		setIsVideoPaused(false)
+		setShowPauseButton(true)
+		// Hide pause button after 2 seconds
+		if (pauseButtonTimeoutRef.current) {
+			clearTimeout(pauseButtonTimeoutRef.current)
+		}
+		pauseButtonTimeoutRef.current = setTimeout(() => {
+			setShowPauseButton(false)
+		}, 2000)
+	}
+
+	const handleVideoPause = () => {
+		setIsVideoPaused(true)
+		setShowPauseButton(false)
+		if (pauseButtonTimeoutRef.current) {
+			clearTimeout(pauseButtonTimeoutRef.current)
+		}
+	}
+
+	const handleMouseMove = () => {
+		// Only show pause button if video is playing
+		if (isVideoPlaying && !isVideoPaused) {
+			setShowPauseButton(true)
+			// Clear existing timeout and set new one
+			if (pauseButtonTimeoutRef.current) {
+				clearTimeout(pauseButtonTimeoutRef.current)
+			}
+			pauseButtonTimeoutRef.current = setTimeout(() => {
+				setShowPauseButton(false)
+			}, 2000)
+		}
+	}
+
+	const handleToggleFullscreen = async () => {
+		if (!videoContainerRef.current) return
+
+		try {
+			if (!document.fullscreenElement) {
+				// Enter fullscreen
+				await videoContainerRef.current.requestFullscreen()
+				setIsFullscreen(true)
+			} else {
+				// Exit fullscreen
+				await document.exitFullscreen()
+				setIsFullscreen(false)
+			}
+		} catch (error) {
+			console.error('Error toggling fullscreen:', error)
+		}
+	}
+
+	// Listen for fullscreen changes
+	useEffect(() => {
+		const handleFullscreenChange = () => {
+			setIsFullscreen(!!document.fullscreenElement)
+		}
+
+		document.addEventListener('fullscreenchange', handleFullscreenChange)
+		return () => {
+			document.removeEventListener('fullscreenchange', handleFullscreenChange)
+		}
+	}, [])
+
+	// Cleanup timeout on unmount
+	useEffect(() => {
+		return () => {
+			if (pauseButtonTimeoutRef.current) {
+				clearTimeout(pauseButtonTimeoutRef.current)
+			}
+		}
+	}, [])
 
 	return (
 		<div className="min-h-screen bg-white">
@@ -147,28 +282,102 @@ export default function LandingPage() {
 
 			{/* Dashboard Preview */}
 			<section className="md:pb-20 px-4">
-				<div className="max-w-5xl mx-auto">
+				<div className="w-full lg:px-20 mx-auto">
 					<motion.div
 						initial={{ y: 50, opacity: 0 }}
 						animate={{ y: 0, opacity: 1 }}
 						transition={{ duration: 0.8, delay: 0.3 }}
 						className="relative"
 					>
-						<div className="bg-gradient-to-br from-teal-50 to-teal-50 rounded-2xl p-2 md:p-12">
-							<div className="bg-white rounded-md md:rounded-xl shadow-2xl overflow-hidden">
-								<div className="bg-gray-50 px-3 md:px-6 py-1 md:py-4 border-b border-gray-100">
-									<div className="flex items-center space-x-1 md:space-x-2">
-										<div className="w-1 h-1 md:w-3 md:h-3 bg-red-400 rounded-full"></div>
-										<div className="w-1 h-1 md:w-3 md:h-3 bg-yellow-400 rounded-full"></div>
-										<div className="w-1 h-1 md:w-3 md:h-3 bg-green-400 rounded-full"></div>
+						<div className="bg-gradient-to-br from-teal-50 to-teal-50 rounded-2xl p-2 md:p-0">
+							<div
+								ref={videoContainerRef}
+								className={`${
+									isFullscreen
+										? 'bg-black h-screen w-screen rounded-none flex flex-col'
+										: 'bg-white rounded-md md:rounded-xl shadow-2xl'
+								} overflow-hidden`}
+							>
+								{!(isVideoPlaying || isVideoPaused) && !isFullscreen && (
+									<div className="bg-gray-50 px-3 md:px-6 py-1 md:py-4 border-b border-gray-100">
+										<div className="flex items-center space-x-1 md:space-x-2">
+											<div className="w-1 h-1 md:w-3 md:h-3 bg-red-400 rounded-full"></div>
+											<div className="w-1 h-1 md:w-3 md:h-3 bg-yellow-400 rounded-full"></div>
+											<div className="w-1 h-1 md:w-3 md:h-3 bg-green-400 rounded-full"></div>
+										</div>
 									</div>
-								</div>
-								<div className="relative">
-									<img
-										src="/dashboard.png"
-										alt="Dashboard de Coco - Gestión de citas y pagos"
-										className="w-full h-auto"
-									/>
+								)}
+								<div
+									className={`relative ${isFullscreen ? 'flex-1 flex items-center justify-center' : ''}`}
+									onMouseMove={handleMouseMove}
+								>
+									<video
+										ref={videoRef}
+										poster="/dashboard.png"
+										className={isFullscreen ? 'w-full h-full object-contain' : 'w-full h-auto'}
+										onEnded={handleVideoEnded}
+										onPlay={handleVideoPlay}
+										onPause={handleVideoPause}
+									>
+										<source src="/dashboard-video.mp4" type="video/mp4" />
+										{/* Fallback for browsers that don't support video */}
+										<img
+											src="/dashboard.png"
+											alt="Dashboard de Coco - Gestión de citas y pagos"
+											className="w-full h-auto"
+										/>
+									</video>
+									{/* Play Button Overlay - Shows when video hasn't started */}
+									{!isVideoPlaying && !isVideoPaused && (
+										<button
+											onClick={handlePlayVideo}
+											className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/5 transition-colors duration-200 group"
+											aria-label="Reproducir video"
+										>
+											<div className="bg-gray-800 hover:bg-gray-700 rounded-full px-6 py-3 flex items-center space-x-3 shadow-lg transition-colors duration-200">
+												<Play className="w-5 h-5 text-white fill-white" />
+												<span className="text-white font-medium text-sm">Ver demo</span>
+											</div>
+										</button>
+									)}
+									{/* Pause Button Overlay - Shows when video is playing */}
+									{isVideoPlaying && !isVideoPaused && showPauseButton && (
+										<button
+											onClick={handlePauseVideo}
+											className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/5 transition-colors duration-200 group"
+											aria-label="Pausar video"
+										>
+											<div className="bg-gray-800 hover:bg-gray-700 rounded-lg px-6 py-3 flex items-center space-x-3 shadow-lg transition-colors duration-200">
+												<Pause className="w-5 h-5 text-white fill-white" />
+												<span className="text-white font-medium text-sm">Pausar</span>
+											</div>
+										</button>
+									)}
+									{/* Play Button Overlay - Shows when video is paused */}
+									{isVideoPaused && (
+										<button
+											onClick={handlePlayVideo}
+											className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/5 transition-colors duration-200 group"
+											aria-label="Reproducir video"
+										>
+											<div className="bg-gray-800 hover:bg-gray-700 rounded-lg px-6 py-3 flex items-center space-x-3 shadow-lg transition-colors duration-200">
+												<Play className="w-5 h-5 text-white fill-white" />
+												<span className="text-white font-medium text-sm">Reproducir</span>
+											</div>
+										</button>
+									)}
+									{/* Fullscreen Button - Bottom Right */}
+									<button
+										onClick={handleToggleFullscreen}
+										className="absolute bottom-4 right-4 bg-gray-800/80 hover:bg-gray-700/90 text-white p-2.5 rounded-lg shadow-lg transition-colors duration-200 z-10"
+										aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+									>
+										{isFullscreen ? (
+											<Minimize className="w-5 h-5" />
+										) : (
+											<Maximize className="w-5 h-5" />
+										)}
+									</button>
 								</div>
 							</div>
 						</div>

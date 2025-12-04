@@ -244,14 +244,6 @@ export class PaymentOrchestrationService {
 			const invoice = await getInvoiceById(invoiceId, serviceClient)
 			if (!invoice) return { success: false, error: 'Invoice not found' }
 
-			console.log('[orchestrateInvoiceCheckout] Invoice loaded:', {
-				invoiceId,
-				status: invoice.status,
-				total: invoice.total,
-				subtotal: invoice.subtotal,
-				tax_total: invoice.tax_total
-			})
-
 			// Allowed statuses: if draft, we still allow payment, but prefer issued (numbers assigned)
 			// Block if canceled or paid
 			if (invoice.status === 'paid' || invoice.status === 'canceled') {
@@ -270,15 +262,6 @@ export class PaymentOrchestrationService {
 			try {
 				const { getBillsForInvoice } = await import('@/lib/db/bills')
 				const bills = await getBillsForInvoice(invoice.id, serviceClient)
-				console.log('[orchestrateInvoiceCheckout] Bills fetched:', {
-					invoiceId,
-					billCount: bills.length,
-					bills: bills.map((b: any) => ({
-						id: b.id,
-						amount: b.amount,
-						bookingStartTime: Array.isArray(b?.booking) ? b.booking[0]?.start_time : b?.booking?.start_time
-					}))
-				})
 				lineItems = bills.map((b: any) => {
 					const iso = Array.isArray(b?.booking) ? b.booking[0]?.start_time : b?.booking?.start_time
 					const when = iso ? new Date(iso) : null
@@ -291,16 +274,6 @@ export class PaymentOrchestrationService {
 						unitAmountEur: Number(b.amount || 0),
 						quantity: 1
 					}
-				})
-				console.log('[orchestrateInvoiceCheckout] Line items built:', {
-					invoiceId,
-					lineItemCount: lineItems.length,
-					lineItems: lineItems.map((li) => ({
-						name: li.name,
-						amount: li.unitAmountEur,
-						description: li.description
-					})),
-					totalFromLineItems: lineItems.reduce((sum, li) => sum + li.unitAmountEur, 0)
 				})
 			} catch (err) {
 				console.error('[orchestrateInvoiceCheckout] Failed to fetch bills, using fallback:', err)
@@ -329,31 +302,11 @@ export class PaymentOrchestrationService {
 				lineItems
 			})
 
-			console.log('[orchestrateInvoiceCheckout] Stripe session created:', {
-				invoiceId,
-				stripeSessionId: sessionId,
-				checkoutUrl,
-				lineItemsSentToStripe: lineItems.length,
-				totalSentToStripe: lineItems.reduce((sum, li) => sum + li.unitAmountEur, 0)
-			})
-
 			// Track or update a payment_session for this invoice
 			// Strategy: Only update if there's an active (pending) session; otherwise create new
 			try {
 				const allSessions = await getPaymentSessionsForInvoice(invoice.id, serviceClient)
 				const activeSessions = (allSessions || []).filter((s) => s.status === 'pending')
-
-				console.log('[orchestrateInvoiceCheckout] Existing payment sessions found:', {
-					invoiceId,
-					totalSessionCount: allSessions?.length || 0,
-					activePendingCount: activeSessions.length,
-					allSessions: allSessions?.map((s) => ({
-						id: s.id,
-						status: s.status,
-						stripe_session_id: s.stripe_session_id,
-						amount: s.amount
-					}))
-				})
 
 				if (activeSessions.length > 0) {
 					// Update the first active pending session (idempotency: multiple clicks reuse same row)
@@ -368,10 +321,6 @@ export class PaymentOrchestrationService {
 						},
 						serviceClient
 					)
-					console.log('[orchestrateInvoiceCheckout] Updated existing pending payment session:', {
-						sessionId: activeSessions[0].id,
-						newStripeSessionId: sessionId
-					})
 				} else {
 					// No active pending sessions - check if this stripe_session_id already exists (duplicate key prevention)
 					const { data: duplicateCheck } = await serviceClient
@@ -393,11 +342,6 @@ export class PaymentOrchestrationService {
 							},
 							serviceClient
 						)
-						console.log('[orchestrateInvoiceCheckout] Updated existing payment session (duplicate stripe_session_id):', {
-							sessionId: duplicateCheck.id,
-							previousStatus: duplicateCheck.status,
-							previousInvoiceId: duplicateCheck.invoice_id
-						})
 					} else {
 						// Create brand new payment session row
 						await createPaymentSession(
@@ -409,10 +353,6 @@ export class PaymentOrchestrationService {
 							},
 							serviceClient
 						)
-						console.log('[orchestrateInvoiceCheckout] Created new payment session:', {
-							invoiceId,
-							stripeSessionId: sessionId
-						})
 					}
 				}
 			} catch (err) {
