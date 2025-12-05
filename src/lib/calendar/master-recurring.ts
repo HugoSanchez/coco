@@ -79,7 +79,9 @@ export async function createMasterRecurringEvent(params: CreateMasterParams): Pr
 		recurrence: [rrule],
 		attendees,
 		// For in-person, set location; for online, we'll add Meet conference
-		location: params.mode === 'in_person' ? params.locationText || undefined : undefined
+		location: params.mode === 'in_person' ? params.locationText || undefined : undefined,
+		// Align recurring series color with confirmed events
+		colorId: '10'
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -341,6 +343,8 @@ export async function createStandaloneOccurrenceEvent(params: {
 		},
 		attendees,
 		location: params.mode === 'in_person' ? params.locationText || undefined : undefined,
+		// Keep rescheduled occurrences aligned with confirmed color
+		colorId: '10',
 		// Link to series via extended properties for tracking
 		extendedProperties: {
 			private: {

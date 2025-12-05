@@ -92,6 +92,10 @@ export async function POST(
 		const bills = await getBillsForBooking(bookingId, supabase)
 		willRefund = bills.some((b) => b.status === 'paid')
 
+		// Determine if we should send calendar notifications (matches email notification logic)
+		// Send notifications if: booking is paid (willRefund) OR user explicitly chose to send email
+		const shouldSendCalendarNotification = willRefund || sendEmailPreference
+
 		// Idempotency: if booking is already canceled, return success and do nothing
 		if (booking.status === 'canceled') {
 			return NextResponse.json({
@@ -145,11 +149,13 @@ export async function POST(
 					// Check if this occurrence has a standalone event (was rescheduled)
 					if (booking.google_standalone_event_id) {
 						// Cancel the standalone event
+						// Suppress notifications if we're not sending email notifications
 						try {
 							const standaloneResult = await cancelCalendarEvent(
 								booking.google_standalone_event_id,
 								user.id,
-								supabase
+								supabase,
+								!shouldSendCalendarNotification
 							)
 							if (standaloneResult.success) {
 								console.log(
@@ -188,12 +194,13 @@ export async function POST(
 							supabase
 						)
 					} else {
-						// CONFIRMED BOOKING: Cancel calendar event with notifications
-						// This marks the event as cancelled and notifies attendees
+						// CONFIRMED BOOKING: Cancel calendar event with optional notifications
+						// Suppress notifications if we're not sending email notifications
 						calendarResult = await cancelCalendarEvent(
 							activeEvent.google_event_id,
 							user.id,
-							supabase
+							supabase,
+							!shouldSendCalendarNotification
 						)
 					}
 

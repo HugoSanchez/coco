@@ -23,6 +23,9 @@ import { Badge } from '@/components/ui/badge'
 import { useState, useEffect, useRef } from 'react'
 import { captureClientEvent } from '@/lib/posthog/client'
 
+// Temporary flag to disable video playback (only show poster). Flip to false to re-enable.
+const VIDEO_DISABLED = true
+
 export default function LandingPage() {
 	const router = useRouter()
 	const [isMobile, setIsMobile] = useState<boolean | null>(false)
@@ -298,87 +301,99 @@ export default function LandingPage() {
 										: 'bg-white rounded-md md:rounded-xl shadow-2xl'
 								} overflow-hidden`}
 							>
-								{!(isVideoPlaying || isVideoPaused) && !isFullscreen && (
-									<div className="bg-gray-50 px-3 md:px-6 py-1 md:py-4 border-b border-gray-100">
-										<div className="flex items-center space-x-1 md:space-x-2">
-											<div className="w-1 h-1 md:w-3 md:h-3 bg-red-400 rounded-full"></div>
-											<div className="w-1 h-1 md:w-3 md:h-3 bg-yellow-400 rounded-full"></div>
-											<div className="w-1 h-1 md:w-3 md:h-3 bg-green-400 rounded-full"></div>
-										</div>
-									</div>
-								)}
-								<div
-									className={`relative ${isFullscreen ? 'flex-1 flex items-center justify-center' : ''}`}
-									onMouseMove={handleMouseMove}
-								>
-									<video
-										ref={videoRef}
-										poster="/dashboard.png"
-										className={isFullscreen ? 'w-full h-full object-contain' : 'w-full h-auto'}
-										onEnded={handleVideoEnded}
-										onPlay={handleVideoPlay}
-										onPause={handleVideoPause}
-									>
-										<source src="/dashboard-video.mp4" type="video/mp4" />
-										{/* Fallback for browsers that don't support video */}
+								{VIDEO_DISABLED ? (
+									<div className="relative">
 										<img
 											src="/dashboard.png"
 											alt="Dashboard de Coco - Gestión de citas y pagos"
-											className="w-full h-auto"
+											className={isFullscreen ? 'w-full h-full object-contain' : 'w-full h-auto'}
 										/>
-									</video>
-									{/* Play Button Overlay - Shows when video hasn't started */}
-									{!isVideoPlaying && !isVideoPaused && (
-										<button
-											onClick={handlePlayVideo}
-											className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/5 transition-colors duration-200 group"
-											aria-label="Reproducir video"
-										>
-											<div className="bg-gray-800 hover:bg-gray-700 rounded-full px-6 py-3 flex items-center space-x-3 shadow-lg transition-colors duration-200">
-												<Play className="w-5 h-5 text-white fill-white" />
-												<span className="text-white font-medium text-sm">Ver demo</span>
+									</div>
+								) : (
+									<>
+										{!(isVideoPlaying || isVideoPaused) && !isFullscreen && (
+											<div className="bg-gray-50 px-3 md:px-6 py-1 md:py-4 border-b border-gray-100">
+												<div className="flex items-center space-x-1 md:space-x-2">
+													<div className="w-1 h-1 md:w-3 md:h-3 bg-red-400 rounded-full"></div>
+													<div className="w-1 h-1 md:w-3 md:h-3 bg-yellow-400 rounded-full"></div>
+													<div className="w-1 h-1 md:w-3 md:h-3 bg-green-400 rounded-full"></div>
+												</div>
 											</div>
-										</button>
-									)}
-									{/* Pause Button Overlay - Shows when video is playing */}
-									{isVideoPlaying && !isVideoPaused && showPauseButton && (
-										<button
-											onClick={handlePauseVideo}
-											className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/5 transition-colors duration-200 group"
-											aria-label="Pausar video"
-										>
-											<div className="bg-gray-800 hover:bg-gray-700 rounded-lg px-6 py-3 flex items-center space-x-3 shadow-lg transition-colors duration-200">
-												<Pause className="w-5 h-5 text-white fill-white" />
-												<span className="text-white font-medium text-sm">Pausar</span>
-											</div>
-										</button>
-									)}
-									{/* Play Button Overlay - Shows when video is paused */}
-									{isVideoPaused && (
-										<button
-											onClick={handlePlayVideo}
-											className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/5 transition-colors duration-200 group"
-											aria-label="Reproducir video"
-										>
-											<div className="bg-gray-800 hover:bg-gray-700 rounded-lg px-6 py-3 flex items-center space-x-3 shadow-lg transition-colors duration-200">
-												<Play className="w-5 h-5 text-white fill-white" />
-												<span className="text-white font-medium text-sm">Reproducir</span>
-											</div>
-										</button>
-									)}
-									{/* Fullscreen Button - Bottom Right */}
-									<button
-										onClick={handleToggleFullscreen}
-										className="absolute bottom-4 right-4 bg-gray-800/80 hover:bg-gray-700/90 text-white p-2.5 rounded-lg shadow-lg transition-colors duration-200 z-10"
-										aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
-									>
-										{isFullscreen ? (
-											<Minimize className="w-5 h-5" />
-										) : (
-											<Maximize className="w-5 h-5" />
 										)}
-									</button>
-								</div>
+										<div
+											className={`relative ${isFullscreen ? 'flex-1 flex items-center justify-center' : ''}`}
+											onMouseMove={handleMouseMove}
+										>
+											<video
+												ref={videoRef}
+												poster="/dashboard.png"
+												className={isFullscreen ? 'w-full h-full object-contain' : 'w-full h-auto'}
+												onEnded={handleVideoEnded}
+												onPlay={handleVideoPlay}
+												onPause={handleVideoPause}
+											>
+												<source src="/dashboard-video.mp4" type="video/mp4" />
+												{/* Fallback for browsers that don't support video */}
+												<img
+													src="/dashboard.png"
+													alt="Dashboard de Coco - Gestión de citas y pagos"
+													className="w-full h-auto"
+												/>
+											</video>
+											{/* Play Button Overlay - Shows when video hasn't started */}
+											{!isVideoPlaying && !isVideoPaused && (
+												<button
+													onClick={handlePlayVideo}
+													className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/5 transition-colors duration-200 group"
+													aria-label="Reproducir video"
+												>
+													<div className="bg-gray-800 hover:bg-gray-700 rounded-full px-6 py-3 flex items-center space-x-3 shadow-lg transition-colors duration-200">
+														<Play className="w-5 h-5 text-white fill-white" />
+														<span className="text-white font-medium text-sm">Ver demo</span>
+													</div>
+												</button>
+											)}
+											{/* Pause Button Overlay - Shows when video is playing */}
+											{isVideoPlaying && !isVideoPaused && showPauseButton && (
+												<button
+													onClick={handlePauseVideo}
+													className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/5 transition-colors duration-200 group"
+													aria-label="Pausar video"
+												>
+													<div className="bg-gray-800 hover:bg-gray-700 rounded-lg px-6 py-3 flex items-center space-x-3 shadow-lg transition-colors duration-200">
+														<Pause className="w-5 h-5 text-white fill-white" />
+														<span className="text-white font-medium text-sm">Pausar</span>
+													</div>
+												</button>
+											)}
+											{/* Play Button Overlay - Shows when video is paused */}
+											{isVideoPaused && (
+												<button
+													onClick={handlePlayVideo}
+													className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/5 transition-colors duration-200 group"
+													aria-label="Reproducir video"
+												>
+													<div className="bg-gray-800 hover:bg-gray-700 rounded-lg px-6 py-3 flex items-center space-x-3 shadow-lg transition-colors duration-200">
+														<Play className="w-5 h-5 text-white fill-white" />
+														<span className="text-white font-medium text-sm">Reproducir</span>
+													</div>
+												</button>
+											)}
+											{/* Fullscreen Button - Bottom Right */}
+											<button
+												onClick={handleToggleFullscreen}
+												className="absolute bottom-4 right-4 bg-gray-800/80 hover:bg-gray-700/90 text-white p-2.5 rounded-lg shadow-lg transition-colors duration-200 z-10"
+												aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+											>
+												{isFullscreen ? (
+													<Minimize className="w-5 h-5" />
+												) : (
+													<Maximize className="w-5 h-5" />
+												)}
+											</button>
+										</div>
+									</>
+								)}
 							</div>
 						</div>
 					</motion.div>

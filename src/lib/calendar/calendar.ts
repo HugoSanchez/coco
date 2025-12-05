@@ -646,22 +646,24 @@ export async function deleteCalendarEvent(
 }
 
 /**
- * Cancels a Google Calendar event with proper notifications
+ * Cancels a Google Calendar event with optional notifications
  * Used for confirmed bookings that need to be cancelled
  *
- * This function updates the event to show cancelled status and sends
+ * This function updates the event to show cancelled status and optionally sends
  * cancellation notifications to attendees. The event remains in calendar
  * history for audit purposes.
  *
  * @param googleEventId - Google Calendar event ID to cancel
  * @param userId - Practitioner's user ID for authentication
  * @param supabaseClient - Optional SupabaseClient for backend operations
+ * @param suppressNotifications - If true, suppresses email notifications to attendees (default: false)
  * @returns Promise<CalendarEventResult> - Result with success status or error
  */
 export async function cancelCalendarEvent(
 	googleEventId: string,
 	userId: string,
-	supabaseClient?: SupabaseClient
+	supabaseClient?: SupabaseClient,
+	suppressNotifications?: boolean
 ): Promise<CalendarEventResult> {
 	try {
 		// Get authenticated calendar client
@@ -687,11 +689,12 @@ export async function cancelCalendarEvent(
 		}
 
 		// Update the event in Google Calendar
+		// Suppress notifications if requested (matches email notification logic)
 		const response = await calendar.events.update({
 			calendarId: 'primary',
 			eventId: googleEventId,
 			requestBody: cancelledEventData,
-			sendUpdates: 'all' // Send cancellation notifications to all attendees
+			sendUpdates: suppressNotifications ? 'none' : 'all' // Send cancellation notifications only if not suppressed
 		})
 
 		return {
