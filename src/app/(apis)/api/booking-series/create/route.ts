@@ -5,13 +5,15 @@
  *
  * WHAT IT DOES (V1)
  * 1) Creates a booking_series row
- * 2) Generates occurrences for a 2-month window starting at dtstart_local
+ * 2) Generates the first 2 occurrences starting at dtstart_local
  * 3) For each occurrence, calls the existing booking orchestrator to reuse
  *    all billing/email/calendar logic
  * 4) Tags each created booking with (series_id, occurrence_index)
  * 5) Returns a compact summary
  *
  * NOTES
+ * - Only creates the first 2 occurrences upfront for better UX
+ * - Remaining occurrences are created by the weekly cron job (/api/cron/series/extend)
  * - Overlaps/conflicts are ignored by design in V1 (always create)
  * - Billing policy is provided in the request and mapped to orchestrator
  * - Amount/currency are provided by the caller (same contract as single bookings)
@@ -49,7 +51,7 @@ type CreateSeriesPayload = {
   mode?: 'online' | 'in_person'
   location_text?: string | null
   consultation_type?: 'first' | 'followup'
-  // Optional safety cap (defaults to 20)
+  // Optional safety cap (defaults to 2 - only first 2 occurrences created upfront)
   max_occurrences?: number
   // Optional: suppress Google Calendar notifications to attendees
   suppress_calendar_notifications?: boolean
@@ -98,7 +100,8 @@ export async function POST(req: Request) {
     }
     const normalizedAmount = Math.round(body.amount * 100) / 100
 
-    const maxOccurrences = body.max_occurrences && body.max_occurrences > 0 ? body.max_occurrences : 20
+    // Only create the first 2 occurrences upfront (better UX, cron handles the rest)
+    const maxOccurrences = body.max_occurrences && body.max_occurrences > 0 ? body.max_occurrences : 2
 
     const client = createServiceRoleClient()
 
@@ -116,9 +119,10 @@ export async function POST(req: Request) {
       consultation_type: body.consultation_type ?? null
     })
 
-    // 3) Compute a 2-month local horizon starting at dtstart_local
+    // 3) Compute a window that will capture the first 2 occurrences
+    // For bi-weekly series, we need at least 4 weeks to ensure we get 2 occurrences
     const startLocal = parseISO(body.dtstart_local)
-    const endLocal = addMonths(startLocal, 2)
+    const endLocal = addMonths(startLocal, 1) // 1 month is enough to capture 2 occurrences (even bi-weekly)
     const windowStartLocal = toLocalIsoNoZ(startLocal)
     const windowEndLocal = toLocalIsoNoZ(endLocal)
 

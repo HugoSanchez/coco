@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Spinner } from '@/components/ui/spinner'
 import { format } from 'date-fns'
@@ -11,7 +11,7 @@ import { StatusBadge, PaymentBadge, SeriesBadge } from '@/components/Badges'
 import BookingDetailsPanel from '@/components/BookingDetailsPanel'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Repeat } from 'lucide-react'
+import { Repeat, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { useBookingDetails } from '@/hooks/useBookingDetails'
 
 export interface Booking {
@@ -136,6 +136,9 @@ function BookingCard({
 	)
 }
 
+type SortColumn = 'patient' | 'date' | 'payment' | 'amount' | null
+type SortDirection = 'asc' | 'desc'
+
 export function BookingsTable({
 	bookings,
 	loading = false,
@@ -150,6 +153,8 @@ export function BookingsTable({
 	const router = useRouter()
 	const [isMobile, setIsMobile] = useState(false)
 	const searchParams = useSearchParams()
+	const [sortColumn, setSortColumn] = useState<SortColumn>(null)
+	const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
 	// Initialize booking details hook with URL sync callbacks
 	const {
@@ -191,6 +196,80 @@ export function BookingsTable({
 		await open(b.id)
 	}
 
+	// Handle column header click for sorting
+	const handleSort = (column: SortColumn) => {
+		if (sortColumn === column) {
+			// Toggle direction if clicking the same column
+			setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+		} else {
+			// Set new column with default direction
+			setSortColumn(column)
+			// Default directions: date and amount start with desc, others with asc
+			setSortDirection(column === 'date' || column === 'amount' ? 'desc' : 'asc')
+		}
+	}
+
+	// Get payment status string for sorting
+	const getPaymentStatusString = (booking: Booking): string => {
+		const displayStatus =
+			booking.payment_status === 'not_applicable' && booking.billing_status === 'pending'
+				? 'scheduled'
+				: booking.payment_status === 'not_applicable'
+					? 'na'
+					: booking.payment_status
+		return displayStatus
+	}
+
+	// Sort bookings based on current sort state
+	const sortedBookings = useMemo(() => {
+		if (!sortColumn) return bookings
+
+		const sorted = [...bookings].sort((a, b) => {
+			let aValue: string | number | Date
+			let bValue: string | number | Date
+
+			switch (sortColumn) {
+				case 'patient':
+					aValue = a.customerName.toLowerCase()
+					bValue = b.customerName.toLowerCase()
+					break
+				case 'date':
+					aValue = a.bookingDate
+					bValue = b.bookingDate
+					break
+				case 'payment':
+					aValue = getPaymentStatusString(a)
+					bValue = getPaymentStatusString(b)
+					break
+				case 'amount':
+					aValue = a.amount
+					bValue = b.amount
+					break
+				default:
+					return 0
+			}
+
+			// Compare values
+			if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+			if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+			return 0
+		})
+
+		return sorted
+	}, [bookings, sortColumn, sortDirection])
+
+	// Render sort icon for column header
+	const renderSortIcon = (column: SortColumn) => {
+		if (sortColumn !== column) {
+			return <ArrowUpDown className="h-3 w-3 text-gray-400" />
+		}
+		return sortDirection === 'asc' ? (
+			<ArrowUp className="h-3 w-3 text-gray-700" />
+		) : (
+			<ArrowDown className="h-3 w-3 text-gray-700" />
+		)
+	}
+
 	// Sync opening from URL (deep-link / back-forward)
 	useEffect(() => {
 		try {
@@ -227,7 +306,7 @@ export function BookingsTable({
 		<div className="space-y-4">
 			{/* Mobile Cards */}
 			<div className="md:hidden">
-				{bookings.map((booking) => (
+				{sortedBookings.map((booking) => (
 					<BookingCard
 						key={booking.id}
 						booking={booking}
@@ -249,9 +328,23 @@ export function BookingsTable({
 					<Table>
 						<TableHeader>
 							<TableRow className=" border-b ">
-								<TableHead className="font-medium w-[150px] md:w-[150px]">Paciente</TableHead>
-								<TableHead className="hidden md:table-cell font-semibold w-[140px] text-center">
-									Fecha
+								<TableHead
+									className="font-medium w-[150px] md:w-[150px] cursor-pointer hover:bg-gray-50/50 transition-colors select-none"
+									onClick={() => handleSort('patient')}
+								>
+									<div className="flex items-center gap-2">
+										Paciente
+										{renderSortIcon('patient')}
+									</div>
+								</TableHead>
+								<TableHead
+									className="hidden md:table-cell font-semibold w-[140px] text-center cursor-pointer hover:bg-gray-50/50 transition-colors select-none"
+									onClick={() => handleSort('date')}
+								>
+									<div className="flex items-center justify-center gap-2">
+										Fecha
+										{renderSortIcon('date')}
+									</div>
 								</TableHead>
 								<TableHead className="hidden md:table-cell font-semibold w-[100px] text-center">
 									Hora
@@ -259,10 +352,24 @@ export function BookingsTable({
 								<TableHead className="hidden sm:table-cell font-semibold w-[160px] text-center">
 									Estado
 								</TableHead>
-								<TableHead className="hidden lg:table-cell font-semibold w-[120px] text-center">
-									Pago
+								<TableHead
+									className="hidden lg:table-cell font-semibold w-[120px] text-center cursor-pointer hover:bg-gray-50/50 transition-colors select-none"
+									onClick={() => handleSort('payment')}
+								>
+									<div className="flex items-center justify-center gap-2">
+										Pago
+										{renderSortIcon('payment')}
+									</div>
 								</TableHead>
-								<TableHead className="text-right font-semibold w-[120px]">Honorarios</TableHead>
+								<TableHead
+									className="text-right font-semibold w-[120px] cursor-pointer hover:bg-gray-50/50 transition-colors select-none"
+									onClick={() => handleSort('amount')}
+								>
+									<div className="flex items-center justify-end gap-2">
+										Honorarios
+										{renderSortIcon('amount')}
+									</div>
+								</TableHead>
 								<TableHead className="w-[50px]"></TableHead>
 							</TableRow>
 						</TableHeader>
@@ -280,7 +387,7 @@ export function BookingsTable({
 									</TableCell>
 								</TableRow>
 							) : (
-								bookings.map((booking) => (
+								sortedBookings.map((booking) => (
 									<TableRow
 										key={booking.id}
 										className="transition-colors h-14 cursor-pointer hover:bg-gray-50/50"

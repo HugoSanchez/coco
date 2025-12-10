@@ -570,8 +570,8 @@ export async function getBookingsWithBills(
 	const { limit = 10, offset = 0 } = options
 	const { customerSearch, statusFilter, startDate, endDate } = filters
 
-	// Fetch one extra record to determine if there are more results
-	const fetchLimit = limit + 1
+	// When both startDate and endDate are provided, return ALL bookings in that range (no pagination)
+	const hasDateRange = !!(startDate && endDate)
 
 	let query = supabase
 		.from('bookings')
@@ -611,13 +611,93 @@ export async function getBookingsWithBills(
 		query = query.lte('start_time', endDate)
 	}
 
-	// Apply ordering and pagination
-	const { data, error } = await query.order('created_at', { ascending: false }).range(offset, offset + fetchLimit - 1)
+	// Apply ordering
+	query = query.order('created_at', { ascending: false })
+
+	// Apply pagination only if date range is NOT specified
+	let data, error
+	if (hasDateRange) {
+		// No pagination - fetch all results in the date range
+		const result = await query
+		data = result.data
+		error = result.error
+	} else {
+		// Fetch one extra record to determine if there are more results
+		const fetchLimit = limit + 1
+		const result = await query.range(offset, offset + fetchLimit - 1)
+		data = result.data
+		error = result.error
+	}
 
 	if (error) throw error
 
 	const allResults = data || []
 
+	// When date range is active, return all results with hasMore = false
+	if (hasDateRange) {
+		const bookings = allResults
+		const bookingsWithBills: BookingWithBills[] = bookings.map((booking) => {
+			const bill = Array.isArray(booking.bill) ? booking.bill[0] : booking.bill
+
+			// Derive billing and payment statuses from bill status
+			let billing_status: BookingWithBills['billing_status']
+			let payment_status: BookingWithBills['payment_status']
+
+			if (!bill) {
+				billing_status = 'not_generated'
+				payment_status = 'not_applicable'
+			} else {
+				switch (bill.status) {
+					case 'scheduled':
+						billing_status = 'pending'
+						payment_status = 'not_applicable'
+						break
+					case 'pending':
+						billing_status = 'pending'
+						payment_status = 'pending'
+						break
+					case 'sent':
+						billing_status = 'sent'
+						payment_status = 'pending'
+						break
+					case 'paid':
+						billing_status = 'sent'
+						payment_status = 'paid'
+						break
+					case 'disputed':
+						billing_status = 'sent'
+						payment_status = 'disputed'
+						break
+					case 'canceled':
+						billing_status = 'canceled'
+						payment_status = 'canceled'
+						break
+					case 'refunded':
+						billing_status = 'sent'
+						payment_status = 'refunded'
+						break
+					default:
+						billing_status = 'not_generated'
+						payment_status = 'not_applicable'
+				}
+			}
+
+			return {
+				...booking,
+				bill: bill || null,
+				billing_status,
+				payment_status
+			}
+		})
+
+		return {
+			bookings: bookingsWithBills,
+			hasMore: false,
+			total: undefined
+		}
+	}
+
+	// Normal pagination logic when date range is not active
 	// Check if there are more results beyond our limit
 	const hasMore = allResults.length > limit
 

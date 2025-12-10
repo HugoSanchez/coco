@@ -460,7 +460,8 @@ export default function Dashboard() {
 	}
 
 	const loadMoreBookings = async () => {
-		if (!user || loadingMore || !hasMore) return
+		// Don't load more if date range is active (all results are already loaded)
+		if (!user || loadingMore || !hasMore || (filters.startDate && filters.endDate)) return
 
 		try {
 			setLoadingMore(true)
@@ -757,7 +758,7 @@ export default function Dashboard() {
 										onResendEmail={resendEmail}
 										onCancelSeries={handleCancelSeries}
 									/>
-									{hasMore && !loadingBookings && (
+									{hasMore && !loadingBookings && !(filters.startDate && filters.endDate) && (
 										<div className="flex justify-center pt-4">
 											<Button
 												variant="ghost"
@@ -848,7 +849,7 @@ export default function Dashboard() {
 									onResendEmail={resendEmail}
 									onCancelSeries={handleCancelSeries}
 								/>
-								{hasMore && !loadingBookings && (
+								{hasMore && !loadingBookings && !(filters.startDate && filters.endDate) && (
 									<div className="flex justify-center pt-4">
 										<Button
 											variant="ghost"
