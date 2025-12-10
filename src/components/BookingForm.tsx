@@ -111,6 +111,7 @@ export function BookingForm({
 	// Recurrence (V1 minimal): checkbox + interval weeks (1 or 2)
 	const [isRecurring, setIsRecurring] = useState<boolean>(false)
 	const [intervalWeeks, setIntervalWeeks] = useState<1 | 2>(1)
+	const [suppressRecurrenceNotifications, setSuppressRecurrenceNotifications] = useState<boolean>(false)
 
 	// Billing timing selection (per-booking lead hours or monthly)
 	const [billingTimingSelection, setBillingTimingSelection] = useState<string>('0') // '0' | '24' | '72' | '168' | '-1' | 'monthly'
@@ -540,7 +541,8 @@ export function BookingForm({
 					location_text: mode === 'in_person' ? locationText || null : null,
 					consultation_type: consultationType,
 					amount: finalAmount,
-					currency: 'EUR'
+					currency: 'EUR',
+					suppress_calendar_notifications: suppressRecurrenceNotifications
 				}
 
 				console.log('booking-form::series-payload', seriesPayload)
@@ -1007,6 +1009,21 @@ export function BookingForm({
 										<SelectItem value="2">Cada 2 semanas</SelectItem>
 									</SelectContent>
 								</Select>
+								<div className="flex items-center space-x-2 pt-2 pl-1">
+									<input
+										type="checkbox"
+										id="suppress-notifications"
+										checked={suppressRecurrenceNotifications}
+										onChange={(e) => setSuppressRecurrenceNotifications(e.target.checked)}
+										className="h-4 w-4 rounded-md border-gray-300 accent-gray-800 focus:ring-gray-500"
+									/>
+									<Label
+										htmlFor="suppress-notifications"
+										className="text-sm font-normal text-gray-700 cursor-pointer"
+									>
+										No notificar al paciente
+									</Label>
+								</div>
 							</CollapsibleSection>
 
 							{/* Booking Summary */}

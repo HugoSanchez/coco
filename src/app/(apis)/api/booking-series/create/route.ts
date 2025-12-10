@@ -51,6 +51,8 @@ type CreateSeriesPayload = {
   consultation_type?: 'first' | 'followup'
   // Optional safety cap (defaults to 20)
   max_occurrences?: number
+  // Optional: suppress Google Calendar notifications to attendees
+  suppress_calendar_notifications?: boolean
 }
 
 /**
@@ -187,7 +189,8 @@ export async function POST(req: Request) {
           byWeekday: body.rule.by_weekday as any,
           mode: (body.mode as any) || 'online',
           locationText: body.location_text || null,
-          supabaseClient: client
+          supabaseClient: client,
+          suppressNotifications: body.suppress_calendar_notifications ?? false
         })
         await setBookingSeriesMasterEventId(client, seriesId, master.googleEventId)
       }

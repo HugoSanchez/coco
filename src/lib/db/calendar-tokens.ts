@@ -102,6 +102,42 @@ export async function getUserCalendarTokens(
 }
 
 /**
+ * Retrieves the Google Calendar ID for a user's Coco events
+ * Returns the user's custom calendar_id if set, otherwise defaults to 'primary'
+ * This enables users to have a dedicated calendar for Coco events while maintaining
+ * backwards compatibility for users without a custom calendar configured.
+ *
+ * @param userId - UUID of the user whose calendar ID to retrieve
+ * @param supabaseClient - Optional SupabaseClient instance (required for backend operations)
+ * @returns Promise<string> - Google Calendar ID ('primary' or custom calendar_id)
+ */
+export async function getUserCalendarId(
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<string> {
+	const client = supabaseClient || supabase
+
+	try {
+		const { data, error } = await client
+			.from('calendar_tokens')
+			.select('calendar_id')
+			.eq('user_id', userId)
+			.maybeSingle()
+
+		if (error) {
+			console.warn('[Calendar ID] Error fetching calendar_id for user:', userId, error)
+			return 'primary' // Fallback to primary on error
+		}
+
+		// Return custom calendar_id if set, otherwise default to 'primary'
+		return data?.calendar_id && data.calendar_id.trim() !== '' ? data.calendar_id : 'primary'
+	} catch (error) {
+		console.warn('[Calendar ID] Exception fetching calendar_id for user:', userId, error)
+		return 'primary' // Fallback to primary on exception
+	}
+}
+
+/**
  * Retrieves the existing refresh_token for a user (if any).
  * Used during OAuth callback to avoid overwriting a valid refresh_token with undefined.
  */

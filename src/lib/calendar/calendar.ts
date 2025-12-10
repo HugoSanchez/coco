@@ -36,6 +36,7 @@ import { getUserEmail, getProfileById } from '../db/profiles'
 import { getClientById } from '../db/clients'
 import { getBookingsMissingCalendarEvents } from '../db/bookings'
 import { getAuthenticatedCalendar } from '../google'
+import { getUserCalendarId } from '../db/calendar-tokens'
 import {
 	buildFullEventData,
 	buildPendingEventData,
@@ -185,7 +186,8 @@ export async function getAvailableSlots(username: string, month: Date) {
 	try {
 		// Get authenticated calendar client using the new helper
 		const calendar = await getAuthenticatedCalendar(userId)
-		// Now proceed with the calendar events fetch
+		// Use 'primary' for availability checks to see ALL calendar events (not just custom Coco calendar)
+		// This ensures we show busy slots from all calendars, not just work-related ones
 		const monthStart = startOfMonth(month)
 		const monthEnd = endOfMonth(month)
 		const { data: events } = await calendar.events.list({
@@ -291,6 +293,8 @@ export async function createCalendarEventWithInvite(
 	try {
 		// Get authenticated calendar client using the new helper
 		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+		// Get user's calendar ID (custom calendar or 'primary')
+		const calendarId = await getUserCalendarId(userId, supabaseClient)
 
 		// Generate unique conference request ID
 		const conferenceRequestId = generateConferenceRequestId('booking')
@@ -310,6 +314,11 @@ export async function createCalendarEventWithInvite(
 			includeMeet: (payload as any).mode !== 'in_person'
 		})
 
+		// Only set colorId for primary calendar; custom calendars use their own default color
+		if (calendarId !== 'primary') {
+			delete (eventData as any).colorId
+		}
+
 		console.log('[calendar] createCalendarEventWithInvite payload', {
 			mode: (payload as any).mode,
 			locationText: (payload as any).locationText
@@ -318,7 +327,7 @@ export async function createCalendarEventWithInvite(
 
 		// Create the event
 		const response = await calendar.events.insert({
-			calendarId: 'primary',
+			calendarId,
 			requestBody: eventData,
 			conferenceDataVersion: 1, // Required for conference creation
 			sendUpdates: 'all' // Send invitations to all attendees
@@ -370,6 +379,8 @@ export async function createInternalConfirmedCalendarEvent(
 
 	try {
 		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+		// Get user's calendar ID (custom calendar or 'primary')
+		const calendarId = await getUserCalendarId(userId, supabaseClient)
 
 		const eventData = buildInternalConfirmedEventData({
 			clientName,
@@ -381,8 +392,13 @@ export async function createInternalConfirmedCalendarEvent(
 			bookingId: (payload as any).bookingId
 		})
 
+		// Only set colorId for primary calendar; custom calendars use their own default color
+		if (calendarId !== 'primary') {
+			delete (eventData as any).colorId
+		}
+
 		const response = await calendar.events.insert({
-			calendarId: 'primary',
+			calendarId,
 			requestBody: eventData,
 			sendUpdates: 'none'
 		})
@@ -434,6 +450,8 @@ export async function createPendingCalendarEvent(
 	try {
 		// Get authenticated calendar client using the new helper
 		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+		// Get user's calendar ID (custom calendar or 'primary')
+		const calendarId = await getUserCalendarId(userId, supabaseClient)
 
 		// Create the pending event object using the builder
 		const eventData = buildPendingEventData({
@@ -446,6 +464,11 @@ export async function createPendingCalendarEvent(
 			extraDescription: (payload as any).extraDescription || undefined
 		})
 
+		// Only set colorId for primary calendar; custom calendars use their own default color
+		if (calendarId !== 'primary') {
+			delete (eventData as any).colorId
+		}
+
 		console.log('[calendar] createPendingCalendarEvent payload', {
 			mode: (payload as any).mode,
 			locationText: (payload as any).locationText
@@ -454,7 +477,7 @@ export async function createPendingCalendarEvent(
 
 		// Create the pending event in Google Calendar
 		const response = await calendar.events.insert({
-			calendarId: 'primary',
+			calendarId,
 			requestBody: eventData,
 			sendUpdates: 'none' // Don't send any notifications for pending events
 		})
@@ -513,10 +536,12 @@ export async function updatePendingToConfirmed(
 	try {
 		// Get authenticated calendar client using the new helper
 		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+		// Get user's calendar ID (custom calendar or 'primary')
+		const calendarId = await getUserCalendarId(userId, supabaseClient)
 
 		// First, get the current event to preserve timing and properties
 		const currentEvent = await calendar.events.get({
-			calendarId: 'primary',
+			calendarId,
 			eventId: googleEventId
 		})
 
@@ -559,9 +584,14 @@ export async function updatePendingToConfirmed(
 			extraDescription: carryOver
 		})
 
+		// Only set colorId for primary calendar; custom calendars use their own default color
+		if (calendarId !== 'primary') {
+			delete (updatedEventData as any).colorId
+		}
+
 		// Patch the existing event so unspecified fields (like location) remain unchanged
 		const response = await calendar.events.patch({
-			calendarId: 'primary',
+			calendarId,
 			eventId: googleEventId,
 			requestBody: updatedEventData,
 			// Only required when creating/altering conference data
@@ -618,10 +648,12 @@ export async function deleteCalendarEvent(
 	try {
 		// Get authenticated calendar client
 		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+		// Get user's calendar ID (custom calendar or 'primary')
+		const calendarId = await getUserCalendarId(userId, supabaseClient)
 
 		// Delete the event from Google Calendar
 		await calendar.events.delete({
-			calendarId: 'primary',
+			calendarId,
 			eventId: googleEventId
 		})
 
@@ -668,10 +700,12 @@ export async function cancelCalendarEvent(
 	try {
 		// Get authenticated calendar client
 		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+		// Get user's calendar ID (custom calendar or 'primary')
+		const calendarId = await getUserCalendarId(userId, supabaseClient)
 
 		// First, get the current event to preserve important details
 		const currentEvent = await calendar.events.get({
-			calendarId: 'primary',
+			calendarId,
 			eventId: googleEventId
 		})
 
@@ -680,18 +714,22 @@ export async function cancelCalendarEvent(
 		}
 
 		// Update the event to show cancelled status
-		const cancelledEventData = {
+		const cancelledEventData: any = {
 			...currentEvent.data,
 			summary: `CANCELLED - ${currentEvent.data.summary}`,
 			description: `This appointment has been cancelled.\n\nOriginal description: ${currentEvent.data.description || 'No description'}`,
-			status: 'cancelled', // Google Calendar cancelled status
-			colorId: '8' // Gray color for cancelled events
+			status: 'cancelled' // Google Calendar cancelled status
+		}
+
+		// Only set colorId for primary calendar; custom calendars use their own default color
+		if (calendarId === 'primary') {
+			cancelledEventData.colorId = '8' // Gray color for cancelled events
 		}
 
 		// Update the event in Google Calendar
 		// Suppress notifications if requested (matches email notification logic)
 		const response = await calendar.events.update({
-			calendarId: 'primary',
+			calendarId,
 			eventId: googleEventId,
 			requestBody: cancelledEventData,
 			sendUpdates: suppressNotifications ? 'none' : 'all' // Send cancellation notifications only if not suppressed
@@ -746,10 +784,12 @@ export async function rescheduleCalendarEvent(
 	try {
 		// Get authenticated calendar client
 		const calendar = await getAuthenticatedCalendar(payload.userId, supabaseClient)
+		// Get user's calendar ID (custom calendar or 'primary')
+		const calendarId = await getUserCalendarId(payload.userId, supabaseClient)
 
 		// First, get the existing event to preserve its properties
 		const existingEvent = await calendar.events.get({
-			calendarId: 'primary',
+			calendarId,
 			eventId: payload.googleEventId
 		})
 
@@ -762,7 +802,7 @@ export async function rescheduleCalendarEvent(
 
 		// Update the event with new start and end times
 		const updatedEvent = await calendar.events.update({
-			calendarId: 'primary',
+			calendarId,
 			eventId: payload.googleEventId,
 			requestBody: {
 				...existingEvent.data,
@@ -844,6 +884,8 @@ export async function getGoogleCalendarEventsForDay(
 	try {
 		// Get authenticated calendar client
 		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+		// Use 'primary' for availability checks to see ALL calendar events (not just custom Coco calendar)
+		// This ensures we show busy slots from all calendars, not just work-related ones
 
 		// Get user's time zone and set up date range for the specific day
 		const userTimeZone = await getUserTimeZone(userId, supabaseClient)
@@ -914,6 +956,8 @@ export async function getGoogleCalendarEventsForRange(
 > {
 	try {
 		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+		// Use 'primary' for availability checks to see ALL calendar events (not just custom Coco calendar)
+		// This ensures we show busy slots from all calendars, not just work-related ones
 		const response = await calendar.events.list({
 			calendarId: 'primary',
 			timeMin: rangeStart.toISOString(),

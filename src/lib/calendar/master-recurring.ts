@@ -16,6 +16,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatExdateRule } from '@/lib/dates/recurrence'
 import { toZonedTime } from 'date-fns-tz'
 import { format } from 'date-fns'
+import { getUserCalendarId } from '@/lib/db/calendar-tokens'
 
 function weekdayToByDay(weekday: 0 | 1 | 2 | 3 | 4 | 5 | 6): string {
 	// 0=Sun..6=Sat → SU,MO,TU,WE,TH,FR,SA
@@ -37,6 +38,8 @@ export type CreateMasterParams = {
 	mode?: 'online' | 'in_person' | null
 	locationText?: string | null
 	supabaseClient?: SupabaseClient
+	// Optional: if true, don't send Google Calendar notifications to attendees
+	suppressNotifications?: boolean
 }
 
 export async function createMasterRecurringEvent(params: CreateMasterParams): Promise<{ googleEventId: string }> {
@@ -44,6 +47,8 @@ export async function createMasterRecurringEvent(params: CreateMasterParams): Pr
 	// Step 0: Get authenticated Google Calendar client
 	////////////////////////////////////////////////////////////////
 	const calendar = await getAuthenticatedCalendar(params.userId, params.supabaseClient)
+	// Get user's calendar ID (custom calendar or 'primary')
+	const calendarId = await getUserCalendarId(params.userId, params.supabaseClient)
 
 	////////////////////////////////////////////////////////////////
 	// Step 1: Compute event end time and recurrence rule
@@ -79,18 +84,21 @@ export async function createMasterRecurringEvent(params: CreateMasterParams): Pr
 		recurrence: [rrule],
 		attendees,
 		// For in-person, set location; for online, we'll add Meet conference
-		location: params.mode === 'in_person' ? params.locationText || undefined : undefined,
-		// Align recurring series color with confirmed events
-		colorId: '10'
+		location: params.mode === 'in_person' ? params.locationText || undefined : undefined
+	}
+
+	// Only set colorId for primary calendar; custom calendars use their own default color
+	if (calendarId === 'primary') {
+		requestBody.colorId = '10' // Align recurring series color with confirmed events
 	}
 
 	////////////////////////////////////////////////////////////////
 	// Step 4: Configure creation options
 	////////////////////////////////////////////////////////////////
 	const createOpts: any = {
-		calendarId: 'primary',
+		calendarId,
 		requestBody,
-		sendUpdates: 'all' // Send email invitations to all attendees
+		sendUpdates: params.suppressNotifications ? 'none' : 'all' // Send email invitations to all attendees unless suppressed
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -123,11 +131,13 @@ export async function deleteMasterRecurringEvent(
 	// Step 0: Get authenticated Google Calendar client
 	////////////////////////////////////////////////////////////////
 	const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
+	// Get user's calendar ID (custom calendar or 'primary')
+	const calendarId = await getUserCalendarId(userId, supabaseClient)
 
 	////////////////////////////////////////////////////////////////
 	// Step 1: Delete the master recurring event
 	////////////////////////////////////////////////////////////////
-	await calendar.events.delete({ calendarId: 'primary', eventId: googleEventId })
+	await calendar.events.delete({ calendarId, eventId: googleEventId })
 }
 
 /**
@@ -152,6 +162,8 @@ export async function deleteOccurrenceInstance(params: {
 		// Step 0: Get authenticated Google Calendar client
 		////////////////////////////////////////////////////////////////
 		const calendar = await getAuthenticatedCalendar(params.userId, params.supabaseClient)
+		// Get user's calendar ID (custom calendar or 'primary')
+		const calendarId = await getUserCalendarId(params.userId, params.supabaseClient)
 
 		////////////////////////////////////////////////////////////////
 		// Step 1: Create a time window around the occurrence for querying
@@ -166,7 +178,7 @@ export async function deleteOccurrenceInstance(params: {
 		// Step 2: Query instances API to find the actual instance
 		////////////////////////////////////////////////////////////////
 		const instancesResponse = await calendar.events.instances({
-			calendarId: 'primary',
+			calendarId,
 			eventId: params.masterEventId,
 			timeMin: windowStart.toISOString(),
 			timeMax: windowEnd.toISOString(),
@@ -202,7 +214,7 @@ export async function deleteOccurrenceInstance(params: {
 		// Step 4: Delete the found instance using its actual ID
 		////////////////////////////////////////////////////////////////
 		await calendar.events.delete({
-			calendarId: 'primary',
+			calendarId,
 			eventId: targetInstance.id,
 			sendUpdates: 'all' // Notify attendees
 		})
@@ -234,12 +246,14 @@ export async function updateMasterRecurringEventWithExdates(params: {
 		// Step 0: Get authenticated Google Calendar client
 		////////////////////////////////////////////////////////////////
 		const calendar = await getAuthenticatedCalendar(params.userId, params.supabaseClient)
+		// Get user's calendar ID (custom calendar or 'primary')
+		const calendarId = await getUserCalendarId(params.userId, params.supabaseClient)
 
 		////////////////////////////////////////////////////////////////
 		// Step 1: Fetch current event to preserve existing data
 		////////////////////////////////////////////////////////////////
 		const currentEvent = await calendar.events.get({
-			calendarId: 'primary',
+			calendarId,
 			eventId: params.googleEventId
 		})
 
@@ -271,7 +285,7 @@ export async function updateMasterRecurringEventWithExdates(params: {
 		// Step 4: Update event with new recurrence (preserves all other fields)
 		////////////////////////////////////////////////////////////////
 		await calendar.events.patch({
-			calendarId: 'primary',
+			calendarId,
 			eventId: params.googleEventId,
 			requestBody: {
 				recurrence: newRecurrence
@@ -307,6 +321,8 @@ export async function createStandaloneOccurrenceEvent(params: {
 	// Step 0: Get authenticated Google Calendar client
 	////////////////////////////////////////////////////////////////
 	const calendar = await getAuthenticatedCalendar(params.userId, params.supabaseClient)
+	// Get user's calendar ID (custom calendar or 'primary')
+	const calendarId = await getUserCalendarId(params.userId, params.supabaseClient)
 
 	////////////////////////////////////////////////////////////////
 	// Step 1: Build event summary based on mode
@@ -343,8 +359,6 @@ export async function createStandaloneOccurrenceEvent(params: {
 		},
 		attendees,
 		location: params.mode === 'in_person' ? params.locationText || undefined : undefined,
-		// Keep rescheduled occurrences aligned with confirmed color
-		colorId: '10',
 		// Link to series via extended properties for tracking
 		extendedProperties: {
 			private: {
@@ -354,11 +368,16 @@ export async function createStandaloneOccurrenceEvent(params: {
 		}
 	}
 
+	// Only set colorId for primary calendar; custom calendars use their own default color
+	if (calendarId === 'primary') {
+		requestBody.colorId = '10' // Keep rescheduled occurrences aligned with confirmed color
+	}
+
 	////////////////////////////////////////////////////////////////
 	// Step 5: Configure creation options
 	////////////////////////////////////////////////////////////////
 	const createOpts: any = {
-		calendarId: 'primary',
+		calendarId,
 		requestBody,
 		sendUpdates: 'all' // Send email invitations to all attendees
 	}
