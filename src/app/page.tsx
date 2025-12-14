@@ -24,7 +24,7 @@ import { useState, useEffect, useRef } from 'react'
 import { captureClientEvent } from '@/lib/posthog/client'
 
 // Temporary flag to disable video playback (only show poster). Flip to false to re-enable.
-const VIDEO_DISABLED = true
+const VIDEO_DISABLED = false
 
 export default function LandingPage() {
 	const router = useRouter()
