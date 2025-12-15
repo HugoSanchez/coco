@@ -38,6 +38,7 @@ interface BookingsTableProps {
 	onRescheduleBooking: (bookingId: string) => void
 	onResendEmail: (bookingId: string) => void
 	onCancelSeries?: (seriesId: string) => void // V2: Optional cancel series handler
+	onArchiveBooking: (bookingId: string) => void
 }
 
 function getStatusBadge(status: 'pending' | 'scheduled' | 'completed' | 'canceled') {
@@ -67,7 +68,8 @@ function BookingCard({
 	onRescheduleBooking,
 	onResendEmail,
 	onViewDetails,
-	onCancelSeries
+	onCancelSeries,
+	onArchiveBooking
 }: {
 	booking: Booking
 	onCancelBooking: (bookingId: string) => void
@@ -78,6 +80,7 @@ function BookingCard({
 	onResendEmail: (bookingId: string) => void
 	onViewDetails: (booking: Booking) => void
 	onCancelSeries?: (seriesId: string) => void // V2: Optional cancel series handler
+	onArchiveBooking: (bookingId: string) => void
 }) {
 	return (
 		<div
@@ -129,6 +132,7 @@ function BookingCard({
 						onRescheduleBooking={onRescheduleBooking}
 						onResendEmail={onResendEmail}
 						onCancelSeries={onCancelSeries}
+						onArchiveBooking={onArchiveBooking}
 					/>
 				</div>
 			</div>
@@ -148,7 +152,8 @@ export function BookingsTable({
 	onRefundBooking,
 	onRescheduleBooking,
 	onResendEmail,
-	onCancelSeries
+	onCancelSeries,
+	onArchiveBooking
 }: BookingsTableProps) {
 	const router = useRouter()
 	const [isMobile, setIsMobile] = useState(false)
@@ -318,6 +323,7 @@ export function BookingsTable({
 						onResendEmail={onResendEmail}
 						onViewDetails={openDetails}
 						onCancelSeries={onCancelSeries}
+						onArchiveBooking={onArchiveBooking}
 					/>
 				))}
 			</div>
@@ -455,6 +461,7 @@ export function BookingsTable({
 												onRescheduleBooking={onRescheduleBooking}
 												onResendEmail={onResendEmail}
 												onCancelSeries={onCancelSeries}
+												onArchiveBooking={onArchiveBooking}
 											/>
 										</TableCell>
 									</TableRow>

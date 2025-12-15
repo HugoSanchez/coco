@@ -173,6 +173,10 @@ interface UseBookingActionsReturn {
 	 * @param seriesId - The ID of the booking series to cancel
 	 */
 	cancelSeries: (seriesId: string) => Promise<void>
+	/**
+	 * Archives a booking (soft delete / hide)
+	 */
+	archiveBooking: (bookingId: string) => Promise<void>
 }
 
 /**
@@ -181,9 +185,7 @@ interface UseBookingActionsReturn {
  * @param options - Configuration options for callbacks
  * @returns Object containing all booking action handlers
  */
-export function useBookingActions(
-	options: UseBookingActionsOptions = {}
-): UseBookingActionsReturn {
+export function useBookingActions(options: UseBookingActionsOptions = {}): UseBookingActionsReturn {
 	const { toast } = useToast()
 	const { onBookingUpdated, onBookingsRemoved, onStatsRefresh } = options
 
@@ -537,6 +539,48 @@ export function useBookingActions(
 		}
 	}
 
+	/**
+	 * Archives a booking (soft delete)
+	 */
+	const archiveBooking = async (bookingId: string): Promise<void> => {
+		try {
+			toast({
+				title: 'Archivando cita...',
+				description: 'Ocultando la cita de la lista.',
+				variant: 'default',
+				color: 'loading'
+			})
+
+			const response = await fetch(`/api/bookings/${bookingId}/archive`, {
+				method: 'POST'
+			})
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}))
+				throw new Error(errorData.error || 'Failed to archive booking')
+			}
+
+			// Remove locally (default views hide archived)
+			onBookingsRemoved?.((booking) => booking.id !== bookingId)
+
+			toast({
+				title: 'Cita archivada',
+				description: 'La cita ya no aparecerá en la lista.',
+				variant: 'default',
+				color: 'success'
+			})
+
+			onStatsRefresh?.()
+		} catch (error) {
+			toast({
+				title: 'Error',
+				description: error instanceof Error ? error.message : 'No se pudo archivar la cita.',
+				variant: 'destructive'
+			})
+			throw error
+		}
+	}
+
 	// Return all action handlers
 	return {
 		cancelBooking,
@@ -544,7 +588,7 @@ export function useBookingActions(
 		markAsPaid,
 		processRefund,
 		resendEmail,
-		cancelSeries
+		cancelSeries,
+		archiveBooking
 	}
 }
-

@@ -123,6 +123,8 @@ export interface BookingFilterOptions {
 	statusFilter?: 'all' | 'pending' | 'scheduled' | 'completed' | 'canceled'
 	startDate?: string
 	endDate?: string
+	includeArchived?: boolean
+	onlyArchived?: boolean
 }
 
 /**
@@ -174,6 +176,7 @@ export async function getBookingsForUser(userId: string): Promise<BookingWithCli
 		`
 		)
 		.eq('user_id', userId)
+		.is('archived_at', null)
 		.order('start_time', { ascending: false })
 
 	if (error) throw error
@@ -207,6 +210,7 @@ export async function getBookingsForDateRange(
 		`
 		)
 		.eq('user_id', userId)
+		.is('archived_at', null)
 		.gte('start_time', startDate)
 		.lte('start_time', endDate)
 		.neq('status', 'canceled') // Exclude canceled bookings from time selection
@@ -259,6 +263,7 @@ export async function getBookingsForDateRangeAllUsers(
             client:clients(id, name, last_name, email)
         `
 		)
+		.is('archived_at', null)
 		.gte('start_time', startDate)
 		.lte('start_time', endDate)
 		.neq('status', 'canceled')
@@ -403,6 +408,62 @@ export async function updateBookingStatus(
 
 	if (error) {
 		console.log('Error updating booking status', error)
+		throw error
+	}
+	return data
+}
+
+/**
+ * Soft-archives a booking (hides it from default queries)
+ */
+export async function archiveBooking(
+	bookingId: string,
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<Booking> {
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
+		.from('bookings')
+		.update({
+			archived_at: new Date().toISOString(),
+			updated_at: new Date().toISOString()
+		})
+		.eq('id', bookingId)
+		.eq('user_id', userId)
+		.select()
+		.single()
+
+	if (error) {
+		console.log('Error archiving booking', error)
+		throw error
+	}
+	return data
+}
+
+/**
+ * Removes archive flag from a booking
+ */
+export async function unarchiveBooking(
+	bookingId: string,
+	userId: string,
+	supabaseClient?: SupabaseClient
+): Promise<Booking> {
+	const client = supabaseClient || supabase
+
+	const { data, error } = await client
+		.from('bookings')
+		.update({
+			archived_at: null,
+			updated_at: new Date().toISOString()
+		})
+		.eq('id', bookingId)
+		.eq('user_id', userId)
+		.select()
+		.single()
+
+	if (error) {
+		console.log('Error unarchiving booking', error)
 		throw error
 	}
 	return data
@@ -568,7 +629,7 @@ export async function getBookingsWithBills(
 	filters: BookingFilterOptions = {}
 ): Promise<PaginatedBookingsResult> {
 	const { limit = 10, offset = 0 } = options
-	const { customerSearch, statusFilter, startDate, endDate } = filters
+	const { customerSearch, statusFilter, startDate, endDate, includeArchived = false, onlyArchived = false } = filters
 
 	// When both startDate and endDate are provided, return ALL bookings in that range (no pagination)
 	const hasDateRange = !!(startDate && endDate)
@@ -591,6 +652,13 @@ export async function getBookingsWithBills(
 		`
 		)
 		.eq('user_id', userId)
+
+	// Archived filter: default hide; allow override
+	if (onlyArchived) {
+		query = query.not('archived_at', 'is', null)
+	} else if (!includeArchived) {
+		query = query.is('archived_at', null)
+	}
 
 	// Apply filters
 	if (customerSearch) {
@@ -777,7 +845,7 @@ export async function getBookingsForExport(
 	supabaseClient?: SupabaseClient
 ): Promise<BookingExportRow[]> {
 	const client = supabaseClient || supabase
-	const { customerSearch, statusFilter, startDate, endDate } = filters
+	const { customerSearch, statusFilter, startDate, endDate, includeArchived = false, onlyArchived = false } = filters
 
 	let query = client
 		.from('bookings')
@@ -799,6 +867,13 @@ export async function getBookingsForExport(
 		`
 		)
 		.eq('user_id', userId)
+
+	// Archived filter: default hide; allow override for exports
+	if (onlyArchived) {
+		query = query.not('archived_at', 'is', null)
+	} else if (!includeArchived) {
+		query = query.is('archived_at', null)
+	}
 
 	// Apply filters mirroring dashboard behavior
 	if (customerSearch) {
@@ -1056,10 +1131,7 @@ export async function deleteEligibleFutureBookingsForSeries(
 /**
  * Returns the maximum occurrence_index for a series, or -1 if none.
  */
-export async function getSeriesMaxOccurrenceIndex(
-	seriesId: string,
-	supabaseClient?: SupabaseClient
-): Promise<number> {
+export async function getSeriesMaxOccurrenceIndex(seriesId: string, supabaseClient?: SupabaseClient): Promise<number> {
 	const client = supabaseClient || supabase
 	const { data, error } = await client
 		.from('bookings')
@@ -1089,6 +1161,7 @@ export async function getBookingsMissingCalendarEvents(userId: string, limit: nu
 		.from('bookings')
 		.select(`*, calendar_events:calendar_events(google_event_id)`)
 		.eq('user_id', userId)
+		.is('archived_at', null)
 		.neq('status', 'canceled')
 		.gte('start_time', nowIso)
 		// Important: for 1:N embeds, filter the whole relation to be null

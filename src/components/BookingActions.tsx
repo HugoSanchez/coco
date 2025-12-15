@@ -14,7 +14,8 @@ import {
 	Send,
 	CreditCard,
 	UserCheck,
-	Ban
+	Ban,
+	Archive
 } from 'lucide-react'
 
 export type BookingActionBooking = {
@@ -22,6 +23,7 @@ export type BookingActionBooking = {
 	status: 'pending' | 'scheduled' | 'completed' | 'canceled'
 	payment_status: 'not_applicable' | 'pending' | 'paid' | 'disputed' | 'canceled' | 'refunded'
 	series_id?: string // V2: For recurring bookings
+	archived_at?: string | null
 }
 
 export function BookingActions({
@@ -34,6 +36,7 @@ export function BookingActions({
 	onRescheduleBooking,
 	onResendEmail,
 	onCancelSeries,
+	onArchiveBooking,
 	open,
 	onOpenChange
 }: {
@@ -46,6 +49,7 @@ export function BookingActions({
 	onRescheduleBooking: (bookingId: string) => void
 	onResendEmail: (bookingId: string) => void
 	onCancelSeries?: (seriesId: string) => void // V2: Optional cancel series handler
+	onArchiveBooking: (bookingId: string) => void
 	open?: boolean // Controlled open state
 	onOpenChange?: (open: boolean) => void // Callback when open state changes
 }) {
@@ -161,6 +165,15 @@ export function BookingActions({
 							</DropdownMenuItem>
 						)}
 					</>
+				)}
+				{booking.status === 'canceled' && (
+					<DropdownMenuItem
+						onClick={() => onArchiveBooking(booking.id)}
+						className="flex items-center gap-3 text-red-800 focus:text-red-700"
+					>
+						<Archive className="h-3 w-3" />
+						Archivar
+					</DropdownMenuItem>
 				)}
 			</DropdownMenuContent>
 		</DropdownMenu>

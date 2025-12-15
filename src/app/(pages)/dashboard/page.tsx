@@ -153,6 +153,7 @@ export default function Dashboard() {
 		markingAsPaidBookingId,
 		cancelingBookingId,
 		cancelingSeriesId,
+		archivingBookingId,
 		isRescheduleOpen,
 		reschedulingBookingId,
 		openRefundModal,
@@ -163,6 +164,8 @@ export default function Dashboard() {
 		closeCancelBookingModal,
 		openCancelSeriesModal,
 		closeCancelSeriesModal,
+		openArchiveBookingModal,
+		closeArchiveBookingModal,
 		openRescheduleModal,
 		closeRescheduleModal
 	} = useBookingModals()
@@ -360,20 +363,21 @@ export default function Dashboard() {
 	// No need for manual fetching or handleClientCreated - the hook handles it
 
 	// Initialize booking actions hook with callbacks for state updates
-	const { cancelBooking, confirmBooking, markAsPaid, processRefund, resendEmail, cancelSeries } = useBookingActions({
-		// Callback to update a single booking in local state
-		onBookingUpdated: (bookingId, updates) => {
-			setBookings((prev) =>
-				prev.map((booking) => (booking.id === bookingId ? { ...booking, ...updates } : booking))
-			)
-		},
-		// Callback to remove bookings from local state (used for series cancellations)
-		onBookingsRemoved: (predicate) => {
-			setBookings((prev) => prev.filter(predicate))
-		},
-		// Callback to refresh dashboard statistics after major state changes
-		onStatsRefresh: fetchDashboardStats
-	})
+	const { cancelBooking, confirmBooking, markAsPaid, processRefund, resendEmail, cancelSeries, archiveBooking } =
+		useBookingActions({
+			// Callback to update a single booking in local state
+			onBookingUpdated: (bookingId, updates) => {
+				setBookings((prev) =>
+					prev.map((booking) => (booking.id === bookingId ? { ...booking, ...updates } : booking))
+				)
+			},
+			// Callback to remove bookings from local state (used for series cancellations)
+			onBookingsRemoved: (predicate) => {
+				setBookings((prev) => prev.filter(predicate))
+			},
+			// Callback to refresh dashboard statistics after major state changes
+			onStatsRefresh: fetchDashboardStats
+		})
 
 	// Modal handlers are now provided by useBookingModals hook
 	// We create wrapper functions that combine modal actions with booking actions
@@ -385,6 +389,9 @@ export default function Dashboard() {
 		const booking = bookings.find((b) => b.id === bookingId)
 		setShouldSendCancelEmail(booking?.payment_status === 'paid')
 		openCancelBookingModal(bookingId)
+	}
+	const handleShowArchiveDialog = (bookingId: string) => {
+		openArchiveBookingModal(bookingId)
 	}
 	const handleCancelSeries = openCancelSeriesModal
 	const handleRescheduleBooking = (bookingId: string) => {
@@ -401,6 +408,14 @@ export default function Dashboard() {
 
 	const handleCancelBooking = async (bookingId: string, options?: { sendEmail: boolean }) => {
 		await cancelBooking(bookingId, options)
+	}
+
+	const handleArchiveBooking = async (bookingId: string) => {
+		try {
+			await archiveBooking(bookingId)
+		} finally {
+			closeArchiveBookingModal()
+		}
 	}
 
 	// Wrapper for mark as paid that closes the modal after success
@@ -757,6 +772,7 @@ export default function Dashboard() {
 										onRescheduleBooking={handleRescheduleBooking}
 										onResendEmail={resendEmail}
 										onCancelSeries={handleCancelSeries}
+										onArchiveBooking={handleShowArchiveDialog}
 									/>
 									{hasMore && !loadingBookings && !(filters.startDate && filters.endDate) && (
 										<div className="flex justify-center pt-4">
@@ -848,6 +864,7 @@ export default function Dashboard() {
 									onRescheduleBooking={handleRescheduleBooking}
 									onResendEmail={resendEmail}
 									onCancelSeries={handleCancelSeries}
+									onArchiveBooking={handleShowArchiveDialog}
 								/>
 								{hasMore && !loadingBookings && !(filters.startDate && filters.endDate) && (
 									<div className="flex justify-center pt-4">
@@ -1053,6 +1070,26 @@ export default function Dashboard() {
 					isPaid={false}
 					title="Cancelar evento recurrente"
 					description="Se cancelarán todas las citas futuras de esta serie recurrente. Esta acción no se puede deshacer."
+				/>
+			)}
+
+			{/* Archive Confirmation Modal */}
+			{archivingBookingId && (
+				<CancelConfirmationModal
+					isOpen={!!archivingBookingId}
+					onOpenChange={(open) => {
+						if (!open) closeArchiveBookingModal()
+					}}
+					onConfirm={async () => {
+						const id = archivingBookingId
+						closeArchiveBookingModal()
+						if (id) {
+							await handleArchiveBooking(id)
+						}
+					}}
+					isPaid={false}
+					title="Archivar cita"
+					description="La cita se ocultará de la lista principal. Esta acción no se puede deshacer."
 				/>
 			)}
 		</div>

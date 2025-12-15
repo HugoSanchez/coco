@@ -78,6 +78,11 @@ interface UseBookingModalsReturn {
 	cancelingSeriesId: string | null
 
 	/**
+	 * The ID of the booking currently being archived, or null if archive modal is closed
+	 */
+	archivingBookingId: string | null
+
+	/**
 	 * Whether the reschedule form modal is open
 	 */
 	isRescheduleOpen: boolean
@@ -160,6 +165,16 @@ interface UseBookingModalsReturn {
 	closeCancelSeriesModal: () => void
 
 	/**
+	 * Opens the archive booking confirmation modal for the given booking
+	 */
+	openArchiveBookingModal: (bookingId: string) => void
+
+	/**
+	 * Closes the archive booking confirmation modal
+	 */
+	closeArchiveBookingModal: () => void
+
+	/**
 	 * Opens the reschedule form modal for the given booking
 	 *
 	 * Steps:
@@ -201,6 +216,9 @@ export function useBookingModals(): UseBookingModalsReturn {
 
 	// State for cancel series modal
 	const [cancelingSeriesId, setCancelingSeriesId] = useState<string | null>(null)
+
+	// State for archive booking modal
+	const [archivingBookingId, setArchivingBookingId] = useState<string | null>(null)
 
 	// State for reschedule modal
 	const [isRescheduleOpen, setIsRescheduleOpen] = useState(false)
@@ -271,6 +289,20 @@ export function useBookingModals(): UseBookingModalsReturn {
 	}, [])
 
 	/**
+	 * Opens the archive booking confirmation modal
+	 */
+	const openArchiveBookingModal = useCallback((bookingId: string) => {
+		setArchivingBookingId(bookingId)
+	}, [])
+
+	/**
+	 * Closes the archive booking confirmation modal
+	 */
+	const closeArchiveBookingModal = useCallback(() => {
+		setArchivingBookingId(null)
+	}, [])
+
+	/**
 	 * Opens the reschedule form modal
 	 */
 	const openRescheduleModal = useCallback((bookingId: string) => {
@@ -298,6 +330,7 @@ export function useBookingModals(): UseBookingModalsReturn {
 		markingAsPaidBookingId,
 		cancelingBookingId,
 		cancelingSeriesId,
+		archivingBookingId,
 		isRescheduleOpen,
 		reschedulingBookingId,
 		openRefundModal,
@@ -308,8 +341,9 @@ export function useBookingModals(): UseBookingModalsReturn {
 		closeCancelBookingModal,
 		openCancelSeriesModal,
 		closeCancelSeriesModal,
+		openArchiveBookingModal,
+		closeArchiveBookingModal,
 		openRescheduleModal,
 		closeRescheduleModal
 	}
 }
-
