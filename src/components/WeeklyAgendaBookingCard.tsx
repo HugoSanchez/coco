@@ -30,6 +30,7 @@ interface BookingCardProps {
 	onRescheduleBooking?: (bookingId: string) => void
 	onResendEmail?: (bookingId: string) => void
 	onCancelSeries?: (seriesId: string) => void
+	onArchiveBooking?: (bookingId: string) => void
 	actionMenuOpen?: boolean
 	onActionMenuOpenChange?: (open: boolean) => void
 	onClick?: (bookingId: string) => void // Handler for clicking on the booking card
@@ -107,6 +108,7 @@ export function WeeklyAgendaBookingCard({
 	onRescheduleBooking,
 	onResendEmail,
 	onCancelSeries,
+	onArchiveBooking,
 	actionMenuOpen,
 	onActionMenuOpenChange,
 	onClick
@@ -205,6 +207,7 @@ export function WeeklyAgendaBookingCard({
 							onRescheduleBooking={onRescheduleBooking!}
 							onResendEmail={onResendEmail!}
 							onCancelSeries={onCancelSeries}
+							onArchiveBooking={onArchiveBooking!}
 							open={actionMenuOpen}
 							onOpenChange={onActionMenuOpenChange}
 						/>
