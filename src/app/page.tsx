@@ -327,12 +327,14 @@ export default function LandingPage() {
 											<video
 												ref={videoRef}
 												poster="/dashboard.png"
-												className={isFullscreen ? 'w-full h-full object-contain' : 'w-full h-auto'}
+												className={
+													isFullscreen ? 'w-full h-full object-contain' : 'w-full h-auto'
+												}
 												onEnded={handleVideoEnded}
 												onPlay={handleVideoPlay}
 												onPause={handleVideoPause}
 											>
-												<source src="/dashboard-video.mp4" type="video/mp4" />
+												<source src="/dashboard-video-720p.mp4" type="video/mp4" />
 												{/* Fallback for browsers that don't support video */}
 												<img
 													src="/dashboard.png"
@@ -375,7 +377,9 @@ export default function LandingPage() {
 												>
 													<div className="bg-gray-800 hover:bg-gray-700 rounded-lg px-6 py-3 flex items-center space-x-3 shadow-lg transition-colors duration-200">
 														<Play className="w-5 h-5 text-white fill-white" />
-														<span className="text-white font-medium text-sm">Reproducir</span>
+														<span className="text-white font-medium text-sm">
+															Reproducir
+														</span>
 													</div>
 												</button>
 											)}
@@ -383,7 +387,9 @@ export default function LandingPage() {
 											<button
 												onClick={handleToggleFullscreen}
 												className="absolute bottom-4 right-4 bg-gray-800/80 hover:bg-gray-700/90 text-white p-2.5 rounded-lg shadow-lg transition-colors duration-200 z-10"
-												aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+												aria-label={
+													isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'
+												}
 											>
 												{isFullscreen ? (
 													<Minimize className="w-5 h-5" />
