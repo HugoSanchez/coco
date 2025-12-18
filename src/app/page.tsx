@@ -334,7 +334,7 @@ export default function LandingPage() {
 												onPlay={handleVideoPlay}
 												onPause={handleVideoPause}
 											>
-												<source src="/dashboard-video-720p.mp4" type="video/mp4" />
+												<source src="/dashboard-video.mp4" type="video/mp4" />
 												{/* Fallback for browsers that don't support video */}
 												<img
 													src="/dashboard.png"
