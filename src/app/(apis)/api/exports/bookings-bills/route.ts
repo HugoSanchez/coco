@@ -105,11 +105,8 @@ export async function GET(request: NextRequest) {
 
 			const formatted = rows.map((r) => {
 				const start = new Date(r.booking_start_time_iso)
-				const end = new Date(r.booking_end_time_iso)
-				const paidAt = r.paid_at_iso ? new Date(r.paid_at_iso) : null
 				const pad = (n: number) => String(n).padStart(2, '0')
 				const ddmmyyyy = (d: Date) => `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`
-				const hhmm = (d: Date) => `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
 
 				const creditNumbers = (r.credit_note_numbers || []).join(' | ')
 				const creditLinks = (r.credit_note_pdf_paths || [])
@@ -117,28 +114,31 @@ export async function GET(request: NextRequest) {
 					.filter((u) => u)
 					.join(' | ')
 
-				const importeNeto = (
-					(typeof r.amount === 'number' ? r.amount : 0) - (r.credit_note_total_abs || 0)
-				).toFixed(2)
+				// Convert amounts from cents to euros
+				const amountEur = typeof r.amount === 'number' ? r.amount / 100 : 0
+				const creditNoteTotalEur = (r.credit_note_total_abs || 0) / 100
+				const refundAmountEur = (r.refund_amount || 0) / 100
+				const taxAmountEur = typeof r.tax_amount === 'number' ? r.tax_amount / 100 : 0
+
+				const importeNeto = (amountEur - taxAmountEur).toFixed(2)
+
+				const nombreCompleto =
+					[r.client_first_name, r.client_last_name]
+						.filter((n) => n && n.trim())
+						.join(' ')
+						.trim() || ''
 
 				return {
-					id_cita: r.booking_id,
-					nombre_del_cliente: r.client_first_name || '',
-					apellido_del_cliente: r.client_last_name || '',
-					email_del_cliente: r.client_email || '',
-					dni_del_cliente: r.client_national_id || '',
-					direccion_del_cliente: r.client_address || '',
 					fecha_de_la_cita_utc: ddmmyyyy(start),
-					hora_de_la_cita_utc: hhmm(start),
-					estado: toEsBookingStatus(r.booking_status),
+
+					nombre_completo_del_cliente: nombreCompleto,
+					dni_del_cliente: r.client_national_id || '',
 					estado_de_pago: toEsPaymentStatus(r.payment_status),
-					importe: (typeof r.amount === 'number' ? r.amount : 0).toFixed(2),
+					importe: amountEur.toFixed(2),
+					iva_porcentaje: r.tax_rate_percent ? r.tax_rate_percent.toFixed(2) : '',
+					importe_iva: taxAmountEur.toFixed(2),
 					importe_neto: importeNeto,
-					moneda: r.currency,
-					pagado_el_utc: paidAt ? `${ddmmyyyy(paidAt)} ${hhmm(paidAt)}` : '',
-					importe_reembolso: (r.refund_amount || 0).toFixed(2),
-					servicio: r.service_name,
-					zona_horaria: r.timezone,
+					importe_reembolso: refundAmountEur.toFixed(2),
 					numero_de_factura:
 						r.invoice_series && typeof r.invoice_number === 'number'
 							? `${r.invoice_series}-${r.invoice_number}`
@@ -146,28 +146,20 @@ export async function GET(request: NextRequest) {
 					url_factura_pdf: r.invoice_pdf_path ? signedUrlByPath[r.invoice_pdf_path] || '' : '',
 					numeros_de_rectificativas: creditNumbers,
 					urls_rectificativas_pdf: creditLinks,
-					total_rectificado_abs: (r.credit_note_total_abs || 0).toFixed(2)
+					total_rectificado_abs: (amountEur - creditNoteTotalEur).toFixed(2)
 				}
 			})
 
 			const headers = [
-				'id_cita',
-				'nombre_del_cliente',
-				'apellido_del_cliente',
-				'email_del_cliente',
+				'fecha',
+				'cliente',
 				'dni_del_cliente',
-				'direccion_del_cliente',
-				'fecha_de_la_cita_utc',
-				'hora_de_la_cita_utc',
-				'estado',
 				'estado_de_pago',
 				'importe',
+				'iva_porcentaje',
+				'importe_iva',
 				'importe_neto',
-				'moneda',
-				'pagado_el_utc',
 				'importe_reembolso',
-				'servicio',
-				'zona_horaria',
 				'numero_de_factura',
 				'url_factura_pdf',
 				'numeros_de_rectificativas',

@@ -148,6 +148,9 @@ export interface BookingExportRow {
 	receipt_url: string | null
 	service_name: string
 	timezone: 'UTC'
+	// VAT/IVA fields
+	tax_rate_percent?: number | null
+	tax_amount?: number | null
 	// Invoice info (dual-write path)
 	invoice_series?: string | null
 	invoice_number?: number | null
@@ -862,7 +865,9 @@ export async function getBookingsForExport(
 				currency,
 				status,
 				paid_at,
-				refunded_amount
+				refunded_amount,
+				tax_rate_percent,
+				tax_amount
 			)
 		`
 		)
@@ -989,6 +994,8 @@ export async function getBookingsForExport(
 			receipt_url: invoice?.stripe_receipt_url ?? null,
 			service_name: 'consulta',
 			timezone: 'UTC',
+			tax_rate_percent: bill?.tax_rate_percent ?? null,
+			tax_amount: bill?.tax_amount ?? null,
 			invoice_series: invoice?.series ?? null,
 			invoice_number: invoice?.number ?? null,
 			invoice_pdf_path: invoice?.pdf_url ?? null,
