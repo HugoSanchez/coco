@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useRef } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
+import { X } from 'lucide-react'
 
 interface SideSheetHeadlessProps {
 	isOpen: boolean
@@ -73,6 +74,13 @@ export function SideSheetHeadless({
 								<Dialog.Panel className="pointer-events-auto w-screen md:max-w-md lg:max-w-lg bg-gray-50 shadow-xl coco-sidesheet">
 									<div className="h-full flex flex-col p-6">
 										<div className="mb-4">
+											<button
+												onClick={onClose}
+												className="p-2 -mt-1 -ml-2 mb-3 rounded-full hover:bg-gray-200 active:bg-gray-300 transition-colors touch-manipulation"
+												aria-label="Cerrar"
+											>
+												<X className="h-5 w-5 text-gray-700" />
+											</button>
 											<Dialog.Title className="text-xl md:text-2xl font-bold">
 												{title}
 											</Dialog.Title>
