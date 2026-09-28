@@ -961,7 +961,9 @@ export async function getGoogleCalendarEventsForRange(
 			}))
 	} catch (error: any) {
 		console.error('❌ [Calendar Events] Range fetch failed for user:', userId, error?.message || error)
-		return []
+		// An unreadable calendar is not an empty calendar. Availability must fail
+		// rather than offer slots that may overlap events we could not retrieve.
+		throw error
 	}
 }
 

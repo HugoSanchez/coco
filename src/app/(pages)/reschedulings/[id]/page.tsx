@@ -82,7 +82,13 @@ export default function ReschedulePage() {
 			console.log('[Reschedule] slots keys', Object.keys(payload?.slotsByDay || {}).length)
 			setState((prev) => ({ ...prev, availableSlots: payload?.slotsByDay || {}, isLoadingSlots: false }))
 		} catch (_) {
-			setState((prev) => ({ ...prev, isLoadingSlots: false }))
+			setState((prev) => ({
+				...prev,
+				isLoadingSlots: false,
+				availableSlots: {},
+				selectedSlot: null,
+				error: 'No se pudo comprobar la disponibilidad. Inténtalo de nuevo.'
+			}))
 		} finally {
 			if (slotsInFlightRef.current === key) slotsInFlightRef.current = null
 		}
@@ -107,6 +113,7 @@ export default function ReschedulePage() {
 			})
 			if (!res.ok) {
 				const payload = await res.json().catch(() => ({}))
+				if (res.status >= 500) throw new Error('No se pudo reprogramar la cita. Inténtalo de nuevo.')
 				throw new Error(payload?.error || 'No se pudo reprogramar la cita.')
 			}
 			setState((prev) => ({ ...prev, bookingConfirmed: true }))
@@ -128,7 +135,14 @@ export default function ReschedulePage() {
 	if (state.error || !state.username) {
 		return (
 			<div className="container flex justify-center items-center min-h-screen">
-				<div className="text-center text-gray-700">{state.error || 'Enlace no válido.'}</div>
+				<div className="text-center text-gray-700 space-y-4">
+					<p>{state.error || 'Enlace no válido.'}</p>
+					{state.username && (
+						<button onClick={() => window.location.reload()} className="text-teal-600 hover:underline">
+							Reintentar
+						</button>
+					)}
+				</div>
 			</div>
 		)
 	}
