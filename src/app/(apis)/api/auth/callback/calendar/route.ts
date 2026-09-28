@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { createClient } from '@supabase/supabase-js'
 import { getProfileByEmail } from '@/lib/db/profiles'
-import { reconcileCalendarEventsForUser } from '@/lib/calendar/calendar'
 import { getExistingRefreshToken, upsertCalendarTokens } from '@/lib/db/calendar-tokens'
 
 const oauth2Client = new google.auth.OAuth2(
@@ -16,7 +15,8 @@ const oauth2Client = new google.auth.OAuth2(
  *
  * This endpoint is called by Google after the user approves (or denies)
  * access to their Google account. We handle the OAuth code exchange,
- * persist tokens, and optionally reconcile missing calendar events.
+ * persist tokens, and redirect back to Coco. Connecting an account must not
+ * create events or send invitations for existing bookings.
  *
  * HIGH-LEVEL FLOW:
  * - Step 0: Parse query parameters (code/state)
@@ -25,8 +25,7 @@ const oauth2Client = new google.auth.OAuth2(
  * - Step 3: Fetch the Google user profile (to derive email)
  * - Step 4: Find our local user profile by email
  * - Step 5: Upsert calendar tokens (preserving refresh_token on re-consent)
- * - Step 6: If full calendar scope, run reconciliation (small batch)
- * - Step 7: Redirect user to appropriate screen based on source and scopes
+ * - Step 6: Redirect user to appropriate screen based on source and scopes
  */
 export async function GET(request: NextRequest) {
 	////////////////////////////////////////////////////////
@@ -131,21 +130,12 @@ export async function GET(request: NextRequest) {
 			await upsertCalendarTokens(upsertPayload, supabase)
 
 			////////////////////////////////////////////////////////
-			//// Step 6: Optional reconciliation (requires full access)
+			//// Step 6: Determine redirect based on source and scope
 			////////////////////////////////////////////////////////
 			const hasCalendarAccess = grantedScopes.includes('https://www.googleapis.com/auth/calendar.events')
 
-			// Reconciliation: only attempt if full access granted
-			if (hasCalendarAccess) {
-				const res = await reconcileCalendarEventsForUser(profileUser.id, { limit: 50 }, supabase)
-				console.log('🧩 [Calendar Reconcile] Completed', res)
-			} else {
-				console.log('🧩 [Calendar Reconcile] Skipped — missing calendar.events scope')
-			}
-
-			////////////////////////////////////////////////////////
-			//// Step 7: Determine redirect based on source and scope
-			////////////////////////////////////////////////////////
+			// Never backfill bookings during OAuth: creating existing events can
+			// send a batch of invitations, including for completed consultations.
 			let successRedirect: string
 
 			if (source === 'settings') {

@@ -176,7 +176,7 @@ export async function upsertCalendarTokens(
 		.upsert(payload as any, { onConflict: 'user_id' })
 
 	if (error) throw error
-	console.log('🧩 [Calendar Tokens] Upserted', payload)
+	console.log('🧩 [Calendar Tokens] Upserted', { user_id: payload.user_id })
 	return true
 }
 
