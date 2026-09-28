@@ -8,8 +8,8 @@
  *
  * How it decides to render
  * - Relies on calendarConnected from UserContext, which is computed server-side by
- *   attempting to build an authenticated Google Calendar client. If that fails,
- *   calendarConnected becomes false.
+ *   attempting to build an authenticated Google Calendar client. Only confirmed
+ *   credential failures set it to false; temporary check failures remain unknown.
  *
  * Dismissal behavior
  * - Session dismiss: Clicking the X hides the banner for the current session (page lifetime).
@@ -38,7 +38,6 @@ export default function CalendarBanner() {
 	const {
 		user,
 		calendarConnected,
-		checkCalendarConnection,
 		stripeOnboardingCompleted
 	} = useUser()
 
@@ -81,21 +80,7 @@ export default function CalendarBanner() {
 		} catch {}
 	}
 
-	// Ensure we have the latest status when component mounts
-	useEffect(() => {
-		if (
-			user &&
-			stripeOnboardingCompleted === true &&
-			calendarConnected == null
-		) {
-			checkCalendarConnection()
-		}
-	}, [
-		user,
-		stripeOnboardingCompleted,
-		calendarConnected,
-		checkCalendarConnection
-	])
+	// UserContext checks on sign-in and window focus. Unknown is not disconnected.
 
 	if (!user) return null
 	if (stripeOnboardingCompleted !== true) return null

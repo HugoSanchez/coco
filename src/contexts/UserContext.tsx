@@ -27,6 +27,7 @@ import { createClient } from '@/lib/supabase/client'
 import * as Sentry from '@sentry/nextjs'
 import { useRouter } from 'next/navigation'
 import posthog from 'posthog-js'
+import { fetchCalendarConnectionStatus } from '@/lib/calendar/connection-status'
 
 /**
  * Interface for user profile data from the profiles table
@@ -78,7 +79,7 @@ interface UserContextType {
 	checkStripeOnboarding: () => Promise<boolean>
 	stripeOnboardingCompleted: boolean | null
 	calendarConnected: boolean | null
-	checkCalendarConnection: () => Promise<boolean>
+	checkCalendarConnection: () => Promise<boolean | null>
 }
 
 // Create the React Context with undefined as default
@@ -283,31 +284,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 		return promise
 	}, [user, supabase])
 
-	const calendarCheckInFlight = useRef<Promise<boolean> | null>(null)
-	const checkCalendarConnection = useCallback(async (): Promise<boolean> => {
+	const calendarCheckInFlight = useRef<Promise<boolean | null> | null>(null)
+	const checkCalendarConnection = useCallback(async (): Promise<boolean | null> => {
 		if (!user) {
 			setCalendarConnected(null)
-			return false
+			return null
 		}
 		if (calendarCheckInFlight.current) return calendarCheckInFlight.current
 
 		const promise = (async () => {
 			try {
-				const res = await fetch('/api/calendar/status', {
-					cache: 'no-store'
-				})
-				if (!res.ok) {
-					setCalendarConnected(false)
-					return false
-				}
-				const data = await res.json()
-				const connected = Boolean(data?.connected)
+				const connected = await fetchCalendarConnectionStatus()
 				setCalendarConnected(connected)
-				console.log('Calendar connected:', connected)
 				return connected
-			} catch (e) {
-				setCalendarConnected(false)
-				return false
 			} finally {
 				calendarCheckInFlight.current = null
 			}
