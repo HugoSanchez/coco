@@ -18,7 +18,6 @@ export function buildFullEventData({
 	clientName,
 	clientEmail,
 	practitionerName,
-	practitionerEmail,
 	startTime,
 	endTime,
 	bookingNotes,
@@ -30,7 +29,6 @@ export function buildFullEventData({
 	clientName: string
 	clientEmail: string
 	practitionerName: string
-	practitionerEmail: string
 	startTime: string
 	endTime: string
 	bookingNotes?: string
@@ -50,11 +48,8 @@ export function buildFullEventData({
 			dateTime: endTime,
 			timeZone: 'UTC'
 		},
+		// Inviting the practitioner would also add a copy to their primary calendar.
 		attendees: [
-			{
-				email: practitionerEmail,
-				responseStatus: 'accepted'
-			},
 			{
 				email: clientEmail,
 				responseStatus: 'needsAction'
@@ -83,7 +78,6 @@ export function buildFullEventData({
  */
 export function buildPendingEventData({
 	clientName,
-	practitionerEmail,
 	startTime,
 	endTime,
 	bookingId,
@@ -91,7 +85,6 @@ export function buildPendingEventData({
 	extraDescription
 }: {
 	clientName: string
-	practitionerEmail: string
 	startTime: string
 	endTime: string
 	bookingId?: string
@@ -133,7 +126,6 @@ export function buildConfirmedEventData({
 	clientName,
 	clientEmail,
 	practitionerName,
-	practitionerEmail,
 	originalStart,
 	originalEnd,
 	conferenceRequestId,
@@ -145,7 +137,6 @@ export function buildConfirmedEventData({
 	clientName: string
 	clientEmail: string
 	practitionerName: string
-	practitionerEmail: string
 	originalStart: any // Google Calendar start object
 	originalEnd: any // Google Calendar end object
 	conferenceRequestId: string
@@ -162,12 +153,8 @@ export function buildConfirmedEventData({
 		end: originalEnd,
 		// Color ID 10 = Dark green for confirmed appointments
 		colorId: '10',
-		// Add both practitioner and client as attendees
+		// The practitioner already has the event in their selected calendar.
 		attendees: [
-			{
-				email: practitionerEmail,
-				responseStatus: 'accepted'
-			},
 			{
 				email: clientEmail,
 				responseStatus: 'needsAction' // Client needs to respond to invitation
@@ -198,7 +185,6 @@ export function buildConfirmedEventData({
 export function buildInternalConfirmedEventData({
 	clientName,
 	practitionerName,
-	practitionerEmail,
 	startTime,
 	endTime,
 	bookingNotes,
@@ -206,7 +192,6 @@ export function buildInternalConfirmedEventData({
 }: {
 	clientName: string
 	practitionerName: string
-	practitionerEmail: string
 	startTime: string
 	endTime: string
 	bookingNotes?: string
@@ -226,13 +211,7 @@ export function buildInternalConfirmedEventData({
 			dateTime: endTime,
 			timeZone: 'UTC'
 		},
-		// Only practitioner as attendee; no client invite, no conference
-		attendees: [
-			{
-				email: practitionerEmail,
-				responseStatus: 'accepted'
-			}
-		],
+		// No invitations: this event belongs only in the selected calendar.
 		colorId: '10',
 		guestsCanModify: false,
 		guestsCanInviteOthers: false,
