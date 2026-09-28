@@ -951,6 +951,7 @@ export async function getBookingsForExport(
 		let payment_status: BookingExportRow['payment_status'] = 'not_applicable'
 		if (bill) {
 			switch (bill.status) {
+				case 'scheduled':
 				case 'pending':
 					payment_status = 'pending'
 					break

@@ -114,11 +114,11 @@ export async function GET(request: NextRequest) {
 					.filter((u) => u)
 					.join(' | ')
 
-				// Convert amounts from cents to euros
-				const amountEur = typeof r.amount === 'number' ? r.amount / 100 : 0
-				const creditNoteTotalEur = (r.credit_note_total_abs || 0) / 100
-				const refundAmountEur = (r.refund_amount || 0) / 100
-				const taxAmountEur = typeof r.tax_amount === 'number' ? r.tax_amount / 100 : 0
+				// Bills and invoices already store amounts in euros.
+				const amountEur = typeof r.amount === 'number' ? r.amount : 0
+				const creditNoteTotalEur = r.credit_note_total_abs ?? 0
+				const refundAmountEur = r.refund_amount ?? 0
+				const taxAmountEur = typeof r.tax_amount === 'number' ? r.tax_amount : 0
 
 				const importeNeto = (amountEur - taxAmountEur).toFixed(2)
 
@@ -129,13 +129,12 @@ export async function GET(request: NextRequest) {
 						.trim() || ''
 
 				return {
-					fecha_de_la_cita_utc: ddmmyyyy(start),
-
-					nombre_completo_del_cliente: nombreCompleto,
+					fecha: ddmmyyyy(start),
+					cliente: nombreCompleto,
 					dni_del_cliente: r.client_national_id || '',
 					estado_de_pago: toEsPaymentStatus(r.payment_status),
 					importe: amountEur.toFixed(2),
-					iva_porcentaje: r.tax_rate_percent ? r.tax_rate_percent.toFixed(2) : '',
+					iva_porcentaje: r.tax_rate_percent != null ? r.tax_rate_percent.toFixed(2) : '',
 					importe_iva: taxAmountEur.toFixed(2),
 					importe_neto: importeNeto,
 					importe_reembolso: refundAmountEur.toFixed(2),
