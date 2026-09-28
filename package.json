@@ -2,11 +2,15 @@
 	"name": "coco-scheduling",
 	"version": "0.1.0",
 	"private": true,
+	"engines": {
+		"node": "22.x"
+	},
 	"scripts": {
-		"dev": "next dev",
-		"build": "next build",
-		"start": "next start",
+		"dev": "node scripts/run-next.cjs dev",
+		"build": "node scripts/run-next.cjs build",
+		"start": "node scripts/run-next.cjs start",
 		"lint": "next lint",
+		"test": "tsx --test src/lib/calendar/*.test.ts",
 		"types:generate": "supabase gen types typescript --project-id xkllkwizcdkydgwzvkdg > src/types/database.types.ts"
 	},
 	"dependencies": {

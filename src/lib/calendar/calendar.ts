@@ -37,6 +37,7 @@ import { getClientById } from '../db/clients'
 import { getBookingsMissingCalendarEvents } from '../db/bookings'
 import { getAuthenticatedCalendar } from '../google'
 import { getUserCalendarId } from '../db/calendar-tokens'
+import { listAvailabilityEvents } from './list-availability-events'
 import {
 	buildFullEventData,
 	buildPendingEventData,
@@ -84,8 +85,7 @@ const supabase = createSupabaseClient()
 function calculateAvailableSlots(
 	availabilitySettings: AvailabilitySettings,
 	calendarEvents: any[],
-	date: Date,
-	calendarTimeZone: string
+	date: Date
 ): { [day: string]: TimeSlot[] } {
 	const availableSlots: { [day: string]: TimeSlot[] } = {}
 	const { weekly_availability, meeting_duration, time_zone } = availabilitySettings
@@ -186,25 +186,18 @@ export async function getAvailableSlots(username: string, month: Date) {
 	try {
 		// Get authenticated calendar client using the new helper
 		const calendar = await getAuthenticatedCalendar(userId)
-		// Use 'primary' for availability checks to see ALL calendar events (not just custom Coco calendar)
-		// This ensures we show busy slots from all calendars, not just work-related ones
+		const calendarId = await getUserCalendarId(userId)
 		const monthStart = startOfMonth(month)
 		const monthEnd = endOfMonth(month)
-		const { data: events } = await calendar.events.list({
-			calendarId: 'primary',
-			timeMin: monthStart.toISOString(),
-			timeMax: monthEnd.toISOString(),
-			singleEvents: true,
-			orderBy: 'startTime'
-		})
+		const events = await listAvailabilityEvents(
+			calendar,
+			calendarId,
+			monthStart.toISOString(),
+			monthEnd.toISOString()
+		)
 
 		// Calculate available slots for the entire month
-		const availableSlots = calculateAvailableSlots(
-			availabilitySettings,
-			events.items || [],
-			month,
-			events.timeZone || 'UTC'
-		)
+		const availableSlots = calculateAvailableSlots(availabilitySettings, events, month)
 		// Return the available slots
 		return availableSlots
 		// If there is an error, throw an error
@@ -239,7 +232,7 @@ export interface CreateCalendarEventPayload {
 export interface CreatePendingCalendarEventPayload {
 	userId: string // Practitioner's auth user ID
 	clientName: string
-	practitionerEmail: string // Practitioner's email for calendar attendee
+	practitionerEmail: string
 	startTime: string // ISO string
 	endTime: string // ISO string
 	bookingId?: string // Optional: tag Google event for idempotent reconciliation
@@ -287,7 +280,7 @@ export async function createCalendarEventWithInvite(
 	payload: CreateCalendarEventPayload,
 	supabaseClient?: SupabaseClient
 ): Promise<CalendarEventResult> {
-	const { userId, clientName, clientEmail, practitionerName, practitionerEmail, startTime, endTime, bookingNotes } =
+	const { userId, clientName, clientEmail, practitionerName, startTime, endTime, bookingNotes } =
 		payload
 
 	try {
@@ -304,7 +297,6 @@ export async function createCalendarEventWithInvite(
 			clientName,
 			clientEmail,
 			practitionerName,
-			practitionerEmail,
 			startTime,
 			endTime,
 			bookingNotes,
@@ -375,7 +367,7 @@ export async function createInternalConfirmedCalendarEvent(
 	},
 	supabaseClient?: SupabaseClient
 ): Promise<CalendarEventResult> {
-	const { userId, clientName, practitionerName, practitionerEmail, startTime, endTime, bookingNotes } = payload
+	const { userId, clientName, practitionerName, startTime, endTime, bookingNotes } = payload
 
 	try {
 		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
@@ -385,7 +377,6 @@ export async function createInternalConfirmedCalendarEvent(
 		const eventData = buildInternalConfirmedEventData({
 			clientName,
 			practitionerName,
-			practitionerEmail,
 			startTime,
 			endTime,
 			bookingNotes,
@@ -445,7 +436,7 @@ export async function createPendingCalendarEvent(
 	payload: CreatePendingCalendarEventPayload,
 	supabaseClient?: SupabaseClient
 ): Promise<CalendarEventResult> {
-	const { userId, clientName, practitionerEmail, startTime, endTime } = payload
+	const { userId, clientName, startTime, endTime } = payload
 
 	try {
 		// Get authenticated calendar client using the new helper
@@ -456,7 +447,6 @@ export async function createPendingCalendarEvent(
 		// Create the pending event object using the builder
 		const eventData = buildPendingEventData({
 			clientName,
-			practitionerEmail,
 			startTime,
 			endTime,
 			bookingId: (payload as any).bookingId,
@@ -531,7 +521,7 @@ export async function updatePendingToConfirmed(
 	payload: UpdatePendingToConfirmedPayload,
 	supabaseClient?: SupabaseClient
 ): Promise<CalendarEventResult> {
-	const { googleEventId, userId, clientEmail, practitionerName, practitionerEmail, clientName } = payload
+	const { googleEventId, userId, clientEmail, practitionerName, clientName } = payload
 
 	try {
 		// Get authenticated calendar client using the new helper
@@ -574,7 +564,6 @@ export async function updatePendingToConfirmed(
 			clientName,
 			clientEmail,
 			practitionerName,
-			practitionerEmail,
 			originalStart,
 			originalEnd,
 			conferenceRequestId,
@@ -884,8 +873,7 @@ export async function getGoogleCalendarEventsForDay(
 	try {
 		// Get authenticated calendar client
 		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
-		// Use 'primary' for availability checks to see ALL calendar events (not just custom Coco calendar)
-		// This ensures we show busy slots from all calendars, not just work-related ones
+		const calendarId = await getUserCalendarId(userId, supabaseClient)
 
 		// Get user's time zone and set up date range for the specific day
 		const userTimeZone = await getUserTimeZone(userId, supabaseClient)
@@ -896,15 +884,13 @@ export async function getGoogleCalendarEventsForDay(
 		const endOfDay = new Date(date.getTime() + 24 * 60 * 60 * 1000 - 1) // End of the same day
 
 		// Fetch events for the day
-		const response = await calendar.events.list({
-			calendarId: 'primary',
-			timeMin: startOfDay.toISOString(),
-			timeMax: endOfDay.toISOString(),
-			singleEvents: true,
-			orderBy: 'startTime'
-		})
+		const events = await listAvailabilityEvents(
+			calendar,
+			calendarId,
+			startOfDay.toISOString(),
+			endOfDay.toISOString()
+		)
 
-		const events = response.data.items || []
 		console.log('🗓️ [Calendar Events] Retrieved', events.length, 'events')
 
 		// Transform events to the format expected by DayViewTimeSelector
@@ -937,7 +923,7 @@ export async function getGoogleCalendarEventsForDay(
 }
 
 /**
- * Fetches Google Calendar events for a date RANGE (single API call)
+ * Fetches Google Calendar events from the primary and selected calendars for a date range
  * Returns external events with start/end and id for deduplication.
  */
 export async function getGoogleCalendarEventsForRange(
@@ -956,17 +942,13 @@ export async function getGoogleCalendarEventsForRange(
 > {
 	try {
 		const calendar = await getAuthenticatedCalendar(userId, supabaseClient)
-		// Use 'primary' for availability checks to see ALL calendar events (not just custom Coco calendar)
-		// This ensures we show busy slots from all calendars, not just work-related ones
-		const response = await calendar.events.list({
-			calendarId: 'primary',
-			timeMin: rangeStart.toISOString(),
-			timeMax: rangeEnd.toISOString(),
-			singleEvents: true,
-			orderBy: 'startTime'
-		})
-
-		const events = response.data.items || []
+		const calendarId = await getUserCalendarId(userId, supabaseClient)
+		const events = await listAvailabilityEvents(
+			calendar,
+			calendarId,
+			rangeStart.toISOString(),
+			rangeEnd.toISOString()
+		)
 
 		return events
 			.filter((event) => event.start?.dateTime && event.end?.dateTime && event.id)
@@ -979,7 +961,9 @@ export async function getGoogleCalendarEventsForRange(
 			}))
 	} catch (error: any) {
 		console.error('❌ [Calendar Events] Range fetch failed for user:', userId, error?.message || error)
-		return []
+		// An unreadable calendar is not an empty calendar. Availability must fail
+		// rather than offer slots that may overlap events we could not retrieve.
+		throw error
 	}
 }
 

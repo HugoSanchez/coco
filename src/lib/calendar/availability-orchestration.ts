@@ -102,8 +102,8 @@ export async function computeMonthlySlots(options: {
 	}
 
 	////////////////////////////////////////////////////////////
-	//// Step 4: Fetch external events ONCE for the month
-	//// - Single Google call, then bucket by dayKey in tz
+	//// Step 4: Fetch external events for the month
+	//// - Read primary and selected calendars, then bucket by dayKey in tz
 	////////////////////////////////////////////////////////////
 	const externalMonth = await getGoogleCalendarEventsForRange(options.userId, monthStart, monthEnd, options.supabase)
 	const externalBuckets = new Map<string, typeof externalMonth>()

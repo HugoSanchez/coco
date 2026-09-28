@@ -2,7 +2,27 @@ This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next
 
 ## Getting Started
 
-First, run the development server:
+Use Node.js 22 for this project. The current Google authentication dependencies
+use `SlowBuffer`, which was removed in Node.js 25.
+
+With nvm installed, select the version in `.nvmrc` and install dependencies:
+
+```bash
+nvm install
+nvm use
+npm ci
+```
+
+Set `NEXT_PUBLIC_BASE_URL=http://localhost:3000` in your local `.env.local`,
+along with the Google Calendar and Supabase credentials. The Google OAuth client
+must allow `http://localhost:3000/api/auth/callback/calendar` as a redirect URI.
+
+Then run the development server:
+
+The `dev`, `build` and `start` commands select Node 22 automatically when it is
+active in your shell, installed through Homebrew (`node@22`), or installed locally
+at `~/.local/share/coco/node22/bin/node`. If it is unavailable, they stop with a
+setup instruction before loading the app.
 
 ```bash
 npm run dev

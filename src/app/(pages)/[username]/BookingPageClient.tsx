@@ -126,7 +126,7 @@ export default function BookingPageClient({ username }: { username: string }) {
 			}))
 		} catch (error) {
 			console.error('Error fetching available slots:', error)
-			setState((prev) => ({ ...prev, isLoadingSlots: false }))
+			setState((prev) => ({ ...prev, isLoadingSlots: false, availableSlots: {}, firstSlots: {}, selectedSlot: null, error: 'availability_unavailable' }))
 		}
 		if (slotsInFlightRef.current === key) slotsInFlightRef.current = null
 	}
@@ -162,7 +162,7 @@ export default function BookingPageClient({ username }: { username: string }) {
 					}))
 				} catch (error) {
 					console.error('Error refreshing available slots:', error)
-					setState((prev) => ({ ...prev, isLoadingSlots: false }))
+					setState((prev) => ({ ...prev, isLoadingSlots: false, availableSlots: {}, firstSlots: {}, selectedSlot: null, error: 'availability_unavailable' }))
 				}
 			})()
 		} else if (state.selectedSlot) {
@@ -208,7 +208,7 @@ export default function BookingPageClient({ username }: { username: string }) {
 		)
 	}
 
-	if (state.error || !state.userProfile) {
+	if (!state.userProfile) {
 		return (
 			<div className="container flex justify-center items-center min-h-screen">
 				<div className="text-center">
@@ -216,6 +216,19 @@ export default function BookingPageClient({ username }: { username: string }) {
 					<p className="text-gray-600">
 						The calendar you&apos;re looking for doesn&apos;t exist or has been removed.
 					</p>
+				</div>
+			</div>
+		)
+	}
+
+	if (state.error) {
+		return (
+			<div className="container flex justify-center items-center min-h-screen">
+				<div className="text-center space-y-4">
+					<p>No se pudo comprobar la disponibilidad. Inténtalo de nuevo.</p>
+					<button onClick={() => window.location.reload()} className="text-teal-600 hover:underline">
+						Reintentar
+					</button>
 				</div>
 			</div>
 		)

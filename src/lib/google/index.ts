@@ -15,6 +15,7 @@
 
 import { google } from 'googleapis'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { CalendarDisconnectedError } from '@/lib/calendar/connection-status'
 import { getUserCalendarTokens, updateUserCalendarTokens, deleteUserCalendarTokens } from '../db/calendar-tokens'
 
 const clientId = process.env.GOOGLE_CLIENT_ID_CALENDAR
@@ -120,7 +121,7 @@ export async function refreshToken(
 			} catch (cleanupError) {
 				console.error('❌ [Token] Failed to cleanup tokens for user:', userId, 'Error:', cleanupError)
 			}
-			throw new Error('Calendar access expired - please reconnect your Google Calendar')
+			throw new CalendarDisconnectedError('Calendar access expired - please reconnect your Google Calendar')
 		}
 
 		throw error
@@ -162,7 +163,7 @@ export async function getAuthenticatedCalendar(userId: string, supabaseClient?: 
 
 	if (!tokens) {
 		// No stored credentials → caller should guide the user to connect
-		throw new Error('Calendar tokens not found')
+		throw new CalendarDisconnectedError('Calendar tokens not found')
 	}
 
 	// ————————————————————————————————————————————————————————————————
@@ -192,6 +193,9 @@ export async function getAuthenticatedCalendar(userId: string, supabaseClient?: 
 	const oauth2Client = createOAuthClient()
 
 	if (needsRefresh) {
+		if (!tokens.refresh_token) {
+			throw new CalendarDisconnectedError('Calendar refresh token not found')
+		}
 		// ————————————————————————————————————————————————————————————————
 		// STEP 4A — Refresh access token using the long‑lived refresh_token
 		// On success we set the new access_token on the client. Any failure is
