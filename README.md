@@ -19,6 +19,11 @@ must allow `http://localhost:3000/api/auth/callback/calendar` as a redirect URI.
 
 Then run the development server:
 
+The `dev`, `build` and `start` commands select Node 22 automatically when it is
+active in your shell, installed through Homebrew (`node@22`), or installed locally
+at `~/.local/share/coco/node22/bin/node`. If it is unavailable, they stop with a
+setup instruction before loading the app.
+
 ```bash
 npm run dev
 # or
