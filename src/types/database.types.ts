@@ -420,6 +420,7 @@ export type Database = {
 			clients: {
 				Row: {
 					created_at: string | null
+					default_booking_mode: string | null
 					description: string | null
 					email: string
 					full_name_search: string | null
@@ -431,6 +432,7 @@ export type Database = {
 				}
 				Insert: {
 					created_at?: string | null
+					default_booking_mode?: string | null
 					description?: string | null
 					email: string
 					full_name_search?: string | null
@@ -442,6 +444,7 @@ export type Database = {
 				}
 				Update: {
 					created_at?: string | null
+					default_booking_mode?: string | null
 					description?: string | null
 					email?: string
 					full_name_search?: string | null
@@ -721,6 +724,7 @@ export type Database = {
 			profiles: {
 				Row: {
 					created_at: string
+					default_booking_mode: string
 					default_in_person_location_text: string | null
 					description: string | null
 					email: string
@@ -742,6 +746,7 @@ export type Database = {
 				Insert: {
 					created_at?: string
 					default_in_person_location_text?: string | null
+					default_booking_mode?: string
 					description?: string | null
 					email: string
 					fiscal_address_line1?: string | null
@@ -762,6 +767,7 @@ export type Database = {
 				Update: {
 					created_at?: string
 					default_in_person_location_text?: string | null
+					default_booking_mode?: string
 					description?: string | null
 					email?: string
 					fiscal_address_line1?: string | null

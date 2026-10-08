@@ -51,6 +51,7 @@ interface UserProfile {
 	description?: string
 	profile_picture_url?: string
 	default_in_person_location_text?: string | null
+	default_booking_mode?: 'online' | 'in_person'
 	// Fiscal fields used by FiscalDataForm
 	tax_id?: string | null
 	fiscal_address_line1?: string | null

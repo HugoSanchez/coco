@@ -29,7 +29,6 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { Spinner } from '@/components/ui/spinner'
 import { ClientFormFields } from '@/components/ClientFormFields'
-import type { Client as DbClient } from '@/lib/db/clients'
 import { Input } from '@/components/ui/input'
 import { updateProfile } from '@/lib/db/profiles'
 import { Check } from 'lucide-react'
@@ -57,6 +56,7 @@ interface Client {
 	name: string // Client's first name
 	last_name?: string | null // Client's last name (optional)
 	email: string // Client's email address
+	default_booking_mode?: string | null
 }
 
 export function BookingForm({
@@ -78,7 +78,7 @@ export function BookingForm({
 		end: string
 	} | null>(initialSlot || null) // Time slot selected in step 2
 	const [selectedClient, setSelectedClient] = useState<string>('') // Client ID selected in step 3
-	const [clientOptions, setClientOptions] = useState<DbClient[]>(clients as any)
+	const [clientOptions, setClientOptions] = useState<Client[]>(clients)
 	const [clientMode, setClientMode] = useState<'select' | 'create'>('select')
 	const [notes, setNotes] = useState('') // Optional notes for the booking
 	const [customPrice, setCustomPrice] = useState('') // Optional custom price (EUR)
@@ -102,7 +102,7 @@ export function BookingForm({
 	const [showConsultationType, setShowConsultationType] = useState<boolean>(false)
 
 	// New: appointment mode and location fields
-	const [mode, setMode] = useState<'online' | 'in_person'>('online')
+	const [modeOverride, setModeOverride] = useState<'online' | 'in_person'>()
 	const [locationText, setLocationText] = useState<string>('')
 	const [savingDefault, setSavingDefault] = useState<boolean>(false)
 	const [savedDefault, setSavedDefault] = useState<boolean>(false)
@@ -132,6 +132,8 @@ export function BookingForm({
 	// Context and utilities
 	const { user, profile, refreshProfile } = useUser() // Current user and profile data
 	const { toast } = useToast() // Toast notification system
+	const clientBookingMode = clientOptions.find((client) => client.id === selectedClient)?.default_booking_mode
+	const mode = modeOverride ?? clientBookingMode ?? profile?.default_booking_mode ?? 'online'
 
 	// Load user's default first consultation amount once
 	useEffect(() => {
@@ -738,9 +740,10 @@ export function BookingForm({
 										if (created) {
 											setClientOptions((prev) => {
 												const exists = prev.some((c) => c.id === created.id)
-												return exists ? prev : [created as any, ...prev]
+												return exists ? prev : [created, ...prev]
 											})
 											setSelectedClient(created.id)
+											setModeOverride(undefined)
 										}
 									}}
 									onCancel={() => setClientMode('select')}
@@ -763,9 +766,12 @@ export function BookingForm({
 									</button>
 								</div>
 								<ClientSearchSelect
-									clients={clientOptions as any}
+									clients={clientOptions}
 									value={selectedClient}
-									onValueChange={(val) => setSelectedClient(val)}
+									onValueChange={(val) => {
+										setSelectedClient(val)
+										setModeOverride(undefined)
+									}}
 									placeholder="Buscar paciente..."
 								/>
 							</div>
@@ -872,7 +878,7 @@ export function BookingForm({
 							{/* Mode select: Online or Presencial - Step 3 */}
 							<div className="space-y-2">
 								<Label className="text-md font-normal text-gray-700">Formato de cita</Label>
-								<Select value={mode} onValueChange={(val) => setMode(val as any)}>
+								<Select value={mode} onValueChange={(val) => setModeOverride(val === 'in_person' ? 'in_person' : 'online')}>
 									<SelectTrigger className="h-12">
 										<SelectValue placeholder="Selecciona modalidad" />
 									</SelectTrigger>

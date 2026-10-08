@@ -167,6 +167,7 @@ function SettingsContent() {
 				return (
 					<div className="">
 						<BillingPreferencesStep
+							showDefaultBookingMode
 							title="Opciones de facturación"
 							subtitle="Configura tus preferencias de facturación por defecto para tus consultas."
 							buttonText="Guardar configuración"

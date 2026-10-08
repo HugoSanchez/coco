@@ -79,6 +79,7 @@ export interface Profile {
 	profile_picture_url: string | null
 	// Default address for in-person appointments
 	default_in_person_location_text?: string | null
+	default_booking_mode?: 'online' | 'in_person'
 	// Fiscal identity (issuer) fields for invoicing
 	tax_id?: string | null
 	fiscal_address_line1?: string | null
@@ -201,6 +202,17 @@ export async function updateProfile(userId: string, profileData: Partial<Profile
 	const { error } = await supabase
 		.from('profiles')
 		.upsert([{ id: userId, ...(profileData as any) }], { onConflict: 'id' })
+	if (error) throw error
+}
+
+/** Updates an existing profile without attempting to insert missing required fields. */
+export async function updateDefaultBookingMode(userId: string, mode: 'online' | 'in_person') {
+	const { error } = await supabase
+		.from('profiles')
+		.update({ default_booking_mode: mode })
+		.eq('id', userId)
+		.select('id')
+		.single()
 	if (error) throw error
 }
 
