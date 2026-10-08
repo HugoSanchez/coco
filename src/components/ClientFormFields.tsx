@@ -26,7 +26,6 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { UserPlus, Save } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
-import { getClientsForUser } from '@/lib/db/clients'
 
 interface ClientFormFieldsProps {
 	onSuccess: (client?: Client) => void
@@ -63,7 +62,7 @@ export function ClientFormFields({
 	scrollableRef
 }: ClientFormFieldsProps) {
 	const [loading, setLoading] = useState(false)
-	const { user } = useUser()
+	const { user, profile } = useUser()
 	const { toast } = useToast()
 
 	// Helper function to convert YYYY-MM-DD to DD/MM/YYYY for display
@@ -127,6 +126,9 @@ export function ClientFormFields({
 		nationalId: (initialData as any)?.national_id || '',
 		dateOfBirth: formatDateForDisplay((initialData as any)?.date_of_birth),
 		address: (initialData as any)?.address || '',
+		defaultBookingMode: initialData?.default_booking_mode === 'online' || initialData?.default_booking_mode === 'in_person'
+			? initialData.default_booking_mode
+			: null,
 		shouldBill: false, // We'll load this from billing settings separately
 		billingAmount: '', // We'll load this from billing settings separately
 		paymentEmailLeadHours: '0',
@@ -142,6 +144,7 @@ export function ClientFormFields({
 	})
 
 	const [formData, setFormData] = useState<ClientFormDraft>(getInitialFormData)
+	const inheritedBookingMode = profile?.default_booking_mode === 'in_person' ? 'in_person' : 'online'
 	const draftLoadedRef = useRef(false)
 
 	// Load draft on mount if available (only in create mode, or edit mode without initialData)
@@ -403,7 +406,8 @@ export function ClientFormFields({
 				phone: formData.phone || null,
 				national_id: formData.nationalId || null,
 				date_of_birth: formatDateForDatabase(formData.dateOfBirth),
-				address: formData.address || null
+				address: formData.address || null,
+				default_booking_mode: formData.defaultBookingMode ?? null
 			}
 
 			// Prepare billing data if billing is enabled
@@ -426,14 +430,7 @@ export function ClientFormFields({
 			}
 
 			// Upsert client with optional billing settings (works for both create and update)
-			await upsertClientWithBilling(clientPayload, billingPayload)
-
-			// Try to retrieve the created/updated client so caller can auto-select it
-			let createdClient: Client | undefined = undefined
-			try {
-				const list = await getClientsForUser(user.id)
-				createdClient = (list as Client[]).find((c) => c.email?.toLowerCase() === formData.email.toLowerCase())
-			} catch {}
+			const createdClient = await upsertClientWithBilling(clientPayload, billingPayload)
 
 			// Clear persisted draft on successful submission
 			if (clearPersistedDraft) {
@@ -451,6 +448,7 @@ export function ClientFormFields({
 					nationalId: '',
 					dateOfBirth: '',
 					address: '',
+					defaultBookingMode: null,
 					shouldBill: false,
 					billingAmount: '',
 					paymentEmailLeadHours: '0',
@@ -507,7 +505,7 @@ export function ClientFormFields({
 		await submitForm()
 	}
 
-	const handleInputChange = (field: string, value: string | boolean) => {
+	const handleInputChange = (field: string, value: string | boolean | null) => {
 		setFormData((prev) => ({ ...prev, [field]: value }))
 		if (field === 'email') {
 			// Reset duplicate state while the user edits the email
@@ -650,6 +648,27 @@ export function ClientFormFields({
 						</div>
 					)}
 				</div>
+			</div>
+
+			<div className="space-y-2 mt-6">
+				<Label htmlFor="defaultBookingMode">Formato de cita habitual</Label>
+				<Select
+					value={formData.defaultBookingMode ?? inheritedBookingMode}
+					onValueChange={(value) => handleInputChange('defaultBookingMode', value === inheritedBookingMode ? null : value)}
+				>
+					<SelectTrigger id="defaultBookingMode" className="h-12">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						<SelectItem value="online">
+							Online{inheritedBookingMode === 'online' ? ' (predeterminado)' : ''}
+						</SelectItem>
+						<SelectItem value="in_person">
+							Presencial{inheritedBookingMode === 'in_person' ? ' (predeterminado)' : ''}
+						</SelectItem>
+					</SelectContent>
+				</Select>
+				<p className="text-sm text-gray-500">Se seleccionará al crear citas para este paciente.</p>
 			</div>
 
 			{/* Notes Section */}

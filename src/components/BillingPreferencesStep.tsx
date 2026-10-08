@@ -8,6 +8,7 @@ import { useUser } from '@/contexts/UserContext'
 import { getBillingPreferences, saveBillingPreferences } from '@/lib/db/billing-settings'
 import { BillingPreferencesForm, BillingPreferences } from '@/components/BillingPreferencesForm'
 import { captureOnboardingStep } from '@/lib/posthog/client'
+import { updateDefaultBookingMode } from '@/lib/db/profiles'
 
 interface BillingPreferencesStepProps {
 	onComplete: () => void
@@ -17,6 +18,7 @@ interface BillingPreferencesStepProps {
 	loadingText?: string
 	showSuccessToast?: boolean
 	skipOnComplete?: boolean
+	showDefaultBookingMode?: boolean
 }
 
 const defaultPrefs: BillingPreferences = {
@@ -31,13 +33,17 @@ export function BillingPreferencesStep({
 	buttonText = 'Continuar',
 	loadingText = 'Guardando...',
 	showSuccessToast = false,
-	skipOnComplete = false
+	skipOnComplete = false,
+	showDefaultBookingMode = false
 }: BillingPreferencesStepProps) {
 	const [isLoading, setIsLoading] = useState(false)
 	const [isLoadingPrefs, setIsLoadingPrefs] = useState(true)
 	const [billingPrefs, setBillingPrefs] = useState<BillingPreferences>(defaultPrefs)
 	const { toast } = useToast()
-	const { user } = useUser()
+	const { user, profile, refreshProfile } = useUser()
+	const [selectedBookingMode, setSelectedBookingMode] = useState<'online' | 'in_person'>()
+	const defaultBookingMode = selectedBookingMode ??
+		(profile?.default_booking_mode === 'in_person' ? 'in_person' : 'online')
 
 	// Fetch existing billing preferences when component mounts
 	useEffect(() => {
@@ -66,6 +72,10 @@ export function BillingPreferencesStep({
 		try {
 			// Save billing preferences using the new unified system
 			await saveBillingPreferences(user?.id, billingPrefs)
+			if (showDefaultBookingMode) {
+				await updateDefaultBookingMode(user.id, defaultBookingMode)
+				await refreshProfile()
+			}
 
 			// Track onboarding step completion (client-side)
 			captureOnboardingStep('billing_preferences_saved')
@@ -113,7 +123,12 @@ export function BillingPreferencesStep({
 
 			<form onSubmit={handleSubmit} className="mb-8">
 				<div className="pt-2">
-					<BillingPreferencesForm values={billingPrefs} onChange={setBillingPrefs} />
+					<BillingPreferencesForm
+						values={billingPrefs}
+						onChange={setBillingPrefs}
+						defaultBookingMode={defaultBookingMode}
+						onDefaultBookingModeChange={showDefaultBookingMode ? setSelectedBookingMode : undefined}
+					/>
 				</div>
 				<Button
 					type="submit"

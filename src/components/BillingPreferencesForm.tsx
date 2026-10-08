@@ -35,9 +35,13 @@ interface BillingPreferencesFormProps {
 	values: BillingPreferences
 	onChange: (values: BillingPreferences) => void
 	disabled?: boolean
+	defaultBookingMode?: 'online' | 'in_person'
+	onDefaultBookingModeChange?: (mode: 'online' | 'in_person') => void
 }
 
-export function BillingPreferencesForm({ values, onChange, disabled }: BillingPreferencesFormProps) {
+export function BillingPreferencesForm({
+	values, onChange, disabled, defaultBookingMode, onDefaultBookingModeChange
+}: BillingPreferencesFormProps) {
 	// Helper function to check if a billing type is currently available
 	const isBillingTypeAvailable = (billingType: string) => {
 		return AVAILABLE_BILLING_TYPES.includes(billingType as any)
@@ -60,6 +64,27 @@ export function BillingPreferencesForm({ values, onChange, disabled }: BillingPr
 	return (
 		<div className="space-y-6 mt-6">
 			<div className="space-y-4">
+				{onDefaultBookingModeChange && (
+					<div className="space-y-2">
+						<Label htmlFor="defaultBookingMode">Formato de cita por defecto</Label>
+						<p className="text-sm text-gray-500">
+							Se usará al crear citas, salvo que el paciente tenga un formato habitual propio.
+						</p>
+						<Select
+							value={defaultBookingMode}
+							onValueChange={(value) => onDefaultBookingModeChange(value === 'in_person' ? 'in_person' : 'online')}
+							disabled={disabled}
+						>
+							<SelectTrigger id="defaultBookingMode" className="h-12">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="online">Online</SelectItem>
+								<SelectItem value="in_person">Presencial</SelectItem>
+							</SelectContent>
+						</Select>
+					</div>
+				)}
 				{/* Normal price + duration in one row */}
 				<div className="space-y-2">
 					<label className="block text-md font-medium text-gray-700">Precio y duración de la consulta</label>

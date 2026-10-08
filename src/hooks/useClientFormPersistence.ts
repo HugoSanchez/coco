@@ -73,6 +73,7 @@ export interface ClientFormDraft {
 	nationalId: string
 	dateOfBirth: string
 	address: string
+	defaultBookingMode?: 'online' | 'in_person' | null
 	shouldBill: boolean
 	billingAmount: string
 	paymentEmailLeadHours: string
@@ -199,4 +200,3 @@ export function useClientFormPersistence() {
 		loadDraft
 	}
 }
-

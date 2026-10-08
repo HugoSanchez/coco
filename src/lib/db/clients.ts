@@ -109,6 +109,7 @@ export interface CreateClientPayload {
 	national_id?: string | null
 	date_of_birth?: string | null
 	address?: string | null
+	default_booking_mode?: 'online' | 'in_person' | null
 }
 
 /**
@@ -160,6 +161,7 @@ export interface UpsertClientPayload {
 	national_id?: string | null
 	date_of_birth?: string | null
 	address?: string | null
+	default_booking_mode?: 'online' | 'in_person' | null
 }
 
 /**
